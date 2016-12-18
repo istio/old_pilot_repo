@@ -44,9 +44,9 @@ type queueImpl struct {
 }
 
 // NewQueue instantiates a queue with a processing function
-func NewQueue() Queue {
+func NewQueue(errorDelay time.Duration) Queue {
 	return &queueImpl{
-		delay:   1 * time.Second,
+		delay:   errorDelay,
 		queue:   make([]Task, 0),
 		closing: false,
 		lock:    sync.Mutex{},
@@ -88,7 +88,7 @@ func (q *queueImpl) Run(stop chan struct{}) {
 			for {
 				err := item.handler(item.obj)
 				if err != nil {
-					log.Println("Work item failed, repeating after delay:", err)
+					log.Printf("Work item failed (%v), repeating after delay %v", err, q.delay)
 					time.Sleep(q.delay)
 				} else {
 					break

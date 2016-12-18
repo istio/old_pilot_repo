@@ -85,6 +85,12 @@ go_test(
     deps = [":test"],
 )
 
+go_test(
+    name = "queue_test",
+    srcs = ["platform/kube/queue_test.go"],
+    library = ":kube",
+)
+
 go_library(
     name = "test",
     srcs = [

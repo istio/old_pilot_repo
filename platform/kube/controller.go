@@ -45,7 +45,7 @@ func NewController(
 	out := &Controller{
 		client:       client,
 		resyncPeriod: resyncPeriod,
-		queue:        NewQueue(),
+		queue:        NewQueue(1 * time.Second),
 	}
 
 	out.services = out.addWatcher(&v1.Service{},
@@ -118,7 +118,7 @@ func (c *Controller) HasSynced() bool {
 
 // Run all controllers until a signal is received
 func (c *Controller) Run(stop chan struct{}) {
-	c.queue.Run(stop)
+	go c.queue.Run(stop)
 	for _, ctl := range c.controllers {
 		go ctl.Run(stop)
 	}
