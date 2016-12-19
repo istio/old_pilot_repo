@@ -18,11 +18,11 @@ import "github.com/golang/protobuf/proto"
 
 // ConfigKey is the identity of the configuration object
 type ConfigKey struct {
-	// Config object kind, e.g.  "MyKind"
+	// Kind specifies the type of the configuration artifact, e.g. "MyKind"
 	Kind string
-	// Config object name, e.g. "my-name"
+	// Name of the artifact, e.g. "my-name"
 	Name string
-	// Config object namespace, e.g. "default"
+	// Namespace provides the name qualifier for Kubernetes, e.g. "default"
 	Namespace string
 }
 

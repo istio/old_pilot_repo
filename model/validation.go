@@ -37,7 +37,7 @@ func IsDNS1123Label(value string) bool {
 	return len(value) <= dns1123LabelMaxLength && dns1123LabelRex.MatchString(value)
 }
 
-// Validate names in the config key
+// Validate confirms that the names in the configuration key are appropriate
 func (k *ConfigKey) Validate() error {
 	if !kindRegexp.MatchString(k.Kind) {
 		return fmt.Errorf("Invalid kind: %q", k.Kind)
@@ -51,7 +51,7 @@ func (k *ConfigKey) Validate() error {
 	return nil
 }
 
-// Validate mapping
+// Validate checks that each name conforms to the spec and has a ProtoMessage
 func (km KindMap) Validate() error {
 	for k, v := range km {
 		if !kindRegexp.MatchString(k) {
@@ -64,7 +64,7 @@ func (km KindMap) Validate() error {
 	return nil
 }
 
-// ValidateConfig object
+// ValidateConfig ensures that the config object is well-defined
 func (km KindMap) ValidateConfig(obj Config) error {
 	if err := obj.ConfigKey.Validate(); err != nil {
 		return err
