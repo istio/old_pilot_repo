@@ -65,7 +65,7 @@ func (km KindMap) Validate() error {
 }
 
 // ValidateConfig ensures that the config object is well-defined
-func (km KindMap) ValidateConfig(obj Config) error {
+func (km KindMap) ValidateConfig(obj *Config) error {
 	if err := obj.ConfigKey.Validate(); err != nil {
 		return err
 	}

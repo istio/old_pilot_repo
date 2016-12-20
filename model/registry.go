@@ -36,10 +36,12 @@ type Config struct {
 }
 
 // Registry of the configuration objects
+// Modification of object pointers violates thread-safety
 type Registry interface {
+	// Get retrieves a configuration element, bool indicates existence
 	Get(key ConfigKey) (*Config, bool)
-	Delete(key ConfigKey)
-	Put(obj Config) error
+	Delete(key ConfigKey) error
+	Put(obj *Config) error
 	List(kind string, namespace string) []*Config
 }
 
