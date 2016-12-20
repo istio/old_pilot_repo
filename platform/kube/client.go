@@ -175,6 +175,11 @@ func (cl *Client) DeregisterResources() error {
 }
 
 func (cl *Client) Get(key model.ConfigKey) (*model.Config, bool) {
+	if err := cl.mapping.ValidateKey(&key); err != nil {
+		log.Print(err)
+		return nil, false
+	}
+
 	config := &Config{}
 	err := cl.dyn.Get().
 		Namespace(key.Namespace).
@@ -206,6 +211,10 @@ func (cl *Client) Put(obj *model.Config) error {
 }
 
 func (cl *Client) Delete(key model.ConfigKey) error {
+	if err := cl.mapping.ValidateKey(&key); err != nil {
+		return err
+	}
+
 	return cl.dyn.Delete().
 		Namespace(key.Namespace).
 		Resource(key.Kind + "s").
@@ -261,6 +270,7 @@ func kindToAPIName(s string) string {
 }
 
 func kubeToModel(kind string, schema model.ProtoSchema, config *Config) (*model.Config, error) {
+	// TODO: validate incoming kube object
 	spec, err := mapToProto(schema.MessageName, config.Spec)
 	if err != nil {
 		return nil, err

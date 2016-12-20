@@ -55,6 +55,7 @@ func NewController(
 	namespace string,
 	resyncPeriod time.Duration,
 ) *Controller {
+	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
 		client: client,
 		queue:  NewQueue(1 * time.Second),
@@ -185,8 +186,12 @@ func keyFunc(namespace, name string) string {
 	return namespace + "/" + name
 }
 
-// TODO: better validation
 func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
+	if err := c.client.mapping.ValidateKey(&key); err != nil {
+		log.Print(err)
+		return nil, false
+	}
+
 	store := c.kinds[key.Kind].store
 	data, exists, err := store.GetByKey(keyFunc(key.Namespace, key.Name))
 	if !exists {
@@ -204,7 +209,6 @@ func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
 	return out, true
 }
 
-// TODO: better validation
 func (c *Controller) Put(obj *model.Config) error {
 	out, err := modelToKube(c.client.mapping, obj)
 	if err != nil {
@@ -213,8 +217,10 @@ func (c *Controller) Put(obj *model.Config) error {
 	return c.kinds[obj.Kind].store.Add(out)
 }
 
-// TODO: better validation
 func (c *Controller) Delete(key model.ConfigKey) error {
+	if err := c.client.mapping.ValidateKey(&key); err != nil {
+		return err
+	}
 	return c.kinds[key.Kind].store.Delete(
 		&Config{
 			TypeMeta: meta_v1.TypeMeta{Kind: key.Kind},
@@ -224,8 +230,11 @@ func (c *Controller) Delete(key model.ConfigKey) error {
 			}})
 }
 
-// TODO: better validation
 func (c *Controller) List(kind string, ns string) []*model.Config {
+	if _, ok := c.kinds[kind]; !ok {
+		return nil
+	}
+
 	// TODO: use indexed cache
 	var out []*model.Config
 	for _, data := range c.kinds[kind].store.List() {

@@ -36,7 +36,8 @@ type Config struct {
 }
 
 // Registry of the configuration objects
-// Modification of object pointers violates thread-safety
+// Object pointers supplied and returned from this interface should be
+// treated as read-only. Updating them might violate thread-safety.
 type Registry interface {
 	// Get retrieves a configuration element, bool indicates existence
 	Get(key ConfigKey) (*Config, bool)
