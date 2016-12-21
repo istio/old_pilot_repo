@@ -226,13 +226,13 @@ func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
 	return out, true
 }
 
-// Put applies operation to the remote storage only
+// Put applies operation to the remote storage ONLY
 // This implies that you might not see the effect immediately
 func (c *Controller) Put(obj *model.Config) error {
 	return c.client.Put(obj)
 }
 
-// Delete applies operation to the remote storage and local cache
+// Delete applies operation to the remote storage ONLY
 // This implies that you might not see the effect immediately
 func (c *Controller) Delete(key model.ConfigKey) error {
 	return c.client.Delete(key)
