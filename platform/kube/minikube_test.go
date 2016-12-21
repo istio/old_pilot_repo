@@ -188,7 +188,7 @@ func TestControllerClientSync(t *testing.T) {
 
 	// check directly through the client
 	eventually(func() bool {
-		cs := cl.List(test.MockKind, ns)
+		cs := ctl.List(test.MockKind, ns)
 		os := cl.List(test.MockKind, ns)
 		log.Printf("ctl.List => Got %d, expected %d", len(cs), n)
 		log.Printf("cl.List => Got %d, expected %d", len(os), n)
