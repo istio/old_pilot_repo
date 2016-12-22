@@ -45,14 +45,16 @@ type Registry interface {
 	// List returns objects for a kind in a namespace ("" namespace implies all)
 	List(kind string, namespace string) ([]*Config, error)
 
-	// Put applies operation to the distributed storage.
-	// Intermittent errors might occur even thought the operation succeeds
-	// This implies that you might not see the effect immediately
+	// Put adds an object to the distributed store.
+	// This implies that you might not see the effect immediately (e.g. Get
+	// might not return the object immediately).
+	// Intermittent errors might occur even though the operation succeeds.
 	Put(obj *Config) error
 
-	// Delete applies operation to the distributed storage.
-	// Intermittent errors might occur even thought the operation succeeds
-	// This implies that you might not see the effect immediately
+	// Delete remotes an object from the distributed store.
+	// This implies that you might not see the effect immediately (e.g. Get
+	// might not return the object immediately).
+	// Intermittent errors might occur even though the operation succeeds.
 	Delete(key ConfigKey) error
 }
 
@@ -89,10 +91,11 @@ type Event int
 const (
 	// EventAdd is sent when an object is added
 	EventAdd Event = 1
-	// EventUpdate is sent when an object is modified or a re-list happens.
+	// EventUpdate is sent when an object is modified
+	// Captures the modified object
 	EventUpdate Event = 2
-	// EventDelete is sent when an object is deleted.
-	// Captures the object at the last state known
+	// EventDelete is sent when an object is deleted
+	// Captures the object at the last known state
 	EventDelete Event = 3
 )
 
