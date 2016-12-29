@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_prefix", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -12,6 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//model:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//jsonpb:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
@@ -49,3 +50,5 @@ go_test(
         "@io_k8s_client_go//pkg/api/v1:go_default_library",
     ],
 )
+
+go_prefix("istio.io/manager")
