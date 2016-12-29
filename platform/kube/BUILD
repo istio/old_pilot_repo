@@ -35,6 +35,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "minikube_test.go",
         "queue_test.go",
