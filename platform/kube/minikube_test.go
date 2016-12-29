@@ -230,7 +230,7 @@ func makeClient(t *testing.T) *Client {
 	// For Bazel sandbox we search a different location:
 	if _, err = os.Stat(kubeconfig); err != nil {
 		kubeconfig, _ = os.Getwd()
-		kubeconfig = kubeconfig + "/platform/kube/config"
+		kubeconfig = kubeconfig + "/config"
 		if _, err = os.Stat(kubeconfig); err != nil {
 			t.Fatalf("Cannot find .kube/config file")
 		}
