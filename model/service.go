@@ -14,6 +14,14 @@
 
 package model
 
+// ServiceDiscovery enumerates Istio service instances
+type ServiceDiscovery interface {
+	// Services list all services and their tags
+	Services() []*Service
+	// Endpoints retrieves service instances for a service and a tag
+	Endpoints(s *Service, tag string) []*ServiceInstance
+}
+
 // Service describes an Istio service
 type Service struct {
 	// Name of the service
