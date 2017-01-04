@@ -18,18 +18,19 @@ package model
 type ServiceDiscovery interface {
 	// Services list all services and their tags
 	Services() []*Service
-	// Endpoints retrieves service instances for a service and a tag
+	// Endpoints retrieves service instances for a service and a tag.
+	// An empty tag value is allowed only for a tag-less service.
 	Endpoints(s *Service, tag string) []*ServiceInstance
 }
 
 // Service describes an Istio service
 type Service struct {
 	// Name of the service
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 	// Namespace of the service name
 	Namespace string `json:"namespace,omitempty"`
 	// Tags is a set of declared tags for the service.
-	// An empty set is allowed but tags must be non-empty strings.
+	// An empty set is allowed but tag values must be non-empty strings.
 	Tags []string `json:"tags,omitempty"`
 }
 
@@ -38,14 +39,27 @@ type Endpoint struct {
 	// Address of the endpoint, typically an IP address
 	Address string `json:"ip_address,omitempty"`
 	// Port on the host address
-	Port int `json:"port,omitempty"`
+	Port int32 `json:"port"`
+	// Name of the port classifies ports for a single service
+	Name string `json:"name,omitempty"`
+	// Protocol for the port: TCP, UDP (default is TCP)
+	Protocol Protocol `json:"protocol,omitempty"`
 }
+
+// Protocol defines network protocols for ports
+type Protocol string
+
+const (
+	ProtocolHTTP Protocol = "HTTP"
+	ProtocolTCP  Protocol = "TCP"
+	ProtocolUDP  Protocol = "UDP"
+)
 
 // ServiceInstance binds an endpoint to a service and a tag.
 // If the service has no tags, the tag value is an empty string;
 // otherwise, the tag value is an element in the set of service tags.
 type ServiceInstance struct {
 	Endpoint Endpoint `json:"endpoint,omitempty"`
-	Service  Service  `json:"service,omitempty"`
+	Service  *Service `json:"service,omitempty"`
 	Tag      string   `json:"tag,omitempty"`
 }

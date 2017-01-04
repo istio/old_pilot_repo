@@ -257,3 +257,62 @@ func (c *Controller) List(kind string, ns string) ([]*model.Config, error) {
 	}
 	return out, errs
 }
+
+func (c *Controller) Services() []*model.Service {
+	var out []*model.Service
+	for _, item := range c.services.informer.GetStore().List() {
+		svc := *item.(*v1.Service)
+		out = append(out, &model.Service{
+			Name:      svc.Name,
+			Namespace: svc.Namespace,
+			// TODO: empty set of service tags for now
+			Tags: nil,
+		})
+	}
+	return out
+}
+
+func (c *Controller) Endpoints(s *model.Service, tag string) []*model.ServiceInstance {
+	// TODO: non-empty set of service tags
+	if tag != "" {
+		return nil
+	}
+	for _, item := range c.endpoints.informer.GetStore().List() {
+		ep := *item.(*v1.Endpoints)
+		if ep.Name == s.Name && ep.Namespace == s.Namespace {
+			return endpointsToInstances(s, tag, &ep)
+		}
+	}
+	return nil
+}
+
+func endpointsToInstances(s *model.Service, tag string, ep *v1.Endpoints) []*model.ServiceInstance {
+	var out []*model.ServiceInstance
+	for _, ss := range ep.Subsets {
+		for _, ea := range ss.Addresses {
+			for _, port := range ss.Ports {
+				out = append(out, &model.ServiceInstance{
+					Endpoint: model.Endpoint{
+						Address:  ea.IP,
+						Port:     port.Port,
+						Name:     port.Name,
+						Protocol: convertProtocol(port.Protocol),
+					},
+					Service: s,
+					Tag:     tag,
+				})
+			}
+		}
+	}
+	return out
+}
+
+func convertProtocol(proto v1.Protocol) model.Protocol {
+	switch proto {
+	case v1.ProtocolTCP:
+		return model.ProtocolTCP
+	case v1.ProtocolUDP:
+		return model.ProtocolUDP
+	}
+	return model.ProtocolTCP
+}
