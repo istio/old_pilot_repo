@@ -224,7 +224,7 @@ func buildWeightKey(service string, tags []string) string {
 }
 
 func buildRoutes() []Route {
-	var routes []Route
+	routes := []Route{}
 	return routes
 }
 
