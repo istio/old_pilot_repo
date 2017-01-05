@@ -294,7 +294,7 @@ func endpointsToInstances(s *model.Service, tag string, ep *v1.Endpoints) []*mod
 				out = append(out, &model.ServiceInstance{
 					Endpoint: model.Endpoint{
 						Address:  ea.IP,
-						Port:     port.Port,
+						Port:     int(port.Port),
 						Name:     port.Name,
 						Protocol: convertProtocol(port.Protocol),
 					},

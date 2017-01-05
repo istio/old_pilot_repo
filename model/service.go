@@ -45,7 +45,7 @@ type Endpoint struct {
 	// Address of the endpoint, typically an IP address
 	Address string `json:"ip_address,omitempty"`
 	// Port on the host address
-	Port int32 `json:"port"`
+	Port int `json:"port"`
 	// Name of the port classifies ports for a single service
 	Name string `json:"name,omitempty"`
 	// Protocol for the port: TCP, UDP (default is TCP)
