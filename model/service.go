@@ -85,20 +85,41 @@ type ServiceInstance struct {
 }
 
 func (s *Service) String() string {
-	// example: name.namespace:my-v1,prod
+	// example: name.namespace:http:my-v1,prod
 	var buffer bytes.Buffer
 	buffer.WriteString(s.Name)
 	if len(s.Namespace) > 0 {
 		buffer.WriteString(".")
 		buffer.WriteString(s.Namespace)
 	}
-	n := len(s.Tags)
-	if n > 0 {
+
+	np := len(s.Ports)
+	nt := len(s.Tags)
+
+	if np > 0 || nt > 0 {
 		buffer.WriteString(":")
-		tags := make([]string, n)
+	}
+
+	if np > 0 {
+		ports := make([]string, np)
+		for i := 0; i < np; i++ {
+			ports[i] = s.Ports[i].Name
+		}
+		sort.Strings(ports)
+		for i := 0; i < np; i++ {
+			if i > 0 {
+				buffer.WriteString(",")
+			}
+			buffer.WriteString(ports[i])
+		}
+	}
+
+	if nt > 0 {
+		buffer.WriteString(":")
+		tags := make([]string, nt)
 		copy(tags, s.Tags)
 		sort.Strings(tags)
-		for i := 0; i < n; i++ {
+		for i := 0; i < nt; i++ {
 			if i > 0 {
 				buffer.WriteString(",")
 			}
@@ -110,26 +131,34 @@ func (s *Service) String() string {
 
 // ParseServiceString is the inverse of the Service.String() method
 func ParseServiceString(s string) *Service {
-	var tags []string
-	sep := strings.Index(s, ":")
-	if sep < 0 {
-		sep = len(s)
+	parts := strings.Split(s, ":")
+	var name, namespace string
+	var names, tags []string
+
+	dot := strings.Index(parts[0], ".")
+	if dot < 0 {
+		name = parts[0]
 	} else {
-		tags = strings.Split(s[sep+1:], ",")
+		name = parts[0][:dot]
+		namespace = parts[0][dot+1:]
 	}
 
-	var name, namespace string
-	dot := strings.Index(s[:sep], ".")
-	if dot < 0 {
-		name = s[:sep]
-	} else {
-		name = s[:dot]
-		namespace = s[dot+1 : sep]
+	if len(parts) > 1 {
+		names = strings.Split(parts[1], ",")
+		if len(parts) > 2 {
+			tags = strings.Split(parts[2], ",")
+		}
+	}
+
+	var ports []Port
+	for _, name := range names {
+		ports = append(ports, Port{Name: name})
 	}
 
 	return &Service{
 		Name:      name,
 		Namespace: namespace,
+		Ports:     ports,
 		Tags:      tags,
 	}
 }
