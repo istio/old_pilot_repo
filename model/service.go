@@ -24,9 +24,12 @@ import (
 type ServiceDiscovery interface {
 	// Services list all services and their tags
 	Services() []*Service
-	// Endpoints retrieves service instances for a service and a tag.
-	// An empty tag value is allowed only for a tag-less service.
-	Endpoints(s *Service, tag string) []*ServiceInstance
+	// Endpoints retrieves service instances for a service.
+	// The query takes a union across a set of tags and a set of named ports
+	// defined in the service parameter.
+	// Empty tag set or port set implies the union of all available tags and
+	// ports, respectively.
+	Endpoints(s *Service) []*ServiceInstance
 }
 
 // Service describes an Istio service
@@ -38,6 +41,9 @@ type Service struct {
 	// Tags is a set of declared tags for the service.
 	// An empty set is allowed but tag values must be non-empty strings.
 	Tags []string `json:"tags,omitempty"`
+	// Ports is a set of declared network ports for the service.
+	// Port value is the service port.
+	Ports []Port `json:"ports"`
 }
 
 // Endpoint defines a network endpoint
@@ -45,10 +51,16 @@ type Endpoint struct {
 	// Address of the endpoint, typically an IP address
 	Address string `json:"ip_address,omitempty"`
 	// Port on the host address
+	Port Port `json:"port"`
+}
+
+// Port represents a network port
+type Port struct {
+	// Port value
 	Port int `json:"port"`
-	// Name of the port classifies ports for a single service
+	// Name of the port classifies ports for a single service, optional
 	Name string `json:"name,omitempty"`
-	// Protocol for the port: TCP, UDP (default is TCP)
+	// Protocol to be used for the port
 	Protocol Protocol `json:"protocol,omitempty"`
 }
 
@@ -56,9 +68,11 @@ type Endpoint struct {
 type Protocol string
 
 const (
-	ProtocolHTTP Protocol = "HTTP"
-	ProtocolTCP  Protocol = "TCP"
-	ProtocolUDP  Protocol = "UDP"
+	ProtocolGRPC  Protocol = "GRPC"
+	ProtocolHTTPS Protocol = "HTTPS"
+	ProtocolHTTP  Protocol = "HTTP"
+	ProtocolTCP   Protocol = "TCP"
+	ProtocolUDP   Protocol = "UDP"
 )
 
 // ServiceInstance binds an endpoint to a service and a tag.

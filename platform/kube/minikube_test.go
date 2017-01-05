@@ -230,7 +230,12 @@ func TestServices(t *testing.T) {
 	eventually(func() bool {
 		out := sds.Services()
 		glog.Info("Services: %#v", out)
-		return len(out) == 1 && out[0].Name == testService && out[0].Namespace == ns
+		return len(out) == 1 &&
+			out[0].Name == testService &&
+			out[0].Namespace == ns &&
+			out[0].Tags == nil &&
+			len(out[0].Ports) == 1 &&
+			out[0].Ports[0].Protocol == model.ProtocolHTTP
 	}, t)
 }
 
@@ -294,7 +299,10 @@ func createService(n, ns string, cl *kubernetes.Clientset, t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{Name: n},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
-				v1.ServicePort{Port: 80},
+				v1.ServicePort{
+					Port: 80,
+					Name: "http-example",
+				},
 			},
 		},
 	})

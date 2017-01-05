@@ -138,5 +138,19 @@ func (s *Service) Validate() error {
 			errs = multierror.Append(errs, fmt.Errorf("Invalid service tag: %q", tag))
 		}
 	}
+	for _, port := range s.Ports {
+		errs = multierror.Append(errs, port.Validate())
+	}
+	return errs
+}
+
+func (p *Port) Validate() error {
+	var errs error
+	if !IsDNS1123Label(p.Name) {
+		errs = multierror.Append(errs, fmt.Errorf("Invalid name: %q", p.Name))
+	}
+	if p.Port <= 0 {
+		errs = multierror.Append(errs, fmt.Errorf("Invalid port value: %d", p.Port))
+	}
 	return errs
 }
