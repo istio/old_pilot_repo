@@ -41,28 +41,26 @@ type host struct {
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
 
-func NewDiscoveryService(services model.ServiceDiscovery, port int) (*DiscoveryService, error) {
+// NewDiscoveryService creates an Envoy discovery service on a given port
+func NewDiscoveryService(services model.ServiceDiscovery, namespace string, port int) (*DiscoveryService, error) {
 	out := DiscoveryService{
 		services: services,
 	}
 	container := restful.NewContainer()
 	out.Register(container)
 	out.server = &http.Server{Addr: ":" + strconv.Itoa(port), Handler: container}
-
 	return &out, nil
 }
 
 func (ds *DiscoveryService) Register(container *restful.Container) {
 	ws := &restful.WebService{}
 	ws.Produces(restful.MIME_JSON)
-
 	ws.Route(ws.
 		GET("/v1/registration/{service-key}").
 		To(ds.ListEndpoints).
 		Doc("SDS registration").
 		Param(ws.PathParameter("service-key", "tuple of service name and tag name").DataType("string")).
 		Writes(hosts{}))
-
 	container.Add(ws)
 }
 
