@@ -42,7 +42,7 @@ type host struct {
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(services model.ServiceDiscovery, namespace string, port int) (*DiscoveryService, error) {
+func NewDiscoveryService(services model.ServiceDiscovery, port int) (*DiscoveryService, error) {
 	out := DiscoveryService{
 		services: services,
 	}
