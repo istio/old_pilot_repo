@@ -12,5 +12,6 @@ go_library(
     deps = [
         "//model:go_default_library",
         "@com_github_emicklei_go_restful//:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
     ],
 )
