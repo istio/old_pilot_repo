@@ -58,8 +58,7 @@ the Istio proxies and the Istio mixer.`,
 
 			controller := kube.NewController(client, sa.namespace, 256*time.Millisecond)
 
-			sds, err := envoy.NewDiscoveryService(controller, sa.sds)
-			check("Failed to start a discovery service", err)
+			sds := envoy.NewDiscoveryService(controller, sa.sds)
 
 			// wait for a signal
 			sigs := make(chan os.Signal, 1)
@@ -68,6 +67,13 @@ the Istio proxies and the Istio mixer.`,
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
+
+			time.Sleep(2 * time.Second)
+			cfg, err := envoy.Generate(controller.Services())
+			check("Failed to generate config", err)
+
+			cfg.Write(os.Stdout)
+
 			<-sigs
 			close(stop)
 			glog.Flush()
