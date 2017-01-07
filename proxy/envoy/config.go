@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 )
 
-const EnvoyConfigPath = "/etc/envoy/envoy.json"
+const EnvoyConfigPath = "/etc/envoy/"
 
 func (conf *Config) WriteFile() error {
-	file, err := os.Create(EnvoyConfigPath)
+	file, err := os.Create(EnvoyConfigPath + "envoy.json")
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-func Generate(services []*model.Service) (*Config, error) {
+func Generate(services []*model.Service, sds string) (*Config, error) {
 	clusters := buildClusters(services)
 	routes := buildRoutes(services)
 	filters := buildFilters()
@@ -120,8 +120,7 @@ func Generate(services []*model.Service) (*Config, error) {
 					LbType:           "round_robin",
 					Hosts: []Host{
 						{
-							// TODO: get manager IP/port here
-							URL: "tcp://127.0.0.1:8080",
+							URL: "tcp://" + sds,
 						},
 					},
 				},
@@ -192,8 +191,8 @@ func buildFilters() []Filter {
 		Type: "both",
 		Name: "esp",
 		Config: FilterEndpointsConfig{
-			ServiceConfig: "/generic_service_config.json",
-			ServerConfig:  "/server_config.pb.txt",
+			ServiceConfig: EnvoyConfigPath + "generic_service_config.json",
+			ServerConfig:  EnvoyConfigPath + "server_config.pb.txt",
 		},
 	})
 
