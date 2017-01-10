@@ -72,7 +72,8 @@ func (s *agent) Reload(config *Config) error {
 	}
 
 	// Spin up a new Envoy process.
-	cmd := exec.Command(s.binary, "-c", fname, "--restart-epoch", fmt.Sprint(s.epoch))
+	cmd := exec.Command(s.binary, "-c", fname, "--restart-epoch", fmt.Sprint(s.epoch),
+		"--drain-time-s", "60", "--parent-shutdown-time-s", "90")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
