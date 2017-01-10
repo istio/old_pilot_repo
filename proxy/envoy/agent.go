@@ -26,15 +26,20 @@ import (
 // Agent manages a proxy instance
 type Agent interface {
 	Reload(config *Config) error
+	ActiveConfig() *Config
 }
 
 type agent struct {
 	// Envoy binary path
 	binary string
 	// Map of known running Envoy processes and their restart epochs.
-	epoch  int
-	cmdMap map[*exec.Cmd]int
+	cmdMap map[*exec.Cmd]instance
 	mutex  sync.Mutex
+}
+
+type instance struct {
+	epoch  int
+	config *Config
 }
 
 const (
@@ -46,7 +51,7 @@ const (
 func NewAgent(binary string) Agent {
 	return &agent{
 		binary: binary,
-		cmdMap: make(map[*exec.Cmd]int),
+		cmdMap: make(map[*exec.Cmd]instance),
 	}
 }
 
@@ -65,22 +70,34 @@ func (s *agent) Reload(config *Config) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	// Discover the latest running instance
+	epoch := -1
+	for _, running := range s.cmdMap {
+		if running.epoch > epoch {
+			epoch = running.epoch
+		}
+	}
+	epoch++
+
 	// Write config file
-	fname := configFile(s.epoch)
+	fname := configFile(epoch)
 	if err := config.WriteFile(fname); err != nil {
 		return err
 	}
 
-	// Spin up a new Envoy process.
-	cmd := exec.Command(s.binary, "-c", fname, "--restart-epoch", fmt.Sprint(s.epoch),
+	// Spin up a new Envoy process
+	cmd := exec.Command(s.binary, "-c", fname, "--restart-epoch", fmt.Sprint(epoch),
 		"--drain-time-s", "60", "--parent-shutdown-time-s", "90")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	glog.V(2).Infof("Envoy starting: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	s.cmdMap[cmd] = s.epoch
-	s.epoch++
+	s.cmdMap[cmd] = instance{
+		epoch:  epoch,
+		config: config,
+	}
 
 	// Start tracking the process.
 	go s.waitForExit(cmd)
@@ -88,19 +105,37 @@ func (s *agent) Reload(config *Config) error {
 	return nil
 }
 
+// ActiveConfig returns the config for the instance with the highest epoch
+func (s *agent) ActiveConfig() (config *Config) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	epoch := -1
+	for _, running := range s.cmdMap {
+		if running.epoch > epoch {
+			epoch = running.epoch
+			config = running.config
+		}
+	}
+
+	return
+}
+
 // waitForExit waits until the command exits and removes it from the set of known running Envoy processes.
 func (s *agent) waitForExit(cmd *exec.Cmd) {
-	if err := cmd.Wait(); err != nil {
-		glog.V(2).Infof("Envoy terminated: %v", err.Error())
-	} else {
-		glog.V(2).Infof("Envoy process exited")
-	}
+	err := cmd.Wait()
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	epoch := s.cmdMap[cmd].epoch
+	if err != nil {
+		glog.V(2).Infof("Envoy epoch %d terminated: %v", epoch, err)
+	} else {
+		glog.V(2).Infof("Envoy epoch %d process exited", epoch)
+	}
+
 	// delete config file
-	epoch := s.cmdMap[cmd]
 	path := configFile(epoch)
 	if err := os.Remove(path); err != nil {
 		glog.Warningf("Failed to delete config file %s, %v", path, err)

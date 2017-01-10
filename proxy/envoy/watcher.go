@@ -15,7 +15,7 @@
 package envoy
 
 import (
-	"bytes"
+	"reflect"
 	"time"
 
 	"github.com/golang/glog"
@@ -28,7 +28,6 @@ type Watcher interface {
 
 type watcher struct {
 	agent     Agent
-	config    string
 	ds        model.ServiceDiscovery
 	dsAddress string
 }
@@ -50,28 +49,17 @@ func (w *watcher) notify(svc *model.Service, ev model.Event) {
 		return
 	}
 
-	buf := new(bytes.Buffer)
-	err = config.Write(buf)
-	if err != nil {
-		glog.Warningf("Failed to serialize Envoy configuration: %v", err)
-		return
-	}
+	current := w.agent.ActiveConfig()
 
-	data := buf.String()
-	if data == w.config {
+	if reflect.DeepEqual(config, current) {
 		glog.V(2).Info("Configuration is identical, skipping reload")
 		return
 	}
-
-	glog.V(2).Infof("Config length %d bytes, old config length %d bytes", len(data), len(w.config))
-	glog.V(10).Infof("Envoy config: %s", data)
 
 	if err := w.agent.Reload(config); err != nil {
 		glog.Warningf("Envoy reload error: %v", err)
 		return
 	}
-
-	w.config = data
 
 	// add a short delay to de-risk race conditions in envoy hot reload code
 	time.Sleep(256 * time.Millisecond)
