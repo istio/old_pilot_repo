@@ -42,4 +42,5 @@ repository pointing to to your Kubernetes configuration file:
     bazel test //...
 
 _Note_: Due to a well-known issue, the namespaces are not deleted completely
-after running the tests and permanently reside in a terminating state.
+after running the tests and permanently reside in a terminating state
+(see https://github.com/istio/manager/issues/15).
