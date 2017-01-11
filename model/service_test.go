@@ -33,6 +33,10 @@ var validServices = map[string]Service{
 		Name:  "svc",
 		Tags:  []Tag{{"istio.io/my_tag-v1.test": "my_value-v2.value"}},
 		Ports: []Port{Port{Name: ""}}},
+	"svc:test:prod": Service{
+		Name:  "svc",
+		Tags:  []Tag{{"prod": ""}},
+		Ports: []Port{Port{Name: "test"}}},
 	"svc:http-test": Service{
 		Name:  "svc",
 		Ports: []Port{Port{Name: "http-test"}}},

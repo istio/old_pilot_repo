@@ -180,7 +180,11 @@ func ParseServiceString(s string) *Service {
 func (t Tag) String() string {
 	labels := make([]string, 0)
 	for k, v := range t {
-		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		if len(v) > 0 {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		} else {
+			labels = append(labels, k)
+		}
 	}
 	sort.Strings(labels)
 
