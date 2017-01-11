@@ -39,7 +39,7 @@ To let Bazel sandboxes access the cluster, please add a symbolic link to your
 repository pointing to to your Kubernetes configuration file:
 
     ln -s ~/.kube/config platform/kube/
-    bazel test :all
+    bazel test //...
 
 _Note_: Due to a well-known issue, the namespaces are not deleted completely
 after running the tests and permanently reside in a terminating state.
