@@ -126,8 +126,10 @@ type NetworkFilter struct {
 
 // Listener definition
 type Listener struct {
-	Port    int             `json:"port"`
-	Filters []NetworkFilter `json:"filters"`
+	Port           int             `json:"port"`
+	Filters        []NetworkFilter `json:"filters"`
+	BindToPort     bool            `json:"bind_to_port"`
+	UseOriginalDst bool            `json:"use_original_dst,omitempty"`
 }
 
 // Admin definition

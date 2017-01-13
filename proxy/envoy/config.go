@@ -56,7 +56,7 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-func Generate(services []*model.Service, sds string) (*Config, error) {
+func Generate(services []*model.Service, sds string, port int) (*Config, error) {
 	clusters := buildClusters(services)
 	routes := buildRoutes(services)
 	filters := buildFilters()
@@ -76,7 +76,7 @@ func Generate(services []*model.Service, sds string) (*Config, error) {
 		*/
 		Listeners: []Listener{
 			{
-				Port: 80,
+				Port: port,
 				Filters: []NetworkFilter{
 					{
 						Type: "read",
@@ -96,16 +96,18 @@ func Generate(services []*model.Service, sds string) (*Config, error) {
 							Filters: filters,
 							AccessLog: []AccessLog{
 								{
-									Path: "/var/log/envoy_access.log",
+									Path: "/dev/stdout",
 								},
 							},
 						},
 					},
 				},
+				BindToPort:     true,
+				UseOriginalDst: false,
 			},
 		},
 		Admin: Admin{
-			AccessLogPath: "/var/log/envoy_admin.log",
+			AccessLogPath: "/dev/stdout",
 			Port:          8001,
 		},
 		ClusterManager: ClusterManager{

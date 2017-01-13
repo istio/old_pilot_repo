@@ -34,6 +34,7 @@ type args struct {
 	sdsPort    int
 	sdsAddress string
 	envoy      string
+	envoyPort  int
 }
 
 func main() {
@@ -88,7 +89,7 @@ the Istio proxies and the Istio mixer.`,
 
 			controller := kube.NewController(client, sa.namespace, 256*time.Millisecond)
 			stop := make(chan struct{})
-			_ = envoy.NewWatcher(controller, controller, sa.sdsAddress, sa.envoy)
+			_ = envoy.NewWatcher(controller, controller, sa.sdsAddress, sa.envoy, sa.envoyPort)
 			controller.Run(stop)
 		},
 	}
@@ -96,6 +97,8 @@ the Istio proxies and the Istio mixer.`,
 		"Discovery service external address")
 	proxyCmd.PersistentFlags().StringVarP(&sa.envoy, "envoy", "e", "/usr/local/bin/envoy",
 		"Envoy binary location")
+	proxyCmd.PersistentFlags().IntVarP(&sa.envoyPort, "port", "p", 80,
+		"Envoy port")
 	rootCmd.AddCommand(proxyCmd)
 
 	rootCmd.PersistentFlags().StringVarP(&sa.kubeconfig, "kubeconfig", "c", "",

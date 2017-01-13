@@ -30,20 +30,22 @@ type watcher struct {
 	agent     Agent
 	ds        model.ServiceDiscovery
 	dsAddress string
+	port      int
 }
 
-func NewWatcher(ds model.ServiceDiscovery, ctl model.Controller, dsAddress string, binary string) Watcher {
+func NewWatcher(ds model.ServiceDiscovery, ctl model.Controller, dsAddress string, binary string, port int) Watcher {
 	out := &watcher{
 		agent:     NewAgent(binary),
 		ds:        ds,
 		dsAddress: dsAddress,
+		port:      port,
 	}
 	ctl.AppendServiceHandler(out.notify)
 	return out
 }
 
 func (w *watcher) notify(svc *model.Service, ev model.Event) {
-	config, err := Generate(w.ds.Services(), w.dsAddress)
+	config, err := Generate(w.ds.Services(), w.dsAddress, w.port)
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
