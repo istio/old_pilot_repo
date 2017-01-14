@@ -29,12 +29,11 @@ import (
 )
 
 type args struct {
-	kubeconfig string
-	namespace  string
-	sdsPort    int
-	sdsAddress string
-	envoy      string
-	envoyPort  int
+	kubeconfig  string
+	namespace   string
+	sdsPort     int
+	envoyBinary string
+	mesh        envoy.MeshConfig
 }
 
 func main() {
@@ -89,16 +88,18 @@ the Istio proxies and the Istio mixer.`,
 
 			controller := kube.NewController(client, sa.namespace, 256*time.Millisecond)
 			stop := make(chan struct{})
-			_ = envoy.NewWatcher(controller, controller, sa.sdsAddress, sa.envoy, sa.envoyPort)
+			_ = envoy.NewWatcher(controller, controller, &sa.mesh, sa.envoyBinary)
 			controller.Run(stop)
 		},
 	}
-	proxyCmd.PersistentFlags().StringVarP(&sa.sdsAddress, "sds", "s", "localhost:8080",
+	proxyCmd.PersistentFlags().StringVarP(&sa.mesh.DiscoveryAddress, "sds", "s", "localhost:8080",
 		"Discovery service external address")
-	proxyCmd.PersistentFlags().StringVarP(&sa.envoy, "envoy", "e", "/usr/local/bin/envoy",
+	proxyCmd.PersistentFlags().IntVarP(&sa.mesh.IngressPort, "port", "p", 5001,
+		"Envoy ingress port")
+	proxyCmd.PersistentFlags().IntVarP(&sa.mesh.AdminPort, "admin", "a", 5000,
+		"Envoy admin port")
+	proxyCmd.PersistentFlags().StringVarP(&sa.envoyBinary, "envoy", "e", "/usr/local/bin/envoy",
 		"Envoy binary location")
-	proxyCmd.PersistentFlags().IntVarP(&sa.envoyPort, "port", "p", 80,
-		"Envoy port")
 	rootCmd.AddCommand(proxyCmd)
 
 	rootCmd.PersistentFlags().StringVarP(&sa.kubeconfig, "kubeconfig", "c", "",

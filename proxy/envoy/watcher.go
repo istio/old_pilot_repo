@@ -28,24 +28,22 @@ type Watcher interface {
 
 type watcher struct {
 	agent     Agent
-	ds        model.ServiceDiscovery
-	dsAddress string
-	port      int
+	discovery model.ServiceDiscovery
+	mesh      *MeshConfig
 }
 
-func NewWatcher(ds model.ServiceDiscovery, ctl model.Controller, dsAddress string, binary string, port int) Watcher {
+func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig, binary string) Watcher {
 	out := &watcher{
 		agent:     NewAgent(binary),
-		ds:        ds,
-		dsAddress: dsAddress,
-		port:      port,
+		discovery: discovery,
+		mesh:      mesh,
 	}
 	ctl.AppendServiceHandler(out.notify)
 	return out
 }
 
 func (w *watcher) notify(svc *model.Service, ev model.Event) {
-	config, err := Generate(w.ds.Services(), w.dsAddress, w.port)
+	config, err := Generate(nil, w.discovery.Services(), w.mesh)
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
@@ -58,11 +56,14 @@ func (w *watcher) notify(svc *model.Service, ev model.Event) {
 		return
 	}
 
+	// TODO: add retry logic
 	if err := w.agent.Reload(config); err != nil {
 		glog.Warningf("Envoy reload error: %v", err)
 		return
 	}
 
-	// add a short delay to de-risk race conditions in envoy hot reload code
+	// Add a short delay to de-risk a potential race condition in envoy hot reload code.
+	// The condition occurs when the active Envoy instance terminates in the middle of
+	// the Reload() function.
 	time.Sleep(256 * time.Millisecond)
 }

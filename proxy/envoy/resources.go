@@ -14,7 +14,19 @@
 
 package envoy
 
-// Config defines definition
+// MeshConfig defines proxy mesh variables
+type MeshConfig struct {
+	// DiscoveryAddress is the "ip:port" address for Envoy discovery service
+	DiscoveryAddress string
+	// IngressPort is the server-side proxy port
+	IngressPort int
+	// EgressPort is the client-side proxy port
+	EgressPort int
+	// AdminPort is the administrative interface port
+	AdminPort int
+}
+
+// Config defines the schema for Envoy JSON configuration format
 type Config struct {
 	RootRuntime    *RootRuntime   `json:"runtime,omitempty"`
 	Listeners      []Listener     `json:"listeners"`
@@ -115,6 +127,7 @@ type NetworkFilterConfig struct {
 	RouteConfig       RouteConfig `json:"route_config"`
 	Filters           []Filter    `json:"filters"`
 	AccessLog         []AccessLog `json:"access_log"`
+	Cluster           string      `json:"cluster,omitempty"`
 }
 
 // NetworkFilter definition
@@ -143,6 +156,10 @@ type Host struct {
 	URL string `json:"url"`
 }
 
+const (
+	LbTypeRoundRobin = "round_robin"
+)
+
 // Cluster definition
 type Cluster struct {
 	Name                     string `json:"name"`
@@ -153,6 +170,21 @@ type Cluster struct {
 	MaxRequestsPerConnection int    `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host `json:"hosts,omitempty"`
 	Features                 string `json:"features,omitempty"`
+}
+
+// ListenersByPort sorts listeners by port
+type ListenersByPort []Listener
+
+func (l ListenersByPort) Len() int {
+	return len(l)
+}
+
+func (l ListenersByPort) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+
+func (l ListenersByPort) Less(i, j int) bool {
+	return l[i].Port < l[j].Port
 }
 
 // ClustersByName sorts clusters by name
