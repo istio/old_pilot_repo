@@ -320,7 +320,6 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 		ep := *item.(*v1.Endpoints)
 		for _, ss := range ep.Subsets {
 			for _, ea := range ss.Addresses {
-				glog.Info(ea.IP)
 				if addrs[ea.IP] {
 					for _, port := range ss.Ports {
 						out = append(out, &model.ServiceInstance{
