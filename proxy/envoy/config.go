@@ -56,21 +56,31 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
+const (
+	EgressClusterPrefix  = "egress_"
+	IngressClusterPrefix = "ingress_"
+	ServerConfig         = "server_config.pb.txt"
+)
+
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
 func Generate(instances []*model.ServiceInstance, services []*model.Service, mesh *MeshConfig) (*Config, error) {
 	clusters := make([]Cluster, 0)
 	listeners := make([]Listener, 0)
 
-	if len(instances) > 0 {
-		ingressListeners, ingressClusters := buildIngressListeners(instances)
-		listeners = append(listeners, Listener{
-			Port:           mesh.IngressPort,
-			BindToPort:     true,
-			UseOriginalDst: true,
-		})
-		listeners = append(listeners, ingressListeners...)
-		clusters = append(clusters, ingressClusters...)
-	}
+	listeners = append(listeners, Listener{
+		Port:           mesh.IngressPort,
+		BindToPort:     true,
+		UseOriginalDst: true,
+		Filters:        make([]NetworkFilter, 0),
+	})
+
+	ingressListeners, ingressClusters := buildIngressListeners(instances)
+	listeners = append(listeners, ingressListeners...)
+	clusters = append(clusters, ingressClusters...)
+
+	egressListeners, egressClusters := buildEgressListeners(services)
+	listeners = append(listeners, egressListeners...)
+	clusters = append(clusters, egressClusters...)
 
 	// TODO: egress routing rules
 	/*
@@ -117,7 +127,7 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 	for _, instance := range instances {
 		protocols, ok := ports[instance.Endpoint.Port.Port]
 		if !ok {
-			protocols := make(map[model.Protocol]bool)
+			protocols = make(map[model.Protocol]bool)
 			ports[instance.Endpoint.Port.Port] = protocols
 		}
 		protocols[instance.Endpoint.Port.Protocol] = true
@@ -127,12 +137,13 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 	clusters := make([]Cluster, 0)
 	for port, protocols := range ports {
 		cluster := Cluster{
-			Name:             fmt.Sprintf("ingress_%d", port),
+			Name:             fmt.Sprintf("%s_%d", IngressClusterPrefix, port),
 			Type:             "static",
 			ConnectTimeoutMs: 1000,
 			LbType:           LbTypeRoundRobin,
 			Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
 		}
+
 		listener := Listener{
 			Port:       port,
 			BindToPort: false,
@@ -167,7 +178,7 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 							Routes:  []Route{{Cluster: cluster.Name}},
 						}},
 					},
-					Filters: []Filter{},
+					Filters: buildFilters(),
 				},
 			})
 		}
@@ -183,6 +194,11 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 	return listeners, clusters
 }
 
+func buildEgressListeners(services []*model.Service) ([]Listener, []Cluster) {
+	return nil, buildClusters(services)
+}
+
+// buildClusters creates a cluster for every (service, port)
 func buildClusters(services []*model.Service) []Cluster {
 	clusters := make([]Cluster, 0)
 	for _, svc := range services {
@@ -192,10 +208,9 @@ func buildClusters(services []*model.Service) []Cluster {
 				Namespace: svc.Namespace,
 				Ports:     []model.Port{port},
 			}
-			clusterName := "egress_" + clusterSvc.String()
 			cluster := Cluster{
-				Name:             clusterName,
-				ServiceName:      clusterName,
+				Name:             EgressClusterPrefix + clusterSvc.String(),
+				ServiceName:      clusterSvc.String(),
 				Type:             "sds",
 				LbType:           LbTypeRoundRobin,
 				ConnectTimeoutMs: 1000,
@@ -241,7 +256,7 @@ func buildFilters() []Filter {
 		Name: "esp",
 		Config: FilterEndpointsConfig{
 			ServiceConfig: EnvoyConfigPath + "generic_service_config.json",
-			ServerConfig:  EnvoyConfigPath + "server_config.pb.txt",
+			ServerConfig:  EnvoyConfigPath + ServerConfig,
 		},
 	})
 

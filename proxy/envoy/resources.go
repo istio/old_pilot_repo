@@ -24,6 +24,10 @@ type MeshConfig struct {
 	EgressPort int
 	// AdminPort is the administrative interface port
 	AdminPort int
+	// Envoy binary path
+	Binary string
+	// Mixer service key (e.g. "mixer.default:grpc")
+	Mixer string
 }
 
 // Config defines the schema for Envoy JSON configuration format
@@ -125,7 +129,7 @@ type NetworkFilterConfig struct {
 	StatPrefix        string      `json:"stat_prefix"`
 	GenerateRequestID bool        `json:"generate_request_id"`
 	RouteConfig       RouteConfig `json:"route_config"`
-	Filters           []Filter    `json:"filters"`
+	Filters           []Filter    `json:"filters,omitempty"`
 	AccessLog         []AccessLog `json:"access_log"`
 	Cluster           string      `json:"cluster,omitempty"`
 }

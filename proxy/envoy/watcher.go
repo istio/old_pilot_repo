@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"net"
 	"reflect"
 	"time"
 
@@ -30,20 +31,36 @@ type watcher struct {
 	agent     Agent
 	discovery model.ServiceDiscovery
 	mesh      *MeshConfig
+	addrs     map[string]bool
 }
 
-func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig, binary string) Watcher {
+func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig) (Watcher, error) {
+	addrs, err := hostIP()
+	if err != nil {
+		return nil, err
+	}
+
+	agent, err := NewAgent(mesh.Binary, mesh.Mixer)
+	if err != nil {
+		return nil, err
+	}
+
 	out := &watcher{
-		agent:     NewAgent(binary),
+		agent:     agent,
 		discovery: discovery,
 		mesh:      mesh,
+		addrs:     addrs,
 	}
+
 	ctl.AppendServiceHandler(out.notify)
-	return out
+	// TODO: restrict the notification callback to co-located instances (e.g. with the same IP)
+	ctl.AppendInstanceHandler(out.notify)
+
+	return out, nil
 }
 
 func (w *watcher) notify(svc *model.Service, ev model.Event) {
-	config, err := Generate(nil, w.discovery.Services(), w.mesh)
+	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(), w.mesh)
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
@@ -66,4 +83,21 @@ func (w *watcher) notify(svc *model.Service, ev model.Event) {
 	// The condition occurs when the active Envoy instance terminates in the middle of
 	// the Reload() function.
 	time.Sleep(256 * time.Millisecond)
+}
+
+// hostIP returns IPv4 non-loopback host addresses
+func hostIP() (map[string]bool, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, 0)
+	for _, addr := range addrs {
+		if ip, ok := addr.(*net.IPNet); ok {
+			if !ip.IP.IsLoopback() && ip.IP.To4() != nil {
+				out[ip.IP.String()] = true
+			}
+		}
+	}
+	return out, nil
 }

@@ -48,11 +48,26 @@ const (
 )
 
 // NewAgent creates a new instance.
-func NewAgent(binary string) Agent {
+func NewAgent(binary string, mixer string) (Agent, error) {
+	// TODO mixer should be configured directly in the envoy filter
+	f, err := os.Create(EnvoyConfigPath + ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+	f.WriteString(fmt.Sprintf(`
+cloud_tracing_config {
+  force_disable: true
+}
+mixer_options {
+  mixer_server: "%s%s"
+}
+	`, EgressClusterPrefix, mixer))
+	f.Close()
+
 	return &agent{
 		binary: binary,
 		cmdMap: make(map[*exec.Cmd]instance),
-	}
+	}, nil
 }
 
 func configFile(epoch int) string {
@@ -90,6 +105,9 @@ func (s *agent) Reload(config *Config) error {
 		"--drain-time-s", "60", "--parent-shutdown-time-s", "90"}
 	if glog.V(3) {
 		args = append(args, "-l", "debug")
+	}
+	if glog.V(2) {
+		config.Write(os.Stderr)
 	}
 	glog.V(2).Infof("Envoy starting: %v", args)
 	cmd := exec.Command(s.binary, args...)
