@@ -33,6 +33,9 @@ func (conf *Config) WriteFile(fname string) error {
 	if err != nil {
 		return err
 	}
+	if err := file.Chmod(0777); err != nil {
+		return err
+	}
 
 	if err := conf.Write(file); err != nil {
 		file.Close()
@@ -98,7 +101,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 		*/
 		Listeners: listeners,
 		Admin: Admin{
-			AccessLogPath: "/dev/stdout",
+			AccessLogPath: "/dev/null",
 			Port:          mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
@@ -137,7 +140,7 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 	clusters := make([]Cluster, 0)
 	for port, protocols := range ports {
 		cluster := Cluster{
-			Name:             fmt.Sprintf("%s_%d", IngressClusterPrefix, port),
+			Name:             fmt.Sprintf("%s%d", IngressClusterPrefix, port),
 			Type:             "static",
 			ConnectTimeoutMs: 1000,
 			LbType:           LbTypeRoundRobin,
@@ -170,7 +173,7 @@ func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cl
 				Config: NetworkFilterConfig{
 					CodecType:  "auto",
 					StatPrefix: "ingress_http",
-					AccessLog:  []AccessLog{{Path: "/dev/stdout"}},
+					AccessLog:  []AccessLog{{Path: "/dev/null"}},
 					RouteConfig: RouteConfig{
 						VirtualHosts: []VirtualHost{{
 							Name:    "backend",

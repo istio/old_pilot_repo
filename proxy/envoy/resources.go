@@ -28,6 +28,8 @@ type MeshConfig struct {
 	Binary string
 	// Mixer service key (e.g. "mixer.default:grpc")
 	Mixer string
+	// Uid for Envoy process
+	Uid int
 }
 
 // Config defines the schema for Envoy JSON configuration format

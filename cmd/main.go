@@ -120,6 +120,8 @@ func init() {
 		"Envoy binary location")
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.Mixer, "mixer", "m", "mixer.default:grpc",
 		"Mixer service key")
+	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.Uid, "uid", "u", 0,
+		"If set to a positive integer, sets UID for the child proxy process")
 	rootCmd.AddCommand(proxyCmd)
 }
 

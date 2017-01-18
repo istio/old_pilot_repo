@@ -33,7 +33,10 @@ spec:
             "securityContext": {
               "privileged": true
             },
-            "command": ["/bin/bash", "-c", "sudo iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 9999"]
+            "command": ["/bin/bash", "-c",
+              "sudo iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port 5001",
+              "sudo iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-port 5002 -m owner \\! --uid-owner 1337"
+            ]
           }
         ]'
     spec:
@@ -44,7 +47,21 @@ spec:
         - containerPort: 8080
       - name: proxy
         image: gcr.io/istio-test/runtime:test
-        args: ["proxy", "-s", "manager:8080", "--logtostderr", "-v", "2", "-p", "9999", "-n", "default"]
+        args:
+          - proxy
+          - -s
+          - manager:8080
+          - --logtostderr
+          - -v
+          - "2"
+          - -p
+          - "5001"
+          - -n
+          - default
+          - -m
+          - mixer.default:grpc
+          - -u
+          - "1337"
         imagePullPolicy: Always
         ports:
         - containerPort: 9999
