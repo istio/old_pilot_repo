@@ -185,7 +185,6 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 		// HTTP-level filter is shared between ingress and egress traffic.
 		// The routing decision is based on the virtual host.
 		hosts := make([]VirtualHost, 0)
-		sort.Sort(HostsByName(hosts))
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
 				// TODO: support all variants for services: name.<my namespace>, name.namespace.svc.cluster.local
@@ -196,6 +195,7 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 				})
 			}
 		}
+		sort.Sort(HostsByName(hosts))
 
 		// The order of the hosts is important: host * is a fallback
 		if lst.instances[model.ProtocolHTTP] || lst.instances[model.ProtocolHTTP2] || lst.instances[model.ProtocolGRPC] {
