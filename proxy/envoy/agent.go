@@ -19,7 +19,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/golang/glog"
 )
@@ -33,8 +32,6 @@ type Agent interface {
 type agent struct {
 	// Envoy binary path
 	binary string
-	// uid for the child envoy process
-	uid int
 	// Map of known running Envoy processes and their restart epochs.
 	cmdMap map[*exec.Cmd]instance
 	// mutex protects cmdMap
@@ -52,7 +49,7 @@ const (
 )
 
 // NewAgent creates a new instance.
-func NewAgent(binary string, mixer string, uid int) (Agent, error) {
+func NewAgent(binary string, mixer string) (Agent, error) {
 	// TODO mixer should be configured directly in the envoy filter
 	f, err := os.Create(EnvoyConfigPath + ServerConfig)
 	if err != nil {
@@ -66,14 +63,10 @@ mixer_options {
   mixer_server: "%s%s"
 }
 	`, EgressClusterPrefix, mixer))
-	if err := f.Chmod(0777); err != nil {
-		return nil, err
-	}
 	f.Close()
 
 	return &agent{
 		binary: binary,
-		uid:    uid,
 		cmdMap: make(map[*exec.Cmd]instance),
 	}, nil
 }
@@ -122,12 +115,6 @@ func (s *agent) Reload(config *Config) error {
 	cmd := exec.Command(s.binary, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	if s.uid > 0 {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{Uid: uint32(s.uid)},
-		}
-	}
 
 	if err := cmd.Start(); err != nil {
 		return err

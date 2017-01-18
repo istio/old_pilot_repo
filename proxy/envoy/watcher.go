@@ -40,7 +40,7 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 		return nil, err
 	}
 
-	agent, err := NewAgent(mesh.Binary, mesh.Mixer, mesh.Uid)
+	agent, err := NewAgent(mesh.Binary, mesh.Mixer)
 	if err != nil {
 		return nil, err
 	}

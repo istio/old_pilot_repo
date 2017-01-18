@@ -33,9 +33,6 @@ func (conf *Config) WriteFile(fname string) error {
 	if err != nil {
 		return err
 	}
-	if err := file.Chmod(0777); err != nil {
-		return err
-	}
 
 	if err := conf.Write(file); err != nil {
 		file.Close()
@@ -63,27 +60,18 @@ const (
 	EgressClusterPrefix  = "egress_"
 	IngressClusterPrefix = "ingress_"
 	ServerConfig         = "server_config.pb.txt"
+	Stdout               = "/dev/stdout"
 )
 
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
 func Generate(instances []*model.ServiceInstance, services []*model.Service, mesh *MeshConfig) (*Config, error) {
-	clusters := make([]Cluster, 0)
-	listeners := make([]Listener, 0)
-
+	listeners, clusters := buildListeners(instances, services)
 	listeners = append(listeners, Listener{
-		Port:           mesh.IngressPort,
+		Port:           mesh.ProxyPort,
 		BindToPort:     true,
 		UseOriginalDst: true,
 		Filters:        make([]NetworkFilter, 0),
 	})
-
-	ingressListeners, ingressClusters := buildIngressListeners(instances)
-	listeners = append(listeners, ingressListeners...)
-	clusters = append(clusters, ingressClusters...)
-
-	egressListeners, egressClusters := buildEgressListeners(services)
-	listeners = append(listeners, egressListeners...)
-	clusters = append(clusters, egressClusters...)
 
 	// TODO: egress routing rules
 	/*
@@ -101,7 +89,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 		*/
 		Listeners: listeners,
 		Admin: Admin{
-			AccessLogPath: "/dev/null",
+			AccessLogPath: Stdout,
 			Port:          mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
@@ -124,81 +112,124 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 	}, nil
 }
 
-func buildIngressListeners(instances []*model.ServiceInstance) ([]Listener, []Cluster) {
-	// project to port values
-	ports := make(map[int]map[model.Protocol]bool)
-	for _, instance := range instances {
-		protocols, ok := ports[instance.Endpoint.Port.Port]
-		if !ok {
-			protocols = make(map[model.Protocol]bool)
-			ports[instance.Endpoint.Port.Port] = protocols
-		}
-		protocols[instance.Endpoint.Port.Protocol] = true
+func buildListeners(instances []*model.ServiceInstance, services []*model.Service) ([]Listener, []Cluster) {
+	clusters := buildClusters(services)
+	listeners := make([]Listener, 0)
+
+	// group by port values
+	type listener struct {
+		instances map[model.Protocol]bool
+		// services map service, port for a given port, protocol pair
+		services map[model.Protocol][]*model.Service
 	}
 
-	listeners := make([]Listener, 0)
-	clusters := make([]Cluster, 0)
-	for port, protocols := range ports {
-		cluster := Cluster{
-			Name:             fmt.Sprintf("%s%d", IngressClusterPrefix, port),
-			Type:             "static",
-			ConnectTimeoutMs: 1000,
-			LbType:           LbTypeRoundRobin,
-			Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
+	ports := make(map[int]*listener, 0)
+	ensure := func(port model.Port) {
+		if _, ok := ports[port.Port]; !ok {
+			ports[port.Port] = &listener{
+				instances: make(map[model.Protocol]bool),
+				services:  make(map[model.Protocol][]*model.Service),
+			}
 		}
+	}
 
+	for _, instance := range instances {
+		port := instance.Endpoint.Port
+		ensure(port)
+		ports[port.Port].instances[port.Protocol] = true
+	}
+
+	for _, svc := range services {
+		for _, port := range svc.Ports {
+			ensure(port)
+			ports[port.Port].services[port.Protocol] = append(ports[port.Port].services[port.Protocol], &model.Service{
+				Name:      svc.Name,
+				Namespace: svc.Namespace,
+				Ports:     []model.Port{port},
+			})
+		}
+	}
+
+	for port, lst := range ports {
 		listener := Listener{
 			Port:       port,
 			BindToPort: false,
 		}
 
+		ingressClusterName := fmt.Sprintf("%s%d", IngressClusterPrefix, port)
+		if len(lst.instances) > 0 {
+			clusters = append(clusters, Cluster{
+				Name:             ingressClusterName,
+				Type:             "static",
+				ConnectTimeoutMs: 1000,
+				LbType:           LbTypeRoundRobin,
+				Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
+			})
+		}
+
 		// These two filters operate at different levels of the network stack.
 		// In practice, no port has two protocols used in the same set of instances, but we
 		// should be careful with not stepping on our feet.
-		if protocols[model.ProtocolTCP] {
+		// The order of the filter insertion is important.
+		if lst.instances[model.ProtocolTCP] {
 			listener.Filters = append(listener.Filters, NetworkFilter{
 				Type: "read",
 				Name: "tcp_proxy",
 				Config: NetworkFilterConfig{
-					Cluster:    cluster.Name,
+					Cluster:    ingressClusterName,
 					StatPrefix: "ingress_tcp",
 				},
 			})
 		}
 
-		if protocols[model.ProtocolGRPC] || protocols[model.ProtocolHTTP2] || protocols[model.ProtocolHTTP] {
+		// HTTP-level filter is shared between ingress and egress traffic.
+		// The routing decision is based on the virtual host.
+		hosts := make([]VirtualHost, 0)
+		sort.Sort(HostsByName(hosts))
+		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
+			for _, svc := range lst.services[proto] {
+				// TODO: support all variants for services: name.<my namespace>, name.namespace.svc.cluster.local
+				hosts = append(hosts, VirtualHost{
+					Name:    svc.String(),
+					Domains: []string{svc.Name, svc.Name + "." + svc.Namespace},
+					Routes:  []Route{{Cluster: EgressClusterPrefix + svc.String()}},
+				})
+			}
+		}
+
+		// The order of the hosts is important: host * is a fallback
+		if lst.instances[model.ProtocolHTTP] || lst.instances[model.ProtocolHTTP2] || lst.instances[model.ProtocolGRPC] {
+			hosts = append(hosts, VirtualHost{
+				Name:    "ingress_http",
+				Domains: []string{"*"},
+				Routes:  []Route{{Cluster: ingressClusterName}},
+			})
+		}
+
+		// TODO: HTTPS protocol ingress and egress configuration
+
+		if len(hosts) > 0 {
 			listener.Filters = append(listener.Filters, NetworkFilter{
 				Type: "read",
 				Name: "http_connection_manager",
 				Config: NetworkFilterConfig{
-					CodecType:  "auto",
-					StatPrefix: "ingress_http",
-					AccessLog:  []AccessLog{{Path: "/dev/null"}},
-					RouteConfig: RouteConfig{
-						VirtualHosts: []VirtualHost{{
-							Name:    "backend",
-							Domains: []string{"*"},
-							Routes:  []Route{{Cluster: cluster.Name}},
-						}},
-					},
-					Filters: buildFilters(),
+					CodecType:   "auto",
+					StatPrefix:  "http",
+					AccessLog:   []AccessLog{{Path: Stdout}},
+					RouteConfig: RouteConfig{VirtualHosts: hosts},
+					Filters:     buildFilters(),
 				},
 			})
 		}
 
-		// TODO: HTTPS protocol ingress configuration
-
-		listeners = append(listeners, listener)
-		clusters = append(clusters, cluster)
+		if len(listener.Filters) > 0 {
+			listeners = append(listeners, listener)
+		}
 	}
 
 	sort.Sort(ListenersByPort(listeners))
 	sort.Sort(ClustersByName(clusters))
 	return listeners, clusters
-}
-
-func buildEgressListeners(services []*model.Service) ([]Listener, []Cluster) {
-	return nil, buildClusters(services)
 }
 
 // buildClusters creates a cluster for every (service, port)
@@ -227,28 +258,6 @@ func buildClusters(services []*model.Service) []Cluster {
 	}
 	sort.Sort(ClustersByName(clusters))
 	return clusters
-}
-
-func buildRoutes(services []*model.Service) []Route {
-	routes := make([]Route, 0)
-	for _, svc := range services {
-		for _, port := range svc.Ports {
-			clusterSvc := model.Service{
-				Name:      svc.Name,
-				Namespace: svc.Namespace,
-				Ports:     []model.Port{port},
-			}
-			clusterName := clusterSvc.String()
-			routes = append(routes, Route{
-				Prefix:        "/" + clusterName,
-				PrefixRewrite: "/",
-				Cluster:       clusterName,
-			})
-		}
-	}
-
-	sort.Sort(RoutesByCluster(routes))
-	return routes
 }
 
 func buildFilters() []Filter {
