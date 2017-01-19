@@ -62,7 +62,7 @@ cloud_tracing_config {
 mixer_options {
   mixer_server: "%s%s"
 }
-	`, EgressClusterPrefix, mixer))
+	`, OutboundClusterPrefix, mixer))
 	f.Close()
 
 	return &agent{
