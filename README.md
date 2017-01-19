@@ -15,7 +15,7 @@ If you have a question about the Istio Manager or have a problem using it, pleas
 
 We are using [Bazel 0.4.3](https://bazel.io) to build Istio Manager:
 
-    bazel build //...
+    bazel build //cmd/...
 
 _Note_: Due to issues with case-insensitive file systems, macOS is not
 supported at the moment by Bazel Go rules.
