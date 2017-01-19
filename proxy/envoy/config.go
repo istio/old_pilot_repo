@@ -57,9 +57,9 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 const (
-	EgressClusterPrefix  = "egress_"
-	IngressClusterPrefix = "ingress_"
-	ServerConfig         = "server_config.pb.txt"
+	OutboundClusterPrefix = "outbound_"
+	InboundClusterPrefix  = "inbound_"
+	ServerConfig          = "server_config.pb.txt"
 
 	// TODO: these values used in the Envoy configuration will be configurable
 	Stdout           = "/dev/stdout"
@@ -77,7 +77,6 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 		Filters:        make([]NetworkFilter, 0),
 	})
 
-	// TODO: egress routing rules
 	/*
 		if err := buildFS(); err != nil {
 			return &Config{}, err
@@ -130,7 +129,7 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 
 	ports := make(map[int]*listener, 0)
 
-	// helper functions to work with multi-maps
+	// helper function to work with multi-maps
 	ensure := func(port model.Port) {
 		if _, ok := ports[port.Port]; !ok {
 			ports[port.Port] = &listener{
@@ -144,22 +143,24 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 	for _, instance := range instances {
 		port := instance.Endpoint.Port
 		ensure(port)
-		ports[port.Port].instances[port.Protocol] = append(ports[port.Port].instances[port.Protocol], &model.Service{
-			Name:      instance.Service.Name,
-			Namespace: instance.Service.Namespace,
-			Ports:     []model.Port{port},
-		})
+		ports[port.Port].instances[port.Protocol] = append(
+			ports[port.Port].instances[port.Protocol], &model.Service{
+				Name:      instance.Service.Name,
+				Namespace: instance.Service.Namespace,
+				Ports:     []model.Port{port},
+			})
 	}
 
 	// group all services by service port values
 	for _, svc := range services {
 		for _, port := range svc.Ports {
 			ensure(port)
-			ports[port.Port].services[port.Protocol] = append(ports[port.Port].services[port.Protocol], &model.Service{
-				Name:      svc.Name,
-				Namespace: svc.Namespace,
-				Ports:     []model.Port{port},
-			})
+			ports[port.Port].services[port.Protocol] = append(
+				ports[port.Port].services[port.Protocol], &model.Service{
+					Name:      svc.Name,
+					Namespace: svc.Namespace,
+					Ports:     []model.Port{port},
+				})
 		}
 	}
 
@@ -171,7 +172,7 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 		}
 
 		// append localhost redirect cluster
-		localhost := fmt.Sprintf("%s%d", IngressClusterPrefix, port)
+		localhost := fmt.Sprintf("%s%d", InboundClusterPrefix, port)
 		if len(lst.instances) > 0 {
 			clusters = append(clusters, Cluster{
 				Name:             localhost,
@@ -193,24 +194,24 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 				Name: "tcp_proxy",
 				Config: NetworkFilterConfig{
 					Cluster:    localhost,
-					StatPrefix: "ingress_tcp",
+					StatPrefix: "inbound_tcp",
 				},
 			})
 		}
 
-		// TODO: TCP routing for egress based on dst IP
-		// TODO: HTTPS protocol for ingress and egress configuration using TCP routing or SNI
+		// TODO: TCP routing for outbound based on dst IP
+		// TODO: HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
 
 		// For HTTP, the routing decision is based on the virtual host.
 		hosts := make(map[string]VirtualHost, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				host := buildHost(svc, EgressClusterPrefix+svc.String())
+				host := buildHost(svc, OutboundClusterPrefix+svc.String())
 				hosts[svc.String()] = host
 			}
 
 			// If the traffic is sent to a service that has instances co-located with the proxy,
-			// we choose the local service instance since we cannot distinguish between ingress and egress packets.
+			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its target port are distinct.
 			for _, svc := range lst.instances[proto] {
 				host := buildHost(svc, localhost)
@@ -219,11 +220,13 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 		}
 
 		if len(hosts) > 0 {
+			// sort hosts by key (should be non-overlapping domains)
 			vhosts := make([]VirtualHost, 0)
 			for _, host := range hosts {
 				vhosts = append(vhosts, host)
 			}
 			sort.Sort(HostsByName(vhosts))
+
 			listener.Filters = append(listener.Filters, NetworkFilter{
 				Type: "read",
 				Name: "http_connection_manager",
@@ -267,7 +270,7 @@ func buildClusters(services []*model.Service) []Cluster {
 				Ports:     []model.Port{port},
 			}
 			cluster := Cluster{
-				Name:             EgressClusterPrefix + clusterSvc.String(),
+				Name:             OutboundClusterPrefix + clusterSvc.String(),
 				ServiceName:      clusterSvc.String(),
 				Type:             "sds",
 				LbType:           DefaultLbType,
