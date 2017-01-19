@@ -57,7 +57,7 @@ check out your repository clone `$REPO_PATH` into `$GOPATH` (e.g.
 `$GOPATH/src/istio.io/manager`). Prepare the dependencies by vendorizing Bazel
 workspace:
 
-    # Vendorize bazel dependeencies
+    # Vendorize bazel dependencies
     bin/bazel_to_go.py .
 
     # Remove doubly-vendorized k8s dependencies
