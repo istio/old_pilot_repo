@@ -31,4 +31,3 @@ gometalinter --deadline=300s --disable-all\
 # --enable=dupl\
 # - comments are not linted
 #	--enable=golint --min-confidence=0 --exclude=.pb.go --exclude="should have a package comment"\
-# - parsing code has high cyclomatic complexity
