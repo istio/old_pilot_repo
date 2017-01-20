@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-gometalinter --deadline=600s --disable-all\
+gometalinter --deadline=300s --disable-all\
 	--enable=aligncheck\
 	--enable=deadcode\
 	--enable=errcheck\
@@ -16,7 +16,7 @@ gometalinter --deadline=600s --disable-all\
   --enable=gotype\
 	--enable=ineffassign\
 	--enable=interfacer\
-	--enable=lll --line-length=160\
+	--enable=lll --line-length=120\
 	--enable=misspell\
 	--enable=staticcheck\
 	--enable=structcheck\

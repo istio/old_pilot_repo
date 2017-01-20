@@ -57,5 +57,5 @@ Bazel does not preclude you from using `go` tool in development. You should
 check out your repository clone `$REPO_PATH` into `$GOPATH` (e.g.
 `$GOPATH/src/istio.io/manager`). Then run this script in the repository root:
 
-    bin/go_init.sh
+    bin/init.sh
 
