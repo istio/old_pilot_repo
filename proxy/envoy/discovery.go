@@ -56,6 +56,7 @@ func NewDiscoveryService(services model.ServiceDiscovery, port int) *DiscoverySe
 	return out
 }
 
+// Register adds routes a web service container
 func (ds *DiscoveryService) Register(container *restful.Container) {
 	ws := &restful.WebService{}
 	ws.Produces(restful.MIME_JSON)
@@ -75,6 +76,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 	container.Add(ws)
 }
 
+// Run starts the server and blocks
 func (ds *DiscoveryService) Run() {
 	glog.Infof("Starting discovery service at %v", ds.server.Addr)
 	if err := ds.server.ListenAndServe(); err != nil {
@@ -82,6 +84,7 @@ func (ds *DiscoveryService) Run() {
 	}
 }
 
+// ListEndpoints responds to SDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
 	key := request.PathParameter("service-key")
 	svc := model.ParseServiceString(key)
@@ -97,6 +100,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	}
 }
 
+// ListClusters responds to CDS requests
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	svc := ds.services.Services()
 	if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {

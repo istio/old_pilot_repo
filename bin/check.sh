@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-gometalinter --deadline=300s --disable-all\
+gometalinter --deadline=600s --disable-all\
 	--enable=aligncheck\
 	--enable=deadcode\
 	--enable=errcheck\
@@ -11,6 +11,7 @@ gometalinter --deadline=300s --disable-all\
   --cyclo-over=15\
 	--enable=gofmt\
 	--enable=goimports\
+	--enable=golint --exclude=.pb.go --exclude="should have a package comment"\
 	--enable=gosimple\
   --enable=gotype\
 	--enable=ineffassign\
@@ -27,7 +28,4 @@ gometalinter --deadline=300s --disable-all\
 	./...
 
 # Disabled linters:
-# - controller code has similar watchers
 # --enable=dupl\
-# - comments are not linted
-#	--enable=golint --min-confidence=0 --exclude=.pb.go --exclude="should have a package comment"\

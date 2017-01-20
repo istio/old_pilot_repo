@@ -34,6 +34,7 @@ type watcher struct {
 	addrs     map[string]bool
 }
 
+// NewWatcher creates a new watcher instance with an agent
 func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig) (Watcher, error) {
 	addrs, err := hostIP()
 	if err != nil {

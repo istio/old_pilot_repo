@@ -54,7 +54,7 @@ type Header struct {
 	Value string `json:"value"`
 }
 
-// FilterEndpointsConfig
+// FilterEndpointsConfig definition
 type FilterEndpointsConfig struct {
 	ServiceConfig string `json:"service_config,omitempty"`
 	ServerConfig  string `json:"server_config,omitempty"`
@@ -150,6 +150,7 @@ type Host struct {
 	URL string `json:"url"`
 }
 
+// Constant values
 const (
 	LbTypeRoundRobin = "round_robin"
 )

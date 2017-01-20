@@ -44,7 +44,10 @@ type instance struct {
 }
 
 const (
-	EnvoyConfigPath   = "/etc/envoy/"
+	// EnvoyConfigPath is the root directory for Envoy configuration
+	EnvoyConfigPath = "/etc/envoy/"
+
+	// EnvoyFileTemplate is a template for root config JSON
 	EnvoyFileTemplate = "envoy-rev%d.json"
 )
 

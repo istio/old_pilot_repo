@@ -27,6 +27,7 @@ import (
 	"fmt"
 )
 
+// WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
 	file, err := os.Create(fname)
 	if err != nil {
@@ -52,11 +53,16 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 const (
+	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
 	OutboundClusterPrefix = "outbound_"
-	InboundClusterPrefix  = "inbound_"
-	ServerConfig          = "server_config.pb.txt"
+	// InboundClusterPrefix is the prefix for service clusters co-hosted on the proxy instance
+	InboundClusterPrefix = "inbound_"
+	// ServerConfig specifies additional config
+	ServerConfig = "server_config.pb.txt"
+)
 
-	// TODO: these values used in the Envoy configuration will be configurable
+// TODO: these values used in the Envoy configuration will be configurable
+const (
 	Stdout           = "/dev/stdout"
 	DefaultTimeoutMs = 1000
 	DefaultLbType    = LbTypeRoundRobin
