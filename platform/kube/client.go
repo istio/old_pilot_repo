@@ -104,7 +104,7 @@ func CreateRESTConfig(kubeconfig string, km model.KindMap) (config *rest.Config,
 			}
 			return nil
 		})
-	schemeBuilder.AddToScheme(api.Scheme)
+	err = schemeBuilder.AddToScheme(api.Scheme)
 
 	return
 }

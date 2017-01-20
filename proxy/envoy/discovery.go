@@ -75,9 +75,11 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 	container.Add(ws)
 }
 
-func (ds *DiscoveryService) Run() error {
+func (ds *DiscoveryService) Run() {
 	glog.Infof("Starting discovery service at %v", ds.server.Addr)
-	return ds.server.ListenAndServe()
+	if err := ds.server.ListenAndServe(); err != nil {
+		glog.Warning(err)
+	}
 }
 
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
@@ -90,10 +92,14 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 			Port:    ep.Endpoint.Port.Port,
 		})
 	}
-	response.WriteEntity(hosts{out})
+	if err := response.WriteEntity(hosts{out}); err != nil {
+		glog.Warning(err)
+	}
 }
 
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	svc := ds.services.Services()
-	response.WriteEntity(clusters{Clusters: buildClusters(svc)})
+	if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {
+		glog.Warning(err)
+	}
 }

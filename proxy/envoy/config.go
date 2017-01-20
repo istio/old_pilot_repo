@@ -22,10 +22,9 @@ import (
 
 	"istio.io/manager/model"
 
+	multierror "github.com/hashicorp/go-multierror"
+
 	"fmt"
-	"io/ioutil"
-	"math/rand"
-	"path/filepath"
 )
 
 func (conf *Config) WriteFile(fname string) error {
@@ -35,7 +34,7 @@ func (conf *Config) WriteFile(fname string) error {
 	}
 
 	if err := conf.Write(file); err != nil {
-		file.Close()
+		err = multierror.Append(err, file.Close())
 		return err
 	}
 
@@ -49,10 +48,6 @@ func (conf *Config) Write(w io.Writer) error {
 	}
 
 	_, err = w.Write(out)
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 
@@ -77,19 +72,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 		Filters:        make([]NetworkFilter, 0),
 	})
 
-	/*
-		if err := buildFS(); err != nil {
-			return &Config{}, err
-		}
-	*/
-
 	return &Config{
-		/*
-			RootRuntime: RootRuntime{
-				SymlinkRoot:  RuntimePath,
-				Subdirectory: "traffic_shift",
-			},
-		*/
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: Stdout,
@@ -306,97 +289,4 @@ func buildFilters() []Filter {
 	})
 
 	return filters
-}
-
-const (
-	RuntimePath         = "/etc/envoy/runtime/routing"
-	RuntimeVersionsPath = "/etc/envoy/routing_versions"
-
-	ConfigDirPerm  = 0775
-	ConfigFilePerm = 0664
-)
-
-// FIXME: doesn't check for name conflicts
-// TODO: could be improved by using the full possible set of filenames.
-func randFilename(prefix string) string {
-	data := make([]byte, 16)
-	for i := range data {
-		data[i] = '0' + byte(rand.Intn(10))
-	}
-
-	return fmt.Sprintf("%s%s", prefix, data)
-}
-
-func buildFS() error {
-	type weightSpec struct {
-		Service string
-		Cluster string
-		Weight  int
-	}
-
-	var weights []weightSpec
-
-	if err := os.MkdirAll(filepath.Dir(RuntimePath), ConfigDirPerm); err != nil { // FIXME: hack
-		return err
-	}
-
-	if err := os.MkdirAll(RuntimeVersionsPath, ConfigDirPerm); err != nil {
-		return err
-	}
-
-	dirName, err := ioutil.TempDir(RuntimeVersionsPath, "")
-	if err != nil {
-		return err
-	}
-
-	success := false
-	defer func() {
-		if !success {
-			os.RemoveAll(dirName)
-		}
-	}()
-
-	for _, weight := range weights {
-		if err := os.MkdirAll(filepath.Join(dirName, "/traffic_shift/", weight.Service), ConfigDirPerm); err != nil {
-			return err
-		} // FIXME: filemode?
-
-		filename := filepath.Join(dirName, "/traffic_shift/", weight.Service, weight.Cluster)
-		data := []byte(fmt.Sprintf("%v", weight.Weight))
-		if err := ioutil.WriteFile(filename, data, ConfigFilePerm); err != nil {
-			return err
-		}
-	}
-
-	oldRuntime, err := os.Readlink(RuntimePath)
-	if err != nil && !os.IsNotExist(err) { // Ignore error from symlink not existing.
-		return err
-	}
-
-	tmpName := randFilename("./")
-
-	if err := os.Symlink(dirName, tmpName); err != nil {
-		return err
-	}
-
-	// Atomically replace the runtime symlink
-	if err := os.Rename(tmpName, RuntimePath); err != nil {
-		return err
-	}
-
-	success = true
-
-	// Clean up the old config FS if necessary
-	// TODO: make this safer
-	if oldRuntime != "" {
-		oldRuntimeDir := filepath.Dir(oldRuntime)
-		if filepath.Clean(oldRuntimeDir) == filepath.Clean(RuntimeVersionsPath) {
-			toDelete := filepath.Join(RuntimeVersionsPath, filepath.Base(oldRuntime))
-			if err := os.RemoveAll(toDelete); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

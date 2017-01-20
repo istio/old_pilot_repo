@@ -30,17 +30,9 @@ type MeshConfig struct {
 
 // Config defines the schema for Envoy JSON configuration format
 type Config struct {
-	RootRuntime    *RootRuntime   `json:"runtime,omitempty"`
 	Listeners      []Listener     `json:"listeners"`
 	Admin          Admin          `json:"admin"`
 	ClusterManager ClusterManager `json:"cluster_manager"`
-}
-
-// RootRuntime defines the root config directory
-type RootRuntime struct {
-	SymlinkRoot          string `json:"symlink_root"`
-	Subdirectory         string `json:"subdirectory"`
-	OverrideSubdirectory string `json:"override_subdirectory,omitempty"`
 }
 
 // AbortFilter definition

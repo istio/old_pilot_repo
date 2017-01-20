@@ -52,9 +52,14 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 		addrs:     addrs,
 	}
 
-	ctl.AppendServiceHandler(out.notify)
+	if err := ctl.AppendServiceHandler(out.notify); err != nil {
+		return nil, err
+	}
+
 	// TODO: restrict the notification callback to co-located instances (e.g. with the same IP)
-	ctl.AppendInstanceHandler(out.notify)
+	if err := ctl.AppendInstanceHandler(out.notify); err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

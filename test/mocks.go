@@ -153,7 +153,7 @@ func CheckMapInvariant(r model.Registry, t *testing.T, namespace string, n int) 
 
 	// delete all elements
 	for _, elt := range elts {
-		if err := r.Delete(elt.ConfigKey); err != nil {
+		if err = r.Delete(elt.ConfigKey); err != nil {
 			t.Error(err)
 		}
 	}
