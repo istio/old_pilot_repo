@@ -37,11 +37,12 @@ before_install:
 
 install:
   - touch platform/kube/config
-  - bazel --output_base=${HOME}/bazel/outbase test //...
-  - bin/go_init.sh
+  - bazel --output_base=${HOME}/bazel/outbase build //...
+  - bin/init.sh
 
 script:
   - bazel --output_base=${HOME}/bazel/outbase test //...
+  - bin/check.sh
 
 notifications:
   slack: istio-dev:wEEEbaabdP5ieCgDOFetA9nX

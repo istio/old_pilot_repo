@@ -295,7 +295,7 @@ func createService(n, ns string, cl *kubernetes.Clientset, t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{Name: n},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
-				v1.ServicePort{
+				{
 					Port: 80,
 					Name: "http-example",
 				},

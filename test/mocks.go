@@ -39,7 +39,7 @@ var (
 	}
 	MockConfigObject = MockConfig{
 		Pairs: []*ConfigPair{
-			&ConfigPair{Key: "key", Value: "value"},
+			{Key: "key", Value: "value"},
 		},
 	}
 	MockObject = model.Config{
@@ -106,7 +106,7 @@ func MakeMock(i int, namespace string) *model.Config {
 		},
 		Spec: &MockConfig{
 			Pairs: []*ConfigPair{
-				&ConfigPair{Key: "key", Value: strconv.Itoa(i)},
+				{Key: "key", Value: strconv.Itoa(i)},
 			},
 		},
 	}
