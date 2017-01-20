@@ -54,15 +54,7 @@ after running the tests and permanently reside in a terminating state
 
 Bazel does not preclude you from using `go` tool in development. You should
 check out your repository clone `$REPO_PATH` into `$GOPATH` (e.g.
-`$GOPATH/src/istio.io/manager`). Prepare the dependencies by vendorizing Bazel
-workspace:
+`$GOPATH/src/istio.io/manager`). Then run this script in the repository root:
 
-    # Vendorize bazel dependencies
-    bin/bazel_to_go.py .
-
-    # Remove doubly-vendorized k8s dependencies
-    rm -rf vendor/k8s.io/client-go/vendor
-
-    # Now you can test with the go tool
-    go test istio.io/manager/... -v
+    bin/go_init.sh
 

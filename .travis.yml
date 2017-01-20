@@ -1,7 +1,11 @@
 sudo: required
+
 dist: xenial
+
 language: go
+
 go_import_path: istio.io/manager
+
 go:
   - 1.7.x
 
@@ -31,8 +35,12 @@ before_install:
   - mv .bazelrc .bazelrc.orig
   - cat .bazelrc.travis .bazelrc.orig > .bazelrc
 
-script:
+install:
   - touch platform/kube/config
+  - bazel --output_base=${HOME}/bazel/outbase test //...
+  - bin/go_init.sh
+
+script:
   - bazel --output_base=${HOME}/bazel/outbase test //...
 
 notifications:
