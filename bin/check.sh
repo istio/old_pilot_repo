@@ -7,6 +7,8 @@ gometalinter --deadline=300s --disable-all\
 	--enable=errcheck\
 	--enable=gas\
 	--enable=goconst\
+  --enable=gocyclo\
+  --cyclo-over=15\
 	--enable=gofmt\
 	--enable=goimports\
 	--enable=gosimple\
@@ -30,4 +32,3 @@ gometalinter --deadline=300s --disable-all\
 # - comments are not linted
 #	--enable=golint --min-confidence=0 --exclude=.pb.go --exclude="should have a package comment"\
 # - parsing code has high cyclomatic complexity
-# --enable=gocyclo\

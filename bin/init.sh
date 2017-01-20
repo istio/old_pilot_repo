@@ -11,7 +11,5 @@ bin/bazel_to_go.py > /dev/null
 # Remove doubly-vendorized k8s dependencies
 rm -rf vendor/k8s.io/client-go/vendor
 
-ls -l
-
-# Test that go installation works
+# Test that go installation works (necessary for gometalinter)
 go install ./...

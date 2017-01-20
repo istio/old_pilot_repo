@@ -1,5 +1,6 @@
 # Istio Manager #
 [![Build Status](https://travis-ci.org/istio/manager.svg?branch=master)](https://travis-ci.org/istio/manager)
+[![Go Report Card](https://goreportcard.com/badge/github.com/istio/manager)](https://goreportcard.com/report/github.com/istio/manager)
 
 The Istio Manager is used to configure Istio and propagate configuration to the
 other components of the system, including the Istio mixer and the Istio proxy mesh.
