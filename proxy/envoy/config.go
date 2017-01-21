@@ -298,8 +298,8 @@ func buildFilters(mesh *MeshConfig) []Filter {
 			Type: "both",
 			Name: "esp",
 			Config: FilterEndpointsConfig{
-				ServiceConfig: mesh.ConfigPath + "generic_service_config.json",
-				ServerConfig:  mesh.ConfigPath + "server_config.pb.txt",
+				ServiceConfig: "/etc/generic_service_config.json",
+				ServerConfig:  "/etc/server_config.pb.txt",
 			},
 		})
 	}

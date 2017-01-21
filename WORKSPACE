@@ -267,7 +267,7 @@ new_go_repository(
 
 git_repository(
     name = "istio_proxy",
-    commit = "ee3cdeeb33b1de0b87c80809802de5246cbb3e25",
+    commit = "92541b79f45fb3ada59e36d3abd87bd7724b27f9",
     remote = "https://github.com/istio/proxy",
 )
 
@@ -309,22 +309,17 @@ envoy_repositories()
 ##
 
 new_http_archive(
-    name = "docker_debian",
+    name = "docker_ubuntu",
     build_file_content = """
 load("@bazel_tools//tools/build_defs/docker:docker.bzl", "docker_build")
-genrule(
-    name = "wheezy_tar",
-    srcs = ["docker-brew-debian-e9bafb113f432c48c7e86c616424cb4b2f2c7a51/wheezy/rootfs.tar.xz"],
-    outs = ["wheezy_tar.tar"],
-    cmd = "cat $< | xzcat >$@",
-)
 docker_build(
-    name = "wheezy",
-    tars = [":wheezy_tar"],
-    visibility = ["//visibility:public"],
+  name = "trusty",
+  tars = ["trusty/ubuntu-trusty-core-cloudimg-amd64-root.tar.gz"],
+  visibility = ["//visibility:public"],
 )
-    """,
-    sha256 = "515d385777643ef184729375bc5cb996134b3c1dc15c53acf104749b37334f68",
+""",
+    sha256 = "de31e6fcb843068965de5945c11a6f86399be5e4208c7299fb7311634fb41943",
+    strip_prefix = "docker-brew-ubuntu-core-e406914e5f648003dfe8329b512c30c9ad0d2f9c",
     type = "zip",
-    url = "https://codeload.github.com/tianon/docker-brew-debian/zip/e9bafb113f432c48c7e86c616424cb4b2f2c7a51",
+    url = "https://codeload.github.com/tianon/docker-brew-ubuntu-core/zip/e406914e5f648003dfe8329b512c30c9ad0d2f9c",
 )
