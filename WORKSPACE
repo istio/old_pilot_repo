@@ -1,7 +1,7 @@
 git_repository(
     name = "io_bazel_rules_go",
+    commit = "fee2a86ddfcbfbc131bcc1a113ca35ddc46fac96",
     remote = "https://github.com/bazelbuild/rules_go.git",
-    commit= "fee2a86ddfcbfbc131bcc1a113ca35ddc46fac96",
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories", "new_go_repository")
@@ -259,4 +259,72 @@ new_go_repository(
     name = "io_k8s_client_go",
     commit = "243d8a9cb66a51ad8676157f79e71033b4014a2a",
     importpath = "k8s.io/client-go",
+)
+
+##
+## Proxy build rules
+##
+
+git_repository(
+    name = "istio_proxy",
+    commit = "ee3cdeeb33b1de0b87c80809802de5246cbb3e25",
+    remote = "https://github.com/istio/proxy",
+)
+
+load(
+    "@istio_proxy//contrib/endpoints:repositories.bzl",
+    "grpc_repositories",
+    "servicecontrol_client_repositories",
+    "mixerapi_repositories",
+)
+
+grpc_repositories()
+
+servicecontrol_client_repositories()
+
+mixerapi_repositories()
+
+load(
+    "@istio_proxy//:repositories.bzl",
+    "boringssl_repositories",
+    "protobuf_repositories",
+    "googletest_repositories",
+)
+
+boringssl_repositories()
+
+protobuf_repositories()
+
+googletest_repositories()
+
+load(
+    "@istio_proxy//src/envoy:repositories.bzl",
+    "envoy_repositories",
+)
+
+envoy_repositories()
+
+##
+## Docker rules
+##
+
+new_http_archive(
+    name = "docker_debian",
+    build_file_content = """
+load("@bazel_tools//tools/build_defs/docker:docker.bzl", "docker_build")
+genrule(
+    name = "wheezy_tar",
+    srcs = ["docker-brew-debian-e9bafb113f432c48c7e86c616424cb4b2f2c7a51/wheezy/rootfs.tar.xz"],
+    outs = ["wheezy_tar.tar"],
+    cmd = "cat $< | xzcat >$@",
+)
+docker_build(
+    name = "wheezy",
+    tars = [":wheezy_tar"],
+    visibility = ["//visibility:public"],
+)
+    """,
+    sha256 = "515d385777643ef184729375bc5cb996134b3c1dc15c53acf104749b37334f68",
+    type = "zip",
+    url = "https://codeload.github.com/tianon/docker-brew-debian/zip/e9bafb113f432c48c7e86c616424cb4b2f2c7a51",
 )
