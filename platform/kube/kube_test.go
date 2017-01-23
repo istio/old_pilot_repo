@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	"istio.io/manager/model"
-	"istio.io/manager/test"
+	"istio.io/manager/test/mock"
 )
 
 var (
