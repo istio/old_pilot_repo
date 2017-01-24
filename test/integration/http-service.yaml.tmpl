@@ -9,7 +9,7 @@ spec:
   type: NodePort
   ports:
   - port: 80
-    targetPort: 8080
+    targetPort: $PORT
     name: http
   selector:
     app: $NAME
@@ -42,7 +42,7 @@ spec:
       - name: echo
         image: gcr.io/google_containers/echoserver:1.4
         ports:
-        - containerPort: 8080
+        - containerPort: $PORT
       - name: proxy
         image: gcr.io/istio-test/runtime:$TAG
         securityContext:

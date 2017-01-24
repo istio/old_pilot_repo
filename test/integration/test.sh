@@ -16,10 +16,10 @@ while getopts :t:s arg; do
 done
 
 # Write template for k8s
-rm echo.yaml
+rm -f echo.yaml
 sed "s|\$TAG|$TAG|g" manager.yaml.tmpl                    >> echo.yaml
-sed "s|\$TAG|$TAG|g;s|\$NAME|a|g" http-service.yaml.tmpl  >> echo.yaml
-sed "s|\$TAG|$TAG|g;s|\$NAME|b|g" http-service.yaml.tmpl  >> echo.yaml
+sed "s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
+sed "s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
 
 if [[ "$create" = true ]]; then
   bazel run //docker:runtime
@@ -44,9 +44,11 @@ m=$(kubectl get pods -l app=m -o jsonpath='{range .items[*]}{@.metadata.name}')
 tt=false
 for src in a b t; do
   for dst in a b t; do
-    echo request from ${src} to ${dst}/${src}
+    echo request from ${src} to ${dst}
 
-    request=$(kubectl exec ${!src} -it -c echo curl ${dst}/${src} | grep "x-request-id" ||\
+    request=$(kubectl exec ${!src} -c echo curl ${dst}/${src})
+
+    echo $request | grep "x-request-id" ||\
       if [[ $src == "t" && $dst == "t" ]]; then
         tt=true
         echo "Expected no request"
@@ -54,19 +56,31 @@ for src in a b t; do
         echo Failed injecting envoy
         exit 1
       fi
-    )
 
-    id=$(echo $request | cut -d'=' -f2-)
+    id=$(echo $request | grep -o "x-request-id=\S*" | cut -d'=' -f2-)
+    echo x-request-id=$id
 
     # query access logs in src and dst
-    if [[ $src != "t" ]]; then
-      echo checking access log of $src
-      kubectl logs ${!src} -c proxy | grep "$id" && (echo "Cannot find request id in access log"; exit 1)
-    fi
-    if [[ $dst != "t" ]]; then
-      echo checking access log of $dst
-      kubectl logs ${!dst} -c proxy | grep "$id" && (echo "Cannot find request id in access log"; exit 1)
-    fi
+    for log in $src $dst; do
+      if [[ $log != "t" ]]; then
+        echo checking access log of $log
+
+        n=1
+        while : ; do
+          if [[ $n == 30 ]]; then
+            break
+          fi
+          kubectl logs ${!log} -c proxy | grep "$id" && break
+          sleep 1
+          ((n++))
+        done
+
+        if [[ $n == 30 ]]; then
+          echo failed to find request $id in access log of $log after $n attempts
+          exit 1
+        fi
+      fi
+    done
   done
 done
 
