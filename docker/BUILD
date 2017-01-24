@@ -38,7 +38,7 @@ pkg_tar(
 
 docker_build(
     name = "runtime",
-    base = "@docker_ubuntu//:trusty",
+    base = "@docker_ubuntu//:xenial",
     entrypoint = ["/usr/local/bin/manager"],
     repository = "istio",
     tags = ["manual"],

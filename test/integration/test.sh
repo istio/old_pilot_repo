@@ -3,12 +3,14 @@ set -e
 
 # Generate SHA for the images and push it
 TAG=$(git rev-parse HEAD)
+HUB="gcr.io/istio-test"
 
 # Creation step
 create=true
 
-while getopts :t:s arg; do
+while getopts :h:t:s arg; do
   case ${arg} in
+    h) HUB="${OPTARG}";;
     t) TAG="${OPTARG}";;
     s) create=false;;
     *) echo "Invalid option: -${OPTARG}"; exit 1;;
@@ -17,15 +19,15 @@ done
 
 # Write template for k8s
 rm -f echo.yaml
-sed "s|\$TAG|$TAG|g" manager.yaml.tmpl                    >> echo.yaml
-sed "s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
-sed "s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g" manager.yaml.tmpl                    >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
 
 if [[ "$create" = true ]]; then
   bazel run //docker:runtime
-  docker tag istio/docker:runtime gcr.io/istio-test/runtime:$TAG
-  gcloud config set project istio-test
-  gcloud docker -- push gcr.io/istio-test/runtime:$TAG
+  gcloud docker --authorize-only
+  docker tag istio/docker:runtime $HUB/runtime:$TAG
+  docker push $HUB/runtime:$TAG
   kubectl apply -f echo.yaml
 fi
 

@@ -56,7 +56,7 @@ spec:
     spec:
       containers:
       - name: manager
-        image: gcr.io/istio-test/runtime:$TAG
+        image: $HUB/runtime:$TAG
         args: ["server", "--logtostderr", "-v", "2"]
         imagePullPolicy: Always
         ports:
