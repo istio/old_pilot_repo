@@ -84,5 +84,3 @@ for src in a b t; do
   done
 done
 
-echo $ab
-
