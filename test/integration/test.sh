@@ -24,10 +24,12 @@ sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.ya
 sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
 
 if [[ "$create" = true ]]; then
-  bazel run //docker:runtime
   gcloud docker --authorize-only
-  docker tag istio/docker:runtime $HUB/runtime:$TAG
-  docker push $HUB/runtime:$TAG
+  for image in runtime app; do
+    bazel run //docker:$image
+    docker tag istio/docker:$image $HUB/$image:$TAG
+    docker push $HUB/$image:$TAG
+  done
   kubectl apply -f echo.yaml
 fi
 
@@ -48,9 +50,9 @@ for src in a b t; do
   for dst in a b t; do
     echo request from ${src} to ${dst}
 
-    request=$(kubectl exec ${!src} -c echo curl ${dst}/${src})
+    request=$(kubectl exec ${!src} -c app client http://${dst}/${src})
 
-    echo $request | grep "x-request-id" ||\
+    echo $request | grep "X-Request-Id" ||\
       if [[ $src == "t" && $dst == "t" ]]; then
         tt=true
         echo "Expected no request"
@@ -59,7 +61,7 @@ for src in a b t; do
         exit 1
       fi
 
-    id=$(echo $request | grep -o "x-request-id=\S*" | cut -d'=' -f2-)
+    id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
     echo x-request-id=$id
 
     # query access logs in src and dst

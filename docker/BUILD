@@ -15,6 +15,19 @@ pkg_tar(
 )
 
 pkg_tar(
+    name = "test",
+    extension = "tar.gz",
+    files = [
+        "//test/client",
+        "//test/server",
+    ],
+    mode = "0755",
+    package_dir = "/bin",
+    tags = ["manual"],
+)
+
+
+pkg_tar(
     name = "config",
     extension = "tar.gz",
     files = [
@@ -47,4 +60,13 @@ docker_build(
         ":config",
         ":proxy",
     ],
+)
+
+docker_build(
+    name = "app",
+    base = "@docker_ubuntu//:xenial",
+    entrypoint = ["/bin/server"],
+    repository = "istio",
+    tags = ["manual"],
+    tars = [":test"],
 )

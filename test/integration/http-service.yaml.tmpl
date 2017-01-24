@@ -39,8 +39,8 @@ spec:
           }]
     spec:
       containers:
-      - name: echo
-        image: gcr.io/google_containers/echoserver:1.4
+      - name: app
+        image: $HUB/app:$TAG
         ports:
         - containerPort: $PORT
       - name: proxy
