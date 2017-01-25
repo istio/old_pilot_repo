@@ -42,6 +42,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	body.WriteString("URL=" + r.URL.String() + "\n")
 	body.WriteString("Proto=" + r.Proto + "\n")
 	body.WriteString("RemoteAddr=" + r.RemoteAddr + "\n")
+	body.WriteString("Host=" + r.Host + "\n")
 	for name, headers := range r.Header {
 		for _, h := range headers {
 			body.WriteString(fmt.Sprintf("%v=%v\n", name, h))
