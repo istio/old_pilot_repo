@@ -17,14 +17,29 @@ while getopts :h:t:s arg; do
   esac
 done
 
+# Get my templater
+bazel build //test/integration
+replacer=../../bazel-bin/test/integration/integration
+out=echo.yaml
+
 # Write template for k8s
-rm -f echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g" manager.yaml.tmpl \
-  >> echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl\
-  >> echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|80|g" http-service.yaml.tmpl\
-  >> echo.yaml
+$replacer manager.yaml.tmpl > $out <<eof
+hub: $HUB
+tag: $TAG
+eof
+$replacer http-service.yaml.tmpl >> $out <<eof
+hub: $HUB
+tag: $TAG
+name: a
+port1: "8080"
+eof
+$replacer http-service.yaml.tmpl >> $out <<eof
+hub: $HUB
+tag: $TAG
+name: b
+port1: "80"
+eof
+
 
 if [[ "$create" = true ]]; then
   gcloud docker --authorize-only
@@ -33,7 +48,7 @@ if [[ "$create" = true ]]; then
     docker tag istio/docker:$image $HUB/$image:$TAG
     docker push $HUB/$image:$TAG
   done
-  kubectl apply -f echo.yaml
+  kubectl apply -f $out
 fi
 
 # Wait for pods to be ready
@@ -51,42 +66,45 @@ done
 tt=false
 for src in a b t; do
   for dst in a b t; do
-    echo request from ${src} to ${dst}
+    for port in 80; do
+      url="http://${dst}:${port}/${src}"
+      echo Requesting ${url} from ${src}...
 
-    request=$(kubectl exec ${!src} -c app client http://${dst}/${src})
+      request=$(kubectl exec ${!src} -c app client ${url})
 
-    echo $request | grep "X-Request-Id" ||\
-      if [[ $src == "t" && $dst == "t" ]]; then
-        tt=true
-        echo "Expected no request"
-      else
-        echo Failed injecting envoy
-        exit 1
-      fi
-
-    id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
-    echo x-request-id=$id
-
-    # query access logs in src and dst
-    for log in $src $dst; do
-      if [[ $log != "t" ]]; then
-        echo checking access log of $log
-
-        n=1
-        while : ; do
-          if [[ $n == 30 ]]; then
-            break
-          fi
-          kubectl logs ${!log} -c proxy | grep "$id" && break
-          sleep 1
-          ((n++))
-        done
-
-        if [[ $n == 30 ]]; then
-          echo failed to find request $id in access log of $log after $n attempts
+      echo $request | grep "X-Request-Id" ||\
+        if [[ $src == "t" && $dst == "t" ]]; then
+          tt=true
+          echo Expected no request
+        else
+          echo Failed injecting envoy: request ${url}
           exit 1
         fi
-      fi
+
+      id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
+      echo x-request-id=$id
+
+      # query access logs in src and dst
+      for log in $src $dst; do
+        if [[ $log != "t" ]]; then
+          echo Checking access log of $log...
+
+          n=1
+          while : ; do
+            if [[ $n == 30 ]]; then
+              break
+            fi
+            kubectl logs ${!log} -c proxy | grep "$id" && break
+            sleep 1
+            ((n++))
+          done
+
+          if [[ $n == 30 ]]; then
+            echo Failed to find request $id in access log of $log after $n attempts for $url
+            exit 1
+          fi
+        fi
+      done
     done
   done
 done

@@ -1,35 +1,42 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-// An example implementation of Echo backend in go.
+// An example implementation of an echo backend.
 
 package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
+	"log"
 	"net/http"
-	"strconv"
+	"os"
+	"os/signal"
+	"syscall"
+
+	flag "github.com/spf13/pflag"
 )
 
 var (
-	port = flag.Int("port", 8080, "default http port")
+	ports []string
 )
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func init() {
+	flag.StringArrayVar(&ports, "port", []string{"8080"}, "HTTP/1.1 ports")
+}
+
+func httpHandler(w http.ResponseWriter, r *http.Request) {
 	body := bytes.Buffer{}
 	body.WriteString("Method=" + r.Method + "\n")
 	body.WriteString("URL=" + r.URL.String() + "\n")
@@ -43,14 +50,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/text")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body.Bytes())
+	if _, err := w.Write(body.Bytes()); err != nil {
+		log.Println(err.Error())
+	}
+}
+
+func run(addr string) {
+	fmt.Printf("Listening HTTP1.1 on %v\n", addr)
+	if err := http.ListenAndServe(":"+addr, nil); err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func main() {
 	flag.Parse()
-
-	fmt.Printf("Listening on port %v\n", *port)
-
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+	http.HandleFunc("/", httpHandler)
+	for _, port := range ports {
+		go run(port)
+	}
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
 }
