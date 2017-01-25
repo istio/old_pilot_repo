@@ -46,6 +46,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("Template error %v", err)
 		}
-		tmpl.Execute(os.Stdout, out)
+		if err := tmpl.Execute(os.Stdout, out); err != nil {
+			log.Fatalf("Template execution error %v", err)
+		}
 	}
 }
