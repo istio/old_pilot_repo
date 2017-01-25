@@ -41,6 +41,9 @@ spec:
       containers:
       - name: app
         image: $HUB/app:$TAG
+        args:
+          - --port
+          - "$PORT"
         ports:
         - containerPort: $PORT
       - name: proxy

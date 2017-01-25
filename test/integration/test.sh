@@ -19,9 +19,12 @@ done
 
 # Write template for k8s
 rm -f echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g" manager.yaml.tmpl                    >> echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
-sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|8080|g" http-service.yaml.tmpl  >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g" manager.yaml.tmpl \
+  >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|a|g;s|\$PORT|8080|g" http-service.yaml.tmpl\
+  >> echo.yaml
+sed "s|\$HUB|$HUB|g;s|\$TAG|$TAG|g;s|\$NAME|b|g;s|\$PORT|80|g" http-service.yaml.tmpl\
+  >> echo.yaml
 
 if [[ "$create" = true ]]; then
   gcloud docker --authorize-only
@@ -39,12 +42,12 @@ while : ; do
   sleep 1
 done
 
-a=$(kubectl get pods -l app=a -o jsonpath='{range .items[*]}{@.metadata.name}')
-b=$(kubectl get pods -l app=b -o jsonpath='{range .items[*]}{@.metadata.name}')
-t=$(kubectl get pods -l app=t -o jsonpath='{range .items[*]}{@.metadata.name}')
-m=$(kubectl get pods -l app=m -o jsonpath='{range .items[*]}{@.metadata.name}')
+# Get pod names
+for pod in a b t m; do
+  declare "${pod}"="$(kubectl get pods -l app=$pod -o jsonpath='{range .items[*]}{@.metadata.name}')"
+done
 
-# try all requests a,b,t
+# Try all pairwise requests
 tt=false
 for src in a b t; do
   for dst in a b t; do
