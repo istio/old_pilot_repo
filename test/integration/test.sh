@@ -66,45 +66,43 @@ done
 tt=false
 for src in a b t; do
   for dst in a b t; do
-    for port in 80; do
-      url="http://${dst}:${port}/${src}"
-      echo Requesting ${url} from ${src}...
+    url="http://${dst}/${src}"
+    echo Requesting ${url} from ${src}...
 
-      request=$(kubectl exec ${!src} -c app client ${url})
+    request=$(kubectl exec ${!src} -c app client ${url})
 
-      echo $request | grep "X-Request-Id" ||\
-        if [[ $src == "t" && $dst == "t" ]]; then
-          tt=true
-          echo Expected no request
-        else
-          echo Failed injecting envoy: request ${url}
+    echo $request | grep "X-Request-Id" ||\
+      if [[ $src == "t" && $dst == "t" ]]; then
+        tt=true
+        echo Expected no request
+      else
+        echo Failed injecting envoy: request ${url}
+        exit 1
+      fi
+
+    id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
+    echo x-request-id=$id
+
+    # query access logs in src and dst
+    for log in $src $dst; do
+      if [[ $log != "t" ]]; then
+        echo Checking access log of $log...
+
+        n=1
+        while : ; do
+          if [[ $n == 30 ]]; then
+            break
+          fi
+          kubectl logs ${!log} -c proxy | grep "$id" && break
+          sleep 1
+          ((n++))
+        done
+
+        if [[ $n == 30 ]]; then
+          echo Failed to find request $id in access log of $log after $n attempts for $url
           exit 1
         fi
-
-      id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
-      echo x-request-id=$id
-
-      # query access logs in src and dst
-      for log in $src $dst; do
-        if [[ $log != "t" ]]; then
-          echo Checking access log of $log...
-
-          n=1
-          while : ; do
-            if [[ $n == 30 ]]; then
-              break
-            fi
-            kubectl logs ${!log} -c proxy | grep "$id" && break
-            sleep 1
-            ((n++))
-          done
-
-          if [[ $n == 30 ]]; then
-            echo Failed to find request $id in access log of $log after $n attempts for $url
-            exit 1
-          fi
-        fi
-      done
+      fi
     done
   done
 done

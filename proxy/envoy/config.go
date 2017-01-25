@@ -69,6 +69,7 @@ const (
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
 func Generate(instances []*model.ServiceInstance, services []*model.Service, mesh *MeshConfig) (*Config, error) {
 	listeners, clusters := buildListeners(instances, services, mesh)
+	// TODO: add catch-all filters to prevent Envoy from crashing
 	listeners = append(listeners, Listener{
 		Port:           mesh.ProxyPort,
 		BindToPort:     true,
