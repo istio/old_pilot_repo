@@ -67,7 +67,7 @@ tt=false
 for src in a b t; do
   for dst in a b t; do
     url="http://${dst}/${src}"
-    echo Requesting ${url} from ${src}...
+    echo -e "\033[1m Requesting ${url} from ${src}... \033[0m"
 
     request=$(kubectl exec ${!src} -c app client ${url})
 
@@ -107,3 +107,4 @@ for src in a b t; do
   done
 done
 
+echo -e "\033[1m Success! \033[0m"
