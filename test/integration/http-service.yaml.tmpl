@@ -53,7 +53,7 @@ spec:
         args:
           - proxy
           - -s
-          - m:8080
+          - manager:8080
           - --logtostderr
           - -v
           - "2"
@@ -61,7 +61,5 @@ spec:
           - "5001"
           - -n
           - default
-          - -b
-          - "/envoy_esp"
         imagePullPolicy: Always
 ---

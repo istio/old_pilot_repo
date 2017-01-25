@@ -58,7 +58,7 @@ while : ; do
 done
 
 # Get pod names
-for pod in a b t m; do
+for pod in a b t; do
   declare "${pod}"="$(kubectl get pods -l app=$pod -o jsonpath='{range .items[*]}{@.metadata.name}')"
 done
 
@@ -76,7 +76,7 @@ for src in a b t; do
         tt=true
         echo Expected no request
       else
-        echo Failed injecting envoy: request ${url}
+        echo Failed injecting proxy: request ${url}
         exit 1
       fi
 

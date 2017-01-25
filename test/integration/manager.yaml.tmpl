@@ -33,26 +33,26 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: m
+  name: manager
   labels:
-    app: m
+    app: manager
 spec:
   ports:
   - port: 8080
     name: http-discovery
   selector:
-    app: m
+    app: manager
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: m
+  name: manager
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: m
+        app: manager
     spec:
       containers:
       - name: manager
