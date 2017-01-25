@@ -54,9 +54,10 @@ func (conf *Config) Write(w io.Writer) error {
 
 const (
 	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
-	OutboundClusterPrefix = "outbound_"
+	OutboundClusterPrefix = "outbound:"
+
 	// InboundClusterPrefix is the prefix for service clusters co-hosted on the proxy instance
-	InboundClusterPrefix = "inbound_"
+	InboundClusterPrefix = "inbound:"
 )
 
 // TODO: these values used in the Envoy configuration will be configurable
@@ -125,7 +126,7 @@ func buildListeners(instances []*model.ServiceInstance,
 	clusters := buildClusters(services)
 	listeners := make([]Listener, 0)
 
-	// group by port values
+	// group by port values to service with the declared port
 	type listener struct {
 		instances map[model.Protocol][]*model.Service
 		services  map[model.Protocol][]*model.Service
@@ -143,23 +144,20 @@ func buildListeners(instances []*model.ServiceInstance,
 		}
 	}
 
-	// Note the distinction between outgoing service ports and incoming instance
-	// ports. Since there is a translation step from service to instance IP the
-	// ports may change from the request to its capture here.
-
 	// group all service instances by (target-)port values
+	// (assumption: traffic gets redirected from service port to instance port)
 	for _, instance := range instances {
-		targetPort := instance.Endpoint.Port
-		ensure(targetPort.Port)
-		ports[targetPort.Port].instances[targetPort.Protocol] = append(
-			ports[targetPort.Port].instances[targetPort.Protocol], &model.Service{
+		port := instance.Endpoint.Port
+		ensure(port)
+		ports[port].instances[instance.Endpoint.ServicePort.Protocol] = append(
+			ports[port].instances[instance.Endpoint.ServicePort.Protocol], &model.Service{
 				Name:      instance.Service.Name,
 				Namespace: instance.Service.Namespace,
-				Ports:     []model.Port{targetPort},
+				Ports:     []*model.Port{instance.Endpoint.ServicePort},
 			})
 	}
 
-	// group all services by (service-)port values
+	// group all services by (service-)port values for outgoing traffic
 	for _, svc := range services {
 		for _, port := range svc.Ports {
 			ensure(port.Port)
@@ -167,7 +165,7 @@ func buildListeners(instances []*model.ServiceInstance,
 				ports[port.Port].services[port.Protocol], &model.Service{
 					Name:      svc.Name,
 					Namespace: svc.Namespace,
-					Ports:     []model.Port{port},
+					Ports:     []*model.Port{port},
 				})
 		}
 	}
@@ -223,7 +221,7 @@ func buildListeners(instances []*model.ServiceInstance,
 
 			// If the traffic is sent to a service that has instances co-located with the proxy,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
-			// Note that this may not be a problem if the service port and its target port are distinct.
+			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
 				host := buildHost(svc, localhost)
 				hosts[svc.String()] = host
@@ -278,7 +276,7 @@ func buildClusters(services []*model.Service) []Cluster {
 			clusterSvc := model.Service{
 				Name:      svc.Name,
 				Namespace: svc.Namespace,
-				Ports:     []model.Port{port},
+				Ports:     []*model.Port{port},
 			}
 			cluster := Cluster{
 				Name:             OutboundClusterPrefix + clusterSvc.String(),
