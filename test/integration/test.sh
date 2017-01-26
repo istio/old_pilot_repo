@@ -32,12 +32,14 @@ hub: $HUB
 tag: $TAG
 name: a
 port1: "8080"
+port2: "80"
 eof
 $replacer http-service.yaml.tmpl >> $out <<eof
 hub: $HUB
 tag: $TAG
 name: b
 port1: "80"
+port2: "8000"
 eof
 
 
@@ -66,43 +68,45 @@ done
 tt=false
 for src in a b t; do
   for dst in a b t; do
-    url="http://${dst}/${src}"
-    echo -e "\033[1m Requesting ${url} from ${src}... \033[0m"
+    for port in "" ":80" ":8080"; do
+      url="http://${dst}${port}/${src}"
+      echo -e "\033[1m Requesting ${url} from ${src}... \033[0m"
 
-    request=$(kubectl exec ${!src} -c app client ${url})
+      request=$(kubectl exec ${!src} -c app client ${url})
 
-    echo $request | grep "X-Request-Id" ||\
-      if [[ $src == "t" && $dst == "t" ]]; then
-        tt=true
-        echo Expected no request
-      else
-        echo Failed injecting proxy: request ${url}
-        exit 1
-      fi
-
-    id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
-    echo x-request-id=$id
-
-    # query access logs in src and dst
-    for log in $src $dst; do
-      if [[ $log != "t" ]]; then
-        echo Checking access log of $log...
-
-        n=1
-        while : ; do
-          if [[ $n == 30 ]]; then
-            break
-          fi
-          kubectl logs ${!log} -c proxy | grep "$id" && break
-          sleep 1
-          ((n++))
-        done
-
-        if [[ $n == 30 ]]; then
-          echo Failed to find request $id in access log of $log after $n attempts for $url
+      echo $request | grep "X-Request-Id" ||\
+        if [[ $src == "t" && $dst == "t" ]]; then
+          tt=true
+          echo Expected no request
+        else
+          echo Failed injecting proxy: request ${url}
           exit 1
         fi
-      fi
+
+      id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
+      echo x-request-id=$id
+
+      # query access logs in src and dst
+      for log in $src $dst; do
+        if [[ $log != "t" ]]; then
+          echo Checking access log of $log...
+
+          n=1
+          while : ; do
+            if [[ $n == 30 ]]; then
+              break
+            fi
+            kubectl logs ${!log} -c proxy | grep "$id" && break
+            sleep 1
+            ((n++))
+          done
+
+          if [[ $n == 30 ]]; then
+            echo Failed to find request $id in access log of $log after $n attempts for $url
+            exit 1
+          fi
+        fi
+      done
     done
   done
 done

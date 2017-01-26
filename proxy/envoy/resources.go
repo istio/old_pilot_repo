@@ -28,8 +28,6 @@ type MeshConfig struct {
 	BinaryPath string
 	// Envoy config root path
 	ConfigPath string
-	// Namespace specifies environment namespace for config generation
-	Namespace string
 }
 
 // Config defines the schema for Envoy JSON configuration format
