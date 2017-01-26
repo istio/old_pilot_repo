@@ -126,6 +126,12 @@ func buildListeners(instances []*model.ServiceInstance,
 	clusters := buildClusters(services)
 	listeners := make([]Listener, 0)
 
+	// namespaces from instances
+	namespaces := make(map[string]bool, 0)
+	for _, instance := range instances {
+		namespaces[instance.Service.Namespace] = true
+	}
+
 	// group by port values to service with the declared port
 	type listener struct {
 		instances map[model.Protocol][]*model.Service
@@ -215,7 +221,7 @@ func buildListeners(instances []*model.ServiceInstance,
 		hosts := make(map[string]VirtualHost, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				host := buildHost(svc, OutboundClusterPrefix+svc.String(), mesh.Namespace)
+				host := buildHost(svc, OutboundClusterPrefix+svc.String(), namespaces)
 				hosts[svc.String()] = host
 			}
 
@@ -223,7 +229,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
-				host := buildHost(svc, localhost, mesh.Namespace)
+				host := buildHost(svc, localhost, namespaces)
 				hosts[svc.String()] = host
 			}
 		}
@@ -259,11 +265,14 @@ func buildListeners(instances []*model.ServiceInstance,
 	return listeners, clusters
 }
 
-func buildHost(svc *model.Service, cluster string, namespace string) VirtualHost {
+// buildHost constructs an entry for VirtualHost for a given service.
+// Service contains name, namespace and a single port declaration.
+func buildHost(svc *model.Service, cluster string, namespaces map[string]bool) VirtualHost {
 	hosts := make([]string, 0)
+	domains := make([]string, 0)
 
 	// add plain name if share namespace
-	if svc.Namespace == namespace {
+	if namespaces[svc.Namespace] {
 		hosts = append(hosts, svc.Name)
 	}
 
@@ -282,15 +291,20 @@ func buildHost(svc *model.Service, cluster string, namespace string) VirtualHost
 
 	// add ports
 	if len(svc.Ports) > 0 {
-		port := svc.Ports[0]
+		port := svc.Ports[0].Port
 		for _, host := range hosts {
-			hosts = append(hosts, fmt.Sprintf("%s:%d", host, port.Port))
+			domains = append(domains, fmt.Sprintf("%s:%d", host, port))
+
+			// default port 80 does not need to be specified
+			if port == 80 {
+				domains = append(domains, host)
+			}
 		}
 	}
 
 	return VirtualHost{
 		Name:    svc.String(),
-		Domains: hosts,
+		Domains: domains,
 		Routes:  []Route{{Cluster: cluster}},
 	}
 }
