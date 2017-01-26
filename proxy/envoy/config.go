@@ -159,6 +159,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			ports[port].instances[instance.Endpoint.ServicePort.Protocol], &model.Service{
 				Name:      instance.Service.Name,
 				Namespace: instance.Service.Namespace,
+				Addresses: instance.Service.Addresses,
 				Ports:     []*model.Port{instance.Endpoint.ServicePort},
 			})
 	}
@@ -171,6 +172,7 @@ func buildListeners(instances []*model.ServiceInstance,
 				ports[port.Port].services[port.Protocol], &model.Service{
 					Name:      svc.Name,
 					Namespace: svc.Namespace,
+					Addresses: svc.Addresses,
 					Ports:     []*model.Port{port},
 				})
 		}
