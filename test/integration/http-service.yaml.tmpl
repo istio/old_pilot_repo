@@ -51,6 +51,7 @@ spec:
           - "{{.port2}}"
         ports:
         - containerPort: {{.port1}}
+        - containerPort: {{.port2}}
       - name: proxy
         image: {{.hub}}/runtime:{{.tag}}
         securityContext:
