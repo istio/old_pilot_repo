@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -46,7 +47,8 @@ func write(in string, data map[string]string, out io.Writer) error {
 }
 
 const (
-	yaml = "echo.yaml"
+	yaml      = "echo.yaml"
+	namespace = "default"
 )
 
 func check(err error) {
@@ -56,11 +58,9 @@ func check(err error) {
 }
 
 var (
-	hub string
-	tag string
-
-	client    *kubernetes.Clientset
-	namespace string
+	hub    string
+	tag    string
+	client *kubernetes.Clientset
 )
 
 func init() {
@@ -70,7 +70,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	create := false
+	create := true
 
 	// write template
 	f, err := os.Create(yaml)
@@ -98,8 +98,8 @@ func main() {
 		"port2": "8000",
 	}, w))
 
-	w.Flush()
-	f.Close()
+	check(w.Flush())
+	check(f.Close())
 
 	// push docker images
 	if create {
@@ -109,7 +109,7 @@ func main() {
 			run(fmt.Sprintf("docker tag istio/docker:%s %s/%s:%s", image, hub, image, tag))
 			run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag))
 		}
-		run("kubectl apply -f " + yaml)
+		run("kubectl apply -f " + yaml + " -n " + namespace)
 	}
 	/*
 	   # Wait for pods to be ready
@@ -125,18 +125,34 @@ func main() {
 	*/
 
 	client = connect()
-	namespace = "default"
 	pods := getPods()
-	log.Println(pods)
+	log.Println("pods:", pods)
+	ids := makeRequests(pods)
+	log.Println("requests:", ids)
+	checkAccessLogs(pods, ids)
+	log.Println("Success!")
 }
 
 func run(command string) {
 	log.Println("run", command)
 	parts := strings.Split(command, " ")
+	/* #nosec */
 	c := exec.Command(parts[0], parts[1:]...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	check(c.Run())
+}
+
+func shell(command string) string {
+	log.Println("exec", command)
+	parts := strings.Split(command, " ")
+	/* #nosec */
+	c := exec.Command(parts[0], parts[1:]...)
+	bytes, err := c.CombinedOutput()
+	if err != nil {
+		log.Fatal(string(bytes), err)
+	}
+	return string(bytes)
 }
 
 func connect() *kubernetes.Clientset {
@@ -151,8 +167,10 @@ func connect() *kubernetes.Clientset {
 func getPods() map[string]string {
 	pods := make([]v1.Pod, 0)
 	out := make(map[string]string)
-	for true {
+	n := 0
+	for {
 		log.Println("Checking all pods are running...")
+		n = n + 1
 		list, err := client.Pods(namespace).List(v1.ListOptions{})
 		check(err)
 		pods = list.Items
@@ -160,6 +178,7 @@ func getPods() map[string]string {
 
 		for _, pod := range pods {
 			if pod.Status.Phase != "Running" {
+				log.Printf("Pod %s has status %s\n", pod.Name, pod.Status.Phase)
 				ready = false
 				break
 			}
@@ -167,6 +186,10 @@ func getPods() map[string]string {
 
 		if ready {
 			break
+		}
+
+		if n > 30 {
+			log.Fatal("Exceeded budget for checking pod status")
 		}
 
 		time.Sleep(1 * time.Second)
@@ -181,53 +204,66 @@ func getPods() map[string]string {
 	return out
 }
 
-/*
-# Try all pairwise requests
-tt=false
-for src in a b t; do
-  for dst in a b t; do
-    for port in "" ":80" ":8080"; do
-      url="http://${dst}${port}/${src}"
-      echo -e "\033[1m Requesting ${url} from ${src}... \033[0m"
+// makeRequests executes requests in each pod and collects request ids per pod
+func makeRequests(pods map[string]string) map[string][]string {
+	out := make(map[string][]string)
+	for app := range pods {
+		out[app] = make([]string, 0)
+	}
 
-      request=$(kubectl exec ${!src} -c app client ${url})
+	for src := range pods {
+		for dst := range pods {
+			for _, port := range []string{"", ":80", ":8080"} {
+				for _, domain := range []string{"", "." + namespace} {
+					url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+					log.Printf("Making a request %s from %s...\n", url, src)
+					request := shell(fmt.Sprintf("kubectl exec %s -c app client %s", pods[src], url))
+					log.Println(request)
+					match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
+					if len(match) > 1 {
+						id := match[1]
+						log.Printf("id=%s\n", id)
+						out[src] = append(out[src], id)
+						out[dst] = append(out[dst], id)
+					} else if src != "t" || dst != "t" {
+						log.Fatalf("Failed to inject proxy from %s to %s (url %s)", src, dst, url)
+					}
+				}
+			}
+		}
+	}
 
-      echo $request | grep "X-Request-Id" ||\
-        if [[ $src == "t" && $dst == "t" ]]; then
-          tt=true
-          echo Expected no request
-        else
-          echo Failed injecting proxy: request ${url}
-          exit 1
-        fi
+	return out
+}
 
-      id=$(echo $request | grep -o "X-Request-Id=\S*" | cut -d'=' -f2-)
-      echo x-request-id=$id
+func checkAccessLogs(pods map[string]string, ids map[string][]string) {
+	n := 0
+	for {
+		found := true
+		n = n + 1
+		for _, pod := range []string{"a", "b"} {
+			log.Printf("Checking access log of %s\n", pod)
+			access := shell(fmt.Sprintf("kubectl logs %s -c proxy", pods[pod]))
+			for _, id := range ids[pod] {
+				if !strings.Contains(access, id) {
+					log.Printf("Failed to find request id %s in log of %s\n", id, pod)
+					found = false
+					break
+				}
+			}
+			if !found {
+				break
+			}
+		}
 
-      # query access logs in src and dst
-      for log in $src $dst; do
-        if [[ $log != "t" ]]; then
-          echo Checking access log of $log...
+		if found {
+			break
+		}
 
-          n=1
-          while : ; do
-            if [[ $n == 30 ]]; then
-              break
-            fi
-            kubectl logs ${!log} -c proxy | grep "$id" && break
-            sleep 1
-            ((n++))
-          done
+		if n > 30 {
+			log.Fatalf("Exceeded budget for checking access logs")
+		}
 
-          if [[ $n == 30 ]]; then
-            echo Failed to find request $id in access log of $log after $n attempts for $url
-            exit 1
-          fi
-        fi
-      done
-    done
-  done
-done
-
-echo -e "\033[1m Success! \033[0m"
-*/
+		time.Sleep(1 * time.Second)
+	}
+}

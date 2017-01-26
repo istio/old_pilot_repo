@@ -42,13 +42,13 @@ kind: Service
 metadata:
   name: manager
   labels:
-    app: manager
+    infra: manager
 spec:
   ports:
   - port: 8080
     name: http-discovery
   selector:
-    app: manager
+    infra: manager
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -59,7 +59,7 @@ spec:
   template:
     metadata:
       labels:
-        app: manager
+        infra: manager
     spec:
       containers:
       - name: manager
