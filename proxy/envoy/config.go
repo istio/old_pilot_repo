@@ -215,7 +215,7 @@ func buildListeners(instances []*model.ServiceInstance,
 		hosts := make(map[string]VirtualHost, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				host := buildHost(svc, OutboundClusterPrefix+svc.String())
+				host := buildHost(svc, OutboundClusterPrefix+svc.String(), mesh.Namespace)
 				hosts[svc.String()] = host
 			}
 
@@ -223,7 +223,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
-				host := buildHost(svc, localhost)
+				host := buildHost(svc, localhost, mesh.Namespace)
 				hosts[svc.String()] = host
 			}
 		}
@@ -259,11 +259,38 @@ func buildListeners(instances []*model.ServiceInstance,
 	return listeners, clusters
 }
 
-func buildHost(svc *model.Service, cluster string) VirtualHost {
-	// TODO: support all variants for services: name.<my namespace>, name.namespace.svc.cluster.local
+func buildHost(svc *model.Service, cluster string, namespace string) VirtualHost {
+	hosts := make([]string, 0)
+
+	// add plain name if share namespace
+	if svc.Namespace == namespace {
+		hosts = append(hosts, svc.Name)
+	}
+
+	// add default hostnames
+	host := svc.Name + "." + svc.Namespace
+	hosts = append(hosts,
+		host,
+		host+".svc",
+		host+".svc.cluster",
+		host+".svc.cluster.local")
+
+	// add cluster IP host names
+	for ip := range svc.Addresses {
+		hosts = append(hosts, ip)
+	}
+
+	// add ports
+	if len(svc.Ports) > 0 {
+		port := svc.Ports[0]
+		for _, host := range hosts {
+			hosts = append(hosts, fmt.Sprintf("%s:%d", host, port.Port))
+		}
+	}
+
 	return VirtualHost{
 		Name:    svc.String(),
-		Domains: []string{svc.Name, svc.Name + "." + svc.Namespace},
+		Domains: hosts,
 		Routes:  []Route{{Cluster: cluster}},
 	}
 }
