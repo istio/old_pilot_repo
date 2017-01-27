@@ -37,7 +37,7 @@ spec:
               "privileged": true
             },
             "command": ["/bin/sh", "-c",
-              "sudo iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port 15001; sudo iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-port 15001 -m owner '!' --uid-owner 1337; sudo iptables -t nat --list"
+              "sudo iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port 5001; sudo iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-port 5001 -m owner '!' --uid-owner 1337; sudo iptables -t nat --list"
             ]
           }]
     spec:

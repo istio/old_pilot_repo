@@ -111,9 +111,9 @@ func init() {
 
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.DiscoveryAddress, "sds", "s", "manager:8080",
 		"Discovery service DNS address")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.ProxyPort, "port", "p", 15001,
+	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.ProxyPort, "port", "p", 5001,
 		"Envoy proxy port")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.AdminPort, "admin_port", "a", 15000,
+	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.AdminPort, "admin_port", "a", 5000,
 		"Envoy admin port")
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.BinaryPath, "envoy_path", "b", "/envoy_esp",
 		"Envoy binary location")
