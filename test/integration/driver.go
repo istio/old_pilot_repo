@@ -156,10 +156,8 @@ func connect() *kubernetes.Clientset {
 func getPods() map[string]string {
 	pods := make([]v1.Pod, 0)
 	out := make(map[string]string)
-	n := 0
-	for {
+	for n := 0; ; n++ {
 		log.Println("Checking all pods are running...")
-		n = n + 1
 		list, err := client.Pods(namespace).List(v1.ListOptions{})
 		check(err)
 		pods = list.Items
@@ -204,8 +202,7 @@ func makeRequests(pods map[string]string) map[string][]string {
 		for dst := range pods {
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + namespace} {
-					n := 1
-					for {
+					for n := 0; ; n++ {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
 						request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
@@ -230,7 +227,6 @@ func makeRequests(pods map[string]string) map[string][]string {
 						}
 
 						time.Sleep(1 * time.Second)
-						n++
 					}
 				}
 			}
@@ -242,10 +238,8 @@ func makeRequests(pods map[string]string) map[string][]string {
 
 // checkAccessLogs searches for request ids in the access logs
 func checkAccessLogs(pods map[string]string, ids map[string][]string) {
-	n := 0
-	for {
+	for n := 0; ; n++ {
 		found := true
-		n = n + 1
 		for _, pod := range []string{"a", "b"} {
 			log.Printf("Checking access log of %s\n", pod)
 			access := shell(fmt.Sprintf("kubectl logs %s -n %s -c proxy", pods[pod], namespace))
