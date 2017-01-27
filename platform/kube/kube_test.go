@@ -295,8 +295,8 @@ func makeClient(t *testing.T) *Client {
 	if _, err = os.Stat(kubeconfig); err != nil {
 		kubeconfig, _ = os.Getwd()
 		kubeconfig = kubeconfig + "/config"
-		info, err := os.Stat(kubeconfig)
-		if err != nil {
+		info, exists := os.Stat(kubeconfig)
+		if exists != nil {
 			t.Fatalf("Cannot find .kube/config file")
 		}
 
