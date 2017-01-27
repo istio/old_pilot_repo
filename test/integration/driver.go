@@ -68,9 +68,12 @@ func fail(msg string) {
 }
 
 func init() {
-	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config", "kube config file or empty for in-cluster")
-	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing", "Docker hub")
-	flag.StringVarP(&tag, "tag", "t", "test", "Docker tag")
+	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
+		"kube config file or empty for in-cluster")
+	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
+		"Docker hub")
+	flag.StringVarP(&tag, "tag", "t", "test",
+		"Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
 }
