@@ -14,13 +14,6 @@ go_library(
 
 go_binary(
     name = "integration",
-    data = [
-        "http-service.yaml.tmpl",
-        "manager.yaml.tmpl",
-        "//docker:app",
-        "//docker:runtime",
-    ],
     library = ":go_default_library",
-    tags = [":manual"],
     visibility = ["//visibility:public"],
 )
