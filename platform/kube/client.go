@@ -29,7 +29,6 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	"istio.io/manager/model"
-	proxycfg "istio.io/manager/model/proxy/alphav1/config"
 
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 
@@ -231,7 +230,8 @@ func (cl *Client) Get(key model.ConfigKey) (*model.Config, bool) {
 		return nil, false
 	}
 
-	if err = cl.mapping[key.Kind].ValidateConfig(out); err != nil {
+	spec, _ := out.Spec.(proto.Message) // FIXME: Check for errors
+	if err = cl.mapping[key.Kind].Validate(spec); err != nil {
 		glog.Warning(err)
 		return nil, false
 	}
@@ -279,13 +279,12 @@ func (cl *Client) List(kind string, ns string) ([]*model.Config, error) {
 	var out []*model.Config
 	for _, item := range list.Items {
 		elt, err := kubeToModel(kind, cl.mapping[kind], &item)
+		spec, _ := elt.Spec.(proto.Message) // FIXME: Check for errors
 		if err != nil {
 			errs = multierror.Append(errs, err)
-		}
-		else if err = cl.mapping[key.Kind].ValidateConfig(elt); err != nil {
+		} else if err = cl.mapping[kind].Validate(spec); err != nil {
 			errs = multierror.Append(errs, err)
-		}
-		else {
+		} else {
 			out = append(out, elt)
 		}
 	}
@@ -405,9 +404,4 @@ func mapToProto(message string, data map[string]interface{}) (proto.Message, err
 	}
 
 	return pb, nil
-}
-
-func (t *ProtoSchema) Validate(o proto.ProxyConfig) error {
-	// TODO: Validate route rules here.
-	return nil
 }
