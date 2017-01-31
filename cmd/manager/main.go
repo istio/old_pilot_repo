@@ -84,7 +84,7 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 
 	proxyCmd = &cobra.Command{
 		Use:   "proxy",
-		Short: "Start the proxy agent",
+		Short: "Start Istio Proxy sidecar agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, err := envoy.NewWatcher(flags.controller, flags.controller, &flags.proxy)
 			if err != nil {
@@ -93,6 +93,15 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 			stop := make(chan struct{})
 			go flags.controller.Run(stop)
 			waitSignal(stop)
+			return nil
+		},
+	}
+
+	egressCmd = &cobra.Command{
+		Use:   "egress",
+		Short: "Start Istio Proxy external service agent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: implement this method
 			return nil
 		},
 	}
@@ -122,6 +131,7 @@ func init() {
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m", "",
 		"Mixer DNS address (or empty to disable Mixer)")
 	rootCmd.AddCommand(proxyCmd)
+	proxyCmd.AddCommand(egressCmd)
 }
 
 func main() {
