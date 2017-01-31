@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: google
+spec:
+  type: ExternalName
+  externalName: google.com
+  ports:
+  - port: 80
+    name: http
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-cluster-egress
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: istio-cluster-egress
+      annotations:
+        pod.beta.kubernetes.io/init-containers: >
+          [{
+            "name": "iptables",
+            "image": "{{.hub}}/init:{{.tag}}",
+            "imagePullPolicy": "Always",
+            "securityContext": {
+              "privileged": true
+            },
+            "command": ["/bin/sh", "-c", "iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port 5001"]
+          }]
+    spec:
+      containers:
+      - name: proxy
+        image: {{.hub}}/runtime:{{.tag}}
+        imagePullPolicy: Always
+        args:
+          - egress
+          - --logtostderr
+          - -v
+          - "2"
+---

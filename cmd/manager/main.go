@@ -102,6 +102,8 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 		Short: "Start Istio Proxy external service agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: implement this method
+			stop := make(chan struct{})
+			waitSignal(stop)
 			return nil
 		},
 	}

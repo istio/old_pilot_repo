@@ -108,6 +108,11 @@ func main() {
 		"port2": "8000",
 	}, w))
 
+	check(write("test/integration/external-services.yaml.tmpl", map[string]string{
+		"hub": hub,
+		"tag": tag,
+	}, w))
+
 	check(w.Flush())
 	check(f.Close())
 
