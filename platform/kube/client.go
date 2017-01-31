@@ -230,11 +230,6 @@ func (cl *Client) Get(key model.ConfigKey) (*model.Config, bool) {
 		return nil, false
 	}
 
-	spec, _ := out.Spec.(proto.Message) // FIXME: Check for errors
-	if err = cl.mapping[key.Kind].Validate(spec); err != nil {
-		glog.Warning(err)
-		return nil, false
-	}
 	return out, true
 }
 
@@ -279,14 +274,10 @@ func (cl *Client) List(kind string, ns string) ([]*model.Config, error) {
 	var out []*model.Config
 	for _, item := range list.Items {
 		elt, err := kubeToModel(kind, cl.mapping[kind], &item)
-		spec, _ := elt.Spec.(proto.Message) // FIXME: Check for errors
 		if err != nil {
 			errs = multierror.Append(errs, err)
-		} else if err = cl.mapping[kind].Validate(spec); err != nil {
-			errs = multierror.Append(errs, err)
-		} else {
-			out = append(out, elt)
 		}
+		out = append(out, elt)
 	}
 	return out, errs
 }
@@ -313,11 +304,15 @@ func kindToAPIName(s string) string {
 }
 
 func kubeToModel(kind string, schema model.ProtoSchema, config *Config) (*model.Config, error) {
-	// TODO: validate incoming kube object	
 	spec, err := mapToProto(schema.MessageName, config.Spec)
 	if err != nil {
 		return nil, err
 	}
+
+	if err := schema.Validate(spec); err != nil {
+		return nil, err
+	}
+
 	var status proto.Message
 	if config.Status != nil {
 		status, err = mapToProto(schema.StatusMessageName, config.Status)
@@ -347,7 +342,7 @@ func modelToKube(km model.KindMap, obj *model.Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
- 	var status map[string]interface{}
+	var status map[string]interface{}
 	if obj.Status != nil {
 		status, err = protoToMap(obj.Status.(proto.Message))
 		if err != nil {
