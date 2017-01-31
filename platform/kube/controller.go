@@ -52,6 +52,7 @@ type cacheHandler struct {
 }
 
 const (
+	// TODO: make this configurable
 	// ServiceSuffix is the hostname suffix used by a Kubernetes service
 	ServiceSuffix = "svc.cluster.local"
 )
@@ -453,14 +454,14 @@ func convertService(svc v1.Service) *model.Service {
 // parseHostname is the inverse of hostname pattern from Kubernetes/Istio service translation
 func parseHostname(hostname string) (string, string, error) {
 	prefix := strings.TrimSuffix(hostname, "."+ServiceSuffix)
-	if len(prefix) < len(hostname) {
-		parts := strings.Split(prefix, ".")
-		if len(parts) == 2 {
-			return parts[0], parts[1], nil
-		}
+	if len(prefix) >= len(hostname) {
+		return "", "", fmt.Errorf("Missing hostname suffix: %q", hostname)
+	}
+	parts := strings.Split(prefix, ".")
+	if len(parts) != 2 {
 		return "", "", fmt.Errorf("Incorrect number of hostname labels, expect 2, got %d, %q", len(parts), prefix)
 	}
-	return "", "", fmt.Errorf("Missing hostname suffix: %q", hostname)
+	return parts[0], parts[1], nil
 }
 
 func convertProtocol(name string, proto v1.Protocol) model.Protocol {
