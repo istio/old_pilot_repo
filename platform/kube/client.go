@@ -361,7 +361,7 @@ func modelToKube(km model.KindMap, obj *model.Config) (*Config, error) {
 	return out, nil
 }
 
-func protoToMap(msg proxycf.ProxyConfig) (map[string]interface{}, error) {
+func protoToMap(msg proxycfg.ProxyConfig) (map[string]interface{}, error) {
 	// Marshal from proto to json bytes
 	m := jsonpb.Marshaler{}
 	bytes, err := m.MarshalToString(msg)
@@ -394,5 +394,14 @@ func mapToProto(message string, data map[string]interface{}) (proxycfg.ProxyConf
 		return nil, err
 	}
 
+	err = validateRouteRules(pb)
+	if err != nill {
+		return nil, err
+	}
 	return pb, nil
+}
+
+func validateRouteRules(msg proxycfg.ProxyConfig) error {
+	// TODO: Validate route rules here.
+	return nil
 }
