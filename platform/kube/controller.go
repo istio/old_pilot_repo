@@ -52,8 +52,8 @@ type cacheHandler struct {
 }
 
 const (
-	// TODO: make this configurable
 	// ServiceSuffix is the hostname suffix used by a Kubernetes service
+	// TODO: DNS suffix configurable
 	ServiceSuffix = "svc.cluster.local"
 )
 
