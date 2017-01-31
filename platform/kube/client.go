@@ -29,6 +29,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	"istio.io/manager/model"
+	proxycfg "istio.io/manager/model/proxy/alphav1/config"
 
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 
@@ -303,18 +304,18 @@ func kindToAPIName(s string) string {
 }
 
 func kubeToModel(kind string, schema model.ProtoSchema, config *Config) (*model.Config, error) {
-	// TODO: validate incoming kube object
+	// TODO: validate incoming kube object	
 	spec, err := mapToProto(schema.MessageName, config.Spec)
 	if err != nil {
 		return nil, err
 	}
-	var status proto.Message
-	if config.Status != nil {
-		status, err = mapToProto(schema.StatusMessageName, config.Status)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// var status proto.Message
+	// if config.Status != nil {
+	// 	status, err = mapToProto(schema.StatusMessageName, config.Status)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	out := model.Config{
 		ConfigKey: model.ConfigKey{
@@ -333,17 +334,17 @@ func modelToKube(km model.KindMap, obj *model.Config) (*Config, error) {
 	if err := km.ValidateConfig(obj); err != nil {
 		return nil, err
 	}
-	spec, err := protoToMap(obj.Spec.(proto.Message))
+	spec, err := protoToMap(obj.Spec.(proxycfg.ProxyConfig))
 	if err != nil {
 		return nil, err
 	}
-	var status map[string]interface{}
-	if obj.Status != nil {
-		status, err = protoToMap(obj.Status.(proto.Message))
-		if err != nil {
-			return nil, err
-		}
-	}
+	// var status map[string]interface{}
+	// if obj.Status != nil {
+	// 	status, err = protoToMap(obj.Status.(proto.Message))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	out := &Config{
 		TypeMeta: meta_v1.TypeMeta{
@@ -360,7 +361,7 @@ func modelToKube(km model.KindMap, obj *model.Config) (*Config, error) {
 	return out, nil
 }
 
-func protoToMap(msg proto.Message) (map[string]interface{}, error) {
+func protoToMap(msg proxycf.ProxyConfig) (map[string]interface{}, error) {
 	// Marshal from proto to json bytes
 	m := jsonpb.Marshaler{}
 	bytes, err := m.MarshalToString(msg)
@@ -378,7 +379,7 @@ func protoToMap(msg proto.Message) (map[string]interface{}, error) {
 	return data, nil
 }
 
-func mapToProto(message string, data map[string]interface{}) (proto.Message, error) {
+func mapToProto(message string, data map[string]interface{}) (proxycfg.ProxyConfig, error) {
 	// Marshal to json bytes
 	str, err := json.Marshal(data)
 	if err != nil {
@@ -387,7 +388,7 @@ func mapToProto(message string, data map[string]interface{}) (proto.Message, err
 
 	// Unmarshal from bytes to proto
 	pbt := proto.MessageType(message)
-	pb := reflect.New(pbt.Elem()).Interface().(proto.Message)
+	pb := reflect.New(pbt.Elem()).Interface().(proxycfg.ProxyConfig)
 	err = jsonpb.UnmarshalString(string(str), pb)
 	if err != nil {
 		return nil, err
