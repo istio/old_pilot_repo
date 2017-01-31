@@ -19,9 +19,16 @@ import (
 	"reflect"
 	"time"
 
+	"encoding/json"
+
+	"github.com/amalgam8/amalgam8/sidecar/config"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/jsonpb"
+	"istio.io/manager/bazel-manager/model"
 	"istio.io/manager/model"
 )
+
+const ProxyConfig = "ProxyConfig"
 
 // Watcher observes service registry and triggers a reload on a change
 type Watcher interface {
@@ -32,6 +39,7 @@ type watcher struct {
 	discovery model.ServiceDiscovery
 	mesh      *MeshConfig
 	addrs     map[string]bool
+	proxyCfg  *config.ProxyConfig
 }
 
 // NewWatcher creates a new watcher instance with an agent
@@ -49,6 +57,10 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 		addrs:     addrs,
 	}
 
+	if err := ctl.AppendConfigHandler(ProxyConfig, out.handleConfig); err != nil {
+		return nil, err
+	}
+
 	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
 		return nil, err
 	}
@@ -61,8 +73,30 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 	return out, nil
 }
 
+func (w *watcher) handleConfig(c *model.Config, e model.Event) {
+	if e == model.EventDelete {
+		return
+	}
+
+	// TODO: factor in the name/namespace?
+
+	m := jsonpb.Marshaler{}
+	s, err := m.MarshalToString(c.Spec)
+	if err != nil {
+		return
+	}
+
+	cfg := &config.ProxyConfig{}
+	if err = json.Unmarshal([]byte(s), cfg); err != nil {
+		return
+	}
+
+	w.proxyCfg = cfg
+	w.reload()
+}
+
 func (w *watcher) reload() {
-	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(), w.mesh)
+	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(), w.mesh, w.proxyCfg)
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
