@@ -407,7 +407,7 @@ func mapToProto(message string, data map[string]interface{}) (proto.Message, err
 	return pb, nil
 }
 
-func (t *ProtoSchema) Validate(o proto.Message) error {
+func (t *ProtoSchema) Validate(o proto.ProxyConfig) error {
 	// TODO: Validate route rules here.
 	return nil
 }
