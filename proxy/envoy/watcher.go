@@ -21,11 +21,10 @@ import (
 
 	"encoding/json"
 
-	"github.com/amalgam8/amalgam8/sidecar/config"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/jsonpb"
-	"istio.io/manager/bazel-manager/model"
 	"istio.io/manager/model"
+	"istio.io/manager/model/proxy/alphav1/config"
 )
 
 const ProxyConfig = "ProxyConfig"
