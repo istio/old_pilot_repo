@@ -63,7 +63,7 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 					MessageName:       "ProxyConfig",
 					Description:       "Proxy configuration",
 					StatusMessageName: "ProxyRuleStatus",
-					Validate:           model.ValidateProxyConfig,
+					Validate:          model.ValidateProxyConfig,
 				},
 			}
 

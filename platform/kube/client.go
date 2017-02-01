@@ -309,7 +309,7 @@ func kubeToModel(kind string, schema model.ProtoSchema, config *Config) (*model.
 		return nil, err
 	}
 
-	if err := schema.Validate(spec); err != nil {
+	if err = schema.Validate(spec); err != nil {
 		return nil, err
 	}
 

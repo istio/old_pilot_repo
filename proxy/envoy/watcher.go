@@ -24,6 +24,7 @@ import (
 	"istio.io/manager/model/proxy/alphav1/config"
 )
 
+// ProxyConfig describes the name of the resource posted
 const ProxyConfig = "ProxyConfig"
 
 // Watcher observes service registry and triggers a reload on a change

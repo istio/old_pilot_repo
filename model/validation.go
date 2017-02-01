@@ -192,7 +192,7 @@ func (t Tag) Validate() error {
 func ValidateProxyConfig(o proto.Message) error {
 	newConfig := &proxyconfig.ProxyConfig{}
 
-	data, err := proto.Marshal(o) 
+	data, err := proto.Marshal(o)
 	if err != nil {
 		return err
 	}
