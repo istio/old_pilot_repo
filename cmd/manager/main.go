@@ -27,7 +27,6 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	"istio.io/manager/model"
 )

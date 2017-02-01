@@ -19,10 +19,7 @@ import (
 	"reflect"
 	"time"
 
-	"encoding/json"
-
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/jsonpb"
 	"istio.io/manager/model"
 	"istio.io/manager/model/proxy/alphav1/config"
 )
@@ -79,17 +76,7 @@ func (w *watcher) handleConfig(c *model.Config, e model.Event) {
 
 	// TODO: factor in the name/namespace?
 
-	m := jsonpb.Marshaler{}
-	s, err := m.MarshalToString(c.Spec)
-	if err != nil {
-		return
-	}
-
-	cfg := &config.ProxyConfig{}
-	if err = json.Unmarshal([]byte(s), cfg); err != nil {
-		return
-	}
-
+	cfg := c.Spec.(*config.ProxyConfig)
 	w.proxyCfg = cfg
 	w.reload()
 }
