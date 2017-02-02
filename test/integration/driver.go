@@ -205,6 +205,21 @@ func getPods() map[string]string {
 		}
 
 		if n > budget {
+			for _, pod := range pods {
+				log.Println("Pod proxy logs", pod.Name)
+				for _, container := range pod.Spec.Containers {
+					if container.Name == "proxy" {
+						out, err := client.Pods(namespace).
+							GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name}).
+							Do().Raw()
+						if err != nil {
+							log.Println("Request error", err)
+						} else {
+							log.Println(string(raw))
+						}
+					}
+				}
+			}
 			fail("Exceeded budget for checking pod status")
 		}
 
