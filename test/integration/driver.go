@@ -209,7 +209,7 @@ func getPods() map[string]string {
 				log.Println("Pod proxy logs", pod.Name)
 				for _, container := range pod.Spec.Containers {
 					if container.Name == "proxy" {
-						out, err := client.Pods(namespace).
+						raw, err := client.Pods(namespace).
 							GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name}).
 							Do().Raw()
 						if err != nil {
