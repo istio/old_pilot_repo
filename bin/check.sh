@@ -7,8 +7,6 @@ gometalinter --deadline=300s --disable-all\
   --enable=errcheck\
   --enable=gas\
   --enable=goconst\
-  --enable=gocyclo\
-  --cyclo-over=15\
   --enable=gofmt\
   --enable=goimports\
   --enable=golint --exclude=.pb.go\
@@ -29,3 +27,5 @@ gometalinter --deadline=300s --disable-all\
 
 # Disabled linters:
 # --enable=dupl\
+# --enable=gocyclo\
+# --cyclo-over=15\
