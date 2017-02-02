@@ -82,6 +82,12 @@ func main() {
 	flag.Parse()
 	log.Printf("hub %v, tag %v", hub, tag)
 
+	// connect to k8s
+	client = connect()
+	if namespace == "" {
+		namespace = generateNamespace(client)
+	}
+
 	// write template
 	f, err := os.Create(yaml)
 	check(err)
@@ -109,17 +115,14 @@ func main() {
 	}, w))
 
 	check(write("test/integration/external-services.yaml.tmpl", map[string]string{
-		"hub": hub,
-		"tag": tag,
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
 	}, w))
 
 	check(w.Flush())
 	check(f.Close())
 
-	client = connect()
-	if namespace == "" {
-		namespace = generateNamespace(client)
-	}
 	run("kubectl apply -f " + yaml + " -n " + namespace)
 	pods := getPods()
 	log.Println("pods:", pods)

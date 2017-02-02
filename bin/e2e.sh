@@ -8,7 +8,6 @@ while getopts :h:t: arg; do
   case ${arg} in
     h) hub="${OPTARG}";;
     t) tag="${OPTARG}";;
-    *) echo unrecognized flag ${OPTARG}; exit 1;;
   esac
 done
 

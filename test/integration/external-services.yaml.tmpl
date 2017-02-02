@@ -2,12 +2,25 @@ apiVersion: v1
 kind: Service
 metadata:
   name: google
+  annotations:
+    istio.io/ExternalName: google.com
 spec:
   type: ExternalName
-  externalName: google.com
+  externalName: istio-egress.{{.namespace}}.svc.cluster.local
   ports:
   - port: 80
     name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-egress
+spec:
+  ports:
+  - port: 80
+    name: http
+  selector:
+    app: istio-egress
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -25,6 +38,7 @@ spec:
         image: {{.hub}}/runtime:{{.tag}}
         imagePullPolicy: Always
         args:
+          - proxy
           - egress
           - --logtostderr
           - -v
