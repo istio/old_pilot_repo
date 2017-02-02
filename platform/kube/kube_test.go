@@ -219,7 +219,7 @@ func TestServices(t *testing.T) {
 	hostname := fmt.Sprintf("%s.%s.%s", testService, ns, ServiceSuffix)
 
 	var sds model.ServiceDiscovery = ctl
-	createService(testService, ns, cl.client, t)
+	makeService(testService, ns, cl.client, t)
 	eventually(func() bool {
 		out := sds.Services()
 		glog.Info("Services: %#v", out)
@@ -231,11 +231,14 @@ func TestServices(t *testing.T) {
 	}, t)
 
 	svc, exists := sds.GetService(hostname)
-	if !exists || svc.Hostname != hostname {
-		t.Errorf("GetService(%q) => %v, %t, want true", hostname, svc, exists)
+	if !exists {
+		t.Errorf("GetService(%q) => %t, want true", hostname, exists)
+	}
+	if svc.Hostname != hostname {
+		t.Errorf("GetService(%q) => %q", hostname, svc.Hostname)
 	}
 
-	missing := fmt.Sprintf("do-not-exist.%s.%s", ns, ServiceSuffix)
+	missing := fmt.Sprintf("does-not-exist.%s.%s", ns, ServiceSuffix)
 	_, exists = sds.GetService(missing)
 	if exists {
 		t.Errorf("GetService(%q) => %t, want false", missing, exists)
@@ -304,7 +307,7 @@ func makeNamespace(cl *kubernetes.Clientset, t *testing.T) string {
 	return ns.Name
 }
 
-func createService(n, ns string, cl *kubernetes.Clientset, t *testing.T) {
+func makeService(n, ns string, cl *kubernetes.Clientset, t *testing.T) {
 	_, err := cl.Core().Services(ns).Create(&v1.Service{
 		ObjectMeta: v1.ObjectMeta{Name: n},
 		Spec: v1.ServiceSpec{
