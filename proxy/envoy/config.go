@@ -73,7 +73,7 @@ const (
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
 func Generate(instances []*model.ServiceInstance, services []*model.Service,
 	mesh *MeshConfig, proxyCfg *config.ProxyConfig) (*Config, error) {
-	listeners, clusters := buildListeners(instances, services, mesh)
+	listeners, clusters := buildListeners(instances, services, mesh, proxyCfg)
 	// TODO: add catch-all filters to prevent Envoy from crashing
 	listeners = append(listeners, Listener{
 		Port:           mesh.ProxyPort,
@@ -126,7 +126,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 // pod or outside the pod to service clusters based on the traffic metadata.
 func buildListeners(instances []*model.ServiceInstance,
 	services []*model.Service,
-	mesh *MeshConfig) ([]Listener, []Cluster) {
+	mesh *MeshConfig, proxyCfg *config.ProxyConfig) ([]Listener, []Cluster) {
 	clusters := buildClusters(services)
 	listeners := make([]Listener, 0)
 
@@ -370,6 +370,8 @@ func buildClusters(services []*model.Service) []Cluster {
 			}
 			if port.Protocol == model.ProtocolGRPC ||
 				port.Protocol == model.ProtocolHTTP2 {
+				// TODO: Shouldn't this be default if we are using Envoy to Envoy communication across
+				// the deployment?
 				cluster.Features = "http2"
 			}
 			clusters = append(clusters, cluster)
