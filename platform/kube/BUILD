@@ -33,13 +33,19 @@ go_library(
     ],
 )
 
+filegroup(
+    name="kubeconfig",
+    srcs = ["config"],
+    visibility = ["//visibility:public"],
+)
+
 go_test(
     name = "go_default_test",
     srcs = [
         "kube_test.go",
         "queue_test.go",
     ],
-    data = ["config"],
+    data = [":kubeconfig"],
     library = ":go_default_library",
     deps = [
         "//model:go_default_library",
@@ -49,5 +55,3 @@ go_test(
         "@io_k8s_client_go//pkg/api/v1:go_default_library",
     ],
 )
-
-go_prefix("istio.io/manager")

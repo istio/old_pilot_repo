@@ -80,7 +80,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	build := true
+	log.Printf("hub %v, tag %v", hub, tag)
 
 	// write template
 	f, err := os.Create(yaml)
@@ -115,16 +115,6 @@ func main() {
 
 	check(w.Flush())
 	check(f.Close())
-
-	// push docker images
-	if build {
-		run("gcloud docker --authorize-only")
-		for _, image := range []string{"app", "init", "runtime"} {
-			run(fmt.Sprintf("bazel run //docker:%s", image))
-			run(fmt.Sprintf("docker tag istio/docker:%s %s/%s:%s", image, hub, image, tag))
-			run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag))
-		}
-	}
 
 	client = connect()
 	if namespace == "" {
@@ -227,15 +217,16 @@ func getPods() map[string]string {
 	return out
 }
 
-// makeRequests executes requests in each pod and collects request ids per pod
+// makeRequests executes requests in pods and collects request ids per pod to check against access logs
 func makeRequests(pods map[string]string) map[string][]string {
 	out := make(map[string][]string)
 	for app := range pods {
 		out[app] = make([]string, 0)
 	}
 
-	for src := range pods {
-		for dst := range pods {
+	testPods := []string{"a", "b", "t"}
+	for _, src := range testPods {
+		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + namespace} {
 					for n := 0; ; n++ {

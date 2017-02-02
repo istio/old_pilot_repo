@@ -12,24 +12,13 @@ spec:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: istio-cluster-egress
+  name: istio-egress
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: istio-cluster-egress
-      annotations:
-        pod.beta.kubernetes.io/init-containers: >
-          [{
-            "name": "iptables",
-            "image": "{{.hub}}/init:{{.tag}}",
-            "imagePullPolicy": "Always",
-            "securityContext": {
-              "privileged": true
-            },
-            "command": ["/bin/sh", "-c", "iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port 5001"]
-          }]
+        app: istio-egress
     spec:
       containers:
       - name: proxy
