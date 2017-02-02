@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e 
+
 # TODO Hardcoded to match user defined deployment/pod specs and istio proxy
 # configuration. Optionally pull this from ConfigMap to dynamically coordinate
 # uid and port management with proxy (re)start and config.
