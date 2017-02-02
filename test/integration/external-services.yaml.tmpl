@@ -1,9 +1,10 @@
+# Example external service for egress
 apiVersion: v1
 kind: Service
 metadata:
-  name: google
+  name: httpbin
   annotations:
-    istio.io/ExternalName: google.com
+    istio.io/external.dns: httpbin.org
 spec:
   type: ExternalName
   externalName: istio-egress.{{.namespace}}.svc.cluster.local
@@ -18,7 +19,7 @@ metadata:
 spec:
   ports:
   - port: 80
-    name: http
+    name: "80"
   selector:
     app: istio-egress
 ---

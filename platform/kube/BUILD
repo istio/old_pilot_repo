@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "config.go",
         "controller.go",
+        "conversion.go",
         "queue.go",
     ],
     visibility = ["//visibility:public"],
@@ -42,6 +43,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "conversion_test.go",
         "kube_test.go",
         "queue_test.go",
     ],
