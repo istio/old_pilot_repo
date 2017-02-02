@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"istio.io/manager/model"
 )
 
 type args struct {
@@ -57,7 +58,16 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			glog.V(2).Infof("flags: %#v", flags)
 
-			client, err := kube.NewClient(flags.kubeconfig, nil)
+			km := model.KindMap{
+				"istio.proxy.v1alpha.config": model.ProtoSchema{
+					MessageName:       "ProxyConfig",
+					Description:       "Proxy configuration",
+					StatusMessageName: "ProxyRuleStatus",
+					Validate:          model.ValidateProxyConfig,
+				},
+			}
+
+			client, err := kube.NewClient(flags.kubeconfig, km)
 			if err != nil {
 				return multierror.Prefix(err, "Failed to connect to Kubernetes API.")
 			}

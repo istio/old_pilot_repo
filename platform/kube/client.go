@@ -229,6 +229,7 @@ func (cl *Client) Get(key model.ConfigKey) (*model.Config, bool) {
 		glog.Warning(err)
 		return nil, false
 	}
+
 	return out, true
 }
 
@@ -303,11 +304,15 @@ func kindToAPIName(s string) string {
 }
 
 func kubeToModel(kind string, schema model.ProtoSchema, config *Config) (*model.Config, error) {
-	// TODO: validate incoming kube object
 	spec, err := mapToProto(schema.MessageName, config.Spec)
 	if err != nil {
 		return nil, err
 	}
+
+	if err = schema.Validate(spec); err != nil {
+		return nil, err
+	}
+
 	var status proto.Message
 	if config.Status != nil {
 		status, err = mapToProto(schema.StatusMessageName, config.Status)

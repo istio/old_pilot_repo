@@ -22,6 +22,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	multierror "github.com/hashicorp/go-multierror"
+
+	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
 const (
@@ -183,5 +185,38 @@ func (t Tag) Validate() error {
 			errs = multierror.Append(errs, fmt.Errorf("Invalid tag value: %q", v))
 		}
 	}
+	return errs
+}
+
+// ValidateProxyConfig ensures that the ProxyConfig posted by the user is well-formed
+func ValidateProxyConfig(o proto.Message) error {
+	newConfig := &proxyconfig.ProxyConfig{}
+
+	data, err := proto.Marshal(o)
+	if err != nil {
+		return err
+	}
+
+	if err = proto.Unmarshal(data, newConfig); err != nil {
+		return err
+	}
+
+	var errs error
+
+	if len(newConfig.RouteRules) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("ProxyConfig must have atleast one route rule"))
+	} else {
+		for _, rule := range newConfig.RouteRules {
+			if rule.GetLayer4() != nil {
+				errs = multierror.Append(errs, fmt.Errorf("Layer4 route rules are not supported yet"))
+			}
+		}
+	}
+
+	if len(newConfig.UpstreamClusters) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("ProxyConfig must have atleast one upstream cluster"))
+	}
+
+	//TODO: validate rest of proxy config
 	return errs
 }
