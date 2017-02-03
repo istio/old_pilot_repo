@@ -337,9 +337,21 @@ func modelToKube(km model.KindMap, obj *model.Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var status map[string]interface{}
-	if obj.Status != nil {
-		status, err = protoToMap(obj.Status.(proto.Message))
+	// var status map[string]interface{}
+	// if obj.Status != nil {
+	// 	status, err = protoToMap(obj.Status.(proto.Message))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
+
+	if err = schema.Validate(spec); err != nil {
+		return nil, err
+	}
+
+	var status proto.Message
+	if config.Status != nil {
+		status, err = mapToProto(schema.StatusMessageName, config.Status)
 		if err != nil {
 			return nil, err
 		}

@@ -26,6 +26,8 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	"fmt"
+
+	"istio.io/manager/model/proxy/alphav1/config"
 )
 
 // WriteFile saves config to a file
@@ -69,8 +71,9 @@ const (
 )
 
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
-func Generate(instances []*model.ServiceInstance, services []*model.Service, mesh *MeshConfig) (*Config, error) {
-	listeners, clusters := buildListeners(instances, services, mesh)
+func Generate(instances []*model.ServiceInstance, services []*model.Service,
+	mesh *MeshConfig, proxyCfg *config.ProxyConfig) (*Config, error) {
+	listeners, clusters := buildListeners(instances, services, mesh, proxyCfg)
 	// TODO: add catch-all filters to prevent Envoy from crashing
 	listeners = append(listeners, Listener{
 		Port:           mesh.ProxyPort,
@@ -123,7 +126,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, mes
 // pod or outside the pod to service clusters based on the traffic metadata.
 func buildListeners(instances []*model.ServiceInstance,
 	services []*model.Service,
-	mesh *MeshConfig) ([]Listener, []Cluster) {
+	mesh *MeshConfig, proxyCfg *config.ProxyConfig) ([]Listener, []Cluster) {
 	clusters := buildClusters(services)
 	listeners := make([]Listener, 0)
 
@@ -222,7 +225,8 @@ func buildListeners(instances []*model.ServiceInstance,
 		hosts := make(map[string]VirtualHost, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				host := buildHost(svc, OutboundClusterPrefix+svc.String(), suffix)
+				host := buildHost(svc, suffix)
+				host.Routes = buildRoutes(OutboundClusterPrefix, svc.String(), proxyCfg)
 				hosts[svc.String()] = host
 			}
 
@@ -230,7 +234,8 @@ func buildListeners(instances []*model.ServiceInstance,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
-				host := buildHost(svc, localhost, suffix)
+				host := buildHost(svc, suffix)
+				host.Routes = buildRoutes("", localhost, nil)
 				hosts[svc.String()] = host
 			}
 		}
@@ -264,6 +269,17 @@ func buildListeners(instances []*model.ServiceInstance,
 	sort.Sort(ListenersByPort(listeners))
 	sort.Sort(ClustersByName(clusters))
 	return listeners, clusters
+}
+
+// buildRoutes adds one or more route blocks using the ProxyConfig object that contains various routing rules
+// If ProxyConfig object is nil, it uses default the cluster for a service.
+func buildRoutes(clusterPrefix string,
+	serviceName string, proxyCfg *config.ProxyConfig) []Route {
+	if proxyCfg == nil {
+		return []Route{{Cluster: clusterPrefix + serviceName}}
+	}
+	//TODO: Look at weighted clusters for the serviceName in proxyConfig and generate WeightedClusters block
+	return nil
 }
 
 // sharedHost computes the shared host name suffix for instances.
@@ -305,7 +321,7 @@ func sharedHost(parts ...[]string) []string {
 
 // buildHost constructs an entry for VirtualHost for a given service.
 // Service contains name, namespace and a single port declaration.
-func buildHost(svc *model.Service, cluster string, suffix []string) VirtualHost {
+func buildHost(svc *model.Service, suffix []string) VirtualHost {
 	hosts := make([]string, 0)
 	domains := make([]string, 0)
 	parts := strings.Split(svc.Hostname, ".")
@@ -345,7 +361,6 @@ func buildHost(svc *model.Service, cluster string, suffix []string) VirtualHost 
 	return VirtualHost{
 		Name:    svc.String(),
 		Domains: domains,
-		Routes:  []Route{{Cluster: cluster}},
 	}
 }
 
@@ -367,6 +382,8 @@ func buildClusters(services []*model.Service) []Cluster {
 			}
 			if port.Protocol == model.ProtocolGRPC ||
 				port.Protocol == model.ProtocolHTTP2 {
+				// TODO: Shouldn't this be default if we are using Envoy to Envoy communication across
+				// the deployment?
 				cluster.Features = "http2"
 			}
 			clusters = append(clusters, cluster)
