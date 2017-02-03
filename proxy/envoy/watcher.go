@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"istio.io/manager/model"
 	"github.com/golang/protobuf/proto"
+	"istio.io/manager/model"
 )
 
 // Watcher observes service registry and triggers a reload on a change
@@ -56,18 +56,17 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry
 		return nil, err
 	}
 
-	err = ctl.AppendConfigHandler(model.RouteRule, func(model.Key, proto.Message, model.Event) { out.reload() })
-	if err != nil {
-		return nil, err
-	}
-
-	err = ctl.AppendConfigHandler(model.UpstreamCluster, func(model.Key, proto.Message, model.Event) { out.reload() })
-	if err != nil {
-		return nil, err
-	}
-
 	// TODO: restrict the notification callback to co-located instances (e.g. with the same IP)
 	if err := ctl.AppendInstanceHandler(func(*model.ServiceInstance, model.Event) { out.reload() }); err != nil {
+		return nil, err
+	}
+
+	handler := func(model.Key, proto.Message, model.Event) { out.reload() }
+	if err = ctl.AppendConfigHandler(model.RouteRule, handler); err != nil {
+		return nil, err
+	}
+
+	if err = ctl.AppendConfigHandler(model.UpstreamCluster, handler); err != nil {
 		return nil, err
 	}
 
