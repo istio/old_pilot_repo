@@ -62,6 +62,7 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry
 	}
 
 	handler := func(model.Key, proto.Message, model.Event) { out.reload() }
+
 	if err = ctl.AppendConfigHandler(model.RouteRule, handler); err != nil {
 		return nil, err
 	}
