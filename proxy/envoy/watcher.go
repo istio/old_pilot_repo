@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"istio.io/manager/model"
+	"github.com/golang/protobuf/proto"
 )
 
 // Watcher observes service registry and triggers a reload on a change
@@ -30,12 +31,13 @@ type Watcher interface {
 type watcher struct {
 	agent     Agent
 	discovery model.ServiceDiscovery
+	registry  model.IstioRegistry
 	mesh      *MeshConfig
 	addrs     map[string]bool
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig) (Watcher, error) {
+func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry model.Registry, mesh *MeshConfig) (Watcher, error) {
 	addrs, err := hostIP()
 	glog.V(2).Infof("host IPs: %v", addrs)
 	if err != nil {
@@ -45,11 +47,22 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 	out := &watcher{
 		agent:     NewAgent(mesh.BinaryPath, mesh.ConfigPath),
 		discovery: discovery,
+		registry:  model.IstioRegistry{Registry: registry},
 		mesh:      mesh,
 		addrs:     addrs,
 	}
 
 	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
+		return nil, err
+	}
+
+	err = ctl.AppendConfigHandler(model.RouteRule, func(model.Key, proto.Message, model.Event) { out.reload() })
+	if err != nil {
+		return nil, err
+	}
+
+	err = ctl.AppendConfigHandler(model.UpstreamCluster, func(model.Key, proto.Message, model.Event) { out.reload() })
+	if err != nil {
 		return nil, err
 	}
 
@@ -62,7 +75,9 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 }
 
 func (w *watcher) reload() {
-	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(), w.mesh)
+	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
+		w.registry.RouteRules(), w.registry.UpstreamClusters(), w.mesh)
+
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
