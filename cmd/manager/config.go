@@ -24,14 +24,13 @@ import (
 
 	"k8s.io/client-go/pkg/api"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 
 	"istio.io/manager/model"
 )
 
 var (
-	kind string
-
 	configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Istio configuration registry",
@@ -91,6 +90,23 @@ var (
 	getCmd = &cobra.Command{
 		Use:   "get [kind] [name]",
 		Short: "Retrieve a configuration object",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 2 {
+				return fmt.Errorf("Provide kind and name")
+			}
+			if flags.namespace == "" {
+				flags.namespace = api.NamespaceDefault
+			}
+			item, exists := flags.client.Get(model.Key{
+				Kind:      args[0],
+				Name:      args[1],
+				Namespace: flags.namespace,
+			})
+			if exists {
+				print(item)
+			}
+			return nil
+		},
 	}
 
 	listCmd = &cobra.Command{
@@ -102,15 +118,10 @@ var (
 				if err != nil {
 					fmt.Printf("Error listing %s: %v\n", kind, err)
 				} else {
-					for name, item := range list {
-						fmt.Printf("Name %s\n", name)
+					for key, item := range list {
+						fmt.Printf("Kind %s, Name: %s, Namespace: %s\n", key.Kind, key.Name, key.Namespace)
 						fmt.Println("======")
-						data, err := yaml.Marshal(item)
-						if err != nil {
-							fmt.Printf("Error %v\n", err)
-						} else {
-							fmt.Println(string(data))
-						}
+						print(item)
 					}
 				}
 			}
@@ -121,6 +132,20 @@ var (
 	deleteCmd = &cobra.Command{
 		Use:   "delete [kind] [name]",
 		Short: "Delete a configuration object",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 2 {
+				return fmt.Errorf("Provide kind and name")
+			}
+			if flags.namespace == "" {
+				flags.namespace = api.NamespaceDefault
+			}
+			err := flags.client.Delete(model.Key{
+				Kind:      args[0],
+				Name:      args[1],
+				Namespace: flags.namespace,
+			})
+			return err
+		},
 	}
 )
 
@@ -129,4 +154,13 @@ func init() {
 	configCmd.AddCommand(getCmd)
 	configCmd.AddCommand(listCmd)
 	configCmd.AddCommand(deleteCmd)
+}
+
+func print(item proto.Message) {
+	data, err := yaml.Marshal(item)
+	if err != nil {
+		fmt.Printf("Error %v\n", err)
+	} else {
+		fmt.Println(string(data))
+	}
 }
