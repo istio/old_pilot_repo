@@ -10,3 +10,9 @@ go_library(
         "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
     ],
 )
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["cfg.proto"],
+    visibility = ["//visibility:public"],
+)

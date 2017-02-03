@@ -15,7 +15,10 @@
 package model
 
 import (
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+
+	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
 // Key is the registry configuration key
@@ -87,3 +90,24 @@ var (
 		},
 	}
 )
+
+// IstioRegistry provides a simple adapter to edit Istio configuration
+type IstioRegistry struct {
+	Registry
+}
+
+// RouteRules lists all rules
+func (i *IstioRegistry) RouteRules() []*proxyconfig.RouteRule {
+	out := make([]*proxyconfig.RouteRule, 0)
+	rs, err := i.List(RouteRule, "")
+	if err != nil {
+		glog.V(2).Infof("RouteRules => %v", err)
+	}
+	for _, r := range rs {
+		if rule, ok := r.(*proxyconfig.RouteRule); ok {
+			out = append(out, rule)
+		}
+	}
+	return out
+
+}

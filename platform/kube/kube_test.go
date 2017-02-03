@@ -275,6 +275,11 @@ func TestProxyConfig(t *testing.T) {
 	if !reflect.DeepEqual(rule, out) {
 		t.Errorf("cl.Get(%v) => %v, want %v", key, out, rule)
 	}
+
+	rules := (&model.IstioRegistry{Registry: cl}).RouteRules()
+	if len(rules) != 1 || !reflect.DeepEqual(rules[0], rule) {
+		t.Errorf("RouteRules() => %v, want %v", rules, rule)
+	}
 }
 
 func eventually(f func() bool, t *testing.T) {
