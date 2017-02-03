@@ -101,10 +101,11 @@ var (
 				Name:      args[1],
 				Namespace: flags.namespace,
 			})
-			if exists {
-				print(args[0], item)
+			if !exists {
+				return fmt.Errorf("Does not exist")
 			}
-			return fmt.Errorf("Does not exist")
+			print(args[0], item)
+			return nil
 		},
 	}
 
