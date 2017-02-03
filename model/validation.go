@@ -22,6 +22,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	multierror "github.com/hashicorp/go-multierror"
+
+	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
 const (
@@ -184,4 +186,22 @@ func (t Tag) Validate() error {
 		}
 	}
 	return errs
+}
+
+// ValidateRouteRule checks routing rules
+func ValidateRouteRule(msg proto.Message) error {
+	_, ok := msg.(*proxyconfig.RouteRule)
+	if !ok {
+		return fmt.Errorf("Cannot cast to routing rule")
+	}
+	return nil
+}
+
+// ValidateUpstreamCluster checks proxy policies
+func ValidateUpstreamCluster(msg proto.Message) error {
+	_, ok := msg.(*proxyconfig.UpstreamCluster)
+	if !ok {
+		return fmt.Errorf("Cannot cast to destination policy")
+	}
+	return nil
 }

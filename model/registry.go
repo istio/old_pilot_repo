@@ -14,7 +14,9 @@
 
 package model
 
-import "github.com/golang/protobuf/proto"
+import (
+	"github.com/golang/protobuf/proto"
+)
 
 // ConfigKey is the identity of the configuration object
 type ConfigKey struct {
@@ -72,3 +74,33 @@ type ProtoSchema struct {
 	// Validate configuration as a protobuf message
 	Validate func(o proto.Message) error
 }
+
+const (
+	// RouteRule kind
+	RouteRule = "RouteRule"
+	// RouteRuleProto message name
+	RouteRuleProto = "istio.proxy.v1alpha.config.RouteRule"
+
+	// UpstreamCluster kind
+	UpstreamCluster = "UpstreamCluster"
+	// UpstreamClusterProto message name
+	UpstreamClusterProto = "istio.proxy.v1alpha.config.UpstreamCluster"
+)
+
+var (
+	// IstioConfig lists all Istio config kinds
+	IstioConfig = KindMap{
+		RouteRule: ProtoSchema{
+			MessageName:       RouteRuleProto,
+			Description:       "Istio route rule",
+			StatusMessageName: "istio.proxy.v1alpha.status.ProxyRuleStatus",
+			Validate:          ValidateRouteRule,
+		},
+		UpstreamCluster: ProtoSchema{
+			MessageName:       UpstreamClusterProto,
+			Description:       "Istio destination policy",
+			StatusMessageName: "istio.proxy.v1alpha.status.ProxyRuleStatus",
+			Validate:          ValidateUpstreamCluster,
+		},
+	}
+)
