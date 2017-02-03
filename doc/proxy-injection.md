@@ -13,7 +13,7 @@ annotations:
     }]
 ```
     
-Add the following container to the deployment's template spec. The UID '1337' should match ISTIO_PROXY_UID as specified by [proxy-redirection-configuration.md](https://github.com/ayj/manager/blob/document-proxy-injection-methods/doc/proxy-redirection-configuration.md )
+Add the following container to the deployment's template spec. The UID '1337' should match ISTIO_PROXY_UID as specified by [proxy-redirection-configuration.md](https://github.com/istio/manager/blob/document-proxy-injection-methods/doc/proxy-redirection-configuration.md )
 
 ```
 - name: proxy
