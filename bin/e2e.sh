@@ -8,6 +8,7 @@ while getopts :h:t: arg; do
   case ${arg} in
     h) hub="${OPTARG}";;
     t) tag="${OPTARG}";;
+    *) ;;
   esac
 done
 
