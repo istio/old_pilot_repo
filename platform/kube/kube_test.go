@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"reflect"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	"istio.io/manager/model"
+	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 	"istio.io/manager/test/mock"
 )
 
@@ -239,45 +241,40 @@ func TestServices(t *testing.T) {
 }
 
 func TestProxyConfig(t *testing.T) {
-	/*
-		cl := makeClient(t)
-		ns := makeNamespace(cl.client, t)
-		defer deleteNamespace(cl.client, ns)
+	cl := makeClient(t)
+	ns := makeNamespace(cl.client, t)
+	defer deleteNamespace(cl.client, ns)
 
-		rule := &proxyconfig.RouteRule{
-			RouteRule: &proxyconfig.RouteRule_Http{
-				Http: &proxyconfig.HttpRouteRule{
-					Match: &proxyconfig.HttpMatchCondition{
-						Uri: &proxyconfig.StringMatch{
-							MatchType: &proxyconfig.StringMatch_Exact{
-								Exact: "test",
-							},
+	rule := &proxyconfig.RouteRule{
+		RouteRule: &proxyconfig.RouteRule_Http{
+			Http: &proxyconfig.HttpRouteRule{
+				Match: &proxyconfig.HttpMatchCondition{
+					Uri: &proxyconfig.StringMatch{
+						MatchType: &proxyconfig.StringMatch_Exact{
+							Exact: "test",
 						},
 					},
 				},
 			},
-		}
+		},
+	}
 
-		key := model.ConfigKey{Kind: model.RouteRule, Name: "test", Namespace: ns}
+	key := model.Key{Kind: model.RouteRule, Name: "test", Namespace: ns}
 
-		err := cl.Put(&model.Config{
-			ConfigKey: key,
-			Spec:      rule,
-		})
-		if err != nil {
-			t.Errorf("cl.Put() => error %v, want no error", err)
-		}
+	err := cl.Put(key, rule)
+	if err != nil {
+		t.Errorf("cl.Put() => error %v, want no error", err)
+	}
 
-		config, exists := cl.Get(key)
-		if !exists {
-			t.Errorf("cl.Get() => missing")
-			return
-		}
+	out, exists := cl.Get(key)
+	if !exists {
+		t.Errorf("cl.Get() => missing")
+		return
+	}
 
-		if !reflect.DeepEqual(rule, config.Spec) {
-			t.Errorf("cl.Get(%v) => %v, want %v", key, config.Spec, rule)
-		}
-	*/
+	if !reflect.DeepEqual(rule, out) {
+		t.Errorf("cl.Get(%v) => %v, want %v", key, out, rule)
+	}
 }
 
 func eventually(f func() bool, t *testing.T) {
@@ -317,9 +314,9 @@ func makeClient(t *testing.T) *Client {
 	}
 
 	km := model.KindMap{}
-	//for k, v := range model.IstioConfig {
-	//	km[k] = v
-	//}
+	for k, v := range model.IstioConfig {
+		km[k] = v
+	}
 	km[mock.Kind] = mock.Mapping[mock.Kind]
 
 	cl, err := NewClient(kubeconfig, km)

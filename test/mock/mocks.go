@@ -101,7 +101,7 @@ func CheckMapInvariant(r model.Registry, t *testing.T, namespace string, n int) 
 	// list elements
 	l, err := r.List(Kind, namespace)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("List error %#v, %v", l, err)
 	}
 	if len(l) != n {
 		t.Errorf("Wanted %d element(s), got %d in %v", n, len(l), l)

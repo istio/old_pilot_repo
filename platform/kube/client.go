@@ -46,7 +46,7 @@ const (
 	IstioAPIGroup = "istio.io"
 
 	// IstioResourceVersion defines Kubernetes API group version
-	IstioResourceVersion = "v1"
+	IstioResourceVersion = "v1alpha1"
 
 	// IstioKind defines the shared TPR kind to avoid boilerplate
 	// code for each custom kind
@@ -224,7 +224,7 @@ func (cl *Client) Get(key model.Key) (proto.Message, bool) {
 	err := cl.dyn.Get().
 		Namespace(key.Namespace).
 		Resource(IstioKind + "s").
-		Name(key.Kind + "-" + key.Name).
+		Name(configKey(&key)).
 		Do().Into(config)
 
 	if err != nil {
@@ -232,7 +232,7 @@ func (cl *Client) Get(key model.Key) (proto.Message, bool) {
 		return nil, false
 	}
 
-	out, err := kubeToModel(key.Kind, cl.mapping[key.Kind], config.Spec)
+	out, err := mapToProto(cl.mapping[key.Kind].MessageName, config.Spec)
 	if err != nil {
 		glog.Warning(err)
 		return nil, false
@@ -262,7 +262,7 @@ func (cl *Client) Delete(key model.Key) error {
 	return cl.dyn.Delete().
 		Namespace(key.Namespace).
 		Resource(IstioKind + "s").
-		Name(key.Kind + "-" + key.Name).
+		Name(configKey(&key)).
 		Do().Error()
 }
 
@@ -280,16 +280,33 @@ func (cl *Client) List(kind, namespace string) (map[string]proto.Message, error)
 
 	out := make(map[string]proto.Message, 0)
 	for _, item := range list.Items {
-		for kind := range cl.mapping {
-			if strings.HasPrefix(item.Metadata.Name, kind) {
-				elt, err := kubeToModel(kind, cl.mapping[kind], item.Spec)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					out[strings.TrimPrefix(item.Metadata.Name, kind+"-")] = elt
-				}
+		name, _, kind, data, err := cl.convertConfig(&item)
+		if kind != "" {
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			} else {
+				out[name] = data
 			}
 		}
 	}
 	return out, errs
+}
+
+// configKey assigns k8s TPR name to Istio config
+func configKey(k *model.Key) string {
+	return k.Kind + "-" + k.Name
+}
+
+// convertConfig extracts Istio config data from k8s TPRs and leaves kind empty if no kind matches
+func (cl *Client) convertConfig(item *Config) (name, namespace, kind string, data proto.Message, err error) {
+	for k, v := range cl.mapping {
+		if strings.HasPrefix(item.Metadata.Name, k) {
+			kind = k
+			name = strings.TrimPrefix(item.Metadata.Name, kind+"-")
+			namespace = item.Metadata.Namespace
+			data, err = mapToProto(v.MessageName, item.Spec)
+			return
+		}
+	}
+	return
 }

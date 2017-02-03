@@ -121,16 +121,6 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 	return out
 }
 
-// kubeToModel translates k8s config JSON to Istio config
-func kubeToModel(kind string, schema model.ProtoSchema, config map[string]interface{}) (proto.Message, error) {
-	// TODO: validate incoming kube object, in case object was edited in the storage directly
-	spec, err := mapToProto(schema.MessageName, config)
-	if err != nil {
-		return nil, err
-	}
-	return spec, nil
-}
-
 // modelToKube translate Istio config to k8s config JSON
 func modelToKube(km model.KindMap, k *model.Key, v proto.Message) (*Config, error) {
 	if err := km.ValidateConfig(k, v); err != nil {
