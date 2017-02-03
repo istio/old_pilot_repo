@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controller.go",
+        "conversion.go",
         "registry.go",
         "service.go",
         "validation.go",

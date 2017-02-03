@@ -59,7 +59,10 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 			glog.V(2).Infof("flags: %#v", flags)
 			flags.client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
 			if err != nil {
-				return multierror.Prefix(err, "Failed to connect to Kubernetes API.")
+				flags.client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
+				if err != nil {
+					return multierror.Prefix(err, "Failed to connect to Kubernetes API.")
+				}
 			}
 			if err = flags.client.RegisterResources(); err != nil {
 				return multierror.Prefix(err, "Failed to register Third-Party Resources.")

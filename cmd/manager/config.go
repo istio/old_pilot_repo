@@ -20,7 +20,7 @@ import (
 	"os"
 	"sort"
 
-	yaml "gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 
 	"k8s.io/client-go/pkg/api"
 
@@ -66,13 +66,12 @@ var (
 				return fmt.Errorf("Cannot read input: %v", err)
 			}
 
-			out := make(map[string]interface{})
-			err = yaml.Unmarshal(bytes, &out)
+			out, err := yaml.YAMLToJSON(bytes)
 			if err != nil {
 				return fmt.Errorf("Cannot read YAML input: %v", err)
 			}
 
-			v, err := kind.FromJSONMap(out)
+			v, err := kind.FromJSON(string(out))
 			if err != nil {
 				return fmt.Errorf("Cannot parse proto message: %v", err)
 			}
@@ -103,14 +102,14 @@ var (
 				Namespace: flags.namespace,
 			})
 			if exists {
-				print(item)
+				print(args[0], item)
 			}
-			return nil
+			return fmt.Errorf("Does not exist")
 		},
 	}
 
 	listCmd = &cobra.Command{
-		Use:   "list [kind]",
+		Use:   "list [kind...]",
 		Short: "List configuration objects",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, kind := range args {
@@ -119,9 +118,11 @@ var (
 					fmt.Printf("Error listing %s: %v\n", kind, err)
 				} else {
 					for key, item := range list {
-						fmt.Printf("Kind %s, Name: %s, Namespace: %s\n", key.Kind, key.Name, key.Namespace)
-						fmt.Println("======")
-						print(item)
+						fmt.Printf("kind: %s\n", key.Kind)
+						fmt.Printf("name: %s\n", key.Name)
+						fmt.Printf("namespace: %s\n", key.Namespace)
+						print(key.Kind, item)
+						fmt.Println("---")
 					}
 				}
 			}
@@ -156,11 +157,16 @@ func init() {
 	configCmd.AddCommand(deleteCmd)
 }
 
-func print(item proto.Message) {
-	data, err := yaml.Marshal(item)
+func print(kind string, item proto.Message) {
+	schema := model.IstioConfig[kind]
+	js, err := schema.ToJSON(item)
 	if err != nil {
-		fmt.Printf("Error %v\n", err)
-	} else {
-		fmt.Println(string(data))
+		fmt.Printf("Error converting to JSON: %v", err)
+		return
 	}
+	yml, err := yaml.JSONToYAML([]byte(js))
+	if err != nil {
+		fmt.Printf("Error converting to YAML: %v", err)
+	}
+	fmt.Print(string(yml))
 }

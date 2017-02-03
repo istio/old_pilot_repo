@@ -15,11 +15,7 @@
 package model
 
 import (
-	"encoding/json"
-	"reflect"
-
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
@@ -68,44 +64,6 @@ type ProtoSchema struct {
 	MessageName string
 	// Validate configuration as a protobuf message
 	Validate func(o proto.Message) error
-}
-
-// ToJSONMap converts a proto message to a generic map
-func (ps *ProtoSchema) ToJSONMap(msg proto.Message) (map[string]interface{}, error) {
-	// Marshal from proto to json bytes
-	m := jsonpb.Marshaler{}
-	bytes, err := m.MarshalToString(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal from json bytes to go map
-	var data map[string]interface{}
-	err = json.Unmarshal([]byte(bytes), &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
-// FromJSONMap converts from a generic map to a proto message
-func (ps *ProtoSchema) FromJSONMap(data map[string]interface{}) (proto.Message, error) {
-	// Marshal to json bytes
-	str, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal from bytes to proto
-	pbt := proto.MessageType(ps.MessageName)
-	pb := reflect.New(pbt.Elem()).Interface().(proto.Message)
-	err = jsonpb.UnmarshalString(string(str), pb)
-	if err != nil {
-		return nil, err
-	}
-
-	return pb, nil
 }
 
 const (
