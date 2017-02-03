@@ -19,7 +19,10 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/golang/protobuf/proto"
 
 	multierror "github.com/hashicorp/go-multierror"
 
@@ -89,7 +92,7 @@ func NewController(
 		})
 
 	// add stores for TPR kinds
-	for kind := range client.mapping {
+	for _, kind := range []string{IstioKind} {
 		out.kinds[kind] = out.createInformer(&Config{}, resyncPeriod,
 			func(opts v1.ListOptions) (result runtime.Object, err error) {
 				result = &ConfigList{}
@@ -164,18 +167,22 @@ func (c *Controller) createInformer(
 }
 
 // AppendConfigHandler adds a notification handler.
-func (c *Controller) AppendConfigHandler(kind string, f func(*model.Config, model.Event)) error {
-	ch, ok := c.kinds[kind]
-	if !ok {
-		return fmt.Errorf("Cannot locate kind %q", kind)
-	}
-	ch.handler.append(func(obj interface{}, ev model.Event) error {
-		cfg, err := kubeToModel(kind, c.client.mapping[kind], obj.(*Config))
-		if err == nil {
-			f(cfg, ev)
-		} else {
-			// Do not trigger re-application of handlers
-			glog.Warningf("Cannot convert kind %s to a config object", kind)
+func (c *Controller) AppendConfigHandler(kind string, f func(model.Key, proto.Message, model.Event)) error {
+	c.kinds[IstioKind].handler.append(func(obj interface{}, ev model.Event) error {
+		config, ok := obj.(*Config)
+		if ok && strings.HasPrefix(config.Metadata.Name, kind) {
+			cfg, err := kubeToModel(kind, c.client.mapping[kind], config.Spec)
+			name := strings.TrimPrefix(config.Metadata.Name, kind+"-")
+			if err == nil {
+				f(model.Key{
+					Name:      name,
+					Namespace: config.Metadata.Namespace,
+					Kind:      kind,
+				}, cfg, ev)
+			} else {
+				// Do not trigger re-application of handlers
+				glog.Warningf("Cannot convert kind %s to a config object", kind)
+			}
 		}
 		return nil
 	})
@@ -221,14 +228,14 @@ func keyFunc(name, namespace string) string {
 }
 
 // Get implements a registry operation
-func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
+func (c *Controller) Get(key model.Key) (proto.Message, bool) {
 	if err := c.client.mapping.ValidateKey(&key); err != nil {
 		glog.Warning(err)
 		return nil, false
 	}
 
-	store := c.kinds[key.Kind].informer.GetStore()
-	data, exists, err := store.GetByKey(key.Namespace + "/" + key.Name)
+	store := c.kinds[IstioKind].informer.GetStore()
+	data, exists, err := store.GetByKey(key.Namespace + "/" + key.Kind + "-" + key.Name)
 	if !exists {
 		return nil, false
 	}
@@ -236,7 +243,14 @@ func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
 		glog.Warning(err)
 		return nil, false
 	}
-	out, err := kubeToModel(key.Kind, c.client.mapping[key.Kind], data.(*Config))
+
+	config, ok := data.(*Config)
+	if !ok {
+		glog.Warning("Cannot convert to config from store")
+		return nil, false
+	}
+
+	out, err := kubeToModel(key.Kind, c.client.mapping[key.Kind], config.Spec)
 	if err != nil {
 		glog.Warning(err)
 		return nil, false
@@ -245,32 +259,35 @@ func (c *Controller) Get(key model.ConfigKey) (*model.Config, bool) {
 }
 
 // Put implements a registry operation
-func (c *Controller) Put(obj *model.Config) error {
-	return c.client.Put(obj)
+func (c *Controller) Put(k model.Key, v proto.Message) error {
+	return c.client.Put(k, v)
 }
 
 // Delete implements a registry operation
-func (c *Controller) Delete(key model.ConfigKey) error {
+func (c *Controller) Delete(key model.Key) error {
 	return c.client.Delete(key)
 }
 
 // List implements a registry operation
-func (c *Controller) List(kind string, ns string) ([]*model.Config, error) {
-	if _, ok := c.kinds[kind]; !ok {
+func (c *Controller) List(kind, namespace string) (map[string]proto.Message, error) {
+	if _, ok := c.client.mapping[kind]; !ok {
 		return nil, fmt.Errorf("Missing kind %q", kind)
 	}
 
-	// TODO: use indexed cache
-	var out []*model.Config
 	var errs error
-	for _, data := range c.kinds[kind].informer.GetStore().List() {
-		config := data.(*Config)
-		if ns == "" || config.Metadata.Namespace == ns {
-			elt, err := kubeToModel(kind, c.client.mapping[kind], data.(*Config))
-			if err != nil {
-				errs = multierror.Append(errs, err)
-			} else {
-				out = append(out, elt)
+	out := make(map[string]proto.Message, 0)
+	for _, data := range c.kinds[IstioKind].informer.GetStore().List() {
+		item, ok := data.(*Config)
+		if ok && (namespace == "" || item.Metadata.Namespace == namespace) {
+			for kind := range c.client.mapping {
+				if strings.HasPrefix(item.Metadata.Name, kind) {
+					elt, err := kubeToModel(kind, c.client.mapping[kind], item.Spec)
+					if err != nil {
+						errs = multierror.Append(errs, err)
+					} else {
+						out[strings.TrimPrefix(item.Metadata.Name, kind+"-")] = elt
+					}
+				}
 			}
 		}
 	}
