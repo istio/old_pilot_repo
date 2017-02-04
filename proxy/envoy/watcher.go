@@ -37,7 +37,8 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry model.Registry, mesh *MeshConfig) (Watcher, error) {
+func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
+	registry model.Registry, mesh *MeshConfig) (Watcher, error) {
 	addrs, err := hostIP()
 	glog.V(2).Infof("host IPs: %v", addrs)
 	if err != nil {
@@ -52,12 +53,12 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry
 		addrs:     addrs,
 	}
 
-	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
+	if err = ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
 		return nil, err
 	}
 
 	// TODO: restrict the notification callback to co-located instances (e.g. with the same IP)
-	if err := ctl.AppendInstanceHandler(func(*model.ServiceInstance, model.Event) { out.reload() }); err != nil {
+	if err = ctl.AppendInstanceHandler(func(*model.ServiceInstance, model.Event) { out.reload() }); err != nil {
 		return nil, err
 	}
 
