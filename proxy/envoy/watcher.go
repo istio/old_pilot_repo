@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	"istio.io/manager/model"
 )
 
@@ -30,12 +31,13 @@ type Watcher interface {
 type watcher struct {
 	agent     Agent
 	discovery model.ServiceDiscovery
+	registry  model.IstioRegistry
 	mesh      *MeshConfig
 	addrs     map[string]bool
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *MeshConfig) (Watcher, error) {
+func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry model.Registry, mesh *MeshConfig) (Watcher, error) {
 	addrs, err := hostIP()
 	glog.V(2).Infof("host IPs: %v", addrs)
 	if err != nil {
@@ -45,6 +47,7 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 	out := &watcher{
 		agent:     NewAgent(mesh.BinaryPath, mesh.ConfigPath),
 		discovery: discovery,
+		registry:  model.IstioRegistry{Registry: registry},
 		mesh:      mesh,
 		addrs:     addrs,
 	}
@@ -58,11 +61,24 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, mesh *Me
 		return nil, err
 	}
 
+	handler := func(model.Key, proto.Message, model.Event) { out.reload() }
+
+	if err = ctl.AppendConfigHandler(model.RouteRule, handler); err != nil {
+		return nil, err
+	}
+
+	if err = ctl.AppendConfigHandler(model.UpstreamCluster, handler); err != nil {
+		return nil, err
+	}
+
 	return out, nil
 }
 
 func (w *watcher) reload() {
-	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(), w.mesh)
+	// FIXME: namespace?
+	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
+		w.registry.RouteRules(""), w.registry.UpstreamClusters(""), w.mesh)
+
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
