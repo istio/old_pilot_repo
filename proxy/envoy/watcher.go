@@ -75,8 +75,9 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller, registry
 }
 
 func (w *watcher) reload() {
+	// FIXME: namespace?
 	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
-		w.registry.RouteRules(), w.registry.UpstreamClusters(), w.mesh)
+		w.registry.RouteRules(""), w.registry.UpstreamClusters(""), w.mesh)
 
 	if err != nil {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
