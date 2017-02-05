@@ -12,7 +12,57 @@ other components of the system, including the Istio mixer and the Istio proxy me
 If you have a question about the Istio Manager or have a problem using it, please
 [file an issue](https://github.com/istio/manager/issues/new).
 
-## Build instructions ##
+## Setting up a local dev environment ##
+
+_Note:_ This section applies to Mac and Windows users only.
+
+### Pre-requisites ##
+
+- Setup Go 1.7.5+ on your host machine
+- Clone this repository
+- Install [Virtualbox](https://github.com/kubernetes/minikube/releases)
+- Install [Minikube](https://github.com/kubernetes/minikube/releases)
+- Install [Vagrant](https://www.vagrantup.com/downloads.html)
+- Install [kubectl](https://kubernetes.io/docs/user-guide/prereqs/)
+
+### Start Minikube
+
+    minikube config set kubernetes-version v1.5.2
+    minikube start
+    
+Create a symlink to your kube config file in the platform/kube directory
+
+    cp ~/.kube/config platform/kube/
+
+### Start Vagrant VM for compiling the code
+
+    vagrant up --provision
+
+The `--provision` is needed for the first time installation of the VM only.
+Your local repository clone will be mounted in the Vagrant VM under
+`/home/ubuntu/go/src/istio.io/manager`.
+
+### Build once in the VM
+
+    bazel build //...
+    ./bin/init.sh
+
+### Use your favorite IDE on the host
+
+You should now have vendor directories in the manager folder on the
+host. You can use your favorite IDE on the host to develop, while using
+standard `go` tools. In order to compile project, run the commands in the
+the build instructions below inside the vagrant VM.
+
+### Before you commit
+
+Run the end to end integration tests in the VM
+
+    ./bin/e2e.sh -h docker.io/<yourusername>
+
+Note that this script will push some images to your dockerhub account.
+
+## Build instructions for Linux##
 
 We are using [Bazel 0.4.4](https://bazel.io) to build Istio Manager:
 
@@ -20,11 +70,11 @@ We are using [Bazel 0.4.4](https://bazel.io) to build Istio Manager:
 
 _Note the three dots_
 
-_Note_: Due to issues with case-insensitive file systems, macOS is not
-supported at the moment by Bazel Go rules. As a workaround, create a case sensitive partition
-on your macOS as described [here](https://coderwall.com/p/mgi8ja/case-sensitive-git-in-mac-os-x-like-a-pro), and build using 
+<!-- _Note_: Due to issues with case-insensitive file systems, macOS is not -->
+<!-- supported at the moment by Bazel Go rules. As a workaround, create a case sensitive partition -->
+<!-- on your macOS as described [here](https://coderwall.com/p/mgi8ja/case-sensitive-git-in-mac-os-x-like-a-pro), and build using  -->
 
-    bazel --output_base=/Volumes/case-sensitive-volume-name/bazel-out build //cmd/... --spawn_strategy=standalone
+<!--     bazel --output_base=/Volumes/case-sensitive-volume-name/bazel-out build //cmd/... --spawn_strategy=standalone -->
 
 Bazel uses `BUILD` files to keep track of dependencies between sources.  If you
 add a new source file or change the imports, please run the following command
@@ -45,14 +95,18 @@ run `locate gazelle`. The gazelle binary should typically be in
 
 ## Test environment ##
 
-Manager tests require access to a Kubernetes cluster. We recommend Kubernetes
-version >=1.5.2 due to its improved support for Third-Party Resources. Each
+Manager tests require access to a Kubernetes v1.5.2 cluster. Each
 test operates on a temporary namespace and deletes it on completion.  Please
 configure your `kubectl` to point to a development cluster (e.g. minikube)
 before building or invoking the tests and add a symbolic link to your
 repository pointing to Kubernetes cluster credentials:
 
     ln -s ~/.kube/config platform/kube/
+
+_Note_: If you are running Bazel in a VM, copy the kube config file on the
+host to platform/kube instead of symlinking it.
+
+    cp ~/.kube/config platform/kube/
 
 If you are using GKE, please make sure you are using static client
 certificates before fetching cluster credentials:
@@ -62,20 +116,6 @@ certificates before fetching cluster credentials:
 To run the tests:
 
     bazel test //...
-
-_Note for minikube users_: You need to configure minikube to use kubernetes 1.5.2 as default
-
-    minikube config set kubernetes-version v1.5.2
-
-## Using `go` tool in IDEs ##
-
-Clone the repository into `$GOPATH` (e.g.
-`$GOPATH/src/istio.io/manager`), run `bazel build //cmd/...` once to let Bazel
-fetch all dependencies, and finally run the following script in the repository root:
-
-    bin/init.sh
-
-The script above installs dependencies in the vendor directory allowing IDEs to compile the code using standard commands like `go build`.
 
 ## Docker images ##
 
