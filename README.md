@@ -25,36 +25,43 @@ _Note:_ This section applies to Mac and Windows users only.
 - Install [Vagrant](https://www.vagrantup.com/downloads.html)
 - Install [kubectl](https://kubernetes.io/docs/user-guide/prereqs/)
 
-### Start Minikube
+### 1. Start Minikube
 
     minikube config set kubernetes-version v1.5.2
     minikube start
     
-Create a symlink to your kube config file in the platform/kube directory
+Copy the kube config file to the platform/kube directory
 
     cp ~/.kube/config platform/kube/
 
-### Start Vagrant VM for compiling the code
+### 2. Start Vagrant VM for compiling the code
+
+When you are setting up the VM for the first time,
 
     vagrant up --provision
 
-The `--provision` is needed for the first time installation of the VM only.
-Your local repository clone will be mounted in the Vagrant VM under
-`/home/ubuntu/go/src/istio.io/manager`.
+For subsequent startups of the VM,
 
-### Build once in the VM
+    vagrant up
+
+Your local clone of the istio/manager repository will be mounted in the
+Vagrant VM under `/home/ubuntu/go/src/istio.io/manager`.
+
+### 3. Build once in the VM
 
     bazel build //...
     ./bin/init.sh
 
-### Use your favorite IDE on the host
+_Note the three dots_
+
+### 4. Use your favorite IDE on the host
 
 You should now have vendor directories in the manager folder on the
 host. You can use your favorite IDE on the host to develop, while using
-standard `go` tools. In order to compile project, run the commands in the
-the build instructions below inside the vagrant VM.
+standard `go` tools. In order to compile project in the vagrant VM, run the
+commands described in the the build instructions section below.
 
-### Before you commit
+### 5. Before you commit
 
 Run the end to end integration tests in the VM
 
@@ -87,9 +94,9 @@ repository, after your initial bazel build:
 
     bazel-bin/external/io_bazel_rules_go_repository_tools/bin/gazelle
 
-_Note_: If you cant find the gazelle binary in the path mentioned above, try to
-update the mlocate database (`sudo updatedb` or the equivalent in macOS) and
-run `locate gazelle`. The gazelle binary should typically be in
+_Note_: If you cant find the gazelle binary in the path mentioned above,
+try to update the mlocate database and run `locate gazelle`. The gazelle
+binary should typically be in
 
     $HOME/.cache/bazel/_bazel_<username>/<somelongfoldername>/external/io_bazel_rules_go_repository_tools/bin/gazelle
 
