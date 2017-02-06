@@ -34,7 +34,7 @@ sudo apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial ma
 sudo apt-get update
 apt-cache policy docker-engine
 sudo apt-get install -y python docker-engine
-
+sudo usermod -a -G docker ubuntu # Add ubuntu user to the docker group
 
 # Install Bazel 
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
