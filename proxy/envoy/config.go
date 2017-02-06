@@ -74,7 +74,7 @@ const (
 func Generate(instances []*model.ServiceInstance, services []*model.Service, rules []*config.RouteRule,
 	upstreams []*config.UpstreamCluster, mesh *MeshConfig) (*Config, error) {
 
-	listeners, clusters := buildListeners(instances, services, mesh)
+	listeners, clusters := buildListeners(instances, services, rules, upstreams, mesh)
 	// TODO: add catch-all filters to prevent Envoy from crashing
 	listeners = append(listeners, Listener{
 		Port:           mesh.ProxyPort,
@@ -126,9 +126,47 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, rul
 // buildListeners uses iptables port redirect to route traffic either into the
 // pod or outside the pod to service clusters based on the traffic metadata.
 func buildListeners(instances []*model.ServiceInstance,
-	services []*model.Service,
+	services []*model.Service, rules []*config.RouteRule,
+	upstreams []*config.UpstreamCluster,
 	mesh *MeshConfig) ([]Listener, []Cluster) {
-	clusters := buildClusters(services)
+
+	// services holds the default k8s services
+	// upstreams holds the different versions of the services specified by the user
+	// upstreams takes priority over services. We create one canonical set of
+	// service objects and pass it to the buildClusters function
+	service_map_tmp := make(map[string]*model.Service, 0)
+	for _, svc := range services {
+		service_map_tmp[svc.Hostname] = svc
+	}
+	upstream_map_tmp := make(map[string]*model.Service, 0)
+	for _, svc := range upstreams {
+		tags := make([]model.Tag, 0)
+		for _, t := range svc.Cluster.Tags {
+			tags = append(tags, model.ParseTagString(t))
+		}
+
+		upstream_map_tmp[svc.Cluster.Name] = &model.Service{
+			Hostname: svc.Cluster.Name,
+			Tags: tags,
+			Ports: service_map_tmp[svc.Cluster.Name].Ports,
+			// TODO: handle addresses
+		}
+	}
+
+	// Now merge the upstream and services maps,
+	// eliminating generic service objects from services
+	for svc := range service_map_tmp {
+		_, prs := upstream_map_tmp[svc]
+		if !prs  {
+			upstream_map_tmp[svc] = service_map_tmp[svc]
+		}
+	}
+
+	service_versions := make([]*model.Service, len(upstream_map_tmp))
+	for _, val := range upstream_map_tmp {
+		service_versions = append(service_versions, val)
+	}
+	clusters := buildClusters(service_versions)
 	listeners := make([]Listener, 0)
 
 	hostnames := make([][]string, 0)
@@ -354,6 +392,7 @@ func buildHost(svc *model.Service, cluster string, suffix []string) VirtualHost 
 }
 
 // buildClusters creates a cluster for every (service, port)
+// and also a cluster per upstream (service, port, subset of service tags)
 func buildClusters(services []*model.Service) []Cluster {
 	clusters := make([]Cluster, 0)
 	for _, svc := range services {
@@ -361,6 +400,7 @@ func buildClusters(services []*model.Service) []Cluster {
 			clusterSvc := model.Service{
 				Hostname: svc.Hostname,
 				Ports:    []*model.Port{port},
+				Tags: svc.Tags,
 			}
 			cluster := Cluster{
 				Name:             OutboundClusterPrefix + clusterSvc.String(),
