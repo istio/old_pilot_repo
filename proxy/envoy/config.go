@@ -305,6 +305,9 @@ func buildListeners(instances []*model.ServiceInstance,
 								// TODO Error check. No regex
 								route.Prefix = match.Uri.GetPrefix()
 								route.Path = match.Uri.GetExact()
+								if route.Prefix == "" && route.Path == "" {
+									route.Prefix = "/"
+								}
 							}
 							if httpRule.WeightedClusters != nil {
 								// Need to populate the weighted_clusters block with the
@@ -325,14 +328,14 @@ func buildListeners(instances []*model.ServiceInstance,
 							} else {
 								route.Cluster = OutboundClusterPrefix + svc.String()
 							}
-						} else {
-							// TODO throw error here? i.e., do not allow TCP rules under http services?
-							route.Cluster = OutboundClusterPrefix + svc.String()
 						}
+						// no else. Because a L4 only based match for a HTTP service makes no sense for Envoy,
+						// as it does not offer the ability to filter HTTP traffic by src/dst IP.
+						// It is the mixer's job to police such traffic.
 						routes = append(routes, route)
 					}
 				} else {
-					routes = append(routes, Route{Cluster: OutboundClusterPrefix + svc.String()})
+					routes = append(routes, Route{Prefix: "/", Cluster: OutboundClusterPrefix + svc.String()})
 				}
 				host := buildHost(svc, suffix)
 				host.Routes = routes
@@ -344,7 +347,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
 				host := buildHost(svc, suffix)
-				host.Routes = []Route{{Cluster: localhost}}
+				host.Routes = []Route{{Prefix: "/", Cluster: localhost}}
 				hosts[svc.String()] = host
 			}
 		}
