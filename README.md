@@ -30,9 +30,14 @@ _Note:_ This section applies to Mac and Windows users only.
     minikube config set kubernetes-version v1.5.2
     minikube start
     
-Copy the kube config file to the platform/kube directory
+Copy the kube config file to the platform/kube directory and update the paths
 
     cp ~/.kube/config platform/kube/
+    sed -i 's!/Users/<username>!/home/ubuntu!' platform/kube/config
+
+_Note_: The `sed` command above may not work on Windows machines. Replace
+the path to certs such that the resultant paths look like
+`/home/ubuntu/.minikube/ca.crt`, etc.
 
 ### 2. Start Vagrant VM for compiling the code
 
@@ -121,9 +126,11 @@ repository pointing to Kubernetes cluster credentials:
     ln -s ~/.kube/config platform/kube/
 
 _Note_: If you are running Bazel in a VM, copy the kube config file on the
-host to platform/kube instead of symlinking it.
+host to platform/kube instead of symlinking it, and change the paths to
+minikube certs.
 
     cp ~/.kube/config platform/kube/
+    sed -i 's!/Users/<username>!/home/ubuntu!' platform/kube/config
 
 If you are using GKE, please make sure you are using static client
 certificates before fetching cluster credentials:

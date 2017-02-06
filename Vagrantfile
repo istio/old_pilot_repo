@@ -41,6 +41,12 @@ echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | 
 curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
 sudo apt-get update && sudo apt-get install -y bazel
 
+# Install kubectl
+cd /tmp
+curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.5.2/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
 # Install golang
 cd /tmp
 curl -O https://storage.googleapis.com/golang/go1.7.5.linux-amd64.tar.gz
@@ -62,6 +68,24 @@ Vagrant.configure('2') do |config|
   config.vm.box = "ubuntu/xenial64"
 
   config.vm.synced_folder ".", "/home/ubuntu/go/src/istio.io/manager"
+
+  # Mount ~/.minikube into the VM
+  ## Snippet borrowed from https://groups.google.com/forum/#!msg/vagrant-up/a1xrXU6AEXk/tcN_Tl94qAEJ
+  @os = RbConfig::CONFIG['host_os']
+  case
+  when @os.downcase.include?('mswin') | @os.downcase.include?('mingw') | @os.downcase.include?('cygwin')
+    homedir= ENV['USERPROFILE']
+    minikubeConfig = homedir + "\\.minikube"
+  when @os.downcase.include?('darwin') | @os.downcase.include?('linux')
+    homedir = "~"
+    minikubeConfig = homedir + "/.minikube"
+  else
+    puts 'You are not on a supported platform. exiting...'
+    print "unknown os: \"" + @os + "\""
+    exit
+  end
+  config.vm.synced_folder minikubeConfig, "/home/ubuntu/.minikube"
+
   config.vm.define "istio" do |istio|
     istio.vm.provider :virtualbox do |vb|
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
