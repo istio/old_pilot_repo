@@ -50,9 +50,19 @@ Vagrant VM under `/home/ubuntu/go/src/istio.io/manager`.
 ### 3. Build once in the VM
 
     bazel build //...
+    
+_Note the three dots_
+Create the vendored directories..
+
     ./bin/init.sh
 
-_Note the three dots_
+Login to your docker hub account
+
+    docker login <yourdockeraccount>
+
+Run a end to end test to make sure the VM can talk to minikube
+
+    ./bin/e2e.sh
 
 ### 4. Use your favorite IDE on the host
 
