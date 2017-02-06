@@ -52,6 +52,13 @@ For subsequent startups of the VM,
 Your local clone of the istio/manager repository will be mounted in the
 Vagrant VM under `/home/ubuntu/go/src/istio.io/manager`.
 
+One time setup in the VM: copy the config file from platform/kube/config
+into /home/ubuntu/config
+
+    vagrant ssh
+    cp go/src/istio.io/manager/platform/kube/config .kube/config
+    sudo chown -R ubuntu:ubuntu .kube
+
 ### 3. Build once in the VM
 
     bazel build //...
@@ -131,6 +138,9 @@ minikube certs.
 
     cp ~/.kube/config platform/kube/
     sed -i 's!/Users/<username>!/home/ubuntu!' platform/kube/config
+
+Also, copy the same file to `/home/ubuntu/.kube/config` in the VM, and make
+sure that the file is readable to user `ubuntu`.
 
 If you are using GKE, please make sure you are using static client
 certificates before fetching cluster credentials:

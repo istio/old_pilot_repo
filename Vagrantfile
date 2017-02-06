@@ -47,6 +47,10 @@ curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.5.2/bin/li
 chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin/kubectl
 
+# Create a .kube directory
+mkdir /home/ubuntu/.kube
+sudo chown -R ubuntu:ubuntu /home/ubuntu/.kube
+
 # Install golang
 cd /tmp
 curl -O https://storage.googleapis.com/golang/go1.7.5.linux-amd64.tar.gz
