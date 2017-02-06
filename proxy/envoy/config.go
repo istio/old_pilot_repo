@@ -292,7 +292,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			for _, svc := range lst.services[proto] {
 				// if there is a routing rule for the host, use that to generate the route block
 				routes := make([]Route, 0)
-				// TODO: do we match on partial hostnames (foo.svc, foo.svc.mynamespace, etc. ?)
+				// TODO: do we match on partial hostnames (foo.svc, foo.svc.namespace, etc. ?)
 				ruleByDestination, prs := rulesMapTmp[svc.Hostname]
 				if prs {
 					for _, rule := range ruleByDestination {
