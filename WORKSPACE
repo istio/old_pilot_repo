@@ -52,8 +52,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_coreos_pkg",
-    # commit = "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8",
-    commit = "1c941d73110817a80b9fa6e14d5d2b00d977ce2a",
+    commit = "1c941d73110817a80b9fa6e14d5d2b00d977ce2a", # Date: 2/6/17 with "build" file rename
     importpath = "github.com/coreos/pkg",
 )
 
