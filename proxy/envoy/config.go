@@ -63,26 +63,29 @@ const (
 
 // TODO: these values used in the Envoy configuration will be configurable
 const (
-	Stdout           = "/dev/stdout"
 	DefaultTimeoutMs = 1000
 	DefaultLbType    = LbTypeRoundRobin
+	DefaultAccessLog = "/dev/stdout"
 )
 
 // Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
 func Generate(instances []*model.ServiceInstance, services []*model.Service, rules []*config.RouteRule,
 	upstreams []*config.UpstreamCluster, mesh *MeshConfig) (*Config, error) {
 
-	listeners, clusters := buildListeners(instances, services, rules, upstreams, mesh)
-	// TODO: add catch-all filters to prevent Envoy from crashing
-	listeners = append(listeners, Listener{
-		Port:           mesh.ProxyPort,
-		BindToPort:     true,
-		UseOriginalDst: true,
-		Filters:        make([]NetworkFilter, 0),
-	})
+	// Generate all upstream blocks (called clusters) in Envoy terminology
+	// service name and hostname are used interchangeably
+	hostToUpstreamsMap, upstreamNameToInternalNameMap := enumerateServiceVersions(services, upstreams)
+	// flatten the map of host->[clusters] into array of clusters
+	serviceUpstreams := make([]*model.Service, 0)
+	for _, val := range hostToUpstreamsMap {
+		serviceUpstreams = append(serviceUpstreams, val...)
+	}
+	// this is what goes into Envoy
+	proxyUpstreams := buildClusters(serviceUpstreams)
 
+	// add the mixer cluster if configured
 	if len(mesh.MixerAddress) > 0 {
-		clusters = append(clusters, Cluster{
+		proxyUpstreams = append(proxyUpstreams, Cluster{
 			Name:             "mixer",
 			Type:             "strict_dns",
 			ConnectTimeoutMs: DefaultTimeoutMs,
@@ -95,14 +98,40 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, rul
 		})
 	}
 
+	// Rules indexed by hostname
+	// There can be more than one rule per destination
+	// TODO: rules sorting - explicit priorities or some other means
+	rulesMap := make(map[string][]*config.RouteRule, 0)
+	for _, r := range rules {
+		_, prs := rulesMap[r.Destination]
+		if !prs {
+			rulesMap[r.Destination] = make([]*config.RouteRule, 0)
+		}
+		rulesMap[r.Destination] = append(rulesMap[r.Destination], r)
+	}
+
+	listeners, localClusters := buildListeners(instances, services, rulesMap, upstreamNameToInternalNameMap, mesh)
+	proxyUpstreams = append(proxyUpstreams, localClusters...)
+
+	sort.Sort(ListenersByPort(listeners))
+	sort.Sort(ClustersByName(proxyUpstreams))
+
+	// TODO: add catch-all filters to prevent Envoy from crashing
+	listeners = append(listeners, Listener{
+		Port:           mesh.ProxyPort,
+		BindToPort:     true,
+		UseOriginalDst: true,
+		Filters:        make([]NetworkFilter, 0),
+	})
+
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
-			AccessLogPath: Stdout,
+			AccessLogPath: DefaultAccessLog,
 			Port:          mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
-			Clusters: clusters,
+			Clusters: proxyUpstreams,
 			SDS: SDS{
 				Cluster: Cluster{
 					Name:             "sds",
@@ -124,75 +153,11 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, rul
 // buildListeners uses iptables port redirect to route traffic either into the
 // pod or outside the pod to service clusters based on the traffic metadata.
 func buildListeners(instances []*model.ServiceInstance,
-	services []*model.Service, rules []*config.RouteRule,
-	upstreams []*config.UpstreamCluster,
+	services []*model.Service, rulesMap map[string][]*config.RouteRule,
+	upstreamNameToInternalNameMap map[string]string,
 	mesh *MeshConfig) ([]Listener, []Cluster) {
 
-	// services holds the default k8s services
-	// upstreams holds the different versions of the services specified by the user
-	// upstreams takes priority over services. We create one canonical set of
-	// service objects and pass it to the buildClusters function
-	// Create maps of all the arrays for easier cross referencing
-	serviceMapTmp := make(map[string]*model.Service, len(services))
-	for _, svc := range services {
-		serviceMapTmp[svc.Hostname] = svc
-	}
-
-	// Rules indexed by service name/hostname/destination
-	// There can be more than one rule per destination
-	rulesMapTmp := make(map[string][]*config.RouteRule, 0)
-	for _, r := range rules {
-		_, prs := rulesMapTmp[r.Destination]
-		if !prs {
-			rulesMapTmp[r.Destination] = make([]*config.RouteRule, 0)
-		}
-		rulesMapTmp[r.Destination] = append(rulesMapTmp[r.Destination], r)
-	}
-
-	// Upstreams indexed by service name/hostname/destination
-	// There can be multiple upstreams per service name
-
-	// And for convenience purposes, maintain a map of service name plus tags
-	// to corresponding upstream cluster names
-	upstreamMapTmp := make(map[string][]*model.Service, 0)
-	clusterIdentifierMap := make(map[string]string, 0) // Hostname + tags -> svc.String()
-	for _, svc := range upstreams {
-		tags := make([]model.Tag, 0)
-		for _, t := range svc.Cluster.Tags {
-			tags = append(tags, model.ParseTagString(t))
-		}
-
-		_, prs := upstreamMapTmp[svc.Cluster.Name]
-		if !prs {
-			upstreamMapTmp[svc.Cluster.Name] = make([]*model.Service, 0)
-		}
-		upstreamSvc := model.Service{
-			Hostname: svc.Cluster.Name,
-			Tags:     tags,
-			Ports:    serviceMapTmp[svc.Cluster.Name].Ports,
-			Address:  serviceMapTmp[svc.Cluster.Name].Address,
-		}
-		upstreamMapTmp[svc.Cluster.Name] = append(upstreamMapTmp[svc.Cluster.Name], &upstreamSvc)
-
-		// create an entry in the clusterIdentifierMap
-		clusterIdentifierMap[clusterIdentifierString(svc.Cluster)] = upstreamSvc.String()
-	}
-
-	// Now merge the upstream and services maps,
-	// eliminating generic service objects from services
-	for svc := range serviceMapTmp {
-		_, prs := upstreamMapTmp[svc]
-		if !prs {
-			upstreamMapTmp[svc] = make([]*model.Service, 0)
-			upstreamMapTmp[svc] = append(upstreamMapTmp[svc], serviceMapTmp[svc])
-		}
-	}
-
-	serviceVersions := make([]*model.Service, 0)
-	for _, val := range upstreamMapTmp {
-		serviceVersions = append(serviceVersions, val...)
-	}
-	clusters := buildClusters(serviceVersions)
+	localClusters := make([]Cluster, 0)
 	listeners := make([]Listener, 0)
 
 	hostnames := make([][]string, 0)
@@ -255,7 +220,7 @@ func buildListeners(instances []*model.ServiceInstance,
 		// append localhost redirect cluster
 		localhost := fmt.Sprintf("%s%d", InboundClusterPrefix, port)
 		if len(lst.instances) > 0 {
-			clusters = append(clusters, Cluster{
+			localClusters = append(localClusters, Cluster{
 				Name:             localhost,
 				Type:             "static",
 				ConnectTimeoutMs: DefaultTimeoutMs,
@@ -290,55 +255,8 @@ func buildListeners(instances []*model.ServiceInstance,
 		hosts := make(map[string]VirtualHost, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				// if there is a routing rule for the host, use that to generate the route block
-				routes := make([]Route, 0)
-				// TODO: do we match on partial hostnames (foo.svc, foo.svc.namespace, etc. ?)
-				ruleByDestination, prs := rulesMapTmp[svc.Hostname]
-				if prs {
-					for _, rule := range ruleByDestination {
-						httpRule := rule.GetHttp()
-						route := Route{}
-						if httpRule != nil {
-							match := httpRule.GetMatch()
-							if match != nil && match.GetUri() != nil {
-								// TODO Error check. Either path/prefix, but not both
-								// TODO Error check. No regex
-								route.Prefix = match.Uri.GetPrefix()
-								route.Path = match.Uri.GetExact()
-								if route.Prefix == "" && route.Path == "" {
-									route.Prefix = "/"
-								}
-							}
-							if httpRule.WeightedClusters != nil {
-								// Need to populate the weighted_clusters block with the
-								// cluster name of the upstream cluster and the weight.
-								// The user provides the destination service and tags and
-								// we have to convert this into the appropriate upstream cluster name
-								wcRule := httpRule.WeightedClusters
-								route.WeightedClusters = &WeightedCluster{}
-								route.WeightedClusters.Clusters = make([]WeightedClusterEntry, 0)
-								for _, wcRuleItem := range wcRule {
-									wcEntry := WeightedClusterEntry{
-										Name: OutboundClusterPrefix +
-											clusterIdentifierMap[clusterIdentifierString(wcRuleItem.DstCluster)],
-										Weight: int(wcRuleItem.Weight),
-									}
-									route.WeightedClusters.Clusters = append(route.WeightedClusters.Clusters, wcEntry)
-								}
-							} else {
-								route.Cluster = OutboundClusterPrefix + svc.String()
-							}
-						}
-						// no else. Because a L4 only based match for a HTTP service makes no sense for Envoy,
-						// as it does not offer the ability to filter HTTP traffic by src/dst IP.
-						// It is the mixer's job to police such traffic.
-						routes = append(routes, route)
-					}
-				} else {
-					routes = append(routes, Route{Prefix: "/", Cluster: OutboundClusterPrefix + svc.String()})
-				}
-				host := buildHost(svc, suffix)
-				host.Routes = routes
+				routes := buildRoutes(svc, rulesMap, upstreamNameToInternalNameMap)
+				host := buildVirtualHost(svc, suffix, routes)
 				hosts[svc.String()] = host
 			}
 
@@ -346,8 +264,7 @@ func buildListeners(instances []*model.ServiceInstance,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
 			for _, svc := range lst.instances[proto] {
-				host := buildHost(svc, suffix)
-				host.Routes = []Route{{Prefix: "/", Cluster: localhost}}
+				host := buildVirtualHost(svc, suffix, []Route{{Prefix: "/", Cluster: localhost}})
 				hosts[svc.String()] = host
 			}
 		}
@@ -366,7 +283,7 @@ func buildListeners(instances []*model.ServiceInstance,
 				Config: NetworkFilterConfig{
 					CodecType:   "auto",
 					StatPrefix:  "http",
-					AccessLog:   []AccessLog{{Path: Stdout}},
+					AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
 					RouteConfig: RouteConfig{VirtualHosts: vhosts},
 					Filters:     buildFilters(mesh),
 				},
@@ -378,9 +295,7 @@ func buildListeners(instances []*model.ServiceInstance,
 		}
 	}
 
-	sort.Sort(ListenersByPort(listeners))
-	sort.Sort(ClustersByName(clusters))
-	return listeners, clusters
+	return listeners, localClusters
 }
 
 // sharedHost computes the shared host name suffix for instances.
@@ -420,9 +335,9 @@ func sharedHost(parts ...[]string) []string {
 	}
 }
 
-// buildHost constructs an entry for VirtualHost for a given service.
+// buildVirtualHost constructs an entry for VirtualHost for a given service.
 // Service contains name, namespace and a single port declaration.
-func buildHost(svc *model.Service, suffix []string) VirtualHost {
+func buildVirtualHost(svc *model.Service, suffix []string, routes []Route) VirtualHost {
 	hosts := make([]string, 0)
 	domains := make([]string, 0)
 	parts := strings.Split(svc.Hostname, ".")
@@ -462,11 +377,129 @@ func buildHost(svc *model.Service, suffix []string) VirtualHost {
 	return VirtualHost{
 		Name:    svc.String(),
 		Domains: domains,
+		Routes:  routes,
 	}
 }
 
+// buildRoutes adds one or more route entries in a virtual host based on the routing rules
+func buildRoutes(svc *model.Service, rulesMap map[string][]*config.RouteRule,
+	upstreamNameToInternalNameMap map[string]string) []Route {
+
+	routes := make([]Route, 0)
+	ruleByDestination, prs := rulesMap[svc.Hostname]
+	if prs {
+		for _, rule := range ruleByDestination {
+			httpRule := rule.GetHttp()
+			route := Route{}
+			if httpRule != nil {
+				match := httpRule.GetMatch()
+				route.Path, route.Prefix = buildPathAndPrefix(match)
+				if httpRule.WeightedClusters != nil {
+					route.WeightedClusters = buildWeightedClusters(httpRule.WeightedClusters,
+						upstreamNameToInternalNameMap)
+				} else {
+					route.Cluster = OutboundClusterPrefix + svc.String()
+				}
+			}
+			routes = append(routes, route)
+		}
+	} else {
+		// services without routing rules
+		routes = append(routes, Route{Prefix: "/", Cluster: OutboundClusterPrefix + svc.String()})
+	}
+
+	return routes
+}
+
+// buildPathAndPrefix returns the path and prefix fields in HTTP route based on routing rule
+func buildPathAndPrefix(match *config.HttpMatchCondition) (string, string) {
+	path := ""
+	prefix := ""
+	if match != nil && match.GetUri() != nil {
+		// TODO Error check. Either path/prefix, but not both
+		// TODO Error check. No regex
+		prefix = match.Uri.GetPrefix()
+		path = match.Uri.GetExact()
+	}
+	if prefix == "" && path == "" {
+		prefix = "/"
+	}
+	return path, prefix
+}
+
+// buildWeightedClusters returns the weighted_clusters block for envoy http route entry
+// The returned block has list of clusters and their weights
+func buildWeightedClusters(wcRules []*config.WeightedCluster,
+	upstreamNameToInternalNameMap map[string]string) (wc *WeightedCluster) {
+
+	// The user provides the destination service and tags in the routing rule.
+	// We convert this into the appropriate upstream cluster name
+	weightedClusters := &WeightedCluster{}
+	weightedClusters.Clusters = make([]WeightedClusterEntry, 0)
+	for _, wcRuleItem := range wcRules {
+		wcEntry := WeightedClusterEntry{
+			Name: OutboundClusterPrefix +
+				upstreamNameToInternalNameMap[toInternalUpstreamName(wcRuleItem.DstCluster)],
+			Weight: int(wcRuleItem.Weight),
+		}
+		weightedClusters.Clusters = append(weightedClusters.Clusters, wcEntry)
+	}
+
+	return weightedClusters
+}
+
+// ruleTagsToSvcTag converts array of string tags from routing rule into internal Tag representation
+func ruleTagsToSvcTag(tags []string) []model.Tag {
+	svcTags := make([]model.Tag, 0)
+	for _, t := range tags {
+		svcTags = append(svcTags, model.ParseTagString(t))
+	}
+	return svcTags
+}
+
+// enumerateServiceVersions splits up the default service objects created by the underlying platform
+// into finer-grained services based on routing rules specified by the user. Routing rules delineate
+// different versions of a service through a set of tags.
+// returns a map of hostname to array of upstreams, and a map of users upstreamName to internalName
+func enumerateServiceVersions(services []*model.Service,
+	serviceVersions []*config.UpstreamCluster) (map[string][]*model.Service, map[string]string) {
+
+	servicesMap := make(map[string]*model.Service, len(services))
+	for _, svc := range services {
+		servicesMap[svc.Hostname] = svc
+	}
+
+	serviceVersionsMap := make(map[string][]*model.Service, 0)
+	upstreamNameToInternalNameMap := make(map[string]string, 0) // Hostname + tags -> svc.String()
+	for _, svc := range serviceVersions {
+		tags := ruleTagsToSvcTag(svc.Cluster.Tags)
+		_, prs := serviceVersionsMap[svc.Cluster.Name]
+		if !prs {
+			serviceVersionsMap[svc.Cluster.Name] = make([]*model.Service, 0)
+		}
+		svcVersion := model.Service{
+			Hostname: svc.Cluster.Name,
+			Tags:     tags,
+			Ports:    servicesMap[svc.Cluster.Name].Ports,
+			Address:  servicesMap[svc.Cluster.Name].Address,
+		}
+		serviceVersionsMap[svc.Cluster.Name] = append(serviceVersionsMap[svc.Cluster.Name], &svcVersion)
+		upstreamNameToInternalNameMap[toInternalUpstreamName(svc.Cluster)] = svcVersion.String()
+	}
+
+	// Now merge the maps, giving preference to serviceVersion over service
+	for svc := range servicesMap {
+		_, prs := serviceVersionsMap[svc]
+		if !prs {
+			serviceVersionsMap[svc] = make([]*model.Service, 0)
+			serviceVersionsMap[svc] = append(serviceVersionsMap[svc], servicesMap[svc])
+		}
+	}
+
+	return serviceVersionsMap, upstreamNameToInternalNameMap
+}
+
 // buildClusters creates a cluster for every (service, port)
-// and also a cluster per upstream (service, port, subset of service tags)
 func buildClusters(services []*model.Service) []Cluster {
 	clusters := make([]Cluster, 0)
 	for _, svc := range services {
@@ -494,6 +527,8 @@ func buildClusters(services []*model.Service) []Cluster {
 	return clusters
 }
 
+// buildFilter adds a filter for the the mixer and fault injection if specified by routing rule
+// TODO: fault injection filter needs to go here
 func buildFilters(mesh *MeshConfig) []Filter {
 	filters := make([]Filter, 0)
 
@@ -517,6 +552,13 @@ func buildFilters(mesh *MeshConfig) []Filter {
 	return filters
 }
 
-func clusterIdentifierString(identifier *config.ClusterIdentifier) string {
-	return identifier.Name + ";" + strings.Join(identifier.Tags, ";")
+// toInternalUpstreamName converts the clusterIdentifier in a route rule to a string representation
+// used by internal model.Service
+func toInternalUpstreamName(identifier *config.ClusterIdentifier) string {
+	s := model.Service{
+		Hostname: identifier.Name,
+		Tags:     ruleTagsToSvcTag(identifier.Tags),
+	}
+
+	return s.String()
 }
