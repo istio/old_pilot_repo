@@ -256,7 +256,7 @@ func buildListeners(instances []*model.ServiceInstance,
 		faultsByPort := make([]Filter, 0)
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
-				routes, faultsByHost := buildHttpRoutesAndFaults(svc, rulesMap,
+				routes, faultsByHost := buildHTTPRoutesAndFaults(svc, rulesMap,
 					upstreamNameToInternalNameMap)
 				host := buildVirtualHost(svc, suffix, routes)
 				hosts[svc.String()] = host
@@ -387,7 +387,7 @@ func buildVirtualHost(svc *model.Service, suffix []string, routes []Route) Virtu
 
 // buildHttpRoutesAndFaults adds one or more route entries in a virtual host based on the routing rules
 // and generates a list of fault injection filters to be injected into the filter array in Envoy's config.
-func buildHttpRoutesAndFaults(svc *model.Service, rulesMap map[string][]*config.RouteRule,
+func buildHTTPRoutesAndFaults(svc *model.Service, rulesMap map[string][]*config.RouteRule,
 	upstreamNameToInternalNameMap map[string]string) ([]Route, []Filter) {
 
 	routes := make([]Route, 0)
