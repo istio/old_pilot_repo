@@ -1,6 +1,6 @@
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "76c63b5cd0d47c1f2b47ab4953db96c574af1c1d",
+    commit = "bfa3601d9ab664b448ddb4cc7e48eea511217aaf",
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -52,7 +52,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_coreos_pkg",
-    commit = "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8",
+    commit = "1c941d73110817a80b9fa6e14d5d2b00d977ce2a", # Date: 2/6/17 with "build" file rename
     importpath = "github.com/coreos/pkg",
 )
 
@@ -251,6 +251,7 @@ new_go_repository(
 
 new_go_repository(
     name = "org_golang_x_text",
+    build_file_name = "BUILD.bazel",
     commit = "2910a502d2bf9e43193af9d68ca516529614eed3",
     importpath = "golang.org/x/text",
 )
@@ -265,63 +266,10 @@ new_go_repository(
 ## Proxy build rules
 ##
 
-git_repository(
+http_file(
     name = "istio_proxy",
-    commit = "53fd02610571f8c05af2e50fea911f89f935e678",
-    remote = "https://github.com/istio/proxy",
+    url = "https://storage.googleapis.com/istio-build/proxy/envoy-alpha-eb8bfccc391e528fba316c4e081515eb18583e5c.tar.gz",
 )
-
-load(
-    "@istio_proxy//:repositories.bzl",
-    "boringssl_repositories",
-    "protobuf_repositories",
-    "googletest_repositories",
-)
-
-boringssl_repositories()
-
-protobuf_repositories()
-
-googletest_repositories()
-
-load(
-    "@istio_proxy//src/envoy:repositories.bzl",
-    "envoy_repositories",
-)
-
-envoy_repositories()
-
-load(
-    "@istio_proxy//contrib/endpoints:repositories.bzl",
-    "grpc_repositories",
-    "mixer_client_repositories",
-    "servicecontrol_client_repositories",
-)
-
-grpc_repositories()
-
-servicecontrol_client_repositories()
-
-mixer_client_repositories()
-
-load(
-    "@mixerclient_git//:repositories.bzl",
-    "mixerapi_repositories",
-)
-
-
-# Workaround for Bazel > 0.4.0 since it needs newer protobuf.bzl from:
-# https://github.com/google/protobuf/pull/2246
-# Do not use this git_repository for anything else than protobuf.bzl
-new_git_repository(
-    name = "protobuf_bzl",
-    # Injecting an empty BUILD file to prevent using any build target
-    build_file_content = "",
-    commit = "05090726144b6e632c50f47720ff51049bfcbef6",
-    remote = "https://github.com/google/protobuf.git",
-)
-
-mixerapi_repositories(protobuf_repo="@protobuf_bzl//")
 
 ##
 ## Docker rules
