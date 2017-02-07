@@ -41,6 +41,12 @@ type args struct {
 
 type serverArgs struct {
 	sdsPort int
+	// Certificate chain file used for proxy-to-proxy TLS origination and termination.
+	certChainFile string
+	// Private key file that corresponds to the certificate chain file.
+	privateKeyFile string
+	// Certificate authority certificate to use in verifying a presented client side certificate.
+	caCertFile string
 }
 
 const (
@@ -122,6 +128,12 @@ func init() {
 
 	serverCmd.PersistentFlags().IntVarP(&flags.server.sdsPort, "port", "p", 8080,
 		"Discovery service port")
+	serverCmd.PersistentFlags().StringVarP(&flags.CertChainFile, "cert", "m", "",
+		"Certificate chain file (or empty to disable TLS)")
+	serverCmd.PersistentFlags().StringVarP(&flags.PrivateKeyFile, "private_key", "m", "",
+		"Private key file")
+	serverCmd.PersistentFlags().StringVarP(&flags.CACertFile, "ca_cert", "m", "",
+		"CA certificate file")
 	rootCmd.AddCommand(serverCmd)
 
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.DiscoveryAddress, "sds", "s", "manager:8080",
@@ -136,6 +148,7 @@ func init() {
 		"Envoy config root location")
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m", "",
 		"Mixer DNS address (or empty to disable Mixer)")
+
 	rootCmd.AddCommand(proxyCmd)
 	proxyCmd.AddCommand(egressCmd)
 
