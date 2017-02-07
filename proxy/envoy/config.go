@@ -455,11 +455,7 @@ func buildFaultFilter(internalUpstreamName string, faultRule *config.HttpFaultIn
 
 // buildAbortConfig builds the envoy config related to abort spec in a fault filter
 func buildAbortConfig(abortRule *config.HttpFaultInjection_Abort) *AbortFilter {
-	if abortRule == nil {
-		return nil
-	}
-	if abortRule.GetHttpStatus() == 0 {
-		// We do not support gRPC and http2 errors now.
+	if abortRule == nil || abortRule.GetHttpStatus() == 0 {
 		return nil
 	}
 
@@ -471,11 +467,7 @@ func buildAbortConfig(abortRule *config.HttpFaultInjection_Abort) *AbortFilter {
 
 // buildDelayConfig builds the envoy config related to delay spec in a fault filter
 func buildDelayConfig(delayRule *config.HttpFaultInjection_Delay) *DelayFilter {
-	if delayRule == nil {
-		return nil
-	}
-	if delayRule.GetFixedDelay() == nil {
-		// no support for exponential delay
+	if delayRule == nil || delayRule.GetFixedDelay() == nil {
 		return nil
 	}
 
