@@ -549,8 +549,7 @@ func buildClusters(services []*model.Service) []Cluster {
 				LbType:           DefaultLbType,
 				ConnectTimeoutMs: DefaultTimeoutMs,
 			}
-			if port.Protocol == model.ProtocolGRPC ||
-				port.Protocol == model.ProtocolHTTP2 {
+			if port.Protocol != model.ProtocolTCP && port.Protocol != model.ProtocolUDP {
 				cluster.Features = "http2"
 			}
 			clusters = append(clusters, cluster)
