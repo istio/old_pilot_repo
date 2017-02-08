@@ -619,7 +619,7 @@ func buildClusters(services []*model.Service) []Cluster {
 				cluster.Features = "http2"
 			case model.ProtocolHTTP:
 				// auto-upgrade to http2 since we expect envoy on the other side
-				cluster.Features = "http"
+				cluster.Features = "http2"
 			}
 			clusters = append(clusters, cluster)
 		}
