@@ -96,7 +96,6 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 			Port:    ep.Endpoint.Port,
 		})
 	}
-	glog.V(2).Infof("tags: %#v, hosts: %#v", key, ds.services.Instances(svc.Hostname, svc.Ports.GetNames(), svc.Tags))
 	if err := response.WriteEntity(hosts{out}); err != nil {
 		glog.Warning(err)
 	}
