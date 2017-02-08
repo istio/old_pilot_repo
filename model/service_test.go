@@ -127,8 +127,8 @@ func TestTags(t *testing.T) {
 		{b, a1b},
 	}
 
-	if (TagList{a}).Matches(b) {
-		t.Errorf("{a}.Matches(b) => Got true")
+	if (TagList{a}).HasSubsetOf(b) {
+		t.Errorf("{a}.HasSubsetOf(b) => Got true")
 	}
 
 	if a1.SubsetOf(a) {
@@ -136,8 +136,8 @@ func TestTags(t *testing.T) {
 	}
 
 	for _, pair := range matching {
-		if !pair.list.Matches(pair.tag) {
-			t.Errorf("%v.Matches(%v) => Got false", pair.list, pair.tag)
+		if !pair.list.HasSubsetOf(pair.tag) {
+			t.Errorf("%v.HasSubsetOf(%v) => Got false", pair.list, pair.tag)
 		}
 	}
 

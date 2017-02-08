@@ -395,7 +395,7 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagLi
 					tag, _ := c.pods.tagByIP(ea.IP)
 
 					// check that one of the input tags is a subset of this tag
-					if !tags.Matches(tag) {
+					if !tags.HasSubsetOf(tag) {
 						continue
 					}
 

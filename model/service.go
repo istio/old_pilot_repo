@@ -70,9 +70,9 @@ func (tag Tag) SubsetOf(that Tag) bool {
 // TagList is a set of tags
 type TagList []Tag
 
-// Matches returns true if the input tag is a super set of one of the tags in the list
-// or if the tag list if empty
-func (tags TagList) Matches(that Tag) bool {
+// HasSubsetOf returns true if the input tag is a super set of one of the tags
+// in the list or if the tag list is empty
+func (tags TagList) HasSubsetOf(that Tag) bool {
 	if len(tags) == 0 {
 		return true
 	}
