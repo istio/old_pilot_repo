@@ -81,7 +81,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service, rul
 		serviceUpstreams = append(serviceUpstreams, val...)
 	}
 	// this is what goes into Envoy
-	proxyUpstreams := buildClusters(serviceUpstreams)
+	proxyUpstreams := buildClusters(serviceUpstreams, upstreams)
 
 	// add the mixer cluster if configured
 	if len(mesh.MixerAddress) > 0 {
@@ -598,7 +598,12 @@ func enumerateServiceVersions(services []*model.Service,
 }
 
 // buildClusters creates a cluster for every (service, port)
-func buildClusters(services []*model.Service) []Cluster {
+func buildClusters(services []*model.Service, upstreams []*config.UpstreamCluster) []Cluster {
+	upstreamsByHostname := make(map[string]*config.UpstreamCluster)
+	for _, up := range upstreams {
+		upstreamsByHostname[up.GetCluster().Name] = up
+	}
+
 	clusters := make([]Cluster, 0)
 	for _, svc := range services {
 		for _, port := range svc.Ports {
@@ -607,12 +612,39 @@ func buildClusters(services []*model.Service) []Cluster {
 				Ports:    []*model.Port{port},
 				Tags:     svc.Tags,
 			}
+
 			cluster := Cluster{
 				Name:             OutboundClusterPrefix + clusterSvc.String(),
 				ServiceName:      clusterSvc.String(),
 				Type:             "sds",
 				LbType:           DefaultLbType,
 				ConnectTimeoutMs: DefaultTimeoutMs,
+			}
+
+			if up, _ := upstreamsByHostname[svc.Hostname]; up != nil {
+				cluster.LbType = loadBalanceType(up.GetLbPolicy())
+				if cb := up.GetCircuitBreaker(); cb != nil {
+					if scb := cb.GetSimpleCb(); scb != nil {
+						cluster.OutlierDetection = &OutlierDetection{
+							ConsecutiveError:   int(scb.GetFailureThreshold()),
+							BaseEjectionTimeMS: int(1000 * scb.GetResetTimeoutSeconds()),
+						}
+					}
+				}
+
+				if t := up.GetTimeout(); t != nil {
+					if st := t.GetSimpleTimeout(); st != nil {
+						cluster.ConnectTimeoutMs = int(st.GetTimeoutSeconds() * 1000)
+					}
+				}
+
+				if r := up.GetRetry(); r != nil {
+					if sr := r.GetSimpleRetry(); sr != nil {
+						cluster.CircuitBreaker = &CircuitBreaker{
+							MaxRetries: int(sr.GetAttempts()),
+						}
+					}
+				}
 			}
 			if port.Protocol == model.ProtocolGRPC ||
 				port.Protocol == model.ProtocolHTTP2 {
@@ -623,6 +655,18 @@ func buildClusters(services []*model.Service) []Cluster {
 	}
 	sort.Sort(ClustersByName(clusters))
 	return clusters
+}
+
+// loadBalanceType converts
+func loadBalanceType(lb *config.LoadBalancingPolicy) string {
+	switch lb.GetName() {
+	case config.LoadBalancingPolicy_RANDOM:
+		return "random"
+	case config.LoadBalancingPolicy_LEAST_CONN: // TODO: is this the correct mapping?
+		return "least_request"
+	default:
+		return DefaultLbType
+	}
 }
 
 // buildFilter adds a filter for the the mixer and fault injection if specified by routing rule

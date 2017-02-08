@@ -104,7 +104,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 // ListClusters responds to CDS requests
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	svc := ds.services.Services()
-	if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {
+	if err := response.WriteEntity(clusters{buildClusters(svc, nil)}); err != nil {
 		glog.Warning(err)
 	}
 }
