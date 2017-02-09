@@ -119,31 +119,14 @@ message RouteRule {
   // Examples: "my-service.default.svc.cluster.local", "svc.cluster.local".
   string destination = 1;
 
+  // Match condition is optional.
+  // By default, the rule applies to HTTP traffic only.
+  MatchCondition match = 2;
+
   // Each routing rule is associated with one or more service version destinations
   // (see glossary in beginning of document). Weights associated with the service
   // version determine the proportion of traffic it receives.
-  repeated DestinationWeight route = 2;
-
-  // Identifies the service initiating a connection or a request by its name.
-  string source = 3;
-
-  // Identifies the source service version. The identifier is interpreted
-  // by the platform to match a service version for the source service.
-  //
-  // N.B. The map is used instead of pstruct due to lack of serialization support
-  // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
-  map<string, string> source_version = 4;
-
-  // Set of layer 4 match conditions based on the IP ranges
-  L4MatchAttributes tcp = 5;
-
-  // Set of layer 4 match conditions based on the IP ranges
-  L4MatchAttributes udp = 6;
-
-  // Set of HTTP match conditions based on HTTP/1.1, HTTP/2, GRPC request metadata,
-  // such as "uri", "scheme", "authority".
-  // The header keys are case-insensitive.
-  map<string, StringMatch> http = 7;
+  repeated DestinationWeight route = 3;
 
   // Precedence is used to disambiguate the order of application of rules for
   // the same destination service. A higher number takes priority.  If not
@@ -152,7 +135,33 @@ message RouteRule {
   //
   // Rule precedence can be used to order routes for a single destination, as
   // well as override existing routes with the same attribute condition.
-  int32 precedence = 8;
+  int32 precedence = 4;
+}
+
+// Match condition selects traffic for routing application.
+// The condition provides distinct set of conditions for each protocol with the
+// intention that conditions apply only to the service ports that match the protocol.
+message MatchCondition {
+  // Identifies the service initiating a connection or a request by its name.
+  string source = 1;
+
+  // Identifies the source service version. The identifier is interpreted
+  // by the platform to match a service version for the source service.
+  //
+  // N.B. The map is used instead of pstruct due to lack of serialization support
+  // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
+  map<string, string> source_version = 2;
+
+  // Set of layer 4 match conditions based on the IP ranges
+  L4MatchAttributes tcp = 3;
+
+  // Set of layer 4 match conditions based on the IP ranges
+  L4MatchAttributes udp = 4;
+
+  // Set of HTTP match conditions based on HTTP/1.1, HTTP/2, GRPC request metadata,
+  // such as "uri", "scheme", "authority".
+  // The header keys are case-insensitive.
+  map<string, StringMatch> http = 5;
 }
 
 // Each routing rule is associated with one or more service versions (see
