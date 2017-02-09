@@ -111,6 +111,8 @@ message RouteRule {
   //
   // The value is either the fully qualified service name or the cluster subdomain
   // with the interpretation that the cluster route rule applies to its ingress traffic.
+  // For example, "my-service.default.svc.cluster.local" refers to a service by its
+  // name, while "svc.cluster.local" refers to the cluster ingress traffic.
   //
   // The destination field is mandatory for each route rule.
   //
