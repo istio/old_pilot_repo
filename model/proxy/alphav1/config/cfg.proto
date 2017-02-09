@@ -15,39 +15,38 @@
 syntax = "proto3";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 package istio.proxy.v1alpha.config;
 option go_package = "config";
 
 // Glossary & concepts
-
+//
 // Service instances - set of pods/VMs/containers where the service is running.
 // The members share one or more common attributes. For e.g., all pods in a
 // group could share a common set of labels, or be running the same version of
 // the application binary.
-
-// Service variants - In a continuous deployment scenario, for a given service,
+//
+// Service versions - In a continuous deployment scenario, for a given service,
 // there can be multiple sets of instances running potentially different
-// *variants* of the application binary. These variants are not necessarily
+// variants of the application binary. These variants are not necessarily
 // different API versions. They could be iterative changes to the same service,
 // deployed in different environments (prod, staging, dev, etc.). Common
 // scenarios where this occurs include A/B testing, canary rollouts, etc. The
-// choice of a particular variant can be decided based on various criterion
-// (headers, url, etc.) and/or by weights assigned to each variant.
-// Each service has a default variant consisting of all its instances.
-
-// Origin - client (browser or another service) calling the proxy/sidecar
-// (typically to reach another service).
-
-// Destination - The remote service to which the proxy/sidecar is talking to,
-// on behalf of the origin service. There can be one or more variants for a
-// given service (see the discussion on versions above). The proxy would choose
-// the variant based on various routing rules.
-
+// choice of a particular version can be decided based on various criterion
+// (headers, url, etc.) and/or by weights assigned to each version.  Each
+// service has a default version consisting of all its instances.
+//
+// Source - downstream client (browser or another service) calling the
+// proxy/sidecar (typically to reach another service).
+//
+// Destination - The remote upstream service to which the proxy/sidecar is
+// talking to, on behalf of the source service. There can be one or more
+// service versions for a given service (see the discussion on versions above).
+// The proxy would choose the version based on various routing rules.
+//
 // Applications address only the destination service using without knowledge of
-// individual service variants. The actual choice of the variant is determined
+// individual service versions. The actual choice of the version is determined
 // by the proxy, enabling the application code to decouple itself from the
 // evolution of dependent services.
 
@@ -55,131 +54,126 @@ option go_package = "config";
 message ProxyMeshConfig {
 }
 
-// Destination declares how to associate service instances with a service
-// variant (through discovery or through static configuration), and policies
-// that determine how to handle traffic (load balancing policies, failure
-// recovery policies such as timeouts, retries, circuit breakers), etc.
-// N.B.  The policies are enforced on egress connections or requests, i.e.,
-// enforced when the origin service is opening a connection/sending a request
-// via the proxy to the destination.
+// Destination declares policies that determine how to handle traffic for a
+// destination service (load balancing policies, failure recovery policies such
+// as timeouts, retries, circuit breakers, etc).  Policies are applicable per
+// individual service versions. It is an error to define multiple policies for
+// the same service version.
+//
+// N.B. The policies are enforced on client-side connections or requests, i.e.,
+// enforced when the service is opening a connection/sending a request via the
+// proxy to the destination.
+//
+// N.B. We may extend destination policies to apply to individual service
+// versions and not to the entire service. Proxy mesh may support only a subset
+// of policies to be applicable to individual service version destinations.
 message Destination {
-  // Service for which the service variant is defined.
+  // Service for which the service version is defined.
   string destination = 1;
 
-  // Identifier is the unique service variant name for a given service.
-  // If left empty, the policies apply to the default service destination.
-  google.protobuf.Struct identifier = 2;
+  // Load balancing policy
+  LoadBalancing load_balancing = 2;
 
-  // Should be either http://.. or tcp://.. 
-  LoadBalancing load_balancing = 3;
-  Timeout timeout = 4;
-  Retry retry = 5;
-  CircuitBreaker circuit_breaker = 6;
-  // TODO(rshriram, should be policy)
-  // string health_check_endpoint = 3;
+  // Timeout policy
+  Timeout timeout = 3;
+
+  // Retry policy
+  Retry retry = 4;
+
+  // Circuit breaker policy
+  CircuitBreaker circuit_breaker = 5;
+
+  // L7 fault injection policy applies to L7 traffic
+  HTTPFaultInjection http_fault = 6;
+
+  // L4 fault injection policy applies to L4 traffic
+  L4FaultInjection l4_fault = 7;
+
+  // Custom policy implementations
+  google.protobuf.Any custom = 8;
 }
 
-// TODO(rshriram): Since a Http request can match multiple route rules (e.g.,
-// there are two routes for the prefix /foo, with differing Http match
-// attributes such as Http headers), the first rule to match will/should be
-// chosen by proxy implementations N.B.: When a request does not match any rule
-// for Http, the downstream service would receive a HTTP 404
-
-// Traffic routing related configurations for the proxy/sidecar.  The
-// configuration generated for the proxy will preserve the order of rules
-// specified by the user in the Istio config.  Requests can match either a L4
-// or HTTP (L7) rule, but not both. A request can match multiple HTTP (L7)
-// rules, but it can match only one L4 rule. This can be enforced by checking
-// the match attributes. A HTTP match rule matches on both L4 and L7
-// attributes, while a L4 rule matches based only on L4 attributes. Any
-// duplication or collision in the match attributes between two L4 rules or
-// between a L4 and L7 rule should throw an error.
+// Route rule provides a custom routing policy based on the source and
+// destination service versions and connection/request metadata.  The rule must
+// provide a set of conditions for each protocol (TCP, UDP, HTTP) that the
+// destination service exposes on its ports. The rule applies only to the ports
+// on the destination service for which it provides protocol-specific match
+// condition, e.g. if the rule does not specify TCP condition, the rule does
+// not apply to TCP traffic towards the destination service.
 message RouteRule {
-  // Uniquely identifies the destination service (not its variants) associated
-  // with this routing rule. This is applicable for host-based resolution in
-  // HTTP as well as IP-based resolution in TCP.
-  // *required*
+  // Uniquely identifies the destination service (not its versions) associated
+  // with this routing rule. This is applicable for hostname-based resolution for
+  // HTTP traffic as well as IP-based resolution for TCP/UDP traffic.  *required*
   string destination = 1;
 
-  // Set of conditions that must be satisfied, such as connection attributes,
-  // protocol, request metadata, etc.
-  MatchCondition match = 2;
+  // Identifies the service initiating a connection or a request.
+  string source = 2;
 
-  // Each routing rule is associated with one or more service variants, (see
+  // Identifies the source service version. The identifier is interpreted
+  // by the platform to match a service version for the source service.
+  //
+  // N.B. The map is used instead of pstruct due to lack of serialization support
+  // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
+  map<string, string> source_version = 3;
+
+  // Set of layer 4 match conditions based on the IP ranges
+  L4MatchAttributes tcp = 4;
+
+  // Set of layer 4 match conditions based on the IP ranges
+  L4MatchAttributes udp = 5;
+
+  // Set of HTTP match conditions based on the request metadata
+  HTTPMatchAttributes http = 6;
+
+  // Each routing rule is associated with one or more service versions (see
   // glossary in beginning of document). Weights associated with the service
-  // variant determine the proportion of traffic it receives.
-  repeated DestinationWeight weights = 3;
+  // version determine the proportion of traffic it receives.
+  repeated DestinationWeight versions = 7;
+
+  // Precedence is used to disambiguate the order of application of rules
+  // for the same destination service. A higher number takes priority.
+  int32 precedence = 8;
 }
 
-message MatchCondition {
-  // Identifies the service initiating a connection or a request.
-  string origin = 1;
+// Each routing rule is associated with one or more service versions (see
+// glossary in beginning of document). Weights associated with the version
+// determine the proportion of traffic it receives.
+message DestinationWeight {
+  // Service version destination identifier for the destination service.
+  //
+  // N.B. The map is used instead of pstruct due to lack of serialization support
+  // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
+  map<string, string> version = 1;
 
-  // Identifies the origin service variant.
-  google.protobuf.Struct origin_identifier = 2;
-
-  oneof protocol {
-    // Set of layer match attributes based on the IP ranges
-    L4MatchAttributes tcp = 3;
-
-    // Set of layer match attributes based on the IP ranges
-    L4MatchAttributes udp = 4;
-
-    // Set of HTTP request attributes in the match condition
-    HTTPMatchAttributes http = 5;
-  }
+  // The proportion of traffic to be forwarded to the service version Max is
+  // 100. Sum of weights across destinations should add up to 100.
+  int32 weight = 2;
 }
 
 // L4 connection match attributes
 message L4MatchAttributes {
   // IPv4 or IPv6 ip address with optional subnet. E.g., a.b.c.d/xx form or
   // just a.b.c.d
-  repeated string origin_subnet = 1;
+  repeated string source_subnet = 1;
 
   // IPv4 or IPv6 ip address with optional subnet. E.g., a.b.c.d/xx form or
   // just a.b.c.d
   repeated string destination_subnet = 2;
 }
 
-// Http/1.1|Http/2|gRPC routing rule match criterion
+// Attributes for HTTP/1.1, HTTP/2, and GRPC protocols.
 message HTTPMatchAttributes {
+  // Protocol scheme
   string scheme = 1;
+
   StringMatch authority = 2;
+
   StringMatch uri = 3;
 
   // Match Http requests based on the specified headers
   // Support exact/prefix/regex match on header values
   map<string, StringMatch> headers = 4;
 }
-
-// Each routing rule is associated with one or more service variants, (see
-// glossary in beginning of document). Weights associated with the variant
-// determine the proportion of traffic it receives.
-message DestinationWeight {
-  // Service variant destination identifier for the destination service.
-  google.protobuf.Struct identifier = 1;
-
-  // The proportion of traffic to be forwarded to the service variant Max is
-  // 100. Sum of weights across variants should add up to 100.
-  int32 weight = 2;
-}
-
-// Faults can be injected into the connections from downstream by the
-// proxy, for testing the failure recovery capabilities of downstream
-// services.  Faults include aborting the request/connection from
-// downstream service, delaying the proxying of request/connection to the
-// upstream service, and throttling the bandwidth of the connection
-// (either end).
-
-// TODO: This should be done on per-cluster basis.
-// L4FaultInjection fault = 3;
-
-// Faults can be injected into the API calls by the proxy, for
-// testing the failure recovery capabilities of downstream services.
-// Faults include aborting the Http request from downstream service,
-// delaying the proxying of request to the upstream service, or both.
-// TODO: This should move into UpstreamCluster
-// HttpFaultInjection fault = 3;
 
 // Describes how to matches a given string (exact match, prefix-based match
 // or posix style regex based match). Match is case-sensitive.
@@ -206,7 +200,7 @@ message LoadBalancing {
   oneof lb_policy {
     SimpleLBPolicy name = 1;
     //Custom policy implementations
-    google.protobuf.Any custom_impl = 2;
+    google.protobuf.Any custom = 2;
   }
 }
 
@@ -224,7 +218,7 @@ message Timeout {
   oneof timeout_policy {
     SimpleTimeoutPolicy simple_timeout = 1;
     // For proxies that support custom timeout policies
-    google.protobuf.Any custom_impl = 2;
+    google.protobuf.Any custom = 2;
   }
 }
 
@@ -241,7 +235,7 @@ message Retry {
   oneof retry_policy {
     SimpleRetryPolicy simple_retry = 1;
     // For proxies that support custom retry policies
-    google.protobuf.Any custom_impl = 2;
+    google.protobuf.Any custom = 2;
   }
 }
 
@@ -264,7 +258,7 @@ message CircuitBreaker {
   oneof cb_policy {
     SimpleCircuitBreakerPolicy simple_cb = 1;
     // For proxies that support custom circuit breaker policies.
-    google.protobuf.Any custom_impl = 2;
+    google.protobuf.Any custom = 2;
   }
 }
 
@@ -272,7 +266,7 @@ message CircuitBreaker {
 // failure recovery capabilities of downstream services.  Faults include
 // aborting the Http request from downstream service, delaying the proxying of
 // requests, or both.
-message HttpFaultInjection {
+message HTTPFaultInjection {
   // Delay requests before forwarding, emulating various failures such as
   // network issues, overloaded upstream service, etc.
   Delay delay = 1;
@@ -338,10 +332,12 @@ message HttpFaultInjection {
   }
 }
 
-// Faults can be injected into the L4 traffic forwarded by the proxy, for
-// testing the failure recovery capabilities of downstream services.
-// Faults include terminating established Tcp connections, throttling the
-// upstream/downstream bandwidth (for Tcp|Udp), or both.
+// Faults can be injected into the connections from downstream by the
+// proxy, for testing the failure recovery capabilities of downstream
+// services.  Faults include aborting the request/connection from
+// downstream service, delaying the proxying of request/connection to the
+// upstream service, and throttling the bandwidth of the connection
+// (either end).
 message L4FaultInjection {
   // Unlike Http services, we have very little context for raw Tcp|Udp
   // connections. We could throttle bandwidth of the connections (slow down
