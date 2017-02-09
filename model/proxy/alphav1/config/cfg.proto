@@ -205,7 +205,7 @@ message LoadBalancing {
 }
 
 // Request timeout: wait time until a response is received. Does not
-// indicate the time for the entire response to arrive. 
+// indicate the time for the entire response to arrive.
 message Timeout {
   message SimpleTimeoutPolicy {
     // timeout is per attempt, when retries are specified as well.
