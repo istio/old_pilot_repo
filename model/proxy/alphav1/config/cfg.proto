@@ -78,14 +78,14 @@ message Destination {
   // Load balancing policy
   LoadBalancing load_balancing = 3;
 
+  // Circuit breaker policy
+  CircuitBreaker circuit_breaker = 4;
+
   // Timeout policy. N.B. Applicable to the default service version only.
-  Timeout timeout = 4;
+  HTTPTimeout http_timeout = 5;
 
   // Retry policy. N.B. Applicable to the default service version only.
-  Retry retry = 5;
-
-  // Circuit breaker policy
-  CircuitBreaker circuit_breaker = 6;
+  HTTPRetry http_retry = 6;
 
   // L7 fault injection policy applies to L7 traffic
   HTTPFaultInjection http_fault = 7;
@@ -138,8 +138,10 @@ message RouteRule {
   // Set of layer 4 match conditions based on the IP ranges
   L4MatchAttributes udp = 6;
 
-  // Set of HTTP match conditions based on the request metadata
-  HTTPMatchAttributes http = 7;
+  // Set of HTTP match conditions based on HTTP/1.1, HTTP/2, GRPC request metadata,
+  // such as "uri", "scheme", "authority".
+  // The header keys are case-insensitive.
+  map<string, StringMatch> http = 7;
 
   // Precedence is used to disambiguate the order of application of rules for
   // the same destination service. A higher number takes priority.  If not
@@ -184,20 +186,6 @@ message L4MatchAttributes {
   repeated string destination_subnet = 2;
 }
 
-// Attributes for HTTP/1.1, HTTP/2, and GRPC protocols.
-message HTTPMatchAttributes {
-  // Protocol scheme
-  string scheme = 1;
-
-  StringMatch authority = 2;
-
-  StringMatch uri = 3;
-
-  // Match Http requests based on the specified headers
-  // Support exact/prefix/regex match on header values
-  map<string, StringMatch> headers = 4;
-}
-
 // Describes how to matches a given string (exact match, prefix-based match
 // or posix style regex based match). Match is case-sensitive.
 message StringMatch {
@@ -217,7 +205,6 @@ message LoadBalancing {
     // additional configuration.
     ROUND_ROBIN = 0;
     LEAST_CONN = 1;
-    IP_HASH = 2;
     RANDOM = 3;
   }
   oneof lb_policy {
@@ -229,7 +216,7 @@ message LoadBalancing {
 
 // Request timeout: wait time until a response is received. Does not
 // indicate the time for the entire response to arrive.
-message Timeout {
+message HTTPTimeout {
   message SimpleTimeoutPolicy {
     // timeout is per attempt, when retries are specified as well.
     // seconds.nanoseconds format
@@ -246,11 +233,11 @@ message Timeout {
 }
 
 // Retry policy to use when a request fails.
-message Retry {
+message HTTPRetry {
   message SimpleRetryPolicy {
     // number of times the request should be retried.
     // total timeout would be attempts * timeout
-    uint32 attempts = 1;
+    int32 attempts = 1;
     // Downstream Service could specify retry attempts via Http header to
     // the proxy, if the proxy supports such a feature.
     string override_header_name = 2;
@@ -268,16 +255,37 @@ message CircuitBreaker {
   message SimpleCircuitBreakerPolicy {
     // (for an unhealthy upstream) number of consecutive requests that
     // should succeed before the upstream is marked healthy.
-    uint32 success_threshold = 1;
+    int32 success_threshold = 1;
 
     // (for a healthy upstream) number of consecutive requests that
     // can fail before the upstream is marked unhealthy.
-    uint32 failure_threshold = 2;
+    int32 failure_threshold = 2;
 
     // When a healthy upstream becomes unhealthy, duration to wait before
     // attempting to send requests to that upstream.
     // format seconds.nanoseconds
     double reset_timeout_seconds = 3;
+
+    // Maximum number of connections to a backend
+    int32 max_connections = 4;
+
+    // Maximum number of pending requests to a backend.
+    int32 http_max_pending_requests = 5;
+
+    // Maximum number of requests to a backend.
+    int32 http_max_requests = 6;
+
+    // Minimum time the circuit will be closed.
+    string sleep_window = 7;
+
+    //Number of 5XX errors before circuit is opened.
+    int32 http_consecutive_errors = 8;
+
+    // Interval for checking state of hystrix circuit.
+    int32 http_detection_interval = 9;
+
+    // Maximum number of requests per connection to a backend.
+    int32 http_max_requests_per_connection = 10;
   }
   oneof cb_policy {
     SimpleCircuitBreakerPolicy simple_cb = 1;
@@ -348,7 +356,7 @@ message HTTPFaultInjection {
     oneof error_type {
       string grpc_status = 2;
       string http2_error = 3;
-      uint32 http_status = 4;
+      int32 http_status = 4;
     }
     // Specify abort code as part of Http request.
     // TODO: The semantics and syntax of the headers is undefined.
@@ -377,9 +385,9 @@ message L4FaultInjection {
     // percentage of connections to throttle.
     float percent = 1;
     // bandwidth limit in "bits" per second between downstream and proxy
-    uint64 downstream_limit_bps = 2;
+    int64 downstream_limit_bps = 2;
     // bandwidth limits in "bits" per second between proxy and upstream
-    uint64 upstream_limit_bps = 3;
+    int64 upstream_limit_bps = 3;
 
     oneof throttle_after {
       // Wait for X seconds after the connection is established, before
