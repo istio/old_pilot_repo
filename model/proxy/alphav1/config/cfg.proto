@@ -131,10 +131,13 @@ message RouteRule {
   // version determine the proportion of traffic it receives.
   repeated DestinationWeight versions = 7;
 
-  // Precedence is used to disambiguate the order of application of rules
-  // for the same destination service. A higher number takes priority.
-  // Rule precedence can be used to order routes for a single destination, as well
-  // as override existing routes.
+  // Precedence is used to disambiguate the order of application of rules for
+  // the same destination service. A higher number takes priority.  If not
+  // specified, the value is assumed to be 0.  The order of application for rules
+  // with the same precedence is unspecified.
+  //
+  // Rule precedence can be used to order routes for a single destination, as
+  // well as override existing routes.
   int32 precedence = 8;
 }
 
