@@ -44,7 +44,7 @@ option go_package = "config";
 // service versions for a given service (see the discussion on versions above).
 // The proxy would choose the version based on various routing rules.
 //
-// Applications address only the destination service using without knowledge of
+// Applications address only the destination service without knowledge of
 // individual service versions. The actual choice of the version is determined
 // by the proxy, enabling the application code to decouple itself from the
 // evolution of dependent services.
@@ -63,35 +63,38 @@ message ProxyMeshConfig {
 // enforced when the service is opening a connection/sending a request via the
 // proxy to the destination.
 message Destination {
-  // Service for which the service version is defined.
+  // Service name for which the service version is defined.
+  // The name should be fully-qualified, e.g. "my-service.default.svc.cluster.local".
   string destination = 1;
 
   // Service version destination identifier for the destination service.
+  // The identifier is qualified by the destination service name, e.g. version
+  // "env=prod" in "my-service.default.svc.cluster.local".
   //
   // N.B. The map is used instead of pstruct due to lack of serialization support
   // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
-  map<string, string> version = 1;
+  map<string, string> version = 2;
 
   // Load balancing policy
-  LoadBalancing load_balancing = 2;
+  LoadBalancing load_balancing = 3;
 
   // Timeout policy. N.B. Applicable to the default service version only.
-  Timeout timeout = 3;
+  Timeout timeout = 4;
 
   // Retry policy. N.B. Applicable to the default service version only.
-  Retry retry = 4;
+  Retry retry = 5;
 
   // Circuit breaker policy
-  CircuitBreaker circuit_breaker = 5;
+  CircuitBreaker circuit_breaker = 6;
 
   // L7 fault injection policy applies to L7 traffic
-  HTTPFaultInjection http_fault = 6;
+  HTTPFaultInjection http_fault = 7;
 
   // L4 fault injection policy applies to L4 traffic
-  L4FaultInjection l4_fault = 7;
+  L4FaultInjection l4_fault = 8;
 
   // Custom policy implementations
-  google.protobuf.Any custom = 8;
+  google.protobuf.Any custom = 9;
 }
 
 // Route rule provides a custom routing policy based on the source and
@@ -102,34 +105,41 @@ message Destination {
 // condition, e.g. if the rule does not specify TCP condition, the rule does
 // not apply to TCP traffic towards the destination service.
 message RouteRule {
-  // Uniquely identifies the destination service (not its versions) associated
-  // with this routing rule. This is applicable for hostname-based resolution for
-  // HTTP traffic as well as IP-based resolution for TCP/UDP traffic.  *required*
+  // Uniquely identifies the destination  associated with this routing rule.
+  // This is applicable for hostname-based resolution for HTTP traffic as well as
+  // IP-based resolution for TCP/UDP traffic.
+  //
+  // The value is either the fully qualified service name or the cluster subdomain
+  // with the interpretation that the cluster route rule applies to its ingress traffic.
+  //
+  // The destination field is mandatory for each route rule.
+  //
+  // Examples: "my-service.default.svc.cluster.local", "svc.cluster.local".
   string destination = 1;
 
-  // Identifies the service initiating a connection or a request.
-  string source = 2;
+  // Each routing rule is associated with one or more service version destinations
+  // (see glossary in beginning of document). Weights associated with the service
+  // version determine the proportion of traffic it receives.
+  repeated DestinationWeight route = 2;
+
+  // Identifies the service initiating a connection or a request by its name.
+  string source = 3;
 
   // Identifies the source service version. The identifier is interpreted
   // by the platform to match a service version for the source service.
   //
   // N.B. The map is used instead of pstruct due to lack of serialization support
   // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
-  map<string, string> source_version = 3;
+  map<string, string> source_version = 4;
 
   // Set of layer 4 match conditions based on the IP ranges
-  L4MatchAttributes tcp = 4;
+  L4MatchAttributes tcp = 5;
 
   // Set of layer 4 match conditions based on the IP ranges
-  L4MatchAttributes udp = 5;
+  L4MatchAttributes udp = 6;
 
   // Set of HTTP match conditions based on the request metadata
-  HTTPMatchAttributes http = 6;
-
-  // Each routing rule is associated with one or more service versions (see
-  // glossary in beginning of document). Weights associated with the service
-  // version determine the proportion of traffic it receives.
-  repeated DestinationWeight versions = 7;
+  HTTPMatchAttributes http = 7;
 
   // Precedence is used to disambiguate the order of application of rules for
   // the same destination service. A higher number takes priority.  If not
@@ -137,7 +147,7 @@ message RouteRule {
   // with the same precedence is unspecified.
   //
   // Rule precedence can be used to order routes for a single destination, as
-  // well as override existing routes.
+  // well as override existing routes with the same attribute condition.
   int32 precedence = 8;
 }
 
@@ -145,15 +155,22 @@ message RouteRule {
 // glossary in beginning of document). Weights associated with the version
 // determine the proportion of traffic it receives.
 message DestinationWeight {
-  // Service version destination identifier for the destination service.
+  // Uniquely identifies the destination service.
+  // If not specified, the value is inherited from the parent route rule.
+  //
+  // Example: "my-service.default.svc.cluster.local".
+  string destination = 1;
+
+  // Service version identifier for the destination service.
   //
   // N.B. The map is used instead of pstruct due to lack of serialization support
   // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
-  map<string, string> version = 1;
+  map<string, string> version = 2;
 
   // The proportion of traffic to be forwarded to the service version Max is
   // 100. Sum of weights across destinations should add up to 100.
-  int32 weight = 2;
+  // If there is only destination in a rule, the weight value is assumed to be 100.
+  int32 weight = 3;
 }
 
 // L4 connection match attributes
