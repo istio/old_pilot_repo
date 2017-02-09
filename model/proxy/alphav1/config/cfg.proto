@@ -188,12 +188,11 @@ message L4MatchAttributes {
 
 // Describes how to matches a given string (exact match, prefix-based match
 // or posix style regex based match). Match is case-sensitive.
+// It is a validation error to supply a regex for a proxy that does not support it.
 message StringMatch {
   oneof match_type {
     string exact = 1;
     string prefix = 2;
-    // posix style regex match. Throw error if user's chosen proxy does not
-    // support posix regex.
     string regex = 3;
   }
 }
@@ -266,7 +265,7 @@ message CircuitBreaker {
     // format seconds.nanoseconds
     double reset_timeout_seconds = 3;
 
-    // Maximum number of connections to a backend
+    // Maximum number of connections to a backend.
     int32 max_connections = 4;
 
     // Maximum number of pending requests to a backend.
@@ -278,7 +277,7 @@ message CircuitBreaker {
     // Minimum time the circuit will be closed.
     string sleep_window = 7;
 
-    //Number of 5XX errors before circuit is opened.
+    // Number of 5XX errors before circuit is opened.
     int32 http_consecutive_errors = 8;
 
     // Interval for checking state of hystrix circuit.
