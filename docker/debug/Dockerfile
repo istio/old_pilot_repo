@@ -1,6 +1,6 @@
 # Refresh istio debug image with the following commands.
 #
-# 	docker build -f Dockerfile.debug . -t istio/debug:test
+# 	docker build . -t istio/debug:test
 # 	docker push istio/debug:test
 
 FROM ubuntu:xenial
