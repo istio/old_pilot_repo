@@ -22,10 +22,9 @@ option go_package = "config";
 
 // Glossary & concepts
 //
-// Service instances - set of pods/VMs/containers where the service is running.
-// The members share one or more common attributes. For e.g., all pods in a
-// group could share a common set of labels, or be running the same version of
-// the application binary.
+// Service is a unit of an application with a unique name that other services
+// can refer to the functionality being called. Service instances are
+// pods/VMs/containers that comprise the service.
 //
 // Service versions - In a continuous deployment scenario, for a given service,
 // there can be multiple sets of instances running potentially different
@@ -63,21 +62,23 @@ message ProxyMeshConfig {
 // N.B. The policies are enforced on client-side connections or requests, i.e.,
 // enforced when the service is opening a connection/sending a request via the
 // proxy to the destination.
-//
-// N.B. We may extend destination policies to apply to individual service
-// versions and not to the entire service. Proxy mesh may support only a subset
-// of policies to be applicable to individual service version destinations.
 message Destination {
   // Service for which the service version is defined.
   string destination = 1;
 
+  // Service version destination identifier for the destination service.
+  //
+  // N.B. The map is used instead of pstruct due to lack of serialization support
+  // in golang protobuf library (see https://github.com/golang/protobuf/pull/208)
+  map<string, string> version = 1;
+
   // Load balancing policy
   LoadBalancing load_balancing = 2;
 
-  // Timeout policy
+  // Timeout policy. N.B. Applicable to the default service version only.
   Timeout timeout = 3;
 
-  // Retry policy
+  // Retry policy. N.B. Applicable to the default service version only.
   Retry retry = 4;
 
   // Circuit breaker policy
@@ -132,6 +133,8 @@ message RouteRule {
 
   // Precedence is used to disambiguate the order of application of rules
   // for the same destination service. A higher number takes priority.
+  // Rule precedence can be used to order routes for a single destination, as well
+  // as override existing routes.
   int32 precedence = 8;
 }
 
@@ -239,6 +242,7 @@ message Retry {
   }
 }
 
+// TODO(rshriram) add all Envoy CB capabilities
 // A minimal circuit breaker configuration.
 message CircuitBreaker {
   message SimpleCircuitBreakerPolicy {
