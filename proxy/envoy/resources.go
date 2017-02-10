@@ -115,15 +115,17 @@ type Runtime struct {
 
 // Route definition
 type Route struct {
-	Runtime          *Runtime         `json:"runtime,omitempty"`
-	Path             string           `json:"path,omitempty"`
-	Prefix           string           `json:"prefix,omitempty"`
-	PrefixRewrite    string           `json:"prefix_rewrite,omitempty"`
+	Runtime       *Runtime `json:"runtime,omitempty"`
+	Path          string   `json:"path,omitempty"`
+	Prefix        string   `json:"prefix,omitempty"`
+	PrefixRewrite string   `json:"prefix_rewrite,omitempty"`
+
 	Cluster          string           `json:"cluster"`
 	WeightedClusters *WeightedCluster `json:"weighted_clusters,omitempty"`
-	Headers          Headers          `json:"headers,omitempty"`
-	TimeoutMS        int              `json:"timeout_ms,omitempty"`
-	RetryPolicy      *RetryPolicy     `json:"retry_policy,omitempty"`
+
+	Headers     Headers      `json:"headers,omitempty"`
+	TimeoutMS   int          `json:"timeout_ms,omitempty"`
+	RetryPolicy *RetryPolicy `json:"retry_policy,omitempty"`
 }
 
 // RetryPolicy definition

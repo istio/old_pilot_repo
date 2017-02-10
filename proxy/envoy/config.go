@@ -195,8 +195,8 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
 			for _, svc := range lst.services[proto] {
 				host := buildVirtualHost(svc, suffix)
-				host.Routes = []Route{buildDefaultRoute(svc)}
-				hosts[svc.String()] = host
+				host.Routes = []Route{buildDefaultRoute(svc, svc.Ports[0])}
+				hosts[host.Name] = host
 			}
 
 			// If the traffic is sent to a service that has instances co-located with the proxy,
@@ -205,7 +205,7 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 			for _, svc := range lst.instances[proto] {
 				host := buildVirtualHost(svc, suffix)
 				host.Routes = []Route{{Prefix: "/", Cluster: localhost}}
-				hosts[svc.String()] = host
+				hosts[host.Name] = host
 			}
 		}
 

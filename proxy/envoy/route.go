@@ -34,8 +34,11 @@ const (
 	InboundClusterPrefix = "inbound:"
 )
 
-func buildDefaultRoute(svc *model.Service) Route {
-	return Route{Prefix: "/", Cluster: OutboundClusterPrefix + svc.String()}
+func buildDefaultRoute(svc *model.Service, port *model.Port) Route {
+	return Route{
+		Prefix:  "/",
+		Cluster: OutboundClusterPrefix + svc.Key(port, nil),
+	}
 }
 
 // insertDestination injects weighted or unweighted destination clusters into envoy route for a service port
@@ -63,13 +66,8 @@ func buildDestination(rule *config.RouteRule, port *model.Port, dst *config.Dest
 		destination = rule.Destination
 	}
 
-	svc := &model.Service{
-		Hostname: destination,
-		Ports:    model.PortList{port},
-		Tags:     model.TagList{dst.Version},
-	}
-
-	return OutboundClusterPrefix + svc.String()
+	svc := &model.Service{Hostname: destination}
+	return OutboundClusterPrefix + svc.Key(port, dst.Version)
 }
 
 func buildMixerCluster(mesh *MeshConfig) *Cluster {
@@ -95,13 +93,10 @@ func buildClusters(versions []*model.Service) []Cluster {
 	clusters := make([]Cluster, 0)
 	for _, svc := range versions {
 		for _, port := range svc.Ports {
-			clusterSvc := model.Service{
-				Hostname: svc.Hostname,
-				Ports:    []*model.Port{port},
-			}
+			key := svc.Key(port, nil)
 			cluster := Cluster{
-				Name:             OutboundClusterPrefix + clusterSvc.String(),
-				ServiceName:      clusterSvc.String(),
+				Name:             OutboundClusterPrefix + key,
+				ServiceName:      key,
 				Type:             "sds",
 				LbType:           DefaultLbType,
 				ConnectTimeoutMs: DefaultTimeoutMs,
@@ -158,7 +153,7 @@ func buildVirtualHost(svc *model.Service, suffix []string) VirtualHost {
 	}
 
 	return VirtualHost{
-		Name:    svc.String(),
+		Name:    svc.Key(svc.Ports[0], nil),
 		Domains: domains,
 	}
 }

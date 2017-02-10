@@ -126,12 +126,6 @@ func (s *Service) Validate() error {
 		}
 	}
 
-	for _, tag := range s.Tags {
-		if err := tag.Validate(); err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}
-
 	// Require at least one port
 	if len(s.Ports) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("Service must have at least one declared port"))

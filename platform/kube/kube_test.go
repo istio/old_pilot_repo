@@ -221,7 +221,6 @@ func TestServices(t *testing.T) {
 		glog.Info("Services: %#v", out)
 		return len(out) == 1 &&
 			out[0].Hostname == hostname &&
-			out[0].Tags == nil &&
 			len(out[0].Ports) == 1 &&
 			out[0].Ports[0].Protocol == model.ProtocolHTTP
 	}, t)
