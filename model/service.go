@@ -53,8 +53,8 @@ type Service struct {
 }
 
 // Port represents a network port where a service is listening for
-// connections Depending on the platform, the port can be annotated with
-// additional information such as the type of protocol used by the port
+// connections. The port should be annotated with the type of protocol
+// used by the port.
 type Port struct {
 	// Name ascribes a human readable name for the port object. When a
 	// service has multiple ports, the name field is mandatory
