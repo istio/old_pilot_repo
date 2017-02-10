@@ -132,6 +132,9 @@ type Route struct {
 	Headers     Headers      `json:"headers,omitempty"`
 	TimeoutMS   int          `json:"timeout_ms,omitempty"`
 	RetryPolicy *RetryPolicy `json:"retry_policy,omitempty"`
+
+	// Special field to collect clusters
+	Clusters []Cluster `json:"-"`
 }
 
 // RetryPolicy definition

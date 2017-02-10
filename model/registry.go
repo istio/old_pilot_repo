@@ -15,6 +15,8 @@
 package model
 
 import (
+	"sort"
+
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
@@ -112,6 +114,18 @@ func (i *IstioRegistry) RouteRules(namespace string) []*proxyconfig.RouteRule {
 	return out
 }
 
+// DestinationRouteRules lists all rules for a destination by precedence
+func (i *IstioRegistry) DestinationRouteRules(destination string) []*proxyconfig.RouteRule {
+	out := make([]*proxyconfig.RouteRule, 0)
+	for _, rule := range i.RouteRules("") {
+		if rule.Destination == destination {
+			out = append(out, rule)
+		}
+	}
+	sort.Sort(RouteRulePrecedence(out))
+	return out
+}
+
 // Destinations lists all destination policies in a namespace (or all if namespace is "")
 func (i *IstioRegistry) Destinations(namespace string) []*proxyconfig.Destination {
 	out := make([]*proxyconfig.Destination, 0)
@@ -125,4 +139,20 @@ func (i *IstioRegistry) Destinations(namespace string) []*proxyconfig.Destinatio
 		}
 	}
 	return out
+}
+
+// RouteRulePrecedence sorts rules by precedence (high precedence first)
+type RouteRulePrecedence []*proxyconfig.RouteRule
+
+func (s RouteRulePrecedence) Len() int {
+	return len(s)
+}
+
+func (s RouteRulePrecedence) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// TODO: define stable order for same precedence
+func (s RouteRulePrecedence) Less(i, j int) bool {
+	return s[i].Precedence < s[j].Precedence
 }

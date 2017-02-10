@@ -16,7 +16,6 @@ package envoy
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -128,17 +127,17 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 		sort.Sort(HostsByName(config.VirtualHosts))
 		listeners = append(listeners, Listener{
 			Port: port,
-			Filters: []*NetworkFilter{&NetworkFilter{
+			Filters: []*NetworkFilter{{
 				Type: "read",
 				Name: HTTPConnectionManager,
 				Config: NetworkFilterConfig{
 					CodecType:  "auto",
 					StatPrefix: "http",
-					AccessLog: []AccessLog{AccessLog{
+					AccessLog: []AccessLog{{
 						Path: DefaultAccessLog,
 					}},
 					RouteConfig: config,
-					Filters: []Filter{Filter{
+					Filters: []Filter{{
 						Type:   "decoder",
 						Name:   "router",
 						Config: FilterRouterConfig{},
@@ -147,6 +146,11 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 			}},
 		})
 	}
+
+	// TODO: re-implement
+	_ = buildFaultFilters(nil, nil)
+	_ = buildMixerCluster(mesh)
+
 	sort.Sort(ListenersByPort(listeners))
 	return listeners, clusters.Normalize()
 }
@@ -156,7 +160,7 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(RouteConfigs)
-	clusters := buildClusters(services)
+	clusters := make(Clusters, 0)
 
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
@@ -165,7 +169,11 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 				host := buildVirtualHost(service, port, suffix)
-				host.Routes = append(host.Routes, buildDefaultRoute(service, port))
+				routes := buildRoutes(service, port, rules)
+				host.Routes = routes
+				for _, route := range routes {
+					clusters = append(clusters, route.Clusters...)
+				}
 				http := httpConfigs.EnsurePort(port.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
 			default:
@@ -187,19 +195,12 @@ func buildInboundFilters(instances []*model.ServiceInstance) (RouteConfigs, Clus
 	// to the service port
 	for _, instance := range instances {
 		port := instance.Endpoint.ServicePort
-		cluster := Cluster{
-			Name:             fmt.Sprintf("%s%d", InboundClusterPrefix, instance.Endpoint.Port),
-			Type:             "static",
-			ConnectTimeoutMs: DefaultTimeoutMs,
-			LbType:           DefaultLbType,
-			Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", instance.Endpoint.Port)}},
-		}
+		cluster := buildInboundCluster(instance.Endpoint.Port, instance.Endpoint.ServicePort.Protocol)
 		clusters = append(clusters, cluster)
-
 		switch port.Protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			host := buildVirtualHost(instance.Service, port, suffix)
-			host.Routes = append(host.Routes, Route{Prefix: "/", Cluster: cluster.Name})
+			host.Routes = []Route{{Prefix: "/", Cluster: cluster.Name}}
 			http := httpConfigs.EnsurePort(instance.Endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
 		default:

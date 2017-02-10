@@ -28,7 +28,7 @@ import (
 // TODO: test sorting, translation
 
 // buildHTTPRoute creates an HTTP route for the route rule condition
-func buildHTTPRoute(match config.MatchCondition) *Route {
+func buildHTTPRoute(match *config.MatchCondition) *Route {
 	path := ""
 	prefix := "/"
 

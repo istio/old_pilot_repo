@@ -25,6 +25,9 @@ import "istio.io/manager/model/proxy/alphav1/config"
 // cluster, an array of size 1 is returned. If the route points to a weighted cluster, an array of fault
 // filters (one per cluster entry in the weighted cluster) is returned.
 func buildFaultFilters(route *Route, faultRule *config.HTTPFaultInjection) []Filter {
+	if route == nil {
+		return nil
+	}
 	faults := make([]Filter, 0)
 	if route.WeightedClusters != nil {
 		for _, cluster := range route.WeightedClusters.Clusters {
