@@ -72,7 +72,7 @@ func (conf *Config) Write(w io.Writer) error {
 // Generate Envoy sidecar proxy configuration
 func Generate(instances []*model.ServiceInstance, services []*model.Service,
 	rules *model.IstioRegistry, mesh *MeshConfig) *Config {
-	listeners, clusters := buildListeners(instances, services, rules, mesh)
+	listeners, clusters := build(instances, services, rules, mesh)
 
 	// set bind to port values to values for port redirection
 	for _, listener := range listeners {
@@ -104,8 +104,8 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 	}
 }
 
-// buildListeners combines the outbound and inbound routes prioritizing the latter
-func buildListeners(instances []*model.ServiceInstance, services []*model.Service,
+// build combines the outbound and inbound routes prioritizing the latter
+func build(instances []*model.ServiceInstance, services []*model.Service,
 	rules *model.IstioRegistry, mesh *MeshConfig) ([]Listener, Clusters) {
 	outbound := buildOutboundFilters(instances, services, rules, mesh)
 	inbound := buildInboundFilters(instances)
