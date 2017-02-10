@@ -65,8 +65,7 @@ type Port struct {
 	// service. See NetworkEndpoint definition below.
 	Port int `json:"port"`
 
-	// Protocol to be used for the port. How the protocol associated with a
-	// port is identified depends heavily on the underlying platform.
+	// Protocol to be used for the port.
 	Protocol Protocol `json:"protocol,omitempty"`
 }
 
@@ -86,13 +85,13 @@ const (
 	ProtocolUDP   Protocol = "UDP"
 )
 
-// NetworkEndpoint defines a IP:port associated with an instance of the
+// NetworkEndpoint defines a network address (IP:port) associated with an instance of the
 // service. A service has one or more instances each running in a
 // container/VM/pod. If a service has multiple ports, then the same
 // instance IP is expected to be listening on multiple ports (one per each
 // service port). Note that the port associated with an instance does not
 // have to be the same as the port associated with the service. Depending
-// on the network setup (NAT, overlays), this could vary very much.
+// on the network setup (NAT, overlays), this could vary.
 //
 // For e.g., if catalog.mystore.com is accessible through port 80 and 8080,
 // and it maps to an instance with IP 172.16.0.1, such that connections to
@@ -118,7 +117,7 @@ type NetworkEndpoint struct {
 	ServicePort *Port `json:"port"`
 }
 
-// Tag is non empty set of key=value pairs. Each version of a service can
+// Tag is non empty set of arbitrary strings. Each version of a service can
 // be differentiated by a unique set of tags associated with the
 // version. These tags are assigned to all instances of a particular
 // service version. For example, lets say catalog.mystore.com has 2
@@ -138,14 +137,8 @@ type TagList []Tag
 // description (which is oblivious to various versions) and a set of tags
 // that describe the service version associated with this instance.
 //
-// So, if catalog.mystore.com has two versions v1, v2, with instance IP
-// addresses 172.16.0.1:8888, 172.16.0.2:8888 of version v1 (tags foo=bar),
-//
-// and instance IP addresses 172.16.0.3:8888, 172.16.0.4:8888 of version v2
-// (with tags kitty=kat),
-//
-// the set of service instances for catalog.mystore.com are
-// catalog.myservice.com ->
+// For example, the set of service instances associated with catalog.mystore.com
+// are modeled like this
 //      --> NetworkEndpoint(172.16.0.1:8888), Service(catalog.myservice.com), Tag(foo=bar)
 //      --> NetworkEndpoint(172.16.0.2:8888), Service(catalog.myservice.com), Tag(foo=bar)
 //      --> NetworkEndpoint(172.16.0.3:8888), Service(catalog.myservice.com), Tag(kitty=cat)
@@ -156,10 +149,7 @@ type ServiceInstance struct {
 	Tag      Tag             `json:"tag,omitempty"`
 }
 
-// ServiceDiscovery enumerates Istio service instances. These interfaces
-// must be supported by underlying platform implementations.  The proxy
-// config generator uses the model interface to query the service discovery
-// in the platform in a platform agnostic way and configure the proxy.
+// ServiceDiscovery enumerates Istio service instances.
 type ServiceDiscovery interface {
 	// Services list declarations of all services in the system
 	Services() []*Service
@@ -170,21 +160,14 @@ type ServiceDiscovery interface {
 	// Instances retrieves instances for a service and its ports that match
 	// any of the supplied tags. All instances match an empty tag list.
 	//
-	// So, if catalog.mystore.com:80 has two versions v1, v2, with instance
-	// IP addresses 172.16.0.1:8888, 172.16.0.2:8888 of version v1 (tags
-	// foo=bar),
-	//
-	// and instance IP addresses 172.16.0.3:8888, 172.16.0.4:8888 of
-	// version v2 (with tags kitty=kat),
-	//
-	// the set of service instances for catalog.mystore.com are
+	// For example, consider the example of catalog.mystore.com as described in NetworkEndpoints
 	// Instances(catalog.myservice.com, 80) ->
 	//      --> NetworkEndpoint(172.16.0.1:8888), Service(catalog.myservice.com), Tag(foo=bar)
 	//      --> NetworkEndpoint(172.16.0.2:8888), Service(catalog.myservice.com), Tag(foo=bar)
 	//      --> NetworkEndpoint(172.16.0.3:8888), Service(catalog.myservice.com), Tag(kitty=cat)
 	//      --> NetworkEndpoint(172.16.0.4:8888), Service(catalog.myservice.com), Tag(kitty=cat)
 	//
-	// OTOH, calling with specific tags returns a trimmed list.
+	// Calling Instances with specific tags returns a trimmed list.
 	// e.g., Instances(catalog.myservice.com, 80, foo=bar) ->
 	//      --> NetworkEndpoint(172.16.0.1:8888), Service(catalog.myservice.com), Tag(foo=bar)
 	//      --> NetworkEndpoint(172.16.0.2:8888), Service(catalog.myservice.com), Tag(foo=bar)
