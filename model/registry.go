@@ -23,7 +23,7 @@ import (
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
-// The Configstore describes a set of platform agnostic APIs that must be
+// The Registry describes a set of platform agnostic APIs that must be
 // supported by the underlying platform to store and retrieve routing
 // rules. The code in proxy/* uses these interfaces to retrieve the routing
 // rules pertaining to each service. The exact storage constructs to use
