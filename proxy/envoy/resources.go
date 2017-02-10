@@ -14,6 +14,8 @@
 
 package envoy
 
+import "sort"
+
 // MeshConfig defines proxy mesh variables
 type MeshConfig struct {
 	// DiscoveryAddress is the DNS address for Envoy discovery service
@@ -39,6 +41,10 @@ const (
 	DefaultTimeoutMs = 1000
 	DefaultLbType    = LbTypeRoundRobin
 	DefaultAccessLog = "/dev/stdout"
+	LbTypeRoundRobin = "round_robin"
+
+	// HTTPConnectionManager is the name of HTTP filter
+	HTTPConnectionManager = "http_connection_manager"
 
 	// URI HTTP header
 	HeaderURI = "uri"
@@ -157,7 +163,24 @@ type VirtualHost struct {
 
 // RouteConfig definition
 type RouteConfig struct {
-	VirtualHosts []VirtualHost `json:"virtual_hosts"`
+	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
+}
+
+// Merge operation selects a union of two route configs prioritizing the first.
+// It matches virtual hosts by name.
+func (rc *RouteConfig) Merge(that *RouteConfig) *RouteConfig {
+	out := &RouteConfig{}
+	set := make(map[string]bool)
+	for _, host := range rc.VirtualHosts {
+		set[host.Name] = true
+		out.VirtualHosts = append(out.VirtualHosts, host)
+	}
+	for _, host := range that.VirtualHosts {
+		if !set[host.Name] {
+			out.VirtualHosts = append(out.VirtualHosts, host)
+		}
+	}
+	return out
 }
 
 // AccessLog definition.
@@ -169,13 +192,13 @@ type AccessLog struct {
 
 // NetworkFilterConfig definition
 type NetworkFilterConfig struct {
-	CodecType         string      `json:"codec_type"`
-	StatPrefix        string      `json:"stat_prefix"`
-	GenerateRequestID bool        `json:"generate_request_id,omitempty"`
-	RouteConfig       RouteConfig `json:"route_config"`
-	Filters           []Filter    `json:"filters"`
-	AccessLog         []AccessLog `json:"access_log"`
-	Cluster           string      `json:"cluster,omitempty"`
+	CodecType         string       `json:"codec_type"`
+	StatPrefix        string       `json:"stat_prefix"`
+	GenerateRequestID bool         `json:"generate_request_id,omitempty"`
+	RouteConfig       *RouteConfig `json:"route_config"`
+	Filters           []Filter     `json:"filters"`
+	AccessLog         []AccessLog  `json:"access_log"`
+	Cluster           string       `json:"cluster,omitempty"`
 }
 
 // NetworkFilter definition
@@ -187,10 +210,23 @@ type NetworkFilter struct {
 
 // Listener definition
 type Listener struct {
-	Port           int             `json:"port"`
-	Filters        []NetworkFilter `json:"filters"`
-	BindToPort     bool            `json:"bind_to_port"`
-	UseOriginalDst bool            `json:"use_original_dst,omitempty"`
+	Port           int              `json:"port"`
+	Filters        []*NetworkFilter `json:"filters"`
+	BindToPort     bool             `json:"bind_to_port"`
+	UseOriginalDst bool             `json:"use_original_dst,omitempty"`
+}
+
+// RouteConfigs provides routes by virtual host and port
+type RouteConfigs map[int]*RouteConfig
+
+// EnsurePort creates a route config if necessary
+func (hosts RouteConfigs) EnsurePort(port int) *RouteConfig {
+	config, ok := hosts[port]
+	if !ok {
+		config = &RouteConfig{}
+		hosts[port] = config
+	}
+	return config
 }
 
 // Admin definition
@@ -203,11 +239,6 @@ type Admin struct {
 type Host struct {
 	URL string `json:"url"`
 }
-
-// Constant values
-const (
-	LbTypeRoundRobin = "round_robin"
-)
 
 // Cluster definition
 type Cluster struct {
@@ -256,23 +287,37 @@ func (l ListenersByPort) Less(i, j int) bool {
 	return l[i].Port < l[j].Port
 }
 
-// ClustersByName sorts clusters by name
-type ClustersByName []Cluster
+// Clusters is a collection of clusters
+type Clusters []Cluster
 
-func (s ClustersByName) Len() int {
+func (s Clusters) Len() int {
 	return len(s)
 }
 
-func (s ClustersByName) Swap(i, j int) {
+func (s Clusters) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s ClustersByName) Less(i, j int) bool {
+func (s Clusters) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
 
+// Normalize deduplicates and sorts clusters
+func (s Clusters) Normalize() Clusters {
+	out := make(Clusters, 0)
+	set := make(map[string]bool)
+	for _, cluster := range s {
+		if !set[cluster.Name] {
+			set[cluster.Name] = true
+			out = append(out, cluster)
+		}
+	}
+	sort.Sort(out)
+	return out
+}
+
 // HostsByName sorts clusters by name
-type HostsByName []VirtualHost
+type HostsByName []*VirtualHost
 
 func (s HostsByName) Len() int {
 	return len(s)

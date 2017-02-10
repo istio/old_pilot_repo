@@ -19,7 +19,6 @@ package envoy
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"istio.io/manager/model"
@@ -108,14 +107,13 @@ func buildClusters(versions []*model.Service) []Cluster {
 			clusters = append(clusters, cluster)
 		}
 	}
-	sort.Sort(ClustersByName(clusters))
 	return clusters
 }
 
 // buildVirtualHost constructs an entry for VirtualHost for a given service.
 // Suffix provides the proxy context information - it is the shared subdomain between co-located
 // service instances (e.g. "namespace", "svc", "cluster", "local")
-func buildVirtualHost(svc *model.Service, suffix []string) VirtualHost {
+func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string) *VirtualHost {
 	hosts := make([]string, 0)
 	domains := make([]string, 0)
 	parts := strings.Split(svc.Hostname, ".")
@@ -140,20 +138,17 @@ func buildVirtualHost(svc *model.Service, suffix []string) VirtualHost {
 	}
 
 	// add ports
-	if len(svc.Ports) > 0 {
-		port := svc.Ports[0].Port
-		for _, host := range hosts {
-			domains = append(domains, fmt.Sprintf("%s:%d", host, port))
+	for _, host := range hosts {
+		domains = append(domains, fmt.Sprintf("%s:%d", host, port.Port))
 
-			// default port 80 does not need to be specified
-			if port == 80 {
-				domains = append(domains, host)
-			}
+		// default port 80 does not need to be specified
+		if port.Port == 80 {
+			domains = append(domains, host)
 		}
 	}
 
-	return VirtualHost{
-		Name:    svc.Key(svc.Ports[0], nil),
+	return &VirtualHost{
+		Name:    svc.Key(port, nil),
 		Domains: domains,
 	}
 }
