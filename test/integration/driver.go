@@ -105,16 +105,30 @@ func main() {
 		"hub":   hub,
 		"tag":   tag,
 		"name":  "a",
+		"service": "a",
 		"port1": "8080",
 		"port2": "80",
+		"version":  "v1",
 	}, w))
 
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
 		"hub":   hub,
 		"tag":   tag,
-		"name":  "b",
+		"name":  "b-v1",
+		"service": "b",
 		"port1": "80",
 		"port2": "8000",
+		"version":  "v1",
+	}, w))
+
+	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+		"hub":   hub,
+		"tag":   tag,
+		"name":  "b-v2",
+		"service": "b",
+		"port1": "80",
+		"port2": "8000",
+		"version":  "v2",
 	}, w))
 
 	check(write("test/integration/external-services.yaml.tmpl", map[string]string{
@@ -133,10 +147,17 @@ func main() {
 		dumpProxyLogs(pods["a"])
 		dumpProxyLogs(pods["b"])
 	}
-	ids := makeRequests(pods)
-	log.Println("requests:", ids)
-	checkAccessLogs(pods, ids)
-	log.Println("Success!")
+	//ids := makeRequests(pods)
+	//log.Println("requests:", ids)
+	//checkAccessLogs(pods, ids)
+	//log.Println("Success!")
+
+	// FIXME
+	verifyRouting(pods, "a", "b", 100, map[string]int{
+		"v1": 50,
+		"v2": 50,
+	})
+
 	cleanup()
 }
 
@@ -316,6 +337,43 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) {
 		}
 
 		time.Sleep(time.Second)
+	}
+}
+
+func verifyRouting(pods map[string]string, src, dst string, samples int, expectedCount map[string]int) {
+	count := make(map[string]int)
+	for version := range expectedCount {
+		count[version] = 0
+	}
+
+	domain := ""
+	port := ""
+	for i := 0; i<samples; i++ {
+		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+		log.Printf("Making a request %s from %s...\n", url, src)
+		request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
+			pods[src], namespace, url))
+		log.Println(request)
+		match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
+		if len(match) > 1 {
+			id := match[1]
+			count[id] += 1
+			log.Printf("id=%s\n", id)
+		}
+	}
+
+	epsilon := 2
+
+	var failures int
+	for version, expected := range expectedCount {
+		if count[version] > expected + epsilon || count[version] < expected - epsilon {
+			log.Printf("Expected %v requests (+/-%v) to reach %s => Got %v\n", expected, epsilon, version, count[version])
+			failures++
+		}
+	}
+
+	if failures > 0 {
+		fail("Routing verification failed\n")
 	}
 }
 
