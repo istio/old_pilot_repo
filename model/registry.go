@@ -154,5 +154,5 @@ func (s RouteRulePrecedence) Swap(i, j int) {
 
 // TODO: define stable order for same precedence
 func (s RouteRulePrecedence) Less(i, j int) bool {
-	return s[i].Precedence < s[j].Precedence
+	return s[i].Precedence > s[j].Precedence
 }
