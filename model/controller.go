@@ -22,7 +22,7 @@ import "github.com/golang/protobuf/proto"
 // the callbacks, the code in proxy/* can decide to regenerate the
 // configuration (and reload the proxy) or skip the reload if the
 // configuration is the same.
-
+//
 // Used in combination with registry, the controller guarantees the
 // following consistency requirement: registry view in the controller is as
 // AT LEAST as fresh as the moment notification arrives, but MAY BE more

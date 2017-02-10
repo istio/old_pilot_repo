@@ -42,7 +42,7 @@ import (
 // - HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
 // - HTTP pod port collision creates duplicate virtual host entries
 // - (bug) two service ports with the same target port create two virtual hosts with same domains
-//   (not allowed by envoy)
+//   (not allowed by envoy). FIXME - need to detect and eliminate such ports in validation
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
