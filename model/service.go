@@ -40,15 +40,14 @@ type ServiceDiscovery interface {
 // Service describes an Istio service
 type Service struct {
 	// Hostname of the service, e.g. "service.default.svc.cluster.local"
+	// Hostname uniquely identifies a service and is used as a reference identifier.
 	Hostname string `json:"hostname"`
 
 	// Address specifies the service IPv4 address, if available
+	// Platform provides a physical address in the form of a virtual IP.
 	Address string `json:"address,omitempty"`
 
-	// Tags is a set of declared distinct tags for the service
-	Tags TagList `json:"tags,omitempty"`
-
-	// Ports is a set of declared network service ports
+	// Ports is a set of declared network service ports annotated with protocols.
 	Ports PortList `json:"ports,omitempty"`
 }
 
@@ -151,16 +150,27 @@ const (
 	ProtocolUDP   Protocol = "UDP"
 )
 
-func (s *Service) String() string {
+// Key generates a unique string referencing service instances for a given port and a tag
+func (s *Service) Key(port *Port, tag Tag) string {
+	// TODO: check port is non nil and membership of port in service
+	return ServiceKey(s.Hostname, PortList{port}, TagList{tag})
+}
+
+// ServiceKey generates a service key for a collection of ports and tags
+func ServiceKey(hostname string, servicePorts PortList, serviceTags TagList) string {
 	// example: name.namespace:http:env=prod;env=test,version=my-v1
 	var buffer bytes.Buffer
-	buffer.WriteString(s.Hostname)
-	np := len(s.Ports)
-	nt := len(s.Tags)
+	buffer.WriteString(hostname)
+	np := len(servicePorts)
+	nt := len(serviceTags)
+
+	if nt == 1 && serviceTags[0] == nil {
+		nt = 0
+	}
 
 	if np == 0 && nt == 0 {
 		return buffer.String()
-	} else if np == 1 && nt == 0 && s.Ports[0].Name == "" {
+	} else if np == 1 && nt == 0 && servicePorts[0].Name == "" {
 		return buffer.String()
 	} else {
 		buffer.WriteString(":")
@@ -169,7 +179,7 @@ func (s *Service) String() string {
 	if np > 0 {
 		ports := make([]string, np)
 		for i := 0; i < np; i++ {
-			ports[i] = s.Ports[i].Name
+			ports[i] = servicePorts[i].Name
 		}
 		sort.Strings(ports)
 		for i := 0; i < np; i++ {
@@ -184,7 +194,7 @@ func (s *Service) String() string {
 		buffer.WriteString(":")
 		tags := make([]string, nt)
 		for i := 0; i < nt; i++ {
-			tags[i] = s.Tags[i].String()
+			tags[i] = serviceTags[i].String()
 		}
 		sort.Strings(tags)
 		for i := 0; i < nt; i++ {
@@ -197,10 +207,10 @@ func (s *Service) String() string {
 	return buffer.String()
 }
 
-// ParseServiceString is the inverse of the Service.String() method
-func ParseServiceString(s string) *Service {
+// ParseServiceKey is the inverse of the Service.String() method
+func ParseServiceKey(s string) (hostname string, ports PortList, tags TagList) {
 	parts := strings.Split(s, ":")
-	hostname := parts[0]
+	hostname = parts[0]
 
 	var names []string
 	if len(parts) > 1 {
@@ -209,23 +219,16 @@ func ParseServiceString(s string) *Service {
 		names = []string{""}
 	}
 
-	var ports []*Port
 	for _, name := range names {
 		ports = append(ports, &Port{Name: name})
 	}
 
-	var tags []Tag
 	if len(parts) > 2 && len(parts[2]) > 0 {
 		for _, tag := range strings.Split(parts[2], ";") {
 			tags = append(tags, ParseTagString(tag))
 		}
 	}
-
-	return &Service{
-		Hostname: hostname,
-		Ports:    ports,
-		Tags:     tags,
-	}
+	return
 }
 
 func (tag Tag) String() string {

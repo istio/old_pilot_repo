@@ -72,10 +72,10 @@ const (
 	// RouteRuleProto message name
 	RouteRuleProto = "istio.proxy.v1alpha.config.RouteRule"
 
-	// UpstreamCluster kind
-	UpstreamCluster = "upstream-cluster"
-	// UpstreamClusterProto message name
-	UpstreamClusterProto = "istio.proxy.v1alpha.config.UpstreamCluster"
+	// Destination kind
+	Destination = "destination"
+	// DestinationProto message name
+	DestinationProto = "istio.proxy.v1alpha.config.Destination"
 )
 
 var (
@@ -85,9 +85,9 @@ var (
 			MessageName: RouteRuleProto,
 			Validate:    ValidateRouteRule,
 		},
-		UpstreamCluster: ProtoSchema{
-			MessageName: UpstreamClusterProto,
-			Validate:    ValidateUpstreamCluster,
+		Destination: ProtoSchema{
+			MessageName: DestinationProto,
+			Validate:    ValidateDestination,
 		},
 	}
 )
@@ -112,15 +112,15 @@ func (i *IstioRegistry) RouteRules(namespace string) []*proxyconfig.RouteRule {
 	return out
 }
 
-// UpstreamClusters lists all destination policies in a namespace (or all if namespace is "")
-func (i *IstioRegistry) UpstreamClusters(namespace string) []*proxyconfig.UpstreamCluster {
-	out := make([]*proxyconfig.UpstreamCluster, 0)
-	rs, err := i.List(UpstreamCluster, namespace)
+// Destinations lists all destination policies in a namespace (or all if namespace is "")
+func (i *IstioRegistry) Destinations(namespace string) []*proxyconfig.Destination {
+	out := make([]*proxyconfig.Destination, 0)
+	rs, err := i.List(Destination, namespace)
 	if err != nil {
-		glog.V(2).Infof("UpstreamClusters => %v", err)
+		glog.V(2).Infof("Destinations => %v", err)
 	}
 	for _, r := range rs {
-		if rule, ok := r.(*proxyconfig.UpstreamCluster); ok {
+		if rule, ok := r.(*proxyconfig.Destination); ok {
 			out = append(out, rule)
 		}
 	}

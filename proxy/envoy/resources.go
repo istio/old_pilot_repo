@@ -34,6 +34,16 @@ type MeshConfig struct {
 	AccessLogPath string
 }
 
+// TODO: these values used in the Envoy configuration will be configurable
+const (
+	DefaultTimeoutMs = 1000
+	DefaultLbType    = LbTypeRoundRobin
+	DefaultAccessLog = "/dev/stdout"
+
+	// URI HTTP header
+	HeaderURI = "uri"
+)
+
 // Config defines the schema for Envoy JSON configuration format
 type Config struct {
 	RootRuntime    *RootRuntime   `json:"runtime,omitempty"`
@@ -80,7 +90,7 @@ type FilterEndpointsConfig struct {
 type FilterFaultConfig struct {
 	Abort           *AbortFilter `json:"abort,omitempty"`
 	Delay           *DelayFilter `json:"delay,omitempty"`
-	Headers         []Header     `json:"headers,omitempty"`
+	Headers         Headers      `json:"headers,omitempty"`
 	UpstreamCluster string       `json:"upstream_cluster,omitempty"`
 }
 
@@ -105,15 +115,17 @@ type Runtime struct {
 
 // Route definition
 type Route struct {
-	Runtime          *Runtime         `json:"runtime,omitempty"`
-	Path             string           `json:"path,omitempty"`
-	Prefix           string           `json:"prefix,omitempty"`
-	PrefixRewrite    string           `json:"prefix_rewrite,omitempty"`
+	Runtime       *Runtime `json:"runtime,omitempty"`
+	Path          string   `json:"path,omitempty"`
+	Prefix        string   `json:"prefix,omitempty"`
+	PrefixRewrite string   `json:"prefix_rewrite,omitempty"`
+
 	Cluster          string           `json:"cluster"`
 	WeightedClusters *WeightedCluster `json:"weighted_clusters,omitempty"`
-	Headers          []Header         `json:"headers,omitempty"`
-	TimeoutMS        int              `json:"timeout_ms,omitempty"`
-	RetryPolicy      *RetryPolicy     `json:"retry_policy,omitempty"`
+
+	Headers     Headers      `json:"headers,omitempty"`
+	TimeoutMS   int          `json:"timeout_ms,omitempty"`
+	RetryPolicy *RetryPolicy `json:"retry_policy,omitempty"`
 }
 
 // RetryPolicy definition
@@ -126,8 +138,8 @@ type RetryPolicy struct {
 // WeightedCluster definition
 // See https://lyft.github.io/envoy/docs/configuration/http_conn_man/route_config/route.html
 type WeightedCluster struct {
-	Clusters         []WeightedClusterEntry `json:"clusters"`
-	RuntimeKeyPrefix string                 `json:"runtime_key_prefix,omitempty"`
+	Clusters         []*WeightedClusterEntry `json:"clusters"`
+	RuntimeKeyPrefix string                  `json:"runtime_key_prefix,omitempty"`
 }
 
 // WeightedClusterEntry definition. Describes the format of each entry in the WeightedCluster
@@ -289,20 +301,24 @@ func (r RoutesByCluster) Less(i, j int) bool {
 	return r[i].Cluster < r[j].Cluster
 }
 
-// HeadersByNameValue sorts headers by name, then value.
-type HeadersByNameValue []Header
+// Headers sorts headers
+type Headers []Header
 
-func (s HeadersByNameValue) Len() int {
+func (s Headers) Len() int {
 	return len(s)
 }
 
-func (s HeadersByNameValue) Swap(i, j int) {
+func (s Headers) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s HeadersByNameValue) Less(i, j int) bool {
+func (s Headers) Less(i, j int) bool {
 	if s[i].Name == s[j].Name {
-		return s[i].Value < s[j].Value
+		if s[i].Regex == s[j].Regex {
+			return s[i].Value < s[j].Value
+		}
+		// true is less, false is more
+		return s[i].Regex
 	}
 	return s[i].Name < s[j].Name
 }
