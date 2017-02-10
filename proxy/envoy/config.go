@@ -169,7 +169,7 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 				host := buildVirtualHost(service, port, suffix)
-				routes := buildRoutes(service, port, rules)
+				routes := buildHTTPRoutes(service.Hostname, port, rules)
 				host.Routes = routes
 				for _, route := range routes {
 					clusters = append(clusters, route.Clusters...)

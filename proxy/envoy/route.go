@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"istio.io/manager/model"
 	"istio.io/manager/model/proxy/alphav1/config"
 )
@@ -47,7 +49,8 @@ func buildInboundCluster(port int, protocol model.Protocol) Cluster {
 	return cluster
 }
 
-func buildOutboundCluster(svc *model.Service, port *model.Port, tag model.Tag) Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, tag model.Tag) Cluster {
+	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tag)
 	cluster := Cluster{
 		Name:             OutboundClusterPrefix + key,
@@ -62,53 +65,76 @@ func buildOutboundCluster(svc *model.Service, port *model.Port, tag model.Tag) C
 	return cluster
 }
 
-func buildRoutes(svc *model.Service, port *model.Port, registry *model.IstioRegistry) []Route {
+func buildHTTPRoutes(hostname string, port *model.Port, registry *model.IstioRegistry) []Route {
 	routes := make([]Route, 0)
-	for _, rule := range registry.DestinationRouteRules(svc.Hostname) {
-		route := buildHTTPRoute(rule.Match)
-		insertDestination(rule, port, route)
-		routes = append(routes, *route)
+	for _, rule := range registry.DestinationRouteRules(hostname) {
+		// TODO: rule applies always, need to check if it's actually HTTP rule
+		routes = append(routes, buildHTTPRoute(rule, port))
 	}
-	routes = append(routes, buildDefaultRoute(svc, port))
+	routes = append(routes, buildDefaultHTTPRoute(hostname, port))
 	return routes
 }
 
-func buildDefaultRoute(svc *model.Service, port *model.Port) Route {
+func buildDefaultHTTPRoute(hostname string, port *model.Port) Route {
+	cluster := buildOutboundCluster(hostname, port, nil)
 	return Route{
 		Prefix:   "/",
-		Cluster:  OutboundClusterPrefix + svc.Key(port, nil),
-		Clusters: []Cluster{buildOutboundCluster(svc, port, nil)},
+		Cluster:  cluster.Name,
+		Clusters: []Cluster{cluster},
 	}
 }
 
 // insertDestination injects weighted or unweighted destination clusters into envoy route for a service port
-func insertDestination(rule *config.RouteRule, port *model.Port, route *Route) {
-	if len(rule.Route) > 1 {
-		clusters := make([]*WeightedClusterEntry, 0)
-		for _, dst := range rule.Route {
-			cluster := buildDestination(rule, port, dst)
-			clusters = append(clusters, &WeightedClusterEntry{
-				Name:   cluster.Name,
-				Weight: int(dst.Weight),
-			})
-			route.Clusters = append(route.Clusters, cluster)
-		}
-		route.WeightedClusters = &WeightedCluster{Clusters: clusters}
-	} else if len(rule.Route) == 1 {
-		cluster := buildDestination(rule, port, rule.Route[0])
-		route.Cluster = cluster.Name
-		route.Clusters = []Cluster{cluster}
+func buildHTTPRoute(rule *config.RouteRule, port *model.Port) Route {
+	route := Route{
+		Path:   "",
+		Prefix: "/",
 	}
-}
 
-// buildDestination produces a string for the destination service key
-func buildDestination(rule *config.RouteRule, port *model.Port, dst *config.DestinationWeight) Cluster {
-	destination := dst.Destination
-	// fallback to rule destination
-	if len(destination) == 0 {
-		destination = rule.Destination
+	if rule.Match != nil {
+		route.Headers = buildHeaders(rule.Match.Http)
+
+		if uri, ok := rule.Match.Http[HeaderURI]; ok {
+			switch m := uri.MatchType.(type) {
+			case *config.StringMatch_Exact:
+				route.Path = m.Exact
+				route.Prefix = ""
+			case *config.StringMatch_Prefix:
+				route.Path = ""
+				route.Prefix = m.Prefix
+			case *config.StringMatch_Regex:
+				glog.Warningf("Unsupported route match condition: regex")
+			}
+		}
 	}
-	return buildOutboundCluster(&model.Service{Hostname: destination}, port, dst.Version)
+
+	clusters := make([]*WeightedClusterEntry, 0)
+	for _, dst := range rule.Route {
+		destination := dst.Destination
+
+		// fallback to rule destination
+		if destination == "" {
+			destination = rule.Destination
+		}
+
+		cluster := buildOutboundCluster(destination, port, dst.Version)
+		clusters = append(clusters, &WeightedClusterEntry{
+			Name:   cluster.Name,
+			Weight: int(dst.Weight),
+		})
+		route.Clusters = append(route.Clusters, cluster)
+	}
+	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
+
+	// rewrite to a single cluster if it's one weighted cluster
+	if len(rule.Route) == 1 {
+		route.Cluster = route.WeightedClusters.Clusters[0].Name
+		route.WeightedClusters = nil
+	}
+
+	// TODO: check envoy schema for early validation
+
+	return route
 }
 
 func buildMixerCluster(mesh *MeshConfig) *Cluster {

@@ -27,32 +27,6 @@ import (
 
 // TODO: test sorting, translation
 
-// buildHTTPRoute creates an HTTP route for the route rule condition
-func buildHTTPRoute(match *config.MatchCondition) *Route {
-	path := ""
-	prefix := "/"
-
-	if uri, ok := match.Http[HeaderURI]; ok {
-		switch m := uri.MatchType.(type) {
-		case *config.StringMatch_Exact:
-			path = m.Exact
-			prefix = ""
-		case *config.StringMatch_Prefix:
-			path = ""
-			prefix = m.Prefix
-		case *config.StringMatch_Regex:
-			glog.Warningf("Unsupported route match condition: regex")
-			return nil
-		}
-	}
-
-	return &Route{
-		Headers: buildHeaders(match.Http),
-		Path:    path,
-		Prefix:  prefix,
-	}
-}
-
 // buildHeaders skips over URI as it has special meaning
 func buildHeaders(matches map[string]*config.StringMatch) []Header {
 	headers := make([]Header, 0, len(matches))
