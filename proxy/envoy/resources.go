@@ -173,12 +173,26 @@ type NetworkFilter struct {
 	Config NetworkFilterConfig `json:"config"`
 }
 
+// ListenerSSLContext definition
+// See: https://lyft.github.io/envoy/docs/configuration/listeners/ssl.html#config-listener-ssl-context
+type ListenerSSLContext struct {
+	CertChainFile         string `json:"cert_chain_file"`
+	PrivateKeyFile        string `json:"private_key_file)"`
+	ALPNProtocols         string `json:"alpn_protocols,omitempty"`
+	AltALPNProtocols      string `json:"alt_alpn_protocols,omitempty"`
+	CACertFile            string `json:"ca_cert_file,omitempty"`
+	VerifyCertificateHash string `json:"verify_certificate_hash,omitempty"`
+	VerifySubjectAltName  sring  `json:"verify_subject_alt_name,omitempty"`
+	CipherSuites          string `json:"cipher_suites,omitempty"`
+}
+
 // Listener definition
 type Listener struct {
-	Port           int             `json:"port"`
-	Filters        []NetworkFilter `json:"filters"`
-	BindToPort     bool            `json:"bind_to_port"`
-	UseOriginalDst bool            `json:"use_original_dst,omitempty"`
+	Port           int                 `json:"port"`
+	Filters        []NetworkFilter     `json:"filters"`
+	SSLContext     *ListenerSSLContext `json:"ssl_context,omitempty"`
+	BindToPort     bool                `json:"bind_to_port"`
+	UseOriginalDst bool                `json:"use_original_dst,omitempty"`
 }
 
 // Admin definition
@@ -199,16 +213,17 @@ const (
 
 // Cluster definition
 type Cluster struct {
-	Name                     string            `json:"name"`
-	ServiceName              string            `json:"service_name,omitempty"`
-	ConnectTimeoutMs         int               `json:"connect_timeout_ms"`
-	Type                     string            `json:"type"`
-	LbType                   string            `json:"lb_type"`
-	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
-	Hosts                    []Host            `json:"hosts,omitempty"`
-	Features                 string            `json:"features,omitempty"`
-	CircuitBreaker           *CircuitBreaker   `json:"circuit_breaker,omitempty"`
-	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
+	Name                     string             `json:"name"`
+	ServiceName              string             `json:"service_name,omitempty"`
+	ConnectTimeoutMs         int                `json:"connect_timeout_ms"`
+	Type                     string             `json:"type"`
+	LbType                   string             `json:"lb_type"`
+	MaxRequestsPerConnection int                `json:"max_requests_per_connection,omitempty"`
+	Hosts                    []Host             `json:"hosts,omitempty"`
+	Features                 string             `json:"features,omitempty"`
+	CircuitBreaker           *CircuitBreaker    `json:"circuit_breaker,omitempty"`
+	SSLContext               *ClusterSSLContext `json:"ssl_context,omitempty"`
+	OutlierDetection         *OutlierDetection  `json:"outlier_detection,omitempty"`
 }
 
 // CircuitBreaker definition
@@ -227,6 +242,19 @@ type OutlierDetection struct {
 	IntervalMS         int `json:"interval_ms,omitempty"`
 	BaseEjectionTimeMS int `json:"base_ejection_time_ms,omitempty"`
 	MaxEjectionPercent int `json:"max_ejection_percent,omitempty"`
+}
+
+// ClusterSSLContext definition
+// See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_ssl.html#config-cluster-manager-cluster-ssl
+type ClusterSSLContext struct {
+	ALPNProtocols         string `json:"alpn_protocols,omitempty"`
+	CertChainFile         string `json:"cert_chain_file,omitempty"`
+	PrivateKeyFile        string `json:"private_key_file,omitempty"`
+	CACertFile            string `json:"ca_cert_file,omitempty"`
+	VerifyCertificateHash string `json:"verify_certificate_hash,omitempty"`
+	VerifySubjectAltName  sring  `json:"verify_subject_alt_name,omitempty"`
+	CipherSuites          string `json:"cipher_suites,omitempty"`
+	SNI                   string `json:"sni,omitempty"`
 }
 
 // ListenersByPort sorts listeners by port
