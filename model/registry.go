@@ -23,6 +23,20 @@ import (
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
+// The Registry describes a set of platform agnostic APIs that must be
+// supported by the underlying platform to store and retrieve routing
+// rules. The code in proxy/* uses these interfaces to retrieve the routing
+// rules pertaining to each service. The exact storage constructs to use
+// depends on the platform.  For example, in Kubernetes, one can use the
+// ThirdPartyResources to store/retrieve rules.
+
+// The storage registry presented here assumes that the underlying storage
+// layer supports GET (list), PUT (add), PATCH (edit) and DELETE semantics
+
+// FIXME rename me to something else for clarity. Registry conflates with
+// service registry, while the code here deals only with third party
+// resources in kubernetes
+
 // Key is the registry configuration key
 type Key struct {
 	// Kind specifies the type of configuration
