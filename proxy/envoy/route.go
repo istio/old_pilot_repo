@@ -28,15 +28,23 @@ import (
 )
 
 const (
-	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
-	OutboundClusterPrefix = "outbound:"
-
 	// InboundClusterPrefix is the prefix for service clusters co-hosted on the proxy instance
 	InboundClusterPrefix = "inbound:"
+
+	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
+	OutboundClusterPrefix = "outbound:"
 )
 
-func buildInboundCluster(port int, protocol model.Protocol) Cluster {
-	cluster := Cluster{
+func buildDefaultRoute(cluster *Cluster) *Route {
+	return &Route{
+		Prefix:   "/",
+		Cluster:  cluster.Name,
+		clusters: []*Cluster{cluster},
+	}
+}
+
+func buildInboundCluster(port int, protocol model.Protocol) *Cluster {
+	cluster := &Cluster{
 		Name:             fmt.Sprintf("%s%d", InboundClusterPrefix, port),
 		Type:             "static",
 		ConnectTimeoutMs: DefaultTimeoutMs,
@@ -49,15 +57,18 @@ func buildInboundCluster(port int, protocol model.Protocol) Cluster {
 	return cluster
 }
 
-func buildOutboundCluster(hostname string, port *model.Port, tag model.Tag) Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, tag model.Tag) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tag)
-	cluster := Cluster{
+	cluster := &Cluster{
 		Name:             OutboundClusterPrefix + key,
 		ServiceName:      key,
 		Type:             "sds",
 		LbType:           DefaultLbType,
 		ConnectTimeoutMs: DefaultTimeoutMs,
+		hostname:         hostname,
+		port:             port,
+		tag:              tag,
 	}
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -65,28 +76,21 @@ func buildOutboundCluster(hostname string, port *model.Port, tag model.Tag) Clus
 	return cluster
 }
 
-func buildHTTPRoutes(hostname string, port *model.Port, registry *model.IstioRegistry) []Route {
-	routes := make([]Route, 0)
+// buildHTTPRoutes assembles all routes for the hostname destination
+func buildHTTPRoutes(hostname string, port *model.Port, registry *model.IstioRegistry) []*Route {
+	routes := make([]*Route, 0)
 	for _, rule := range registry.DestinationRouteRules(hostname) {
 		// TODO: rule applies always, need to check if it's actually HTTP rule
 		routes = append(routes, buildHTTPRoute(rule, port))
 	}
-	routes = append(routes, buildDefaultHTTPRoute(hostname, port))
+	cluster := buildOutboundCluster(hostname, port, nil)
+	routes = append(routes, buildDefaultRoute(cluster))
 	return routes
 }
 
-func buildDefaultHTTPRoute(hostname string, port *model.Port) Route {
-	cluster := buildOutboundCluster(hostname, port, nil)
-	return Route{
-		Prefix:   "/",
-		Cluster:  cluster.Name,
-		Clusters: []Cluster{cluster},
-	}
-}
-
-// insertDestination injects weighted or unweighted destination clusters into envoy route for a service port
-func buildHTTPRoute(rule *config.RouteRule, port *model.Port) Route {
-	route := Route{
+// buildHTTPRoute translates a route rule to an Envoy route
+func buildHTTPRoute(rule *config.RouteRule, port *model.Port) *Route {
+	route := &Route{
 		Path:   "",
 		Prefix: "/",
 	}
@@ -122,7 +126,7 @@ func buildHTTPRoute(rule *config.RouteRule, port *model.Port) Route {
 			Name:   cluster.Name,
 			Weight: int(dst.Weight),
 		})
-		route.Clusters = append(route.Clusters, cluster)
+		route.clusters = append(route.clusters, cluster)
 	}
 	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
 
@@ -132,9 +136,21 @@ func buildHTTPRoute(rule *config.RouteRule, port *model.Port) Route {
 		route.WeightedClusters = nil
 	}
 
-	// TODO: check envoy schema for early validation
-
 	return route
+}
+
+func buildSDSCluster(mesh *MeshConfig) *Cluster {
+	return &Cluster{
+		Name:             "sds",
+		Type:             "strict_dns",
+		ConnectTimeoutMs: DefaultTimeoutMs,
+		LbType:           DefaultLbType,
+		Hosts: []Host{
+			{
+				URL: "tcp://" + mesh.DiscoveryAddress,
+			},
+		},
+	}
 }
 
 func buildMixerCluster(mesh *MeshConfig) *Cluster {
@@ -155,10 +171,12 @@ func buildMixerCluster(mesh *MeshConfig) *Cluster {
 	}
 }
 
-// buildVirtualHost constructs an entry for VirtualHost for a given service.
-// Suffix provides the proxy context information - it is the shared subdomain between co-located
+// buildVirtualHost constructs an entry for VirtualHost for a destination service.
+// The unique name for a virtual host is a combination of the destination service and the port, e.g.
+// "svc.ns.svc.cluster.local:http".
+// Suffix provides the proxy context information - it is the shared sub-domain between co-located
 // service instances (e.g. "namespace", "svc", "cluster", "local")
-func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string) *VirtualHost {
+func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string, routes []*Route) *VirtualHost {
 	hosts := make([]string, 0)
 	domains := make([]string, 0)
 	parts := strings.Split(svc.Hostname, ".")
@@ -169,6 +187,7 @@ func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string) *Vi
 	if len(host) > 0 {
 		hosts = append(hosts, host)
 	}
+
 	for _, part := range shared {
 		if len(host) > 0 {
 			host = host + "."
@@ -195,6 +214,7 @@ func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string) *Vi
 	return &VirtualHost{
 		Name:    svc.Key(port, nil),
 		Domains: domains,
+		Routes:  routes,
 	}
 }
 

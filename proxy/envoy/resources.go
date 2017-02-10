@@ -14,7 +14,11 @@
 
 package envoy
 
-import "sort"
+import (
+	"sort"
+
+	"istio.io/manager/model"
+)
 
 // MeshConfig defines proxy mesh variables
 type MeshConfig struct {
@@ -133,8 +137,9 @@ type Route struct {
 	TimeoutMS   int          `json:"timeout_ms,omitempty"`
 	RetryPolicy *RetryPolicy `json:"retry_policy,omitempty"`
 
-	// Special field to collect clusters
-	Clusters []Cluster `json:"-"`
+	// clusters contains the set of referenced clusters in the route; the field is special
+	// and used only to aggregate cluster information after composing routes
+	clusters []*Cluster
 }
 
 // RetryPolicy definition
@@ -161,7 +166,7 @@ type WeightedClusterEntry struct {
 type VirtualHost struct {
 	Name    string   `json:"name"`
 	Domains []string `json:"domains"`
-	Routes  []Route  `json:"routes"`
+	Routes  []*Route `json:"routes"`
 }
 
 // RouteConfig definition
@@ -171,7 +176,7 @@ type RouteConfig struct {
 
 // Merge operation selects a union of two route configs prioritizing the first.
 // It matches virtual hosts by name.
-func (rc *RouteConfig) Merge(that *RouteConfig) *RouteConfig {
+func (rc *RouteConfig) merge(that *RouteConfig) *RouteConfig {
 	out := &RouteConfig{}
 	set := make(map[string]bool)
 	for _, host := range rc.VirtualHosts {
@@ -181,6 +186,17 @@ func (rc *RouteConfig) Merge(that *RouteConfig) *RouteConfig {
 	for _, host := range that.VirtualHosts {
 		if !set[host.Name] {
 			out.VirtualHosts = append(out.VirtualHosts, host)
+		}
+	}
+	return out
+}
+
+// Clusters aggregates clusters across routes
+func (rc *RouteConfig) clusters() []*Cluster {
+	out := make([]*Cluster, 0)
+	for _, host := range rc.VirtualHosts {
+		for _, route := range host.Routes {
+			out = append(out, route.clusters...)
 		}
 	}
 	return out
@@ -255,6 +271,11 @@ type Cluster struct {
 	Features                 string            `json:"features,omitempty"`
 	CircuitBreaker           *CircuitBreaker   `json:"circuit_breaker,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
+
+	// special values used by the post-processing passes for outbound clusters
+	hostname string
+	port     *model.Port
+	tag      model.Tag
 }
 
 // CircuitBreaker definition
@@ -291,7 +312,7 @@ func (l ListenersByPort) Less(i, j int) bool {
 }
 
 // Clusters is a collection of clusters
-type Clusters []Cluster
+type Clusters []*Cluster
 
 func (s Clusters) Len() int {
 	return len(s)
@@ -373,14 +394,14 @@ func (s Headers) Less(i, j int) bool {
 
 // SDS is a service discovery service definition
 type SDS struct {
-	Cluster        Cluster `json:"cluster"`
-	RefreshDelayMs int     `json:"refresh_delay_ms"`
+	Cluster        *Cluster `json:"cluster"`
+	RefreshDelayMs int      `json:"refresh_delay_ms"`
 }
 
 // ClusterManager definition
 type ClusterManager struct {
-	Clusters []Cluster `json:"clusters"`
-	SDS      SDS       `json:"sds"`
+	Clusters []*Cluster `json:"clusters"`
+	SDS      SDS        `json:"sds"`
 }
 
 // ByName implements sort

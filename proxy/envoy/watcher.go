@@ -77,14 +77,8 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 
 func (w *watcher) reload() {
 	// FIXME: namespace?
-	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
+	config := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
 		w.registry, w.mesh)
-
-	if err != nil {
-		glog.Warningf("Failed to generate Envoy configuration: %v", err)
-		return
-	}
-
 	current := w.agent.ActiveConfig()
 
 	if reflect.DeepEqual(config, current) {

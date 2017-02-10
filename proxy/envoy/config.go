@@ -26,11 +26,23 @@ import (
 	"istio.io/manager/model"
 )
 
-// TODO: TCP routing for outbound based on dst IP
-// TODO: HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
-// TODO: if two service ports have same port or same target port values but
-// different names, we will get duplicate host routes.  Envoy prohibits
-// duplicate entries with identical domains.
+// Config generation main functions.
+// The general flow of the generation process consists of the following steps:
+// - routes are created for each destination, with referenced clusters stored as a special field
+// - routes are grouped organized into listeners for inbound and outbound traffic
+// - the outbound and inbound listeners are merged with preference given to the inbound traffic
+// - clusters are aggregated and normalized.
+
+// Requirements for the additions to the generation routines:
+// - extra policies and filters should be added as additional passes over abstract config structures
+// - lists in the config must be de-duplicated and ordered in a canonical way
+
+// TODO: missing features in the config generation:
+// - TCP routing
+// - HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
+// - HTTP pod port collision creates duplicate virtual host entries
+// - (bug) two service ports with the same target port create two virtual hosts with same domains
+//   (not allowed by envoy)
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
@@ -57,16 +69,17 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-// Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
+// Generate Envoy sidecar proxy configuration
 func Generate(instances []*model.ServiceInstance, services []*model.Service,
-	rules *model.IstioRegistry, mesh *MeshConfig) (*Config, error) {
+	rules *model.IstioRegistry, mesh *MeshConfig) *Config {
 	listeners, clusters := buildListeners(instances, services, rules, mesh)
 
-	// set bind to port values
+	// set bind to port values to values for port redirection
 	for _, listener := range listeners {
 		listener.BindToPort = false
 	}
 
+	// add an extra listener that binds to a port
 	listeners = append(listeners, Listener{
 		Port:           mesh.ProxyPort,
 		BindToPort:     true,
@@ -74,6 +87,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
+	// add SDS cluster
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -83,49 +97,43 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: SDS{
-				Cluster: Cluster{
-					Name:             "sds",
-					Type:             "strict_dns",
-					ConnectTimeoutMs: DefaultTimeoutMs,
-					LbType:           DefaultLbType,
-					Hosts: []Host{
-						{
-							URL: "tcp://" + mesh.DiscoveryAddress,
-						},
-					},
-				},
+				Cluster:        buildSDSCluster(mesh),
 				RefreshDelayMs: 1000,
 			},
 		},
-	}, nil
+	}
 }
 
+// buildListeners combines the outbound and inbound routes prioritizing the latter
 func buildListeners(instances []*model.ServiceInstance, services []*model.Service,
 	rules *model.IstioRegistry, mesh *MeshConfig) ([]Listener, Clusters) {
-	outbound, outboundClusters := buildOutboundFilters(instances, services, rules, mesh)
-	inbound, inboundClusters := buildInboundFilters(instances)
-	clusters := append(inboundClusters, outboundClusters...)
+	outbound := buildOutboundFilters(instances, services, rules, mesh)
+	inbound := buildInboundFilters(instances)
 
 	// merge the two sets of route configs
 	configs := make(RouteConfigs)
 	for port, config := range inbound {
 		configs[port] = config
 	}
+
 	for port, outgoing := range outbound {
 		if incoming, ok := configs[port]; ok {
 			// If the traffic is sent to a service that has instances co-located with the proxy,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
-			configs[port] = incoming.Merge(outgoing)
+			configs[port] = incoming.merge(outgoing)
 		} else {
 			configs[port] = outgoing
 		}
 	}
 
+	// canonicalize listeners and collect clusters
+	clusters := make(Clusters, 0)
 	listeners := make([]Listener, 0)
 	for port, config := range configs {
 		sort.Sort(HostsByName(config.VirtualHosts))
-		listeners = append(listeners, Listener{
+		clusters = append(clusters, config.clusters()...)
+		listener := Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
 				Type: "read",
@@ -144,23 +152,25 @@ func buildListeners(instances []*model.ServiceInstance, services []*model.Servic
 					}},
 				},
 			}},
-		})
+		}
+		listeners = append(listeners, listener)
 	}
+	sort.Sort(ListenersByPort(listeners))
 
 	// TODO: re-implement
 	_ = buildFaultFilters(nil, nil)
 	_ = buildMixerCluster(mesh)
 
-	sort.Sort(ListenersByPort(listeners))
 	return listeners, clusters.Normalize()
 }
 
+// buildOutboundFilters creates route configs indexed by ports for the traffic outbound
+// from the proxy instance
 func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
-	rules *model.IstioRegistry, mesh *MeshConfig) (RouteConfigs, Clusters) {
+	rules *model.IstioRegistry, mesh *MeshConfig) RouteConfigs {
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(RouteConfigs)
-	clusters := make(Clusters, 0)
 
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
@@ -168,45 +178,41 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 		for _, port := range service.Ports {
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-				host := buildVirtualHost(service, port, suffix)
 				routes := buildHTTPRoutes(service.Hostname, port, rules)
-				host.Routes = routes
-				for _, route := range routes {
-					clusters = append(clusters, route.Clusters...)
-				}
+				host := buildVirtualHost(service, port, suffix, routes)
 				http := httpConfigs.EnsurePort(port.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
 			default:
-				glog.Warningf("Unsupported inbound protocol: %v", port.Protocol)
+				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port)
 			}
 		}
 	}
 
-	return httpConfigs, clusters
+	return httpConfigs
 }
 
-func buildInboundFilters(instances []*model.ServiceInstance) (RouteConfigs, Clusters) {
+// buildInboundFilters creates route configs indexed by ports for the traffic inbound
+// to co-located service instances
+func buildInboundFilters(instances []*model.ServiceInstance) RouteConfigs {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(RouteConfigs)
-	clusters := make(Clusters, 0)
 
-	// inbound connections/requests are redirected to endpoint port but appear to be sent
+	// inbound connections/requests are redirected to the endpoint port but appear to be sent
 	// to the service port
 	for _, instance := range instances {
 		port := instance.Endpoint.ServicePort
-		cluster := buildInboundCluster(instance.Endpoint.Port, instance.Endpoint.ServicePort.Protocol)
-		clusters = append(clusters, cluster)
 		switch port.Protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-			host := buildVirtualHost(instance.Service, port, suffix)
-			host.Routes = []Route{{Prefix: "/", Cluster: cluster.Name}}
+			cluster := buildInboundCluster(instance.Endpoint.Port, instance.Endpoint.ServicePort.Protocol)
+			route := buildDefaultRoute(cluster)
+			host := buildVirtualHost(instance.Service, port, suffix, []*Route{route})
 			http := httpConfigs.EnsurePort(instance.Endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
 		default:
-			glog.Warningf("Unsupported outbound protocol: %v", port.Protocol)
+			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}
 	}
 
-	return httpConfigs, clusters
+	return httpConfigs
 }
