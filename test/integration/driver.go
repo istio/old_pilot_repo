@@ -179,7 +179,7 @@ func checkBasicReachability(pods map[string]string) {
 func checkRouting(pods map[string]string) {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
-	log.Println("Routing all traffic to b-v1 and verifying..")
+	log.Println("Routing all traffic to b (v1) and verifying..")
 	var defaultRoute bytes.Buffer
 	w := bufio.NewWriter(&defaultRoute)
 
@@ -196,7 +196,7 @@ func checkRouting(pods map[string]string) {
 	})
 	log.Println("Success!")
 
-	log.Println("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
+	log.Println("Routing 75 percent to b (v1), 25 percent to b-v2 and verifying..")
 	// Create a bytes buffer to hold the YAML form of rules
 	var weightedRoute bytes.Buffer
 	w = bufio.NewWriter(&weightedRoute)
