@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	ports []string
+	ports          []string
 	serviceVersion string
 )
 

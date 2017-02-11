@@ -60,7 +60,9 @@ var (
 )
 
 func teardown() {
-	istioClient.DeregisterResources()
+	if err := istioClient.DeregisterResources(); err != nil {
+		log.Printf("Error unregistering TPRs: %v\n", err)
+	}
 	deleteNamespace(client, namespace)
 }
 
@@ -177,7 +179,7 @@ func checkBasicReachability(pods map[string]string) {
 func checkRouting(pods map[string]string) {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
-	log.Printf("Routing all traffic to b-v1 and verifying..")
+	log.Println("Routing all traffic to b-v1 and verifying..")
 	var defaultRoute bytes.Buffer
 	w := bufio.NewWriter(&defaultRoute)
 
@@ -192,9 +194,9 @@ func checkRouting(pods map[string]string) {
 		"v1": 100,
 		"v2": 0,
 	})
-	log.Printf("Success!")
+	log.Println("Success!")
 
-	log.Printf("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
+	log.Println("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
 	// Create a bytes buffer to hold the YAML form of rules
 	var weightedRoute bytes.Buffer
 	w = bufio.NewWriter(&weightedRoute)
@@ -210,7 +212,7 @@ func checkRouting(pods map[string]string) {
 		"v1": 75,
 		"v2": 25,
 	})
-	log.Printf("Success!")
+	log.Println("Success!")
 }
 
 func addRule(ruleConfig []byte, kind string, name string, namespace string) error {
@@ -445,7 +447,7 @@ func verifyRouting(pods map[string]string, src, dst string, samples int, expecte
 		match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
 		if len(match) > 1 {
 			id := match[1]
-			count[id] += 1
+			count[id]++
 			log.Printf("id=%s\n", id)
 		}
 	}
