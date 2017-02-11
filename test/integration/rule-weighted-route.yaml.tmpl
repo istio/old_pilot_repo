@@ -1,0 +1,8 @@
+destination: "{{.destination}}.{{.namespace}}.svc.cluster.local"
+route:
+  - version:
+       version: v1
+    weight: 75
+  - version:
+       version: v2
+    weight: 25

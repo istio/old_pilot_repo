@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -28,17 +29,22 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/ghodss/yaml"
+
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/golang/protobuf/proto"
 	flag "github.com/spf13/pflag"
+
+	"istio.io/manager/model"
 )
 
 const (
 	yaml = "echo.yaml"
-
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )
@@ -91,6 +97,13 @@ func main() {
 		namespace = generateNamespace(client)
 	}
 
+	createAppDeployment()
+	checkBasicReachability()
+	checkRouting()
+	cleanup()
+}
+
+func createAppDeployment() {
 	// write template
 	f, err := os.Create(yaml)
 	check(err)
@@ -114,7 +127,7 @@ func main() {
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
 		"hub":   hub,
 		"tag":   tag,
-		"name":  "b-v1",
+		"name":  "b",
 		"service": "b",
 		"port1": "80",
 		"port2": "8000",
@@ -147,20 +160,80 @@ func main() {
 		dumpProxyLogs(pods["a"])
 		dumpProxyLogs(pods["b"])
 	}
-	//ids := makeRequests(pods)
-	//log.Println("requests:", ids)
-	//checkAccessLogs(pods, ids)
-	//log.Println("Success!")
-
-	// FIXME
-	verifyRouting(pods, "a", "b", 100, map[string]int{
-		"v1": 50,
-		"v2": 50,
-	})
-
-	cleanup()
 }
 
+func checkBasicReachability() {
+	log.Printf("Verifying basic reachability across pods/services (a, b (b-v1), and t)..")
+	ids := makeRequests(pods)
+	log.Println("requests:", ids)
+	checkAccessLogs(pods, ids)
+	log.Println("Success!")
+}
+
+func checkRouting() {
+	// First test default routing
+	// Create a bytes buffer to hold the YAML form of rules
+	log.Printf("Routing all traffic to b-v1 and verifying..")
+	var defaultRoute bytes.Buffer
+	w := bufio.NewWriter(&defaultRoute)
+
+	check(write("test/integration/rule-default-route.yaml.tmpl", map[string]string{
+		"destination": "b",
+		"namespace" : namespace,
+	}, w))
+
+	check(w.Flush())
+	check(setupRule(defaultRoute.Bytes, "route-rule", "default-route", namespace))
+	verifyRouting(pods, "a", "b", 100, map[string]int{
+		"v1": 100,
+		"v2": 0,
+	})
+	log.Printf("Success!")
+
+	log.Printf("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
+	// Create a bytes buffer to hold the YAML form of rules
+	var weightedRoute  bytes.Buffer
+	w := bufio.NewWriter(&weightedRoute)
+
+	check(write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
+		"destination": "b",
+		"namespace" : namespace,
+	}, w))
+
+	check(w.Flush())
+	check(setupRule(weightedRoute.Bytes, "route-rule", "default-route", namespace))
+	verifyRouting(pods, "a", "b", 100, map[string]int{
+		"v1": 75,
+		"v2": 25,
+	})
+	log.Printf("Success!")
+}
+
+func setupRule(ruleConfig []byte, kind string, name string, namespace string) error {
+
+	if namespace == "" {
+		namespace = api.NamespaceDefault
+	}
+
+	out, err := yaml.YAMLToJSON(ruleConfig)
+	if err != nil {
+		return fmt.Errorf("Cannot convert YAML rule to JSON: %v", err)
+	}
+
+	v, err := kind.FromJSON(string(out))
+	if err != nil {
+		return fmt.Errorf("Cannot parse proto message from JSON: %v", err)
+	}
+
+	err = client.Put(model.Key{
+		Kind:      kind,
+		Name:      name,
+		Namespace: namespace,
+	}, v)
+
+	return err
+}
+	
 func write(in string, data map[string]string, out io.Writer) error {
 	tmpl, err := template.ParseFiles(in)
 	if err != nil {
@@ -206,6 +279,7 @@ func connect() *kubernetes.Clientset {
 	check(err)
 	cl, err := kubernetes.NewForConfig(config)
 	check(err)
+	check(cl.RegisterResources())
 	return cl
 }
 
@@ -340,6 +414,7 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) {
 	}
 }
 
+// verifyRouting verifies if the traffic is split as specified across different deployments in a service
 func verifyRouting(pods map[string]string, src, dst string, samples int, expectedCount map[string]int) {
 	count := make(map[string]int)
 	for version := range expectedCount {
