@@ -79,20 +79,19 @@ func init() {
 func main() {
 	flag.Parse()
 	log.Printf("hub %v, tag %v", hub, tag)
-
 	// connect to k8s and set up TPRs
 	if err := setup(); err != nil {
 		log.Fatal(err)
 	}
 	if namespace == "" {
-		var err error
-		if namespace, err = generateNamespace(client); err != nil {
+		namespace, err = generateNamespace(client)
+		if err != nil {
 			log.Fatal(err)
 		}
+		defer func() {
+			deleteNamespace(client, namespace)
+		}()
 	}
-	defer func() {
-		deleteNamespace(client, namespace)
-	}()
 
 	if err := setupManager(); err != nil {
 		log.Fatal(err)
@@ -175,11 +174,11 @@ func setupSimpleApp() error {
 		return err
 	}
 
-	if err := (write("test/integration/external-services.yaml.tmpl", map[string]string{
+	if err := write("test/integration/external-services.yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
 		"namespace": namespace,
-	}, w)); err != nil {
+	}, w); err != nil {
 		return err
 	}
 
@@ -403,7 +402,7 @@ func shell(command string, printCmd bool) (string, error) {
 	bytes, err := c.CombinedOutput()
 	if err != nil {
 		log.Println(string(bytes))
-		return "", err
+		return "", fmt.Errorf("command failed: %q %v", string(bytes), err)
 	}
 	return string(bytes), nil
 }
@@ -510,6 +509,7 @@ func makeRequests(pods map[string]string) (map[string][]string, error) {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						for n := 0; n < budget; n++ {
 							log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
+
 							request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[src], namespace, url), verbose)
 							if err != nil {
 								return err
