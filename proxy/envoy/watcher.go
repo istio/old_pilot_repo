@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,14 +31,14 @@ type Watcher interface {
 type watcher struct {
 	agent     Agent
 	discovery model.ServiceDiscovery
-	registry  model.IstioRegistry
+	registry  *model.IstioRegistry
 	mesh      *MeshConfig
 	addrs     map[string]bool
 }
 
 // NewWatcher creates a new watcher instance with an agent
 func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
-	registry model.Registry, mesh *MeshConfig) (Watcher, error) {
+	registry *model.IstioRegistry, mesh *MeshConfig) (Watcher, error) {
 	addrs, err := hostIP()
 	glog.V(2).Infof("host IPs: %v", addrs)
 	if err != nil {
@@ -48,7 +48,7 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 	out := &watcher{
 		agent:     NewAgent(mesh.BinaryPath, mesh.ConfigPath),
 		discovery: discovery,
-		registry:  model.IstioRegistry{Registry: registry},
+		registry:  registry,
 		mesh:      mesh,
 		addrs:     addrs,
 	}
@@ -68,7 +68,7 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 		return nil, err
 	}
 
-	if err = ctl.AppendConfigHandler(model.UpstreamCluster, handler); err != nil {
+	if err = ctl.AppendConfigHandler(model.Destination, handler); err != nil {
 		return nil, err
 	}
 
@@ -77,14 +77,8 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 
 func (w *watcher) reload() {
 	// FIXME: namespace?
-	config, err := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
-		w.registry.RouteRules(""), w.registry.UpstreamClusters(""), w.mesh)
-
-	if err != nil {
-		glog.Warningf("Failed to generate Envoy configuration: %v", err)
-		return
-	}
-
+	config := Generate(w.discovery.HostInstances(w.addrs), w.discovery.Services(),
+		w.registry, w.mesh)
 	current := w.agent.ActiveConfig()
 
 	if reflect.DeepEqual(config, current) {

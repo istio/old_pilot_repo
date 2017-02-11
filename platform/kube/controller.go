@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -403,7 +403,7 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagLi
 					for _, port := range ss.Ports {
 						if svcPort, exists := svcPorts[port.Name]; exists {
 							out = append(out, &model.ServiceInstance{
-								Endpoint: model.Endpoint{
+								Endpoint: model.NetworkEndpoint{
 									Address:     ea.IP,
 									Port:        int(port.Port),
 									ServicePort: svcPort,
@@ -441,7 +441,7 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 						}
 						tag, _ := c.pods.tagByIP(ea.IP)
 						out = append(out, &model.ServiceInstance{
-							Endpoint: model.Endpoint{
+							Endpoint: model.NetworkEndpoint{
 								Address:     ea.IP,
 								Port:        int(port.Port),
 								ServicePort: svcPort,

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -90,7 +90,8 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 		Short: "Start Istio Proxy sidecar agent",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(flags.client, flags.namespace, resyncPeriod)
-			_, err = envoy.NewWatcher(controller, controller, controller, &flags.proxy)
+			_, err = envoy.NewWatcher(controller, controller, &model.IstioRegistry{ConfigRegistry: controller},
+				&flags.proxy)
 			if err != nil {
 				return
 			}

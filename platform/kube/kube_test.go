@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -221,7 +221,6 @@ func TestServices(t *testing.T) {
 		glog.Info("Services: %#v", out)
 		return len(out) == 1 &&
 			out[0].Hostname == hostname &&
-			out[0].Tags == nil &&
 			len(out[0].Ports) == 1 &&
 			out[0].Ports[0].Protocol == model.ProtocolHTTP
 	}, t)
@@ -248,13 +247,11 @@ func TestProxyConfig(t *testing.T) {
 
 	rule := &proxyconfig.RouteRule{
 		Destination: "foo",
-		RouteRule: &proxyconfig.RouteRule_Http{
-			Http: &proxyconfig.HttpRouteRule{
-				Match: &proxyconfig.HttpMatchCondition{
-					Uri: &proxyconfig.StringMatch{
-						MatchType: &proxyconfig.StringMatch_Exact{
-							Exact: "test",
-						},
+		Match: &proxyconfig.MatchCondition{
+			Http: map[string]*proxyconfig.StringMatch{
+				"uri": {
+					MatchType: &proxyconfig.StringMatch_Exact{
+						Exact: "test",
 					},
 				},
 			},
@@ -278,7 +275,7 @@ func TestProxyConfig(t *testing.T) {
 		t.Errorf("cl.Get(%v) => %v, want %v", key, out, rule)
 	}
 
-	rules := (&model.IstioRegistry{Registry: cl}).RouteRules(ns)
+	rules := (&model.IstioRegistry{ConfigRegistry: cl}).RouteRules(ns)
 	if len(rules) != 1 || !reflect.DeepEqual(rules[0], rule) {
 		t.Errorf("RouteRules() => %v, want %v", rules, rule)
 	}

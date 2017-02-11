@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ func Make(i int) proto.Message {
 }
 
 // CheckMapInvariant validates operational invariants of a registry
-func CheckMapInvariant(r model.Registry, t *testing.T, namespace string, n int) {
+func CheckMapInvariant(r model.ConfigRegistry, t *testing.T, namespace string, n int) {
 	// create configuration objects
 	keys := make(map[int]model.Key, 0)
 	elts := make(map[int]proto.Message, 0)
