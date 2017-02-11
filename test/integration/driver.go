@@ -189,8 +189,14 @@ func setupSimpleApp() error {
 		return err
 	}
 
+<<<<<<< HEAD
 	return run("kubectl apply -f " + simpleAppYaml + " -n " + namespace)
 }
+=======
+	if err := run("kubectl apply -f " + yaml + " -n " + namespace); err != nil {
+		log.Fatal(err)
+	}
+>>>>>>> fix linter errors
 
 func setupVersionedApp() error {
 	// write template
@@ -593,7 +599,6 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 
 		time.Sleep(time.Second)
 	}
-	return nil
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
