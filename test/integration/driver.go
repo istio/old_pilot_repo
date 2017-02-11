@@ -29,15 +29,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ghodss/yaml"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/golang/protobuf/proto"
 	flag "github.com/spf13/pflag"
 
 	"istio.io/manager/model"
@@ -115,33 +112,33 @@ func createAppDeployment() {
 	}, w))
 
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "a",
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "a",
 		"service": "a",
-		"port1": "8080",
-		"port2": "80",
-		"version":  "v1",
+		"port1":   "8080",
+		"port2":   "80",
+		"version": "v1",
 	}, w))
 
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "b",
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "b",
 		"service": "b",
-		"port1": "80",
-		"port2": "8000",
-		"version":  "v1",
+		"port1":   "80",
+		"port2":   "8000",
+		"version": "v1",
 	}, w))
 
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "b-v2",
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "b-v2",
 		"service": "b",
-		"port1": "80",
-		"port2": "8000",
-		"version":  "v2",
+		"port1":   "80",
+		"port2":   "8000",
+		"version": "v2",
 	}, w))
 
 	check(write("test/integration/external-services.yaml.tmpl", map[string]string{
@@ -179,7 +176,7 @@ func checkRouting() {
 
 	check(write("test/integration/rule-default-route.yaml.tmpl", map[string]string{
 		"destination": "b",
-		"namespace" : namespace,
+		"namespace":   namespace,
 	}, w))
 
 	check(w.Flush())
@@ -192,12 +189,12 @@ func checkRouting() {
 
 	log.Printf("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
 	// Create a bytes buffer to hold the YAML form of rules
-	var weightedRoute  bytes.Buffer
+	var weightedRoute bytes.Buffer
 	w := bufio.NewWriter(&weightedRoute)
 
 	check(write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "b",
-		"namespace" : namespace,
+		"namespace":   namespace,
 	}, w))
 
 	check(w.Flush())
@@ -233,7 +230,7 @@ func setupRule(ruleConfig []byte, kind string, name string, namespace string) er
 
 	return err
 }
-	
+
 func write(in string, data map[string]string, out io.Writer) error {
 	tmpl, err := template.ParseFiles(in)
 	if err != nil {
@@ -423,7 +420,7 @@ func verifyRouting(pods map[string]string, src, dst string, samples int, expecte
 
 	domain := ""
 	port := ""
-	for i := 0; i<samples; i++ {
+	for i := 0; i < samples; i++ {
 		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 		log.Printf("Making a request %s from %s...\n", url, src)
 		request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
@@ -441,7 +438,7 @@ func verifyRouting(pods map[string]string, src, dst string, samples int, expecte
 
 	var failures int
 	for version, expected := range expectedCount {
-		if count[version] > expected + epsilon || count[version] < expected - epsilon {
+		if count[version] > expected+epsilon || count[version] < expected-epsilon {
 			log.Printf("Expected %v requests (+/-%v) to reach %s => Got %v\n", expected, epsilon, version, count[version])
 			failures++
 		}
