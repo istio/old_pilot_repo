@@ -39,6 +39,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"istio.io/manager/model"
+	"istio.io/manager/platform/kube"
 )
 
 const (
@@ -49,15 +50,17 @@ const (
 )
 
 var (
-	kubeconfig string
-	hub        string
-	tag        string
-	namespace  string
-	dump       bool
-	client     *kubernetes.Clientset
+	kubeconfig  string
+	hub         string
+	tag         string
+	namespace   string
+	dump        bool
+	client      *kubernetes.Clientset
+	istioClient *kube.Client
 )
 
-func cleanup() {
+func teardown() {
+	istioClient.DeregisterResources()
 	deleteNamespace(client, namespace)
 }
 
@@ -69,7 +72,7 @@ func check(err error) {
 
 func fail(msg string) {
 	log.Printf("Test failure: %v\n", msg)
-	cleanup()
+	teardown()
 	os.Exit(1)
 }
 
@@ -90,8 +93,8 @@ func main() {
 	flag.Parse()
 	log.Printf("hub %v, tag %v", hub, tag)
 
-	// connect to k8s
-	client = connect()
+	// connect to k8s and set up TPRs
+	setup()
 	if namespace == "" {
 		namespace = generateNamespace(client)
 	}
@@ -99,7 +102,7 @@ func main() {
 	pods := createAppDeployment()
 	checkBasicReachability(pods)
 	checkRouting(pods)
-	cleanup()
+	teardown()
 }
 
 func createAppDeployment() map[string]string {
@@ -184,7 +187,7 @@ func checkRouting(pods map[string]string) {
 	}, w))
 
 	check(w.Flush())
-	check(setupRule(defaultRoute.Bytes(), "route-rule", "default-route", namespace))
+	check(addRule(defaultRoute.Bytes(), "route-rule", "default-route", namespace))
 	verifyRouting(pods, "a", "b", 100, map[string]int{
 		"v1": 100,
 		"v2": 0,
@@ -202,7 +205,7 @@ func checkRouting(pods map[string]string) {
 	}, w))
 
 	check(w.Flush())
-	check(setupRule(weightedRoute.Bytes(), "route-rule", "default-route", namespace))
+	check(addRule(weightedRoute.Bytes(), "route-rule", "default-route", namespace))
 	verifyRouting(pods, "a", "b", 100, map[string]int{
 		"v1": 75,
 		"v2": 25,
@@ -210,7 +213,7 @@ func checkRouting(pods map[string]string) {
 	log.Printf("Success!")
 }
 
-func setupRule(ruleConfig []byte, kind string, name string, namespace string) error {
+func addRule(ruleConfig []byte, kind string, name string, namespace string) error {
 
 	if namespace == "" {
 		namespace = api.NamespaceDefault
@@ -221,12 +224,17 @@ func setupRule(ruleConfig []byte, kind string, name string, namespace string) er
 		return fmt.Errorf("Cannot convert YAML rule to JSON: %v", err)
 	}
 
-	v, err := kind.FromJSON(string(out))
+	istioKind, ok := model.IstioConfig[kind]
+	if !ok {
+		return fmt.Errorf("Invalid kind %s", kind)
+	}
+	v, err := istioKind.FromJSON(string(out))
 	if err != nil {
 		return fmt.Errorf("Cannot parse proto message from JSON: %v", err)
 	}
 
-	err = client.Put(model.Key{
+	istioClient := kube.Client{}
+	err = istioClient.Put(model.Key{
 		Kind:      kind,
 		Name:      name,
 		Namespace: namespace,
@@ -269,19 +277,23 @@ func shell(command string) string {
 	return string(bytes)
 }
 
-func connect() *kubernetes.Clientset {
+// connect to K8S cluster and register TPRs
+func setup() {
 	var err error
 	var config *rest.Config
+
 	if kubeconfig == "" {
 		config, err = rest.InClusterConfig()
 	} else {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	check(err)
-	cl, err := kubernetes.NewForConfig(config)
+
+	client, err = kubernetes.NewForConfig(config)
 	check(err)
-	check(cl.RegisterResources())
-	return cl
+
+	istioClient = &kube.Client{}
+	check(istioClient.RegisterResources())
 }
 
 // pods returns pod names by app label as soon as all pods are ready

@@ -22,6 +22,8 @@ go_binary(
         "external-services.yaml.tmpl",
         "http-service.yaml.tmpl",
         "manager.yaml.tmpl",
+        "rules-default-route.yaml.tmpl",
+        "rules-weighted-route.yaml.tmpl",
         "//platform/kube:kubeconfig",
     ],
     library = ":go_default_library",
