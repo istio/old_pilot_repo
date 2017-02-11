@@ -35,13 +35,15 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/ghodss/yaml"
 	flag "github.com/spf13/pflag"
 
 	"istio.io/manager/model"
 )
 
 const (
-	yaml = "echo.yaml"
+	appDeployment = "echo.yaml"
+
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )
@@ -94,15 +96,15 @@ func main() {
 		namespace = generateNamespace(client)
 	}
 
-	createAppDeployment()
-	checkBasicReachability()
-	checkRouting()
+	pods := createAppDeployment()
+	checkBasicReachability(pods)
+	checkRouting(pods)
 	cleanup()
 }
 
-func createAppDeployment() {
+func createAppDeployment() map[string]string {
 	// write template
-	f, err := os.Create(yaml)
+	f, err := os.Create(appDeployment)
 	check(err)
 	w := bufio.NewWriter(f)
 
@@ -150,16 +152,18 @@ func createAppDeployment() {
 	check(w.Flush())
 	check(f.Close())
 
-	run("kubectl apply -f " + yaml + " -n " + namespace)
+	run("kubectl apply -f " + appDeployment + " -n " + namespace)
 	pods := getPods()
 	log.Println("pods:", pods)
 	if dump {
 		dumpProxyLogs(pods["a"])
 		dumpProxyLogs(pods["b"])
 	}
+
+	return pods
 }
 
-func checkBasicReachability() {
+func checkBasicReachability(pods map[string]string) {
 	log.Printf("Verifying basic reachability across pods/services (a, b (b-v1), and t)..")
 	ids := makeRequests(pods)
 	log.Println("requests:", ids)
@@ -167,7 +171,7 @@ func checkBasicReachability() {
 	log.Println("Success!")
 }
 
-func checkRouting() {
+func checkRouting(pods map[string]string) {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
 	log.Printf("Routing all traffic to b-v1 and verifying..")
@@ -180,7 +184,7 @@ func checkRouting() {
 	}, w))
 
 	check(w.Flush())
-	check(setupRule(defaultRoute.Bytes, "route-rule", "default-route", namespace))
+	check(setupRule(defaultRoute.Bytes(), "route-rule", "default-route", namespace))
 	verifyRouting(pods, "a", "b", 100, map[string]int{
 		"v1": 100,
 		"v2": 0,
@@ -190,7 +194,7 @@ func checkRouting() {
 	log.Printf("Routing 75% to b-v1 and 25% to b-v2 and verifying..")
 	// Create a bytes buffer to hold the YAML form of rules
 	var weightedRoute bytes.Buffer
-	w := bufio.NewWriter(&weightedRoute)
+	w = bufio.NewWriter(&weightedRoute)
 
 	check(write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "b",
@@ -198,7 +202,7 @@ func checkRouting() {
 	}, w))
 
 	check(w.Flush())
-	check(setupRule(weightedRoute.Bytes, "route-rule", "default-route", namespace))
+	check(setupRule(weightedRoute.Bytes(), "route-rule", "default-route", namespace))
 	verifyRouting(pods, "a", "b", 100, map[string]int{
 		"v1": 75,
 		"v2": 25,
