@@ -26,7 +26,12 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 
+	"github.com/hashicorp/go-multierror"
+	"istio.io/manager/model/proxy/alphav1/config"
+	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"regexp"
+	"strconv"
 )
 
 const (
@@ -80,13 +85,17 @@ func convertService(svc v1.Service) *model.Service {
 	}
 
 	return &model.Service{
-		Hostname: fmt.Sprintf("%s.%s.%s", svc.Name, svc.Namespace, ServiceSuffix),
+		Hostname: serviceHostname(svc.Name, svc.Namespace),
 		Ports:    ports,
 		Address:  addr,
 	}
 }
 
-// parseHostname is the inverse of hostname pattern from convertService
+func serviceHostname(serviceName string, namespace string) string {
+	return fmt.Sprintf("%s.%s.%s", serviceName, namespace, ServiceSuffix)
+}
+
+// parseHostname is the inverse of hostname pattern from serviceHostname
 func parseHostname(hostname string) (string, string, error) {
 	prefix := strings.TrimSuffix(hostname, "."+ServiceSuffix)
 	if len(prefix) >= len(hostname) {
@@ -146,4 +155,104 @@ func modelToKube(km model.KindMap, k *model.Key, v proto.Message) (*Config, erro
 	}
 
 	return out, nil
+}
+
+func convertIngress(ingress v1beta1.Ingress) map[model.Key]proto.Message {
+	messages := make(map[model.Key]proto.Message)
+
+	keyOf := func(ruleNum, pathNum int) model.Key {
+		return model.Key{
+			Kind:      model.IngressRule,
+			Name:      encodeIngressRuleName(ingress.Name, ruleNum, pathNum),
+			Namespace: ingress.Namespace,
+		}
+	}
+
+	if ingress.Spec.Backend != nil {
+		messages[keyOf(0, 0)] = createIngressRule("", "", ingress.Namespace, *ingress.Spec.Backend)
+	}
+
+	for i, rule := range ingress.Spec.Rules {
+		for j, path := range rule.HTTP.Paths {
+			messages[keyOf(i+1, j+1)] = createIngressRule(rule.Host, path.Path, ingress.Namespace, path.Backend)
+		}
+	}
+
+	return messages
+}
+
+func createIngressRule(host string, path string, namespace string, backend v1beta1.IngressBackend) proto.Message {
+	destination := serviceHostname(backend.ServiceName, namespace)
+
+	rule := &config.RouteRule{
+		Destination: destination,
+		Match:       &config.MatchCondition{},
+		Route: []*config.DestinationWeight{
+			{
+				Destination: destination,
+				Weight:      100,
+
+				// A temporary measure to communicate the destination service's port
+				// to the proxy configuration generator. This can be improved by using
+				// a dedicated model object for IngressRule (instead of reusing RouteRule),
+				// which exposes the necessary target port field within the "Route" field.
+				Tags: map[string]string{
+					"servicePort": backend.ServicePort.String(),
+				},
+			},
+		},
+	}
+
+	if host != "" {
+		rule.Match.Http["autority"] = &config.StringMatch{&config.StringMatch_Exact{host}}
+	}
+
+	if path != "" {
+		if isRegularExpression(path) {
+			if strings.HasSuffix(path, ".*") && !isRegularExpression(strings.TrimSuffix(path, ".*")) {
+				rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Prefix{strings.TrimSuffix(path, ".*")}}
+			} else {
+				rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Regex{path}}
+			}
+		} else {
+			rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Exact{path}}
+		}
+	}
+
+	return rule
+}
+
+// encodeIngressRuleName encodes an ingress rule name for a given ingress resource name,
+// as well as the position of the rule and path specified within it, counting from 1.
+// ruleNum == pathNum == 0 indicates the default backend specified for an ingress.
+func encodeIngressRuleName(ingressName string, ruleNum, pathNum int) string {
+	return fmt.Sprintf("%s-%d-%d", ingressName, ruleNum, pathNum)
+}
+
+// decodeIngressRuleName decodes an ingress rule name previously encoded with encodeIngressRuleName.
+func decodeIngressRuleName(name string) (ingressName string, ruleNum, pathNum int, err error) {
+	parts := strings.Split(name, "-")
+	if len(parts) < 3 {
+		err = fmt.Errorf("could not decode string into ingress rule name: %s", name)
+		return
+	}
+
+	pathNum, pathErr := strconv.Atoi(parts[len(parts)-1])
+	ruleNum, ruleErr := strconv.Atoi(parts[len(parts)-2])
+
+	if pathErr != nil || ruleErr != nil {
+		err = multierror.Append(
+			fmt.Errorf("could not decode string into ingress rule name: %s", name),
+			pathErr, ruleErr)
+		return
+	}
+
+	ingressName = strings.Join(parts[0:len(parts)-2], "-")
+	return
+}
+
+// isRegularExpression determines whether the given string s is a non-trivial regular expression,
+// i.e., it can potentially match other strings different than itself.
+func isRegularExpression(s string) bool {
+	return len(s) < len(regexp.QuoteMeta(s))
 }
