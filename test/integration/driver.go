@@ -231,10 +231,11 @@ func checkRouting(pods map[string]string) {
 
 	check(w.Flush())
 	check(addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace))
-	verifyRouting(pods, "hello", "world", 100, map[string]int{
-		"v1": 100,
-		"v2": 0,
-	})
+	verifyRouting(pods, "hello", "world", "", "",
+		100, map[string]int{
+			"v1": 100,
+			"v2": 0,
+		})
 	log.Println("Success!")
 
 	log.Println("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
@@ -249,10 +250,30 @@ func checkRouting(pods map[string]string) {
 
 	check(w.Flush())
 	check(addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace))
-	verifyRouting(pods, "hello", "world", 100, map[string]int{
-		"v1": 75,
-		"v2": 25,
-	})
+	verifyRouting(pods, "hello", "world", "", "",
+		100, map[string]int{
+			"v1": 75,
+			"v2": 25,
+		})
+	log.Println("Success!")
+
+	log.Println("Routing 100 percent to world-v2 using header based routing and verifying..")
+	// Create a bytes buffer to hold the YAML form of rules
+	var contentRoute bytes.Buffer
+	w = bufio.NewWriter(&contentRoute)
+
+	check(write("test/integration/rule-content-route.yaml.tmpl", map[string]string{
+		"destination": "world",
+		"namespace":   namespace,
+	}, w))
+
+	check(w.Flush())
+	check(addRule(contentRoute.Bytes(), model.RouteRule, "content-route", namespace))
+	verifyRouting(pods, "hello", "world", "version", "v2",
+		100, map[string]int{
+			"v1": 0,
+			"v2": 100,
+		})
 	log.Println("Success!")
 }
 
@@ -480,7 +501,9 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) {
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func verifyRouting(pods map[string]string, src, dst string, samples int, expectedCount map[string]int) {
+func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string,
+	samples int, expectedCount map[string]int) {
+
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0
@@ -490,8 +513,8 @@ func verifyRouting(pods map[string]string, src, dst string, samples int, expecte
 	log.Printf("Making %d requests (%s) from %s...\n", samples, url, src)
 
 	for i := 0; i < samples; i++ {
-		request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
-			pods[src], namespace, url), false)
+		request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s",
+			pods[src], namespace, url, headerKey, headerVal), false)
 		if verbose {
 			log.Println(request)
 		}
