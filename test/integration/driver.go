@@ -235,7 +235,6 @@ func addRule(ruleConfig []byte, kind string, name string, namespace string) erro
 		return fmt.Errorf("Cannot parse proto message from JSON: %v", err)
 	}
 
-	istioClient := kube.Client{}
 	err = istioClient.Put(model.Key{
 		Kind:      kind,
 		Name:      name,
@@ -283,7 +282,6 @@ func shell(command string) string {
 func setup() {
 	var err error
 	var config *rest.Config
-
 	if kubeconfig == "" {
 		config, err = rest.InClusterConfig()
 	} else {
@@ -294,7 +292,9 @@ func setup() {
 	client, err = kubernetes.NewForConfig(config)
 	check(err)
 
-	istioClient = &kube.Client{}
+	istioClient, err = kube.NewClient(kubeconfig, model.IstioConfig)
+	check(err)
+
 	check(istioClient.RegisterResources())
 }
 
