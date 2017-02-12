@@ -22,6 +22,7 @@ go_binary(
         "external-services.yaml.tmpl",
         "http-service.yaml.tmpl",
         "manager.yaml.tmpl",
+        "http-service-versions.yaml.tmpl",
         "rule-default-route.yaml.tmpl",
         "rule-weighted-route.yaml.tmpl",
         "//platform/kube:kubeconfig",

@@ -43,7 +43,9 @@ import (
 )
 
 const (
-	appDeployment = "echo.yaml"
+	managerYaml      = "manager.yaml"
+	simpleAppYaml    = "simple-app.yaml"
+	versionedAppYaml = "versioned-app.yaml"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
@@ -101,15 +103,25 @@ func main() {
 		namespace = generateNamespace(client)
 	}
 
-	pods := createAppDeployment()
+	setupManager()
+	setupSimpleApp()
+	setupVersionedApp()
+
+	pods := getPods()
+	log.Println("pods:", pods)
+	if dump {
+		dumpProxyLogs(pods["a"])
+		dumpProxyLogs(pods["b"])
+	}
+
 	checkBasicReachability(pods)
 	checkRouting(pods)
 	teardown()
 }
 
-func createAppDeployment() map[string]string {
+func setupManager() {
 	// write template
-	f, err := os.Create(appDeployment)
+	f, err := os.Create(managerYaml)
 	check(err)
 	w := bufio.NewWriter(f)
 
@@ -118,34 +130,32 @@ func createAppDeployment() map[string]string {
 		"tag": tag,
 	}, w))
 
+	check(w.Flush())
+	check(f.Close())
+
+	run("kubectl apply -f " + managerYaml + " -n " + namespace)
+}
+
+func setupSimpleApp() {
+	// write template
+	f, err := os.Create(simpleAppYaml)
+	check(err)
+	w := bufio.NewWriter(f)
+
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "a",
-		"service": "a",
-		"port1":   "8080",
-		"port2":   "80",
-		"version": "v1",
+		"hub":   hub,
+		"tag":   tag,
+		"name":  "a",
+		"port1": "8080",
+		"port2": "80",
 	}, w))
 
 	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "b",
-		"service": "b",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v1",
-	}, w))
-
-	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "b-v2",
-		"service": "b",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v2",
+		"hub":   hub,
+		"tag":   tag,
+		"name":  "b",
+		"port1": "80",
+		"port2": "8000",
 	}, w))
 
 	check(write("test/integration/external-services.yaml.tmpl", map[string]string{
@@ -157,19 +167,53 @@ func createAppDeployment() map[string]string {
 	check(w.Flush())
 	check(f.Close())
 
-	run("kubectl apply -f " + appDeployment + " -n " + namespace)
-	pods := getPods()
-	log.Println("pods:", pods)
-	if dump {
-		dumpProxyLogs(pods["a"])
-		dumpProxyLogs(pods["b"])
-	}
+	run("kubectl apply -f " + simpleAppYaml + " -n " + namespace)
+}
 
-	return pods
+func setupVersionedApp() {
+	// write template
+	f, err := os.Create(versionedAppYaml)
+	check(err)
+	w := bufio.NewWriter(f)
+
+	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "hello",
+		"service": "hello",
+		"port1":   "8080",
+		"port2":   "80",
+		"version": "v1",
+	}, w))
+
+	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "world-v1",
+		"service": "world",
+		"port1":   "80",
+		"port2":   "8000",
+		"version": "v1",
+	}, w))
+
+	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+		"hub":     hub,
+		"tag":     tag,
+		"name":    "world-v2",
+		"service": "world",
+		"port1":   "80",
+		"port2":   "8000",
+		"version": "v2",
+	}, w))
+
+	check(w.Flush())
+	check(f.Close())
+
+	run("kubectl apply -f " + versionedAppYaml + " -n " + namespace)
 }
 
 func checkBasicReachability(pods map[string]string) {
-	log.Printf("Verifying basic reachability across pods/services (a, b (b-v1), and t)..")
+	log.Printf("Verifying basic reachability across pods/services (a, b, and t)..")
 	ids := makeRequests(pods)
 	log.Println("requests:", ids)
 	checkAccessLogs(pods, ids)
@@ -179,36 +223,36 @@ func checkBasicReachability(pods map[string]string) {
 func checkRouting(pods map[string]string) {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
-	log.Println("Routing all traffic to b (v1) and verifying..")
+	log.Println("Routing all traffic to world-v1 and verifying..")
 	var defaultRoute bytes.Buffer
 	w := bufio.NewWriter(&defaultRoute)
 
 	check(write("test/integration/rule-default-route.yaml.tmpl", map[string]string{
-		"destination": "b",
+		"destination": "world",
 		"namespace":   namespace,
 	}, w))
 
 	check(w.Flush())
 	check(addRule(defaultRoute.Bytes(), "route-rule", "default-route", namespace))
-	verifyRouting(pods, "a", "b", 100, map[string]int{
+	verifyRouting(pods, "hello", "world", 100, map[string]int{
 		"v1": 100,
 		"v2": 0,
 	})
 	log.Println("Success!")
 
-	log.Println("Routing 75 percent to b (v1), 25 percent to b-v2 and verifying..")
+	log.Println("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
 	// Create a bytes buffer to hold the YAML form of rules
 	var weightedRoute bytes.Buffer
 	w = bufio.NewWriter(&weightedRoute)
 
 	check(write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
-		"destination": "b",
+		"destination": "world",
 		"namespace":   namespace,
 	}, w))
 
 	check(w.Flush())
 	check(addRule(weightedRoute.Bytes(), "route-rule", "default-route", namespace))
-	verifyRouting(pods, "a", "b", 100, map[string]int{
+	verifyRouting(pods, "hello", "world", 100, map[string]int{
 		"v1": 75,
 		"v2": 25,
 	})
