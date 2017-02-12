@@ -176,7 +176,7 @@ func setupVersionedApp() {
 	check(err)
 	w := bufio.NewWriter(f)
 
-	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+	check(write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
 		"hub":     hub,
 		"tag":     tag,
 		"name":    "hello",
@@ -186,7 +186,7 @@ func setupVersionedApp() {
 		"version": "v1",
 	}, w))
 
-	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+	check(write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
 		"hub":     hub,
 		"tag":     tag,
 		"name":    "world-v1",
@@ -196,7 +196,7 @@ func setupVersionedApp() {
 		"version": "v1",
 	}, w))
 
-	check(write("test/integration/http-service.yaml.tmpl", map[string]string{
+	check(write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
 		"hub":     hub,
 		"tag":     tag,
 		"name":    "world-v2",
