@@ -56,7 +56,7 @@ var (
 	hub         string
 	tag         string
 	namespace   string
-	dump        bool
+	verbose     bool
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
 )
@@ -89,8 +89,8 @@ func init() {
 		"Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
-	flag.BoolVarP(&dump, "dump", "d", false,
-		"Dump proxy logs from all containers")
+	flag.BoolVarP(&verbose, "verbose", "v", false,
+		"Dump proxy logs and request logs")
 }
 
 func main() {
@@ -109,7 +109,7 @@ func main() {
 
 	pods := getPods()
 	log.Println("pods:", pods)
-	if dump {
+	if verbose {
 		dumpProxyLogs(pods["a"])
 		dumpProxyLogs(pods["b"])
 	}
@@ -215,7 +215,9 @@ func setupVersionedApp() {
 func checkBasicReachability(pods map[string]string) {
 	log.Printf("Verifying basic reachability across pods/services (a, b, and t)..")
 	ids := makeRequests(pods)
-	log.Println("requests:", ids)
+	if verbose {
+		log.Println("requests:", ids)
+	}
 	checkAccessLogs(pods, ids)
 	log.Println("Success!")
 }
@@ -251,7 +253,7 @@ func checkRouting(pods map[string]string) {
 	}, w))
 
 	check(w.Flush())
-	check(addRule(weightedRoute.Bytes(), "route-rule", "default-route", namespace))
+	check(addRule(weightedRoute.Bytes(), "route-rule", "weighted-route", namespace))
 	verifyRouting(pods, "hello", "world", 100, map[string]int{
 		"v1": 75,
 		"v2": 25,
@@ -309,8 +311,10 @@ func run(command string) {
 	check(c.Run())
 }
 
-func shell(command string) string {
-	log.Println(command)
+func shell(command string, printCmd bool) string {
+	if printCmd {
+		log.Println(command)
+	}
 	parts := strings.Split(command, " ")
 	/* #nosec */
 	c := exec.Command(parts[0], parts[1:]...)
@@ -412,19 +416,25 @@ func makeRequests(pods map[string]string) map[string][]string {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
 						request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
-							pods[src], namespace, url))
-						log.Println(request)
+							pods[src], namespace, url), true)
+						if verbose {
+							log.Println(request)
+						}
 						match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
 						if len(match) > 1 {
 							id := match[1]
-							log.Printf("id=%s\n", id)
+							if verbose {
+								log.Printf("id=%s\n", id)
+							}
 							out[src] = append(out[src], id)
 							out[dst] = append(out[dst], id)
 							break
 						}
 
 						if src == "t" && dst == "t" {
-							log.Println("Expected no match")
+							if verbose {
+								log.Println("Expected no match for t->t")
+							}
 							break
 						}
 
@@ -444,14 +454,19 @@ func makeRequests(pods map[string]string) map[string][]string {
 
 // checkAccessLogs searches for request ids in the access logs
 func checkAccessLogs(pods map[string]string, ids map[string][]string) {
+	log.Println("Checking access logs of pods to correlate request IDs...")
 	for n := 0; ; n++ {
 		found := true
 		for _, pod := range []string{"a", "b"} {
-			log.Printf("Checking access log of %s\n", pod)
-			access := shell(fmt.Sprintf("kubectl logs %s -n %s -c proxy", pods[pod], namespace))
+			if verbose {
+				log.Printf("Checking access log of %s\n", pod)
+			}
+			access := shell(fmt.Sprintf("kubectl logs %s -n %s -c proxy", pods[pod], namespace), false)
 			for _, id := range ids[pod] {
 				if !strings.Contains(access, id) {
-					log.Printf("Failed to find request id %s in log of %s\n", id, pod)
+					if verbose {
+						log.Printf("Failed to find request id %s in log of %s\n", id, pod)
+					}
 					found = false
 					break
 				}
@@ -480,19 +495,19 @@ func verifyRouting(pods map[string]string, src, dst string, samples int, expecte
 		count[version] = 0
 	}
 
-	domain := ""
-	port := ""
+	url := fmt.Sprintf("http://%s/%s", dst, src)
+	log.Printf("Making %d requests (%s) from %s...\n", samples, url, src)
+
 	for i := 0; i < samples; i++ {
-		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-		log.Printf("Making a request %s from %s...\n", url, src)
 		request := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
-			pods[src], namespace, url))
-		log.Println(request)
+			pods[src], namespace, url), false)
+		if verbose {
+			log.Println(request)
+		}
 		match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
 		if len(match) > 1 {
 			id := match[1]
 			count[id]++
-			log.Printf("id=%s\n", id)
 		}
 	}
 
