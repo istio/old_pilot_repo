@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -46,7 +45,6 @@ const (
 	managerYaml      = "manager.yaml"
 	simpleAppYaml    = "simple-app.yaml"
 	versionedAppYaml = "versioned-app.yaml"
-
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )
@@ -62,9 +60,6 @@ var (
 )
 
 func teardown() {
-	if err := istioClient.DeregisterResources(); err != nil {
-		log.Printf("Error unregistering TPRs: %v\n", err)
-	}
 	deleteNamespace(client, namespace)
 }
 
@@ -235,7 +230,7 @@ func checkRouting(pods map[string]string) {
 	}, w))
 
 	check(w.Flush())
-	check(addRule(defaultRoute.Bytes(), "route-rule", "default-route", namespace))
+	check(addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace))
 	verifyRouting(pods, "hello", "world", 100, map[string]int{
 		"v1": 100,
 		"v2": 0,
@@ -253,7 +248,7 @@ func checkRouting(pods map[string]string) {
 	}, w))
 
 	check(w.Flush())
-	check(addRule(weightedRoute.Bytes(), "route-rule", "weighted-route", namespace))
+	check(addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace))
 	verifyRouting(pods, "hello", "world", 100, map[string]int{
 		"v1": 75,
 		"v2": 25,
@@ -262,10 +257,6 @@ func checkRouting(pods map[string]string) {
 }
 
 func addRule(ruleConfig []byte, kind string, name string, namespace string) error {
-
-	if namespace == "" {
-		namespace = api.NamespaceDefault
-	}
 
 	out, err := yaml.YAMLToJSON(ruleConfig)
 	if err != nil {
