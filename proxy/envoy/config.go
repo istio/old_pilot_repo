@@ -79,9 +79,6 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		insertMixerFilter(listeners, mesh.MixerAddress)
 	}
 
-	// TODO: re-implement
-	_ = buildFaultFilters(nil, nil)
-
 	// set bind to port values to values for port redirection
 	for _, listener := range listeners {
 		listener.BindToPort = false
@@ -114,8 +111,8 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 
 // build combines the outbound and inbound routes prioritizing the latter
 func build(instances []*model.ServiceInstance, services []*model.Service,
-	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
-	outbound := buildOutboundFilters(instances, services, config, mesh)
+	proxyconfig *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
+	outbound := buildOutboundFilters(instances, services, proxyconfig, mesh)
 	inbound := buildInboundFilters(instances)
 
 	// merge the two sets of route configs
@@ -141,6 +138,15 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 	for port, config := range configs {
 		sort.Sort(HostsByName(config.VirtualHosts))
 		clusters = append(clusters, config.clusters()...)
+
+		filters := buildFaultFilters(proxyconfig, config)
+
+		filters = append(filters, Filter{
+			Type:   "decoder",
+			Name:   "router",
+			Config: FilterRouterConfig{},
+		})
+
 		listener := &Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
@@ -153,11 +159,7 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 						Path: DefaultAccessLog,
 					}},
 					RouteConfig: config,
-					Filters: []Filter{{
-						Type:   "decoder",
-						Name:   "router",
-						Config: FilterRouterConfig{},
-					}},
+					Filters:     filters,
 				},
 			}},
 		}
