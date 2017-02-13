@@ -310,11 +310,13 @@ func checkRouting(pods map[string]string) error {
 	if err := addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace); err != nil {
 		return err
 	}
-	verifyRouting(pods, "hello", "world", "", "",
+	if err := verifyRouting(pods, "hello", "world", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
-		})
+		}); err != nil {
+		return err
+	}
 	log.Println("Success!")
 
 	log.Println("Routing 100 percent to world-v2 using header based routing and verifying..")
@@ -596,7 +598,8 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
+func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string,
+	samples int, expectedCount map[string]int) error {
 	var mu sync.Mutex
 	count := make(map[string]int)
 	for version := range expectedCount {
@@ -643,7 +646,7 @@ func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string
 	}
 
 	if failures > 0 {
-		return errors.New("Routing verification failed\n")
+		return errors.New("routing verification failed")
 	}
 	return nil
 }
