@@ -79,9 +79,6 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		insertMixerFilter(listeners, mesh.MixerAddress)
 	}
 
-	// TODO: re-implement
-	_ = buildFaultFilters(nil, nil)
-
 	// set bind to port values to values for port redirection
 	for _, listener := range listeners {
 		listener.BindToPort = false
@@ -142,6 +139,14 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
 		clusters = append(clusters, routeConfig.clusters()...)
 
+		filters := buildFaultFilters(config, routeConfig)
+
+		filters = append(filters, Filter{
+			Type:   "decoder",
+			Name:   "router",
+			Config: FilterRouterConfig{},
+		})
+
 		listener := &Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
@@ -154,11 +159,7 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 						Path: DefaultAccessLog,
 					}},
 					RouteConfig: routeConfig,
-					Filters: []Filter{{
-						Type:   "decoder",
-						Name:   "router",
-						Config: FilterRouterConfig{},
-					}},
+					Filters:     filters,
 				},
 			}},
 		}
