@@ -597,6 +597,7 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
 func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
+	var mu sync.Mutex
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0
@@ -605,20 +606,30 @@ func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	log.Printf("Making %d requests (%s) from %s...\n", samples, url, src)
 
+	var g errgroup.Group
 	for i := 0; i < samples; i++ {
-		request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s",
-			pods[src], namespace, url, headerKey, headerVal), false)
-		if err != nil {
-			return err
-		}
-		if verbose {
-			log.Println(request)
-		}
-		match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
-		if len(match) > 1 {
-			id := match[1]
-			count[id]++
-		}
+		cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s", pods[src], namespace, url, headerKey, headerVal)
+		g.Go(func() error {
+			request, err := shell(cmd, false)
+			if err != nil {
+				return err
+			}
+			if verbose {
+				log.Println(request)
+			}
+			match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
+			if len(match) > 1 {
+				id := match[1]
+				mu.Lock()
+				count[id]++
+				mu.Unlock()
+			}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	epsilon := 2
