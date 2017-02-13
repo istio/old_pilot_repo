@@ -1,3 +1,7 @@
+PROXY = "eb8bfccc391e528fba316c4e081515eb18583e5c"
+
+PROXY_SHA = ""
+
 git_repository(
     name = "io_bazel_rules_go",
     commit = "bfa3601d9ab664b448ddb4cc7e48eea511217aaf",
@@ -52,7 +56,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_coreos_pkg",
-    commit = "1c941d73110817a80b9fa6e14d5d2b00d977ce2a", # Date: 2/6/17 with "build" file rename
+    commit = "1c941d73110817a80b9fa6e14d5d2b00d977ce2a",  # Date: 2/6/17 with "build" file rename
     importpath = "github.com/coreos/pkg",
 )
 
@@ -274,7 +278,8 @@ new_go_repository(
 
 http_file(
     name = "istio_proxy",
-    url = "https://storage.googleapis.com/istio-build/proxy/envoy-alpha-eb8bfccc391e528fba316c4e081515eb18583e5c.tar.gz",
+    sha256 = PROXY_SHA,
+    url = "https://storage.googleapis.com/istio-build/proxy/envoy-alpha-" + PROXY + ".tar.gz",
 )
 
 ##
@@ -299,18 +304,18 @@ docker_build(
 
 http_file(
     name = "deb_iptables",
-    url = "http://mirrors.kernel.org/ubuntu/pool/main/i/iptables/iptables_1.6.0-2ubuntu3_amd64.deb",
     sha256 = "d2cafb4f1860435ce69a4971e3af5f4bb20753054020f32e1b767e4ba79c0831",
+    url = "http://mirrors.kernel.org/ubuntu/pool/main/i/iptables/iptables_1.6.0-2ubuntu3_amd64.deb",
 )
 
 http_file(
     name = "deb_libnfnetlink",
-    url = "http://mirrors.kernel.org/ubuntu/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.1-3_amd64.deb",
     sha256 = "fbaf9b8914a607e2a07e5525c6c9c0ecb71d70236f54ad185f4cc81b4541f6ba",
+    url = "http://mirrors.kernel.org/ubuntu/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.1-3_amd64.deb",
 )
 
 http_file(
     name = "deb_libxtables",
-    url = "http://mirrors.kernel.org/ubuntu/pool/main/i/iptables/libxtables11_1.6.0-2ubuntu3_amd64.deb",
     sha256 = "9a4140b0b599612af1006efeee1c6b98771b0bc8dcdcd0510218ef69d6652c7f",
+    url = "http://mirrors.kernel.org/ubuntu/pool/main/i/iptables/libxtables11_1.6.0-2ubuntu3_amd64.deb",
 )
