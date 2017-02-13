@@ -84,8 +84,8 @@ func main() {
 		log.Fatal(err)
 	}
 	if namespace == "" {
-		namespace, err = generateNamespace(client)
-		if err != nil {
+		var err error
+		if namespace, err = generateNamespace(client); err != nil {
 			log.Fatal(err)
 		}
 		defer func() {
@@ -189,14 +189,8 @@ func setupSimpleApp() error {
 		return err
 	}
 
-<<<<<<< HEAD
 	return run("kubectl apply -f " + simpleAppYaml + " -n " + namespace)
 }
-=======
-	if err := run("kubectl apply -f " + yaml + " -n " + namespace); err != nil {
-		log.Fatal(err)
-	}
->>>>>>> fix linter errors
 
 func setupVersionedApp() error {
 	// write template
@@ -603,7 +597,6 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
 func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
-
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0
