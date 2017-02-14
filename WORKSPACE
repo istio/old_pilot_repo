@@ -1,6 +1,6 @@
-PROXY = "eb8bfccc391e528fba316c4e081515eb18583e5c"
+PROXY = "25adae9db6ab1b499815ba7a8fd87d4309cdff69"
 
-PROXY_SHA = ""
+PROXY_SHA = "ee26ed68d0d0fb414cdd9cf58f12906e9775c86ea9844869fb85270016bf845c"
 
 git_repository(
     name = "io_bazel_rules_go",
