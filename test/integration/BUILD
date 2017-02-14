@@ -28,6 +28,10 @@ go_binary(
         "rule-content-route.yaml.tmpl",
         "policy-fault-injection.yaml.tmpl",
         "//platform/kube:kubeconfig",
+        "//docker:app",
+        "//docker:runtime",
+        "//docker:init",
+
     ],
     library = ":go_default_library",
 )

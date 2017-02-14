@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,23 +67,50 @@ var (
 )
 
 func init() {
+
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
 		"kube config file or empty for in-cluster")
 	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
-	flag.StringVarP(&tag, "tag", "t", "test",
-		"Docker tag")
+	flag.StringVarP(&tag, "tag", "t", "",
+		"Docker tag (default <username>_YYYMMDD_HHMMSS formatted date)")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.BoolVarP(&verbose, "dump", "d", false,
 		"Dump proxy logs and request logs")
-	flag.BoolVar(&norouting, "norouting", false,
+	flag.BoolVar(&norouting, "norouting", true,
 		"Disable route rule tests")
 }
 
 func main() {
 	flag.Parse()
+
+	if tag == "" {
+		// tag is the date with format <username>_YYYYMMDD-HHMMSS
+		user, err := user.Current()
+		if err != nil {
+			log.Fatal(err)
+		}
+		tag = fmt.Sprintf("%s_%s", user.Username, time.Now().UTC().Format("20160102_150405"))
+	}
+
 	log.Printf("hub %v, tag %v", hub, tag)
+
+	if strings.HasPrefix(hub, "gcr.io") {
+		if err := run("gcloud docker --authorize-only"); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for _, image := range []string{"app", "init", "runtime"} {
+		if err := run(fmt.Sprintf("docker tag istio/docker:%s %s/%s:%s", image, hub, image, tag)); err != nil {
+			log.Fatal(err)
+		}
+		if err := run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag)); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// connect to k8s and set up TPRs
 	if err := setup(); err != nil {
 		log.Fatal(err)
