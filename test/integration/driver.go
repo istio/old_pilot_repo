@@ -711,7 +711,7 @@ func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal
 	log.Printf("Response time is %s with status code %d\n", elapsed, statusCode)
 	log.Printf("Expected response time is %s +/- %s with status code %d\n", respTime, epsilon, respCode)
 	if elapsed > respTime+epsilon || elapsed < respTime-epsilon || respCode != statusCode {
-		return errors.New("Fault injection verification failed\n")
+		return errors.New("fault injection verification failed")
 	}
 	return nil
 }
