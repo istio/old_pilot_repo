@@ -17,21 +17,20 @@ package kube
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-
-	"istio.io/manager/model"
+	"github.com/hashicorp/go-multierror"
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-
-	"github.com/hashicorp/go-multierror"
-	"istio.io/manager/model/proxy/alphav1/config"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"regexp"
-	"strconv"
+
+	"istio.io/manager/model"
+	"istio.io/manager/model/proxy/alphav1/config"
 )
 
 const (
@@ -204,18 +203,26 @@ func createIngressRule(host string, path string, namespace string, backend v1bet
 	}
 
 	if host != "" {
-		rule.Match.Http["autority"] = &config.StringMatch{&config.StringMatch_Exact{host}}
+		rule.Match.Http["authority"] = &config.StringMatch{
+			MatchType: &config.StringMatch_Exact{Exact: host},
+		}
 	}
 
 	if path != "" {
 		if isRegularExpression(path) {
 			if strings.HasSuffix(path, ".*") && !isRegularExpression(strings.TrimSuffix(path, ".*")) {
-				rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Prefix{strings.TrimSuffix(path, ".*")}}
+				rule.Match.Http["uri"] = &config.StringMatch{
+					MatchType: &config.StringMatch_Prefix{Prefix: strings.TrimSuffix(path, ".*")},
+				}
 			} else {
-				rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Regex{path}}
+				rule.Match.Http["uri"] = &config.StringMatch{
+					MatchType: &config.StringMatch_Regex{Regex: path},
+				}
 			}
 		} else {
-			rule.Match.Http["uri"] = &config.StringMatch{&config.StringMatch_Exact{path}}
+			rule.Match.Http["uri"] = &config.StringMatch{
+				MatchType: &config.StringMatch_Exact{Exact: path},
+			}
 		}
 	}
 

@@ -28,24 +28,24 @@ func TestRoutesByPath(t *testing.T) {
 		// Case 2: Prefix before path
 		{
 			in: []*Route{
-				&Route{Prefix: "/api"},
-				&Route{Path: "/api/v1"},
+				{Prefix: "/api"},
+				{Path: "/api/v1"},
 			},
 			expected: []*Route{
-				&Route{Path: "/api/v1"},
-				&Route{Prefix: "/api"},
+				{Path: "/api/v1"},
+				{Prefix: "/api"},
 			},
 		},
 
 		// Case 3: Longer prefix before shorter prefix
 		{
 			in: []*Route{
-				&Route{Prefix: "/api"},
-				&Route{Prefix: "/api/v1"},
+				{Prefix: "/api"},
+				{Prefix: "/api/v1"},
 			},
 			expected: []*Route{
-				&Route{Prefix: "/api/v1"},
-				&Route{Prefix: "/api"},
+				{Prefix: "/api/v1"},
+				{Prefix: "/api"},
 			},
 		},
 	}

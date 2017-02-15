@@ -16,6 +16,7 @@ package envoy
 
 import (
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 
 	"istio.io/manager/model"
 	"istio.io/manager/model/proxy/alphav1/config"
-	"sort"
 )
 
 type ingressWatcher struct {
@@ -98,12 +98,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 			}
 		}
 
-		hostRules, ok := rulesByHost[host]
-		if !ok {
-			hostRules = make([]*config.RouteRule, 0, 1)
-			rulesByHost[host] = hostRules
-		}
-		hostRules = append(hostRules, rule)
+		rulesByHost[host] = append(rulesByHost[host], rule)
 	}
 
 	// Phase 2: create a VirtualHost for each host
@@ -237,30 +232,4 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 	}
 
 	return route
-}
-
-func vhostMapToSlice(m map[string]VirtualHost) []VirtualHost {
-	// Put aside the wildcard domain's VirtualHost,
-	// so that we can ensure it's last on the ordered slice
-	wildcardDomain, hasWildcard := m["*"]
-	delete(m, "*")
-
-	s := make([]VirtualHost, 0, len(m))
-	for _, v := range m {
-		s = append(s, v)
-	}
-
-	if hasWildcard {
-		s = append(s, wildcardDomain)
-	}
-
-	return s
-}
-
-func clusterMapToSlice(m map[string]Cluster) []Cluster {
-	s := make([]Cluster, 0, len(m))
-	for _, v := range m {
-		s = append(s, v)
-	}
-	return s
 }

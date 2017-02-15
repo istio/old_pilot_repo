@@ -15,12 +15,12 @@
 package model
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
-	"fmt"
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
