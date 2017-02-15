@@ -1,0 +1,53 @@
+# Example service with an injected proxy
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.name}}
+  labels:
+    app: {{.name}}
+spec:
+  ports:
+  - port: 80
+    targetPort: {{.port1}}
+    name: http
+  selector:
+    app: {{.name}}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{.name}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{.name}}
+      annotations:
+        pod.beta.kubernetes.io/init-containers: >
+        [{
+          "name": "iptables",
+          "image": "{{.hub}}/init:{{.tag}}",
+          "imagePullPolicy": "Always",
+          "securityContext": { "capabilities" : { "add" : ["NET_ADMIN"] } }
+        }]
+    spec:
+      containers:
+      - name: app
+        image: {{.hub}}/app:{{.tag}}
+        args:
+          - --port
+          - "{{.port1}}"
+        ports:
+        - containerPort: {{.port1}}
+      - name: proxy
+        image: gcr.io/istio-testing/proxy
+        args:
+          - -l 2
+          - -m mixer
+        imagePullPolicy: Always
+      - name: debug
+        image: docker.io/istio/debug:test
+        securityContext:
+            privileged: true
+---

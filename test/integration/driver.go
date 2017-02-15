@@ -47,9 +47,12 @@ import (
 )
 
 const (
-	managerYaml      = "manager.yaml"
-	simpleAppYaml    = "simple-app.yaml"
-	versionedAppYaml = "versioned-app.yaml"
+	managerDiscovery     = "manager-discovery"
+	mixer                = "mixer"
+	egressProxy          = "egress-proxy"
+	app                  = "app"
+	appProxyManagerAgent = "app-proxy-manager-agent"
+	versionedAppYaml     = "versioned-app.yaml"
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )
@@ -94,12 +97,16 @@ func main() {
 		}()
 	}
 
-	if err := setupManager(); err != nil {
-		log.Fatal(err)
-	}
-	if err := setupSimpleApp(); err != nil {
-		log.Fatal(err)
-	}
+	// deploy istio-infra
+	deploy("http-discovery", managerDiscovery, namespace)
+	deploy("mixer", mixer, namespace)
+	deploy("istio-egress", egressProxy, namespace)
+
+	//deploy a healthy mix of apps, with and without proxy
+	deploy("t", app, namespace)
+	deploy("a", appProxyManagerAgent, namespace)
+	deploy("b", appProxyManagerAgent, namespace)
+
 	if err := setupVersionedApp(); err != nil {
 		log.Fatal(err)
 	}
@@ -122,75 +129,33 @@ func main() {
 	}
 }
 
-func setupManager() error {
+func deploy(svcName, svcType, namespace string) {
 	// write template
-	f, err := os.Create(managerYaml)
-	if err != nil {
-		return err
-	}
-	w := bufio.NewWriter(f)
-
-	if err := write("test/integration/manager.yaml.tmpl", map[string]string{
-		"hub": hub,
-		"tag": tag,
-	}, w); err != nil {
-		return err
+	svcConfigFile := svcName + "-" + svcType + ".yaml"
+	var w *bufio.Writer
+	if f, err := os.Create(svcConfigFile); err != nil {
+		log.Fatal(err)
+	} else {
+		defer f.Close()
+		w = bufio.NewWriter(f)
 	}
 
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return run("kubectl apply -f " + managerYaml + " -n " + namespace)
-}
-
-func setupSimpleApp() error {
-	// write template
-	f, err := os.Create(simpleAppYaml)
-	if err != nil {
-		return err
-	}
-	w := bufio.NewWriter(f)
-
-	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "a",
-		"port1": "8080",
-		"port2": "80",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "b",
-		"port1": "80",
-		"port2": "8000",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/external-services.yaml.tmpl", map[string]string{
+	if err:= write("test/integration/"+svcType+".yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
 		"namespace": namespace,
+		"name":      svcName,
+		"port1":     "8080",
+		"port2":     "80",
 	}, w); err != nil {
-		return err
+		log.Fatal(err)
 	}
 
 	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	return run("kubectl apply -f " + simpleAppYaml + " -n " + namespace)
+	run("kubectl apply -f " + svcConfigFile + " -n " + namespace)
 }
 
 func setupVersionedApp() error {
