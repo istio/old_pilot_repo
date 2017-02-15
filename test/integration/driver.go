@@ -162,7 +162,7 @@ func prepareDockerImages() error {
 		}
 		groups := re.FindStringSubmatch(out)
 		if len(groups) != 2 {
-			return fmt.Errorf("Could not find docker Image ID for %q: %q", image, out)
+			return fmt.Errorf("could not find docker Image ID for %q: %q", image, out)
 		}
 		srcTag := groups[1][:10]
 		if err := run(fmt.Sprintf("docker tag %s %s/%s:%s", srcTag, hub, image, tag)); err != nil {
