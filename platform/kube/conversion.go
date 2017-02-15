@@ -185,7 +185,9 @@ func createIngressRule(host string, path string, namespace string, backend v1bet
 
 	rule := &config.RouteRule{
 		Destination: destination,
-		Match:       &config.MatchCondition{},
+		Match: &config.MatchCondition{
+			Http: make(map[string]*config.StringMatch, 2),
+		},
 		Route: []*config.DestinationWeight{
 			{
 				Destination: destination,
