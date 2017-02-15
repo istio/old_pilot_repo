@@ -60,6 +60,7 @@ var (
 	hub         string
 	tag         string
 	namespace   string
+	layers      string
 	verbose     bool
 	norouting   bool
 	client      *kubernetes.Clientset
@@ -80,6 +81,8 @@ func init() {
 		"Dump proxy logs and request logs")
 	flag.BoolVar(&norouting, "norouting", true,
 		"Disable route rule tests")
+	flag.StringVar(&layers, "layers", "docker",
+		"path to directory with manager docker layers")
 }
 
 func main() {
@@ -96,19 +99,8 @@ func main() {
 
 	log.Printf("hub %v, tag %v", hub, tag)
 
-	if strings.HasPrefix(hub, "gcr.io") {
-		if err := run("gcloud docker --authorize-only"); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	for _, image := range []string{"app", "init", "runtime"} {
-		if err := run(fmt.Sprintf("docker tag istio/docker:%s %s/%s:%s", image, hub, image, tag)); err != nil {
-			log.Fatal(err)
-		}
-		if err := run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag)); err != nil {
-			log.Fatal(err)
-		}
+	if err := prepareDockerImages(); err != nil {
+		log.Fatal(err)
 	}
 
 	// connect to k8s and set up TPRs
@@ -153,6 +145,34 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func prepareDockerImages() error {
+	if strings.HasPrefix(hub, "gcr.io") {
+		if err := run("gcloud docker --authorize-only"); err != nil {
+			return err
+		}
+	}
+
+	re := regexp.MustCompile(`Loaded image ID: sha256:([a-zA-Z0-9]{10,})`)
+	for _, image := range []string{"app", "init", "runtime"} {
+		out, err := shell(fmt.Sprintf("docker load -i %s/%s-layer.tar", layers, image), true)
+		if err != nil {
+			return err
+		}
+		groups := re.FindStringSubmatch(out)
+		if len(groups) != 2 {
+			return fmt.Errorf("Could not find docker Image ID for %q: %q", image, out)
+		}
+		srcTag := groups[1][:10]
+		if err := run(fmt.Sprintf("docker tag %s %s/%s:%s", srcTag, hub, image, tag)); err != nil {
+			return err
+		}
+		if err := run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setupManager() error {
