@@ -18,9 +18,13 @@ if [[ "$hub" =~ ^gcr\.io ]]; then
 fi
 
 for image in app init runtime; do
-	bazel run //docker:$image
-	docker tag istio/docker:$image $hub/$image:$tag
-	docker push $hub/$image:$tag
+    bazel run //docker:$image
+    # bazel strips timestamp from timestamps to make it reproducible
+    # (see https://bazel.build/docs/be/docker.html). Use docker
+    # save+import so we push images with correct timestamps so k8s
+    # image caching and pull policy works correctly.
+    docker save istio/docker:$image | docker import - $hub/$image:$tag
+    docker push $hub/$image:$tag
 done
 
 bazel run //test/integration -- "$@" --norouting
