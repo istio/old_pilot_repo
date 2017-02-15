@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -281,8 +281,8 @@ func (cl *Client) List(kind, namespace string) (map[model.Key]proto.Message, err
 
 	out := make(map[model.Key]proto.Message, 0)
 	for _, item := range list.Items {
-		name, ns, kind, data, err := cl.convertConfig(&item)
-		if kind != "" {
+		name, ns, istioKind, data, err := cl.convertConfig(&item)
+		if kind == istioKind {
 			if err != nil {
 				errs = multierror.Append(errs, err)
 			} else {

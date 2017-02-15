@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,14 +19,30 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 
-	"istio.io/manager/model"
-
+	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
-	"fmt"
+	"istio.io/manager/model"
 )
+
+// Config generation main functions.
+// The general flow of the generation process consists of the following steps:
+// - routes are created for each destination, with referenced clusters stored as a special field
+// - routes are grouped organized into listeners for inbound and outbound traffic
+// - the outbound and inbound listeners are merged with preference given to the inbound traffic
+// - clusters are aggregated and normalized.
+
+// Requirements for the additions to the generation routines:
+// - extra policies and filters should be added as additional passes over abstract config structures
+// - lists in the config must be de-duplicated and ordered in a canonical way
+
+// TODO: missing features in the config generation:
+// - TCP routing
+// - HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
+// - HTTP pod port collision creates duplicate virtual host entries
+// - (bug) two service ports with the same target port create two virtual hosts with same domains
+//   (not allowed by envoy). FIXME - need to detect and eliminate such ports in validation
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
@@ -53,348 +69,161 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-const (
-	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
-	OutboundClusterPrefix = "outbound:"
+// Generate Envoy sidecar proxy configuration
+func Generate(instances []*model.ServiceInstance, services []*model.Service,
+	config *model.IstioRegistry, mesh *MeshConfig) *Config {
+	listeners, clusters := build(instances, services, config, mesh)
 
-	// InboundClusterPrefix is the prefix for service clusters co-hosted on the proxy instance
-	InboundClusterPrefix = "inbound:"
-)
+	// inject mixer filter
+	if mesh.MixerAddress != "" {
+		insertMixerFilter(listeners, mesh.MixerAddress)
+	}
 
-// TODO: these values used in the Envoy configuration will be configurable
-const (
-	Stdout           = "/dev/stdout"
-	DefaultTimeoutMs = 1000
-	DefaultLbType    = LbTypeRoundRobin
-)
+	// set bind to port values to values for port redirection
+	for _, listener := range listeners {
+		listener.BindToPort = false
+	}
 
-// Generate Envoy configuration for service instances co-located with Envoy and all services in the mesh
-func Generate(instances []*model.ServiceInstance, services []*model.Service, mesh *MeshConfig) (*Config, error) {
-	listeners, clusters := buildListeners(instances, services, mesh)
-	// TODO: add catch-all filters to prevent Envoy from crashing
-	listeners = append(listeners, Listener{
+	// add an extra listener that binds to a port
+	listeners = append(listeners, &Listener{
 		Port:           mesh.ProxyPort,
 		BindToPort:     true,
 		UseOriginalDst: true,
-		Filters:        make([]NetworkFilter, 0),
+		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	if len(mesh.MixerAddress) > 0 {
-		clusters = append(clusters, Cluster{
-			Name:             "mixer",
-			Type:             "strict_dns",
-			ConnectTimeoutMs: DefaultTimeoutMs,
-			LbType:           DefaultLbType,
-			Hosts: []Host{
-				{
-					URL: "tcp://" + mesh.MixerAddress,
-				},
-			},
-		})
-	}
-
+	// add SDS cluster
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
-			AccessLogPath: Stdout,
+			AccessLogPath: DefaultAccessLog,
 			Port:          mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: SDS{
-				Cluster: Cluster{
-					Name:             "sds",
-					Type:             "strict_dns",
-					ConnectTimeoutMs: DefaultTimeoutMs,
-					LbType:           DefaultLbType,
-					Hosts: []Host{
-						{
-							URL: "tcp://" + mesh.DiscoveryAddress,
-						},
-					},
-				},
+				Cluster:        buildSDSCluster(mesh),
 				RefreshDelayMs: 1000,
 			},
 		},
-	}, nil
+	}
 }
 
-// buildListeners uses iptables port redirect to route traffic either into the
-// pod or outside the pod to service clusters based on the traffic metadata.
-func buildListeners(instances []*model.ServiceInstance,
-	services []*model.Service,
-	mesh *MeshConfig) ([]Listener, []Cluster) {
-	clusters := buildClusters(services)
-	listeners := make([]Listener, 0)
+// build combines the outbound and inbound routes prioritizing the latter
+func build(instances []*model.ServiceInstance, services []*model.Service,
+	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
+	outbound := buildOutboundFilters(instances, services, config, mesh)
+	inbound := buildInboundFilters(instances)
 
-	hostnames := make([][]string, 0)
-	for _, instance := range instances {
-		hostnames = append(hostnames, strings.Split(instance.Service.Hostname, "."))
-	}
-	suffix := sharedHost(hostnames...)
-
-	// group by port values to service with the declared port
-	type listener struct {
-		instances map[model.Protocol][]*model.Service
-		services  map[model.Protocol][]*model.Service
+	// merge the two sets of route configs
+	routeConfigs := make(RouteConfigs)
+	for port, routeConfig := range inbound {
+		routeConfigs[port] = routeConfig
 	}
 
-	ports := make(map[int]*listener, 0)
-
-	// helper function to work with multi-maps
-	ensure := func(port int) {
-		if _, ok := ports[port]; !ok {
-			ports[port] = &listener{
-				instances: make(map[model.Protocol][]*model.Service),
-				services:  make(map[model.Protocol][]*model.Service),
-			}
-		}
-	}
-
-	// group all service instances by (target-)port values
-	// (assumption: traffic gets redirected from service port to instance port)
-	for _, instance := range instances {
-		port := instance.Endpoint.Port
-		ensure(port)
-		ports[port].instances[instance.Endpoint.ServicePort.Protocol] = append(
-			ports[port].instances[instance.Endpoint.ServicePort.Protocol], &model.Service{
-				Hostname: instance.Service.Hostname,
-				Address:  instance.Service.Address,
-				Ports:    []*model.Port{instance.Endpoint.ServicePort},
-			})
-	}
-
-	// group all services by (service-)port values for outgoing traffic
-	for _, svc := range services {
-		for _, port := range svc.Ports {
-			ensure(port.Port)
-			ports[port.Port].services[port.Protocol] = append(
-				ports[port.Port].services[port.Protocol], &model.Service{
-					Hostname: svc.Hostname,
-					Address:  svc.Address,
-					Ports:    []*model.Port{port},
-				})
-		}
-	}
-
-	// generate listener for each port
-	for port, lst := range ports {
-		listener := Listener{
-			Port:       port,
-			BindToPort: false,
-		}
-
-		// append localhost redirect cluster
-		localhost := fmt.Sprintf("%s%d", InboundClusterPrefix, port)
-		if len(lst.instances) > 0 {
-			clusters = append(clusters, Cluster{
-				Name:             localhost,
-				Type:             "static",
-				ConnectTimeoutMs: DefaultTimeoutMs,
-				LbType:           DefaultLbType,
-				Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
-			})
-		}
-
-		// Envoy uses L4 and L7 filters for TCP and HTTP traffic.
-		// In practice, no port has two protocols used by both filters, but we
-		// should be careful with not stepping on our feet.
-
-		// The order of the filter insertion is important.
-		if len(lst.instances[model.ProtocolTCP]) > 0 {
-			listener.Filters = append(listener.Filters, NetworkFilter{
-				Type: "read",
-				Name: "tcp_proxy",
-				Config: NetworkFilterConfig{
-					Cluster:    localhost,
-					StatPrefix: "inbound_tcp",
-				},
-			})
-		}
-
-		// TODO: TCP routing for outbound based on dst IP
-		// TODO: HTTPS protocol for inbound and outbound configuration using TCP routing or SNI
-		// TODO: if two service ports have same port or same target port values but
-		// different names, we will get duplicate host routes.  Envoy prohibits
-		// duplicate entries with identical domains.
-
-		// For HTTP, the routing decision is based on the virtual host.
-		hosts := make(map[string]VirtualHost, 0)
-		for _, proto := range []model.Protocol{model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC} {
-			for _, svc := range lst.services[proto] {
-				host := buildHost(svc, OutboundClusterPrefix+svc.String(), suffix)
-				hosts[svc.String()] = host
-			}
-
+	for port, outgoing := range outbound {
+		if incoming, ok := routeConfigs[port]; ok {
 			// If the traffic is sent to a service that has instances co-located with the proxy,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
-			for _, svc := range lst.instances[proto] {
-				host := buildHost(svc, localhost, suffix)
-				hosts[svc.String()] = host
-			}
-		}
-
-		if len(hosts) > 0 {
-			// sort hosts by key (should be non-overlapping domains)
-			vhosts := make([]VirtualHost, 0)
-			for _, host := range hosts {
-				vhosts = append(vhosts, host)
-			}
-			sort.Sort(HostsByName(vhosts))
-
-			listener.Filters = append(listener.Filters, NetworkFilter{
-				Type: "read",
-				Name: "http_connection_manager",
-				Config: NetworkFilterConfig{
-					CodecType:   "auto",
-					StatPrefix:  "http",
-					AccessLog:   []AccessLog{{Path: Stdout}},
-					RouteConfig: RouteConfig{VirtualHosts: vhosts},
-					Filters:     buildFilters(mesh),
-				},
-			})
-		}
-
-		if len(listener.Filters) > 0 {
-			listeners = append(listeners, listener)
+			routeConfigs[port] = incoming.merge(outgoing)
+		} else {
+			routeConfigs[port] = outgoing
 		}
 	}
 
+	// canonicalize listeners and collect clusters
+	clusters := make(Clusters, 0)
+	listeners := make([]*Listener, 0)
+	for port, routeConfig := range routeConfigs {
+		sort.Sort(HostsByName(routeConfig.VirtualHosts))
+		clusters = append(clusters, routeConfig.clusters()...)
+
+		filters := buildFaultFilters(config, routeConfig)
+
+		filters = append(filters, Filter{
+			Type:   "decoder",
+			Name:   "router",
+			Config: FilterRouterConfig{},
+		})
+
+		listener := &Listener{
+			Port: port,
+			Filters: []*NetworkFilter{{
+				Type: "read",
+				Name: HTTPConnectionManager,
+				Config: NetworkFilterConfig{
+					CodecType:  "auto",
+					StatPrefix: "http",
+					AccessLog: []AccessLog{{
+						Path: DefaultAccessLog,
+					}},
+					RouteConfig: routeConfig,
+					Filters:     filters,
+				},
+			}},
+		}
+		listeners = append(listeners, listener)
+	}
 	sort.Sort(ListenersByPort(listeners))
-	sort.Sort(ClustersByName(clusters))
+
+	clusters = clusters.Normalize()
+	for _, cluster := range clusters {
+		insertDestinationPolicy(config, cluster)
+	}
+
 	return listeners, clusters
 }
 
-// sharedHost computes the shared host name suffix for instances.
-func sharedHost(parts ...[]string) []string {
-	switch len(parts) {
-	case 0:
-		return nil
-	case 1:
-		return parts[0]
-	default:
-		// longest common suffix
-		out := make([]string, 0)
-		for i := 1; i <= len(parts[0]); i++ {
-			part := ""
-			all := true
-			for j, host := range parts {
-				hostpart := host[len(host)-i]
-				if j == 0 {
-					part = hostpart
-				} else if part != hostpart {
-					all = false
-					break
-				}
-			}
-			if all {
-				out = append(out, part)
-			} else {
-				break
-			}
-		}
+// buildOutboundFilters creates route configs indexed by ports for the traffic outbound
+// from the proxy instance
+func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
+	config *model.IstioRegistry, mesh *MeshConfig) RouteConfigs {
+	// used for shortcut domain names for outbound hostnames
+	suffix := sharedInstanceHost(instances)
+	httpConfigs := make(RouteConfigs)
 
-		// reverse
-		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-			out[i], out[j] = out[j], out[i]
+	// outbound connections/requests are redirected to service ports; we create a
+	// map for each service port to define filters
+	for _, service := range services {
+		for _, port := range service.Ports {
+			switch port.Protocol {
+			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+				routes := buildHTTPRoutes(service.Hostname, port, config)
+				host := buildVirtualHost(service, port, suffix, routes)
+				http := httpConfigs.EnsurePort(port.Port)
+				http.VirtualHosts = append(http.VirtualHosts, host)
+			default:
+				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port)
+			}
 		}
-		return out
 	}
+
+	return httpConfigs
 }
 
-// buildHost constructs an entry for VirtualHost for a given service.
-// Service contains name, namespace and a single port declaration.
-func buildHost(svc *model.Service, cluster string, suffix []string) VirtualHost {
-	hosts := make([]string, 0)
-	domains := make([]string, 0)
-	parts := strings.Split(svc.Hostname, ".")
-	shared := sharedHost(suffix, parts)
+// buildInboundFilters creates route configs indexed by ports for the traffic inbound
+// to co-located service instances
+func buildInboundFilters(instances []*model.ServiceInstance) RouteConfigs {
+	// used for shortcut domain names for hostnames
+	suffix := sharedInstanceHost(instances)
+	httpConfigs := make(RouteConfigs)
 
-	// if shared is "svc.cluster.local", then we can add "name.namespace", "name.namespace.svc", etc
-	host := strings.Join(parts[0:len(parts)-len(shared)], ".")
-	if len(host) > 0 {
-		hosts = append(hosts, host)
-	}
-	for _, part := range shared {
-		if len(host) > 0 {
-			host = host + "."
-		}
-		host = host + part
-		hosts = append(hosts, host)
-	}
-
-	// add cluster IP host name
-	if len(svc.Address) > 0 {
-		hosts = append(hosts, svc.Address)
-	}
-
-	// add ports
-	if len(svc.Ports) > 0 {
-		port := svc.Ports[0].Port
-		for _, host := range hosts {
-			domains = append(domains, fmt.Sprintf("%s:%d", host, port))
-
-			// default port 80 does not need to be specified
-			if port == 80 {
-				domains = append(domains, host)
-			}
+	// inbound connections/requests are redirected to the endpoint port but appear to be sent
+	// to the service port
+	for _, instance := range instances {
+		port := instance.Endpoint.ServicePort
+		switch port.Protocol {
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+			cluster := buildInboundCluster(instance.Endpoint.Port, instance.Endpoint.ServicePort.Protocol)
+			route := buildDefaultRoute(cluster)
+			host := buildVirtualHost(instance.Service, port, suffix, []*Route{route})
+			http := httpConfigs.EnsurePort(instance.Endpoint.Port)
+			http.VirtualHosts = append(http.VirtualHosts, host)
+		default:
+			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}
 	}
 
-	return VirtualHost{
-		Name:    svc.String(),
-		Domains: domains,
-		Routes:  []Route{{Cluster: cluster}},
-	}
-}
-
-// buildClusters creates a cluster for every (service, port)
-func buildClusters(services []*model.Service) []Cluster {
-	clusters := make([]Cluster, 0)
-	for _, svc := range services {
-		for _, port := range svc.Ports {
-			clusterSvc := model.Service{
-				Hostname: svc.Hostname,
-				Ports:    []*model.Port{port},
-			}
-			cluster := Cluster{
-				Name:             OutboundClusterPrefix + clusterSvc.String(),
-				ServiceName:      clusterSvc.String(),
-				Type:             "sds",
-				LbType:           DefaultLbType,
-				ConnectTimeoutMs: DefaultTimeoutMs,
-			}
-			if port.Protocol == model.ProtocolGRPC ||
-				port.Protocol == model.ProtocolHTTP2 {
-				cluster.Features = "http2"
-			}
-			clusters = append(clusters, cluster)
-		}
-	}
-	sort.Sort(ClustersByName(clusters))
-	return clusters
-}
-
-func buildFilters(mesh *MeshConfig) []Filter {
-	filters := make([]Filter, 0)
-
-	if len(mesh.MixerAddress) > 0 {
-		filters = append(filters, Filter{
-			Type: "both",
-			Name: "esp",
-			Config: FilterEndpointsConfig{
-				ServiceConfig: "/etc/generic_service_config.json",
-				ServerConfig:  "/etc/server_config.pb.txt",
-			},
-		})
-	}
-
-	filters = append(filters, Filter{
-		Type:   "decoder",
-		Name:   "router",
-		Config: FilterRouterConfig{},
-	})
-
-	return filters
+	return httpConfigs
 }

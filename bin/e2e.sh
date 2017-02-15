@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ex
 
+# These default values must be consistent with test/integration/driver.go
 hub="gcr.io/istio-testing"
 tag="test"
 
@@ -12,7 +13,10 @@ while getopts :h:t: arg; do
   esac
 done
 
-gcloud docker --authorize-only
+if [[ "$hub" =~ ^gcr\.io ]]; then
+    gcloud docker --authorize-only
+fi
+
 for image in app init runtime; do
 	bazel run //docker:$image
 	docker tag istio/docker:$image $hub/$image:$tag

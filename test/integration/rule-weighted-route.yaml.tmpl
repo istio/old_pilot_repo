@@ -1,0 +1,9 @@
+destination: "{{.destination}}.{{.namespace}}.svc.cluster.local"
+precedence: 2
+route:
+  - tags:
+       version: v1
+    weight: 75
+  - tags:
+       version: v2
+    weight: 25

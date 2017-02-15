@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ type serverArgs struct {
 }
 
 const (
-	resyncPeriod = 256 * time.Millisecond
+	resyncPeriod = 100 * time.Millisecond
 )
 
 var (
@@ -90,7 +90,8 @@ Istio Manager provides management plane functionality to the Istio proxy mesh an
 		Short: "Start Istio Proxy sidecar agent",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(flags.client, flags.namespace, resyncPeriod)
-			_, err = envoy.NewWatcher(controller, controller, &flags.proxy)
+			_, err = envoy.NewWatcher(controller, controller, &model.IstioRegistry{ConfigRegistry: controller},
+				&flags.proxy)
 			if err != nil {
 				return
 			}
@@ -130,7 +131,7 @@ func init() {
 		"Envoy proxy port")
 	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.AdminPort, "admin_port", "a", 5000,
 		"Envoy admin port")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.BinaryPath, "envoy_path", "b", "/envoy_esp",
+	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.BinaryPath, "envoy_path", "b", "/usr/local/bin/envoy",
 		"Envoy binary location")
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.ConfigPath, "config_path", "e", "/etc/envoy",
 		"Envoy config root location")

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,6 +56,14 @@ func kindToAPIName(s string) string {
 	return camelCaseToKabobCase(s) + "." + IstioAPIGroup
 }
 
+func convertTags(obj v1.ObjectMeta) model.Tags {
+	out := make(model.Tags)
+	for k, v := range obj.Labels {
+		out[k] = v
+	}
+	return out
+}
+
 func convertService(svc v1.Service) *model.Service {
 	ports := make([]*model.Port, 0)
 	addr := ""
@@ -75,8 +83,6 @@ func convertService(svc v1.Service) *model.Service {
 		Hostname: fmt.Sprintf("%s.%s.%s", svc.Name, svc.Namespace, ServiceSuffix),
 		Ports:    ports,
 		Address:  addr,
-		// TODO: empty set of service tags for now
-		Tags: nil,
 	}
 }
 
