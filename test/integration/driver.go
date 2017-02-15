@@ -60,6 +60,7 @@ var (
 	tag         string
 	namespace   string
 	verbose     bool
+	norouting   bool
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
 )
@@ -73,8 +74,10 @@ func init() {
 		"Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
-	flag.BoolVarP(&verbose, "verbose", "v", false,
+	flag.BoolVarP(&verbose, "dump", "d", false,
 		"Dump proxy logs and request logs")
+	flag.BoolVar(&norouting, "norouting", false,
+		"Disable route rule tests")
 }
 
 func main() {
@@ -109,16 +112,18 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println("pods:", pods)
-	if verbose {
-		dumpProxyLogs(pods["a"])
-		dumpProxyLogs(pods["b"])
-	}
 
 	if err := checkBasicReachability(pods); err != nil {
+		if verbose {
+			dumpProxyLogs(pods["a"])
+			dumpProxyLogs(pods["b"])
+		}
 		log.Fatal(err)
 	}
-	if err := checkRouting(pods); err != nil {
-		log.Fatal(err)
+	if !norouting {
+		if err := checkRouting(pods); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
@@ -284,6 +289,10 @@ func checkRouting(pods map[string]string) error {
 	if err := addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace); err != nil {
 		return err
 	}
+
+	// TODO: eliminate this wait
+	time.Sleep(time.Second * 10)
+
 	if err := verifyRouting(pods, "hello", "world", "", "",
 		100, map[string]int{
 			"v1": 100,
@@ -311,6 +320,10 @@ func checkRouting(pods map[string]string) error {
 	if err := addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace); err != nil {
 		return err
 	}
+
+	// TODO: eliminate this wait
+	time.Sleep(time.Second * 15)
+
 	if err := verifyRouting(pods, "hello", "world", "", "",
 		100, map[string]int{
 			"v1": 75,
@@ -338,6 +351,10 @@ func checkRouting(pods map[string]string) error {
 	if err := addRule(contentRoute.Bytes(), model.RouteRule, "content-route", namespace); err != nil {
 		return err
 	}
+
+	// TODO: eliminate this wait
+	time.Sleep(time.Second * 15)
+
 	if err := verifyRouting(pods, "hello", "world", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
@@ -366,8 +383,9 @@ func checkRouting(pods map[string]string) error {
 		return err
 	}
 
-	// sleep for a while so that envoy has a chance to reload
+	// TODO: eliminate this wait
 	time.Sleep(time.Second * 15)
+
 	if err := verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503); err != nil {
 		return err
 	}
@@ -663,7 +681,7 @@ func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string
 		return err
 	}
 
-	epsilon := 2
+	epsilon := 5
 
 	var failures int
 	for version, expected := range expectedCount {
