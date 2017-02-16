@@ -26,7 +26,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
@@ -85,7 +84,7 @@ func init() {
 		"Use in-cluster kube config")
 	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
-	flag.StringVarP(&tag, "tag", "t", "test",
+	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
@@ -107,12 +106,8 @@ func main() {
 
 func setup() {
 	if tag == "" {
-		// tag is the date with format <username>_YYYYMMDD-HHMMSS
-		user, err := user.Current()
-		if err != nil {
-			log.Fatal(err)
-		}
-		tag = fmt.Sprintf("%s_%s", user.Username, time.Now().UTC().Format("20160102_150405"))
+		teardown()
+		log.Fatal("No docker tag specified with -t or --tag")
 	}
 	log.Printf("hub %v, tag %v", hub, tag)
 
