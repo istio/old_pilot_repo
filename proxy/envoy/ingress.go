@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
@@ -195,28 +196,13 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 			destination = rule.Destination
 		}
 
-		// A temporary measure to communicate the destination service's port
-		// to the proxy configuration generator. This can be improved by using
-		// a dedicated model object for IngressRule (instead of reusing RouteRule),
-		// which exposes the necessary target port field within the "Route" field.
-		port, err := strconv.Atoi(dst.Tags["servicePort"])
+		port, tags, err := extractPortAndTags(dst)
 		if err != nil {
-			glog.Warning("Failed to parse routing rule destination port: %v", err)
+			glog.Warningf("Failed to extract routing rule destination port: %v", err)
 			continue
 		}
-		cPort := &model.Port{
-			Port:     port,
-			Protocol: model.ProtocolHTTP,
-		}
 
-		// Copy the destination tags, if any, but omit the servicePort
-		tags := make(map[string]string, len(dst.Tags))
-		for k, v := range dst.Tags {
-			tags[k] = v
-		}
-		delete(tags, "servicePort")
-
-		cluster := buildOutboundCluster(destination, cPort, tags)
+		cluster := buildOutboundCluster(destination, port, tags)
 		clusters = append(clusters, &WeightedClusterEntry{
 			Name:   cluster.Name,
 			Weight: int(dst.Weight),
@@ -232,4 +218,44 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 	}
 
 	return route
+}
+
+// extractPortAndTags extracts the destination service port from the given destination,
+// as well as its tags (after clearing meta-tags describing the port).
+// Note that this is a temporary measure to communicate the destination service's port
+// to the proxy configuration generator. This can be improved by using
+// a dedicated model object for IngressRule (instead of reusing RouteRule),
+// which exposes the necessary target port field within the "Route" field.
+func extractPortAndTags(dst *config.DestinationWeight) (*model.Port, model.Tags, error) {
+	portNum, err := strconv.Atoi(dst.Tags["servicePort.port"])
+	if err != nil {
+		return nil, nil, err
+	}
+	portName, ok := dst.Tags["servicePort.name"]
+	if !ok {
+		return nil, nil, fmt.Errorf("no name specified for service port %d", portNum)
+	}
+	portProto, ok := dst.Tags["servicePort.protocol"]
+	if !ok {
+		return nil, nil, fmt.Errorf("no protocol specified for service port %d", portNum)
+	}
+
+	port := &model.Port{
+		Port:     portNum,
+		Name:     portName,
+		Protocol: model.Protocol(portProto),
+	}
+
+	var tags model.Tags
+	if len(dst.Tags) > 3 {
+		tags = make(model.Tags, len(dst.Tags)-3)
+		for k, v := range dst.Tags {
+			tags[k] = v
+		}
+		delete(tags, "servicePort.port")
+		delete(tags, "servicePort.name")
+		delete(tags, "servicePort.protocol")
+	}
+
+	return port, tags, nil
 }

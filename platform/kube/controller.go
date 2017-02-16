@@ -21,11 +21,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-
-	multierror "github.com/hashicorp/go-multierror"
-
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
+	multierror "github.com/hashicorp/go-multierror"
 
 	"istio.io/manager/model"
 
@@ -214,7 +212,7 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 		// Convert the ingress into a map[Key]Message, and invoke handler for each
 		// TODO: This works well for Add and Delete events, but no so for Update:
 		// A updated ingress may also trigger an Add or Delete for one of its constituent sub-rules.
-		messages := convertIngress(*obj.(*v1beta1.Ingress))
+		messages := convertIngress(*obj.(*v1beta1.Ingress), c.serviceByKey)
 		for key, message := range messages {
 			f(key, message, ev)
 		}
@@ -321,7 +319,7 @@ func (c *Controller) getIngress(key model.Key) (proto.Message, bool) {
 		return nil, false
 	}
 
-	messages := convertIngress(*obj.(*v1beta1.Ingress))
+	messages := convertIngress(*obj.(*v1beta1.Ingress), c.serviceByKey)
 	message, exists := messages[key]
 	return message, exists
 }
@@ -405,7 +403,7 @@ func (c *Controller) listIngresses(kind, namespace string) (map[model.Key]proto.
 	for _, obj := range c.ingresses.informer.GetStore().List() {
 		ingress, ok := obj.(*v1beta1.Ingress)
 		if ok && (namespace == "" || ingress.GetObjectMeta().GetNamespace() == namespace) {
-			ingressRules := convertIngress(*ingress)
+			ingressRules := convertIngress(*ingress, c.serviceByKey)
 			for key, message := range ingressRules {
 				out[key] = message
 			}

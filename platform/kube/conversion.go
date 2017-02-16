@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/go-multierror"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/util/intstr"
 
 	"istio.io/manager/model"
 	"istio.io/manager/model/proxy/alphav1/config"
@@ -38,6 +40,9 @@ const (
 	// TODO: make DNS suffix configurable
 	ServiceSuffix = "svc.cluster.local"
 )
+
+// serviceGetter is a function that retrieves a service by name and namespace
+type serviceGetter func(name, namespace string) (*v1.Service, bool)
 
 // camelCaseToKabobCase converts "MyName" to "my-name"
 func camelCaseToKabobCase(s string) string {
@@ -68,6 +73,14 @@ func convertTags(obj v1.ObjectMeta) model.Tags {
 	return out
 }
 
+func convertPort(port v1.ServicePort) *model.Port {
+	return &model.Port{
+		Name:     port.Name,
+		Port:     int(port.Port),
+		Protocol: convertProtocol(port.Name, port.Protocol),
+	}
+}
+
 func convertService(svc v1.Service) *model.Service {
 	ports := make([]*model.Port, 0)
 	addr := ""
@@ -76,11 +89,7 @@ func convertService(svc v1.Service) *model.Service {
 	}
 
 	for _, port := range svc.Spec.Ports {
-		ports = append(ports, &model.Port{
-			Name:     port.Name,
-			Port:     int(port.Port),
-			Protocol: convertProtocol(port.Name, port.Protocol),
-		})
+		ports = append(ports, convertPort(port))
 	}
 
 	return &model.Service{
@@ -156,7 +165,7 @@ func modelToKube(km model.KindMap, k *model.Key, v proto.Message) (*Config, erro
 	return out, nil
 }
 
-func convertIngress(ingress v1beta1.Ingress) map[model.Key]proto.Message {
+func convertIngress(ingress v1beta1.Ingress, getService serviceGetter) map[model.Key]proto.Message {
 	messages := make(map[model.Key]proto.Message)
 
 	keyOf := func(ruleNum, pathNum int) model.Key {
@@ -168,20 +177,22 @@ func convertIngress(ingress v1beta1.Ingress) map[model.Key]proto.Message {
 	}
 
 	if ingress.Spec.Backend != nil {
-		messages[keyOf(0, 0)] = createIngressRule("", "", ingress.Namespace, *ingress.Spec.Backend)
+		messages[keyOf(0, 0)] = createIngressRule("", "", ingress.Namespace, *ingress.Spec.Backend, getService)
 	}
 
 	for i, rule := range ingress.Spec.Rules {
 		for j, path := range rule.HTTP.Paths {
-			messages[keyOf(i+1, j+1)] = createIngressRule(rule.Host, path.Path, ingress.Namespace, path.Backend)
+			messages[keyOf(i+1, j+1)] = createIngressRule(rule.Host, path.Path, ingress.Namespace, path.Backend, getService)
 		}
 	}
 
 	return messages
 }
 
-func createIngressRule(host string, path string, namespace string, backend v1beta1.IngressBackend) proto.Message {
+func createIngressRule(host string, path string, namespace string,
+	backend v1beta1.IngressBackend, getService serviceGetter) proto.Message {
 	destination := serviceHostname(backend.ServiceName, namespace)
+	port := convertPort(resolveServicePort(namespace, backend, getService))
 
 	rule := &config.RouteRule{
 		Destination: destination,
@@ -198,7 +209,9 @@ func createIngressRule(host string, path string, namespace string, backend v1bet
 				// a dedicated model object for IngressRule (instead of reusing RouteRule),
 				// which exposes the necessary target port field within the "Route" field.
 				Tags: map[string]string{
-					"servicePort": backend.ServicePort.String(),
+					"servicePort.port":     strconv.Itoa(port.Port),
+					"servicePort.name":     port.Name,
+					"servicePort.protocol": string(port.Protocol),
 				},
 			},
 		},
@@ -229,6 +242,37 @@ func createIngressRule(host string, path string, namespace string, backend v1bet
 	}
 
 	return rule
+}
+
+// resolveServicePort returns the service port referenced in the given ingress backend
+func resolveServicePort(namespace string, backend v1beta1.IngressBackend, getService serviceGetter) v1.ServicePort {
+	portNum := int32(backend.ServicePort.IntValue())
+	portName := backend.ServicePort.String()
+	fallbackPort := v1.ServicePort{
+		Port:     portNum,
+		Name:     "",
+		Protocol: v1.ProtocolTCP,
+	}
+
+	service, ok := getService(backend.ServiceName, namespace)
+	if !ok {
+		glog.Warningf("Failed to resolve service port %s of service %s.%s: service does not exist",
+			backend.ServicePort.String(), backend.ServiceName, namespace)
+		return fallbackPort
+	}
+
+	for _, servicePort := range service.Spec.Ports {
+		if backend.ServicePort.Type == intstr.Int && portNum == servicePort.Port {
+			return servicePort
+		}
+		if backend.ServicePort.Type == intstr.String && portName == servicePort.Name {
+			return servicePort
+		}
+	}
+
+	glog.Warningf("Failed to resolve service port %s of service %s.%s: port does not exist",
+		backend.ServicePort.String(), backend.ServiceName, namespace)
+	return fallbackPort
 }
 
 // encodeIngressRuleName encodes an ingress rule name for a given ingress resource name,

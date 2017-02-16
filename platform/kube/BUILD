@@ -27,6 +27,7 @@ go_library(
         "@io_k8s_client_go//pkg/runtime/schema:go_default_library",
         "@io_k8s_client_go//pkg/runtime/serializer:go_default_library",
         "@io_k8s_client_go//pkg/util/flowcontrol:go_default_library",
+        "@io_k8s_client_go//pkg/util/intstr:go_default_library",
         "@io_k8s_client_go//pkg/watch:go_default_library",
         "@io_k8s_client_go//rest:go_default_library",
         "@io_k8s_client_go//tools/cache:go_default_library",
