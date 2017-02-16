@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: {{.hub}}/app:demo
+        image: {{.hub}}/app:{{.tag}}
         args:
           - --port
           - "{{.port1}}"
