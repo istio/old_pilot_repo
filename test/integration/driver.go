@@ -168,6 +168,11 @@ func setupDockerImages() error {
 		}
 	}
 
+	// out, err := shell(fmt.Sprintf("docker load -i external/docker_ubuntu/xenial-layer.tar"), true)
+	// if err != nil {
+	// 	return err
+	// }
+
 	re := regexp.MustCompile(`Loaded image ID: sha256:([a-zA-Z0-9]{10,})`)
 	for _, image := range []string{"app", "init", "runtime"} {
 		out, err := shell(fmt.Sprintf("docker load -i %s/%s-layer.tar", layers, image), true)
