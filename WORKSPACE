@@ -257,7 +257,6 @@ new_go_repository(
 
 new_go_repository(
     name = "org_golang_x_text",
-    build_file_name = "BUILD.bazel",
     commit = "2910a502d2bf9e43193af9d68ca516529614eed3",
     importpath = "golang.org/x/text",
 )
