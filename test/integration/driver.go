@@ -192,8 +192,9 @@ func setupManager() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/manager.yaml.tmpl", map[string]string{
-		"hub": hub,
-		"tag": tag,
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
 	}, w); err != nil {
 		return err
 	}
@@ -217,21 +218,23 @@ func setupSimpleApp() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "a",
-		"port1": "8080",
-		"port2": "80",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "a",
+		"port1":     "8080",
+		"port2":     "80",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "b",
-		"port1": "80",
-		"port2": "8000",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "b",
+		"port1":     "80",
+		"port2":     "8000",
 	}, w); err != nil {
 		return err
 	}
@@ -263,37 +266,40 @@ func setupVersionedApp() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "hello",
-		"service": "hello",
-		"port1":   "8080",
-		"port2":   "80",
-		"version": "v1",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "hello",
+		"service":   "hello",
+		"port1":     "8080",
+		"port2":     "80",
+		"version":   "v1",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "world-v1",
-		"service": "world",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v1",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "world-v1",
+		"service":   "world",
+		"port1":     "80",
+		"port2":     "8000",
+		"version":   "v1",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "world-v2",
-		"service": "world",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v2",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "world-v2",
+		"service":   "world",
+		"port1":     "80",
+		"port2":     "8000",
+		"version":   "v2",
 	}, w); err != nil {
 		return err
 	}
