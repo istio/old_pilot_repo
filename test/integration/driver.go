@@ -56,13 +56,14 @@ const (
 )
 
 var (
-	kubeconfig string
-	hub        string
-	tag        string
-	namespace  string
-	verbose    bool
-	norouting  bool
-	parallel   bool
+	kubeconfig      string
+	inClusterConfig bool
+	hub             string
+	tag             string
+	namespace       string
+	verbose         bool
+	norouting       bool
+	parallel        bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -79,7 +80,9 @@ var (
 
 func init() {
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
-		"kube config file or empty for in-cluster")
+		"kube config file (ignored if --in_cluster_config is set")
+	flag.BoolVar(&inClusterConfig, "in_cluster_config", false,
+		"Use in-cluster kube config")
 	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "test",
@@ -499,7 +502,7 @@ func shell(command string, printCmd bool) (string, error) {
 func setupClient() error {
 	var err error
 	var config *rest.Config
-	if kubeconfig == "" {
+	if inClusterConfig {
 		config, err = rest.InClusterConfig()
 	} else {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
