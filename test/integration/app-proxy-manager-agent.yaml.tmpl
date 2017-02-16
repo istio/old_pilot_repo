@@ -57,6 +57,8 @@ spec:
           - sidecar
           - -s
           - manager:8080
+          - -n
+          - {{.namespace}}
           - --logtostderr
           - -v
           - "2"
