@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,14 +56,26 @@ const (
 )
 
 var (
-	kubeconfig  string
-	hub         string
-	tag         string
-	namespace   string
-	verbose     bool
-	norouting   bool
+	kubeconfig string
+	hub        string
+	tag        string
+	namespace  string
+	layers     string
+	verbose    bool
+	norouting  bool
+	parallel   bool
+
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
+
+	// pods is a mapping from app name to a pod name (write once, read only)
+	pods map[string]string
+
+	// accessLogs is a mapping from app name to a list of request ids that should be present in it
+	accessLogs map[string][]string
+
+	// mu protects mutable global state
+	mu sync.Mutex
 )
 
 func init() {
@@ -70,61 +83,110 @@ func init() {
 		"kube config file or empty for in-cluster")
 	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
-	flag.StringVarP(&tag, "tag", "t", "test",
-		"Docker tag")
+	flag.StringVarP(&tag, "tag", "t", "",
+		"Docker tag (default <username>_YYYMMDD_HHMMSS formatted date)")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.BoolVarP(&verbose, "dump", "d", false,
 		"Dump proxy logs and request logs")
-	flag.BoolVar(&norouting, "norouting", false,
+	flag.BoolVar(&norouting, "norouting", true,
 		"Disable route rule tests")
+	flag.StringVar(&layers, "layers", "docker",
+		"path to directory with manager docker layers")
+	flag.BoolVar(&parallel, "parallel", true,
+		"Run requests in parallel")
 }
 
 func main() {
 	flag.Parse()
-	log.Printf("hub %v, tag %v", hub, tag)
-	// connect to k8s and set up TPRs
-	if err := setup(); err != nil {
-		log.Fatal(err)
+	setup()
+	check(testBasicReachability())
+	check(testRouting())
+	teardown()
+}
+
+func setup() {
+	if tag == "" {
+		// tag is the date with format <username>_YYYYMMDD-HHMMSS
+		user, err := user.Current()
+		if err != nil {
+			log.Fatal(err)
+		}
+		tag = fmt.Sprintf("%s_%s", user.Username, time.Now().UTC().Format("20160102_150405"))
 	}
+	log.Printf("hub %v, tag %v", hub, tag)
+
+	check(setupClient())
+
 	if namespace == "" {
 		var err error
 		if namespace, err = generateNamespace(client); err != nil {
-			log.Fatal(err)
+			check(err)
 		}
-		defer func() {
-			deleteNamespace(client, namespace)
-		}()
 	}
 
-	if err := setupManager(); err != nil {
-		log.Fatal(err)
-	}
-	if err := setupSimpleApp(); err != nil {
-		log.Fatal(err)
-	}
-	if err := setupVersionedApp(); err != nil {
-		log.Fatal(err)
+	pods = make(map[string]string)
+
+	check(setupDockerImages())
+	check(setupManager())
+	check(setupSimpleApp())
+	check(setupVersionedApp())
+	check(setPods())
+
+	accessLogs = make(map[string][]string)
+	for app := range pods {
+		accessLogs[app] = make([]string, 0)
 	}
 
-	pods, err := getPods()
+}
+
+// check function correctly cleans up on failure
+func check(err error) {
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		teardown()
+		os.Exit(1)
 	}
-	log.Println("pods:", pods)
+}
 
-	if err := checkBasicReachability(pods); err != nil {
-		if verbose {
-			dumpProxyLogs(pods["a"])
-			dumpProxyLogs(pods["b"])
-		}
-		log.Fatal(err)
+// teardown removes resources
+func teardown() {
+	if verbose {
+		dumpProxyLogs(pods["a"])
+		dumpProxyLogs(pods["b"])
 	}
-	if !norouting {
-		if err := checkRouting(pods); err != nil {
-			log.Fatal(err)
+	if namespace != "" && namespace != "default" {
+		deleteNamespace(client, namespace)
+		namespace = ""
+	}
+}
+
+func setupDockerImages() error {
+	if strings.HasPrefix(hub, "gcr.io") {
+		if err := run("gcloud docker --authorize-only"); err != nil {
+			return err
 		}
 	}
+
+	re := regexp.MustCompile(`Loaded image ID: sha256:([a-zA-Z0-9]{10,})`)
+	for _, image := range []string{"app", "init", "runtime"} {
+		out, err := shell(fmt.Sprintf("docker load -i %s/%s-layer.tar", layers, image), true)
+		if err != nil {
+			return err
+		}
+		groups := re.FindStringSubmatch(out)
+		if len(groups) != 2 {
+			return fmt.Errorf("could not find docker Image ID for %q: %q", image, out)
+		}
+		srcTag := groups[1][:10]
+		if err := run(fmt.Sprintf("docker tag %s %s/%s:%s", srcTag, hub, image, tag)); err != nil {
+			return err
+		}
+		if err := run(fmt.Sprintf("docker push %s/%s:%s", hub, image, tag)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setupManager() error {
@@ -136,8 +198,9 @@ func setupManager() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/manager.yaml.tmpl", map[string]string{
-		"hub": hub,
-		"tag": tag,
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
 	}, w); err != nil {
 		return err
 	}
@@ -161,21 +224,23 @@ func setupSimpleApp() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "a",
-		"port1": "8080",
-		"port2": "80",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "a",
+		"port1":     "8080",
+		"port2":     "80",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":   hub,
-		"tag":   tag,
-		"name":  "b",
-		"port1": "80",
-		"port2": "8000",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "b",
+		"port1":     "80",
+		"port2":     "8000",
 	}, w); err != nil {
 		return err
 	}
@@ -207,37 +272,40 @@ func setupVersionedApp() error {
 	w := bufio.NewWriter(f)
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "hello",
-		"service": "hello",
-		"port1":   "8080",
-		"port2":   "80",
-		"version": "v1",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "hello",
+		"service":   "hello",
+		"port1":     "8080",
+		"port2":     "80",
+		"version":   "v1",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "world-v1",
-		"service": "world",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v1",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "world-v1",
+		"service":   "world",
+		"port1":     "80",
+		"port2":     "8000",
+		"version":   "v1",
 	}, w); err != nil {
 		return err
 	}
 
 	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":     hub,
-		"tag":     tag,
-		"name":    "world-v2",
-		"service": "world",
-		"port1":   "80",
-		"port2":   "8000",
-		"version": "v2",
+		"hub":       hub,
+		"tag":       tag,
+		"namespace": namespace,
+		"name":      "world-v2",
+		"service":   "world",
+		"port1":     "80",
+		"port2":     "8000",
+		"version":   "v2",
 	}, w); err != nil {
 		return err
 	}
@@ -252,16 +320,16 @@ func setupVersionedApp() error {
 	return run("kubectl apply -f " + versionedAppYaml + " -n " + namespace)
 }
 
-func checkBasicReachability(pods map[string]string) error {
+func testBasicReachability() error {
 	log.Printf("Verifying basic reachability across pods/services (a, b, and t)..")
-	ids, err := makeRequests(pods)
+	err := makeRequests()
 	if err != nil {
 		return err
 	}
 	if verbose {
-		log.Println("requests:", ids)
+		log.Println("requests:", accessLogs)
 	}
-	err = checkAccessLogs(pods, ids)
+	err = checkAccessLogs()
 	if err != nil {
 		return err
 	}
@@ -269,7 +337,11 @@ func checkBasicReachability(pods map[string]string) error {
 	return nil
 }
 
-func checkRouting(pods map[string]string) error {
+func testRouting() error {
+	if norouting {
+		return nil
+	}
+
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
 	log.Println("Routing all traffic to world-v1 and verifying..")
@@ -293,7 +365,7 @@ func checkRouting(pods map[string]string) error {
 	// TODO: eliminate this wait
 	time.Sleep(time.Second * 10)
 
-	if err := verifyRouting(pods, "hello", "world", "", "",
+	if err := verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 100,
 			"v2": 0,
@@ -324,7 +396,7 @@ func checkRouting(pods map[string]string) error {
 	// TODO: eliminate this wait
 	time.Sleep(time.Second * 15)
 
-	if err := verifyRouting(pods, "hello", "world", "", "",
+	if err := verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
@@ -355,7 +427,7 @@ func checkRouting(pods map[string]string) error {
 	// TODO: eliminate this wait
 	time.Sleep(time.Second * 15)
 
-	if err := verifyRouting(pods, "hello", "world", "version", "v2",
+	if err := verifyRouting("hello", "world", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
@@ -456,7 +528,7 @@ func shell(command string, printCmd bool) (string, error) {
 }
 
 // connect to K8S cluster and register TPRs
-func setup() error {
+func setupClient() error {
 	var err error
 	var config *rest.Config
 	if kubeconfig == "" {
@@ -481,20 +553,18 @@ func setup() error {
 	return istioClient.RegisterResources()
 }
 
-// pods returns pod names by app label as soon as all pods are ready
-func getPods() (map[string]string, error) {
-	pods := make([]v1.Pod, 0)
-	out := make(map[string]string)
+func setPods() error {
+	items := make([]v1.Pod, 0)
 	for n := 0; ; n++ {
 		log.Println("Checking all pods are running...")
 		list, err := client.Pods(namespace).List(v1.ListOptions{})
 		if err != nil {
-			return nil, err
+			return err
 		}
-		pods = list.Items
+		items = list.Items
 		ready := true
 
-		for _, pod := range pods {
+		for _, pod := range items {
 			if pod.Status.Phase != "Running" {
 				log.Printf("Pod %s has status %s\n", pod.Name, pod.Status.Phase)
 				ready = false
@@ -507,22 +577,22 @@ func getPods() (map[string]string, error) {
 		}
 
 		if n > budget {
-			for _, pod := range pods {
+			for _, pod := range items {
 				dumpProxyLogs(pod.Name)
 			}
-			return nil, fmt.Errorf("exceeded budget for checking pod status")
+			return fmt.Errorf("exceeded budget for checking pod status")
 		}
 
 		time.Sleep(time.Second)
 	}
 
-	for _, pod := range pods {
+	for _, pod := range items {
 		if app, exists := pod.Labels["app"]; exists {
-			out[app] = pod.Name
+			pods[app] = pod.Name
 		}
 	}
 
-	return out, nil
+	return nil
 }
 
 func dumpProxyLogs(name string) {
@@ -537,75 +607,85 @@ func dumpProxyLogs(name string) {
 	}
 }
 
-// makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func makeRequests(pods map[string]string) (map[string][]string, error) {
-	var mu sync.Mutex
-	out := make(map[string][]string)
-	for app := range pods {
-		out[app] = make([]string, 0)
-	}
+// makeRequest creates a function to make requests; done should return true to quickly exit the retry loop
+func makeRequest(src, dst, port, domain string, done func() bool) func() error {
+	return func() error {
+		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+		for n := 0; n < budget; n++ {
+			log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
 
+			request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[src], namespace, url), verbose)
+			if err != nil {
+				return err
+			}
+			if verbose {
+				log.Println(request)
+			}
+			match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
+			if len(match) > 1 {
+				id := match[1]
+				if verbose {
+					log.Printf("id=%s\n", id)
+				}
+				mu.Lock()
+				accessLogs[src] = append(accessLogs[src], id)
+				accessLogs[dst] = append(accessLogs[dst], id)
+				mu.Unlock()
+				return nil
+			}
+
+			// Expected no match
+			if src == "t" && dst == "t" {
+				if verbose {
+					log.Println("Expected no match for t->t")
+				}
+				return nil
+			}
+			if done() {
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
+	}
+}
+
+// makeRequests executes requests in pods and collects request ids per pod to check against access logs
+func makeRequests() error {
+	log.Printf("makeRequests parallel=%t\n", parallel)
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b", "t"}
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + namespace} {
-					// capture local copy of loop variables
-					src, dst, port, domain := src, dst, port, domain
-					g.Go(func() error {
-						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-						for n := 0; n < budget; n++ {
-							log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
-
-							request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[src], namespace, url), verbose)
-							if err != nil {
-								return err
-							}
-							if verbose {
-								log.Println(request)
-							}
-							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-							if len(match) > 1 {
-								id := match[1]
-								if verbose {
-									log.Printf("id=%s\n", id)
-								}
-								mu.Lock()
-								out[src] = append(out[src], id)
-								out[dst] = append(out[dst], id)
-								mu.Unlock()
-								return nil
-							}
-
-							// Expected no match
-							if src == "t" && dst == "t" {
-								if verbose {
-									log.Println("Expected no match for t->t")
-								}
-								return nil
-							}
-
+					if parallel {
+						g.Go(makeRequest(src, dst, port, domain, func() bool {
 							select {
 							case <-time.After(time.Second):
 								// try again
 							case <-ctx.Done():
-								return nil
+								return true
 							}
+							return false
+						}))
+					} else {
+						if err := makeRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
+							return err
 						}
-						return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
-					})
+					}
 				}
 			}
 		}
 	}
-	if err := g.Wait(); err != nil {
-		return nil, err
+	if parallel {
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
-	return out, nil
+	return nil
 }
 
-func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
+func checkAccessLogs() error {
 	log.Println("Checking access logs of pods to correlate request IDs...")
 	for n := 0; ; n++ {
 		found := true
@@ -617,7 +697,7 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 			if err != nil {
 				return err
 			}
-			for _, id := range ids[pod] {
+			for _, id := range accessLogs[pod] {
 				if !strings.Contains(access, id) {
 					if verbose {
 						log.Printf("Failed to find request id %s in log of %s\n", id, pod)
@@ -644,7 +724,7 @@ func checkAccessLogs(pods map[string]string, ids map[string][]string) error {
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func verifyRouting(pods map[string]string, src, dst, headerKey, headerVal string,
+func verifyRouting(src, dst, headerKey, headerVal string,
 	samples int, expectedCount map[string]int) error {
 	var mu sync.Mutex
 	count := make(map[string]int)
