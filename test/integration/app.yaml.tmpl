@@ -2,38 +2,42 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: t
+  name: {{.name}}
   labels:
-    app: t
+    app: {{.name}}
 spec:
   ports:
   - port: 80
+    targetPort: {{.port1}}
     name: http
   - port: 8080
+    targetPort: {{.port2}}
     name: http-alternative
   selector:
-    app: t
+    app: {{.name}}
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: t
+  name: {{.name}}
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: t
+        app: {{.name}}
     spec:
       containers:
       - name: app
-        image: {{.hub}}/app:{{.tag}}
+        image: {{.hub}}/app:demo
         args:
           - --port
-          - "80"
+          - "{{.port1}}"
           - --port
-          - "8080"
+          - "{{.port2}}"
+          - --version
+          - "{{.version}}"
         ports:
-        - containerPort: 80
-        - containerPort: 8080
+        - containerPort: {{.port1}}
+        - containerPort: {{.port2}}
 ---

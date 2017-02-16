@@ -45,6 +45,7 @@ spec:
         args:
           - -l 2
           - -m mixer
+          - --logtostderr
         imagePullPolicy: Always
       - name: debug
         image: docker.io/istio/debug:test

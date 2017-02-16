@@ -37,14 +37,14 @@ spec:
     spec:
       containers:
       - name: app
-        image: {{.hub}}/app:{{.tag}}
+        image: {{.hub}}/app:demo
         args:
           - --port
           - "{{.port1}}"
           - --port
           - "{{.port2}}"
           - --version
-          - "unversioned"
+          - "{{.version}}"
         ports:
         - containerPort: {{.port1}}
         - containerPort: {{.port2}}

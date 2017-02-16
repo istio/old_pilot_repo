@@ -70,13 +70,13 @@ var (
 func init() {
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
 		"kube config file or empty for in-cluster")
-	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
+	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-demo",
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "test",
 		"Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
-	flag.BoolVarP(&verbose, "verbose", "v", false,
+	flag.BoolVarP(&verbose, "verbose", "v", true,
 		"Dump proxy logs and request logs")
 }
 
@@ -98,14 +98,14 @@ func main() {
 	}
 
 	// deploy istio-infra
-	deploy("http-discovery", managerDiscovery, namespace)
-	deploy("mixer", mixer, namespace)
-	deploy("istio-egress", egressProxy, namespace)
+	deploy("http-discovery", managerDiscovery, namespace, "8080", "80", "unversioned")
+	deploy("mixer", mixer, namespace, "8080", "80", "unversioned")
+	deploy("istio-egress", egressProxy, namespace, "8080", "80", "unversioned")
 
 	//deploy a healthy mix of apps, with and without proxy
-	deploy("t", app, namespace)
-	deploy("a", appProxyManagerAgent, namespace)
-	deploy("b", appProxyManagerAgent, namespace)
+	deploy("t", app, namespace, "8080", "80", "unversioned")
+	deploy("a", appProxyManagerAgent, namespace, "8080", "80", "unversioned")
+	deploy("b", appProxyManagerAgent, namespace, "80", "8080", "unversioned")
 
 	if err := setupVersionedApp(); err != nil {
 		log.Fatal(err)
@@ -129,7 +129,7 @@ func main() {
 	}
 }
 
-func deploy(svcName, svcType, namespace string) {
+func deploy(svcName, svcType, namespace, port1, port2, version string) {
 	// write template
 	svcConfigFile := svcName + "-" + svcType + ".yaml"
 	var w *bufio.Writer
@@ -145,8 +145,9 @@ func deploy(svcName, svcType, namespace string) {
 		"tag":       tag,
 		"namespace": namespace,
 		"name":      svcName,
-		"port1":     "8080",
-		"port2":     "80",
+		"port1":     port1,
+		"port2":     port2,
+		"version":   version,
 	}, w); err != nil {
 		log.Fatal(err)
 	}
