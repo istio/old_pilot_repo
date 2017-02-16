@@ -12,7 +12,7 @@ while [[ $# -gt 0 ]]; do
         -n) namespace="$2"; shift ;;
         *) # special case for passing empty strings, e.g. -c ""
             if [ "$1" == "" ]; then
-                args=$args" \"\""
+                args=$args" ""\"\"
             else
                 args=$args" $1"
            fi
