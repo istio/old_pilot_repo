@@ -10,7 +10,13 @@ while [[ $# -gt 0 ]]; do
         -h) hub="$2"; shift ;;
         -t) tag="$2"; shift ;;
         -n) namespace="$2"; shift ;;
-         *) args=$args" $1" ;;
+        *) # special case for passing empty strings, e.g. -c ""
+            if [ "$1" == "" ]; then
+                args=$args" \"\""
+            else
+                args=$args" $1"
+           fi
+           ;;
     esac
     shift
 done
