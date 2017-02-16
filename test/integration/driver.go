@@ -74,7 +74,7 @@ func init() {
 
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
 		"kube config file or empty for in-cluster")
-	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-demo",
+	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag (default <username>_YYYMMDD_HHMMSS formatted date)")
@@ -123,8 +123,8 @@ func endToEndTest() error {
 		defer func() {
 			deleteNamespace(client, namespace)
 		}()
-	}
 
+	}
 	// deploy istio-infra
 	deploy("http-discovery", managerDiscovery, namespace, "8080", "80", "unversioned")
 	deploy("mixer", mixer, namespace, "8080", "80", "unversioned")
