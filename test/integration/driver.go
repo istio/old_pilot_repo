@@ -52,7 +52,6 @@ const (
 	egressProxy          = "egress-proxy"
 	app                  = "app"
 	appProxyManagerAgent = "app-proxy-manager-agent"
-	versionedAppYaml     = "versioned-app.yaml"
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )

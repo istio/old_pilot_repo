@@ -58,6 +58,8 @@ spec:
           - sidecar
           - -s
           - manager:8080
+          - -m
+          - mixer:9091
           - -n
           - {{.namespace}}
           - --logtostderr
