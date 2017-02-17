@@ -42,14 +42,14 @@ def presubmit(gitUtils, bazel) {
     stage('Go Build') {
       sh('bin/init.sh')
     }
-    stage('Code Check') {
-      sh('bin/check.sh')
-    }
     stage('Code Coverage') {
       sh('bin/codecov.sh')
-      withCredentials([string(credentialsId: 'istio-testing', variable: 'MANAGER_CODECOV_TOKEN')]) {
-        sh('curl -s https://codecov.io/bash | bash /dev/stdin -t ' + env.MANAGER_CODECOV_TOKEN)
+      withCredentials([string(credentialsId: 'MANAGER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
+        sh('curl -s https://codecov.io/bash | bash')
       }
+    }
+    stage('Code Check') {
+      sh('bin/check.sh')
     }
     stage('Bazel Tests') {
       bazel.test('//...')
