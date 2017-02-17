@@ -45,17 +45,17 @@ def presubmit(gitUtils, bazel) {
     stage('Code Check') {
       sh('bin/check.sh')
     }
-    stage('Bazel Tests') {
-      bazel.test('//...')
-    }
-    stage('Integration Tests') {
-      sh('bin/e2e.sh -t alpha' + gitUtils.GIT_SHA + ' -d --in_cluster_config')
-    }
     stage('Code Coverage') {
       sh('bin/codecov.sh')
       withCredentials([string(credentialsId: 'istio-testing', variable: 'MANAGER_CODECOV_TOKEN')]) {
         sh('curl -s https://codecov.io/bash | bash /dev/stdin -t ' + env.MANAGER_CODECOV_TOKEN)
       }
+    }
+    stage('Bazel Tests') {
+      bazel.test('//...')
+    }
+    stage('Integration Tests') {
+      sh('bin/e2e.sh -t alpha' + gitUtils.GIT_SHA + ' -d --in_cluster_config')
     }
   }
 }
