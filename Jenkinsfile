@@ -45,7 +45,7 @@ def presubmit(gitUtils, bazel) {
     stage('Code Coverage') {
       sh('bin/codecov.sh')
       withCredentials([string(credentialsId: 'MANAGER_CODECOV_TOKEN', variable: 'CODECOV_TOKEN')]) {
-        sh('curl -s https://codecov.io/bash | bash /dev/stdin -K -r istio.io/manager')
+        sh('curl -s https://codecov.io/bash | bash /dev/stdin -K')
       }
     }
     stage('Code Check') {
