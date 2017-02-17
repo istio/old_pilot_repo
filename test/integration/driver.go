@@ -170,14 +170,19 @@ func deploy(svcName, svcType, namespace, port1, port2, version string) error {
 	// write template
 	svcConfigFile := svcName + "-" + svcType + ".yaml"
 	var w *bufio.Writer
-	if f, err := os.Create(svcConfigFile); err != nil {
+	f, err := os.Create(svcConfigFile)
+	if err != nil {
 		return err
-	} else {
-		defer f.Close()
-		w = bufio.NewWriter(f)
 	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Error closing file " + svcConfigFile)
+		}
+	}()
 
-	if err:= write("test/integration/"+svcType+".yaml.tmpl", map[string]string{
+	w = bufio.NewWriter(f)
+
+	if err := write("test/integration/"+svcType+".yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
 		"namespace": namespace,
