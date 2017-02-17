@@ -125,14 +125,14 @@ func setup() {
 	pods = make(map[string]string)
 
 	// deploy istio-infra
-	deploy("http-discovery", managerDiscovery, namespace, "8080", "80", "unversioned")
-	deploy("mixer", mixer, namespace, "8080", "80", "unversioned")
-	deploy("istio-egress", egressProxy, namespace, "8080", "80", "unversioned")
+	check(deploy("http-discovery", managerDiscovery, namespace, "8080", "80", "unversioned"))
+	check(deploy("mixer", mixer, namespace, "8080", "80", "unversioned"))
+	check(deploy("istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
 
 	//deploy a healthy mix of apps, with and without proxy
-	deploy("t", app, namespace, "8080", "80", "unversioned")
-	deploy("a", appProxyManagerAgent, namespace, "8080", "80", "unversioned")
-	deploy("b", appProxyManagerAgent, namespace, "80", "8080", "unversioned")
+	check(deploy("t", app, namespace, "8080", "80", "unversioned"))
+	check(deploy("a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
+	check(deploy("b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
 
 	check(setupVersionedApp())
 
@@ -166,12 +166,12 @@ func teardown() {
 	}
 }
 
-func deploy(svcName, svcType, namespace, port1, port2, version string) {
+func deploy(svcName, svcType, namespace, port1, port2, version string) error {
 	// write template
 	svcConfigFile := svcName + "-" + svcType + ".yaml"
 	var w *bufio.Writer
 	if f, err := os.Create(svcConfigFile); err != nil {
-		log.Fatal(err)
+		return err
 	} else {
 		defer f.Close()
 		w = bufio.NewWriter(f)
@@ -186,14 +186,14 @@ func deploy(svcName, svcType, namespace, port1, port2, version string) {
 		"port2":     port2,
 		"version":   version,
 	}, w); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if err := w.Flush(); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	run("kubectl apply -f " + svcConfigFile + " -n " + namespace)
+	return run("kubectl apply -f " + svcConfigFile + " -n " + namespace)
 }
 
 func setupVersionedApp() error {

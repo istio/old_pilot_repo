@@ -26,8 +26,6 @@ go_binary(
         "manager-discovery.yaml.tmpl",
         "mixer.yaml.tmpl",
         "http-service-versions.yaml.tmpl",
-        "policy-fault-injection.yaml.tmpl",
-        "rule-content-route.yaml.tmpl",
         "rule-default-route.yaml.tmpl",
         "rule-weighted-route.yaml.tmpl",
         "rule-content-route.yaml.tmpl",
