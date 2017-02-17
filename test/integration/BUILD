@@ -21,7 +21,6 @@ go_binary(
     data = [
         "egress-proxy.yaml.tmpl",
         "app.yaml.tmpl",
-        "app-proxy.yaml.tmpl",
         "app-proxy-manager-agent.yaml.tmpl",
         "manager-discovery.yaml.tmpl",
         "mixer.yaml.tmpl",
