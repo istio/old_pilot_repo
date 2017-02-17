@@ -25,7 +25,6 @@ go_binary(
         "app-proxy-manager-agent.yaml.tmpl",
         "manager-discovery.yaml.tmpl",
         "mixer.yaml.tmpl",
-        "http-service-versions.yaml.tmpl",
         "rule-default-route.yaml.tmpl",
         "rule-weighted-route.yaml.tmpl",
         "rule-content-route.yaml.tmpl",

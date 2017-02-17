@@ -125,16 +125,18 @@ func setup() {
 	pods = make(map[string]string)
 
 	// deploy istio-infra
-	check(deploy("http-discovery", managerDiscovery, namespace, "8080", "80", "unversioned"))
-	check(deploy("mixer", mixer, namespace, "8080", "80", "unversioned"))
-	check(deploy("istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
+	check(deploy("http-discovery", "http-discovery", managerDiscovery, namespace,
+		"8080", "80", "unversioned"))
+	check(deploy("mixer", "mixer", mixer, namespace, "8080", "80", "unversioned"))
+	check(deploy("istio-egress", "istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
 
 	//deploy a healthy mix of apps, with and without proxy
-	check(deploy("t", app, namespace, "8080", "80", "unversioned"))
-	check(deploy("a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
-	check(deploy("b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
-
-	check(setupVersionedApp())
+	check(deploy("t", "t", app, namespace, "8080", "80", "unversioned"))
+	check(deploy("a", "a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
+	check(deploy("b", "b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
+	check(deploy("hello", "hello", appProxyManagerAgent, namespace, "8080", "80", "v1"))
+	check(deploy("world-v1", "world", appProxyManagerAgent, namespace, "80", "8000", "v1"))
+	check(deploy("world-v2", "world", appProxyManagerAgent, namespace, "80", "8000", "v2"))
 
 	check(setPods())
 
@@ -166,27 +168,28 @@ func teardown() {
 	}
 }
 
-func deploy(svcName, svcType, namespace, port1, port2, version string) error {
+func deploy(name, svcName, dType, namespace, port1, port2, version string) error {
 	// write template
-	svcConfigFile := svcName + "-" + svcType + ".yaml"
+	configFile := name + "-" + dType + ".yaml"
 	var w *bufio.Writer
-	f, err := os.Create(svcConfigFile)
+	f, err := os.Create(configFile)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Printf("Error closing file " + svcConfigFile)
+			log.Printf("Error closing file " + configFile)
 		}
 	}()
 
 	w = bufio.NewWriter(f)
 
-	if err := write("test/integration/"+svcType+".yaml.tmpl", map[string]string{
+	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
 		"namespace": namespace,
-		"name":      svcName,
+		"service":   svcName,
+		"name":      name,
 		"port1":     port1,
 		"port2":     port2,
 		"version":   version,
@@ -198,64 +201,7 @@ func deploy(svcName, svcType, namespace, port1, port2, version string) error {
 		return err
 	}
 
-	return run("kubectl apply -f " + svcConfigFile + " -n " + namespace)
-}
-
-func setupVersionedApp() error {
-	// write template
-	f, err := os.Create(versionedAppYaml)
-	if err != nil {
-		return err
-	}
-	w := bufio.NewWriter(f)
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "hello",
-		"service":   "hello",
-		"port1":     "8080",
-		"port2":     "80",
-		"version":   "v1",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "world-v1",
-		"service":   "world",
-		"port1":     "80",
-		"port2":     "8000",
-		"version":   "v1",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "world-v2",
-		"service":   "world",
-		"port1":     "80",
-		"port2":     "8000",
-		"version":   "v2",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return run("kubectl apply -f " + versionedAppYaml + " -n " + namespace)
+	return run("kubectl apply -f " + configFile + " -n " + namespace)
 }
 
 func testBasicReachability() error {
