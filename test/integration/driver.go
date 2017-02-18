@@ -57,14 +57,16 @@ const (
 )
 
 var (
-	kubeconfig      string
-	inClusterConfig bool
-	hub             string
-	tag             string
-	namespace       string
-	verbose         bool
-	norouting       bool
-	parallel        bool
+	kubeconfig       string
+	inClusterConfig  bool
+	hub              string
+	tag              string
+	mixerTag         string
+	namespace        string
+	verbose          bool
+	norouting        bool
+	parallel         bool
+	cleanupNameSpace bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -88,6 +90,8 @@ func init() {
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
+	flag.StringVarP(&mixerTag, "mixerTag", "", "latest",
+		"Mixer Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.BoolVarP(&verbose, "dump", "d", false,
@@ -119,8 +123,10 @@ func setup() {
 		if namespace, err = generateNamespace(client); err != nil {
 			check(err)
 		}
-	}
+	} else {
+		assertExistsNamespace(client, namespace)
 
+	}
 	pods = make(map[string]string)
 
 	// deploy istio-infra
@@ -142,6 +148,24 @@ func setup() {
 	accessLogs = make(map[string][]string)
 	for app := range pods {
 		accessLogs[app] = make([]string, 0)
+	}
+
+}
+
+func assertExistsNamespace(cl *kubernetes.Clientset, ns string) {
+	if nl, err := cl.Core().Namespaces().List(v1.ListOptions{}); err != nil {
+		check(err)
+	} else {
+		found := false
+		for _, ns := range nl.Items {
+			if ns.GetName() == namespace {
+				found = true
+				break
+			}
+		}
+		if !found {
+			check(fmt.Errorf("namespace \"%s\" not found, create it before running.", ns))
+		}
 	}
 
 }
@@ -186,6 +210,7 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
+		"mixerTag":  mixerTag,
 		"namespace": namespace,
 		"service":   svcName,
 		"name":      name,
@@ -763,6 +788,7 @@ func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal
 }
 
 func generateNamespace(cl *kubernetes.Clientset) (string, error) {
+
 	ns, err := cl.Core().Namespaces().Create(&v1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "istio-integration-",
@@ -772,10 +798,15 @@ func generateNamespace(cl *kubernetes.Clientset) (string, error) {
 		return "", err
 	}
 	log.Printf("Created namespace %s\n", ns.Name)
+	cleanupNameSpace = true
 	return ns.Name, nil
 }
 
 func deleteNamespace(cl *kubernetes.Clientset, ns string) {
+	// do not cleanup namespace that we did not create
+	if !cleanupNameSpace {
+		return
+	}
 	if cl != nil && ns != "" && ns != "default" {
 		if err := cl.Core().Namespaces().Delete(ns, &v1.DeleteOptions{}); err != nil {
 			log.Printf("Error deleting namespace: %v\n", err)
