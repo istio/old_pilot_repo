@@ -47,9 +47,11 @@ import (
 )
 
 const (
-	managerYaml      = "manager.yaml"
-	simpleAppYaml    = "simple-app.yaml"
-	versionedAppYaml = "versioned-app.yaml"
+	managerDiscovery     = "manager-discovery"
+	mixer                = "mixer"
+	egressProxy          = "egress-proxy"
+	app                  = "app"
+	appProxyManagerAgent = "app-proxy-manager-agent"
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
 )
@@ -106,7 +108,6 @@ func main() {
 
 func setup() {
 	if tag == "" {
-		teardown()
 		log.Fatal("No docker tag specified with -t or --tag")
 	}
 	log.Printf("hub %v, tag %v", hub, tag)
@@ -122,9 +123,20 @@ func setup() {
 
 	pods = make(map[string]string)
 
-	check(setupManager())
-	check(setupSimpleApp())
-	check(setupVersionedApp())
+	// deploy istio-infra
+	check(deploy("http-discovery", "http-discovery", managerDiscovery, namespace,
+		"8080", "80", "unversioned"))
+	check(deploy("mixer", "mixer", mixer, namespace, "8080", "80", "unversioned"))
+	check(deploy("istio-egress", "istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
+
+	//deploy a healthy mix of apps, with and without proxy
+	check(deploy("t", "t", app, namespace, "8080", "80", "unversioned"))
+	check(deploy("a", "a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
+	check(deploy("b", "b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
+	check(deploy("hello", "hello", appProxyManagerAgent, namespace, "8080", "80", "v1"))
+	check(deploy("world-v1", "world", appProxyManagerAgent, namespace, "80", "8000", "v1"))
+	check(deploy("world-v2", "world", appProxyManagerAgent, namespace, "80", "8000", "v2"))
+
 	check(setPods())
 
 	accessLogs = make(map[string][]string)
@@ -155,18 +167,31 @@ func teardown() {
 	}
 }
 
-func setupManager() error {
+func deploy(name, svcName, dType, namespace, port1, port2, version string) error {
 	// write template
-	f, err := os.Create(managerYaml)
+	configFile := name + "-" + dType + ".yaml"
+	var w *bufio.Writer
+	f, err := os.Create(configFile)
 	if err != nil {
 		return err
 	}
-	w := bufio.NewWriter(f)
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Error closing file " + configFile)
+		}
+	}()
 
-	if err := write("test/integration/manager.yaml.tmpl", map[string]string{
+	w = bufio.NewWriter(f)
+
+	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
 		"hub":       hub,
 		"tag":       tag,
 		"namespace": namespace,
+		"service":   svcName,
+		"name":      name,
+		"port1":     port1,
+		"port2":     port2,
+		"version":   version,
 	}, w); err != nil {
 		return err
 	}
@@ -174,116 +199,8 @@ func setupManager() error {
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	if err := f.Close(); err != nil {
-		return err
-	}
 
-	return run("kubectl apply -f " + managerYaml + " -n " + namespace)
-}
-
-func setupSimpleApp() error {
-	// write template
-	f, err := os.Create(simpleAppYaml)
-	if err != nil {
-		return err
-	}
-	w := bufio.NewWriter(f)
-
-	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "a",
-		"port1":     "8080",
-		"port2":     "80",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "b",
-		"port1":     "80",
-		"port2":     "8000",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/external-services.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-	}, w); err != nil {
-		return err
-	}
-
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return run("kubectl apply -f " + simpleAppYaml + " -n " + namespace)
-}
-
-func setupVersionedApp() error {
-	// write template
-	f, err := os.Create(versionedAppYaml)
-	if err != nil {
-		return err
-	}
-	w := bufio.NewWriter(f)
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "hello",
-		"service":   "hello",
-		"port1":     "8080",
-		"port2":     "80",
-		"version":   "v1",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "world-v1",
-		"service":   "world",
-		"port1":     "80",
-		"port2":     "8000",
-		"version":   "v1",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := write("test/integration/http-service-versions.yaml.tmpl", map[string]string{
-		"hub":       hub,
-		"tag":       tag,
-		"namespace": namespace,
-		"name":      "world-v2",
-		"service":   "world",
-		"port1":     "80",
-		"port2":     "8000",
-		"version":   "v2",
-	}, w); err != nil {
-		return err
-	}
-
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return run("kubectl apply -f " + versionedAppYaml + " -n " + namespace)
+	return run("kubectl apply -f " + configFile + " -n " + namespace)
 }
 
 func testBasicReachability() error {
@@ -324,14 +241,21 @@ func testRouting() error {
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	if err := addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace); err != nil {
+
+	epoch, err := getRestartEpoch("hello")
+	if err != nil {
 		return err
 	}
 
-	// TODO: eliminate this wait
-	time.Sleep(time.Second * 10)
+	if err = addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace); err != nil {
+		return err
+	}
 
-	if err := verifyRouting("hello", "world", "", "",
+	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
+		return err
+	}
+
+	if err = verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 100,
 			"v2": 0,
@@ -345,24 +269,31 @@ func testRouting() error {
 	var weightedRoute bytes.Buffer
 	w = bufio.NewWriter(&weightedRoute)
 
-	if err := write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
+	if err = write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "world",
 		"namespace":   namespace,
 	}, w); err != nil {
 		return err
 	}
 
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace); err != nil {
+	if err = w.Flush(); err != nil {
 		return err
 	}
 
-	// TODO: eliminate this wait
-	time.Sleep(time.Second * 15)
+	epoch, err = getRestartEpoch("hello")
+	if err != nil {
+		return err
+	}
 
-	if err := verifyRouting("hello", "world", "", "",
+	if err = addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace); err != nil {
+		return err
+	}
+
+	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
+		return err
+	}
+
+	if err = verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
@@ -376,24 +307,31 @@ func testRouting() error {
 	var contentRoute bytes.Buffer
 	w = bufio.NewWriter(&contentRoute)
 
-	if err := write("test/integration/rule-content-route.yaml.tmpl", map[string]string{
+	if err = write("test/integration/rule-content-route.yaml.tmpl", map[string]string{
 		"destination": "world",
 		"namespace":   namespace,
 	}, w); err != nil {
 		return err
 	}
 
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := addRule(contentRoute.Bytes(), model.RouteRule, "content-route", namespace); err != nil {
+	if err = w.Flush(); err != nil {
 		return err
 	}
 
-	// TODO: eliminate this wait
-	time.Sleep(time.Second * 15)
+	epoch, err = getRestartEpoch("hello")
+	if err != nil {
+		return err
+	}
 
-	if err := verifyRouting("hello", "world", "version", "v2",
+	if err = addRule(contentRoute.Bytes(), model.RouteRule, "content-route", namespace); err != nil {
+		return err
+	}
+
+	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
+		return err
+	}
+
+	if err = verifyRouting("hello", "world", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
@@ -407,29 +345,73 @@ func testRouting() error {
 	var faultPolicy bytes.Buffer
 	w = bufio.NewWriter(&faultPolicy)
 
-	if err := write("test/integration/policy-fault-injection.yaml.tmpl", map[string]string{
+	if err = write("test/integration/policy-fault-injection.yaml.tmpl", map[string]string{
 		"destination": "world",
 		"namespace":   namespace,
 	}, w); err != nil {
 		return err
 	}
 
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	if err := addRule(faultPolicy.Bytes(), model.Destination, "fault-policy", namespace); err != nil {
+	if err = w.Flush(); err != nil {
 		return err
 	}
 
-	// TODO: eliminate this wait
-	time.Sleep(time.Second * 15)
+	epoch, err = getRestartEpoch("hello")
+	if err != nil {
+		return err
+	}
 
-	if err := verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503); err != nil {
+	if err = addRule(faultPolicy.Bytes(), model.Destination, "fault-policy", namespace); err != nil {
+		return err
+	}
+
+	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
+		return err
+	}
+
+	if err = verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503); err != nil {
 		return err
 	}
 	log.Println("Success!")
 
 	return nil
+}
+
+func waitForNewRestartEpoch(pod string, start int) error {
+	log.Println("Waiting for Envoy restart epoch to increment...")
+	for n := 0; n < budget; n++ {
+		current, err := getRestartEpoch(pod)
+		if err != nil {
+			log.Printf("Could not obtain Envoy restart epoch for %s: %v", pod, err)
+		}
+
+		if current > start {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("exceeded budget for waiting for envoy restart epoch to increment")
+}
+
+// getRestartEpoch gets the current restart epoch of a pod by calling the Envoy admin API.
+func getRestartEpoch(pod string) (int, error) {
+	url := "http://localhost:5000/server_info"
+	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], namespace, url)
+	out, err := shell(cmd, true)
+	if err != nil {
+		return 0, err
+	}
+
+	// Response body is of the form: envoy 267724/RELEASE live 1571 1571 0
+	// The last value is the restart epoch.
+	match := regexp.MustCompile(`envoy .+/\w+ \w+ \d+ \d+ (\d+)`).FindStringSubmatch(out)
+	if len(match) > 1 {
+		epoch, err := strconv.ParseInt(match[1], 10, 32)
+		return int(epoch), err
+	}
+
+	return 0, fmt.Errorf("could not obtain envoy restart epoch")
 }
 
 func addRule(ruleConfig []byte, kind string, name string, namespace string) error {
