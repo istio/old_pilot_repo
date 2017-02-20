@@ -5,6 +5,10 @@ tag=$(whoami)_$(date +%Y%m%d_%H%M%S)
 namespace=""
 debug_suffix=""
 
+# manager is known to work with this mixer build
+# update manually
+mixerTag="ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e"
+
 args=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -21,16 +25,18 @@ done
 [[ ! -z "$hub" ]]       && args=$args" -h $hub"
 [[ ! -z "$namespace" ]] && args=$args" -n $namespace"
 
+args=$args" --mixerTag $mixerTag"
+
 set -ex
 
 if [[ "$hub" =~ ^gcr\.io ]]; then
-    gcloud docker --authorize-only
+	gcloud docker --authorize-only
 fi
 
 for image in app init runtime; do
-    bazel run //docker:$image$debug_suffix
-    docker tag istio/docker:$image$debug_suffix $hub/$image:$tag
-    docker push $hub/$image:$tag
+	bazel run //docker:$image$debug_suffix
+	docker tag istio/docker:$image$debug_suffix $hub/$image:$tag
+	docker push $hub/$image:$tag
 done
 
-bazel run //test/integration -- $args --norouting
+bazel $BAZEL_ARGS run //test/integration -- $args --norouting

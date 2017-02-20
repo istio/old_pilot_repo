@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -66,7 +67,7 @@ var (
 	verbose          bool
 	norouting        bool
 	parallel         bool
-	cleanupNameSpace bool
+	nameSpaceCreated bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -90,7 +91,7 @@ func init() {
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
-	flag.StringVarP(&mixerTag, "mixerTag", "", "latest",
+	flag.StringVarP(&mixerTag, "mixerTag", "", "",
 		"Mixer Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
@@ -114,6 +115,9 @@ func setup() {
 	if tag == "" {
 		log.Fatal("No docker tag specified with -t or --tag")
 	}
+	if mixerTag == "" {
+		log.Fatal("No mixer tag specified with --mixerTag, 'latest?'")
+	}
 	log.Printf("hub %v, tag %v", hub, tag)
 
 	check(setupClient())
@@ -124,7 +128,7 @@ func setup() {
 			check(err)
 		}
 	} else {
-		assertExistsNamespace(client, namespace)
+		assertNamespaceExists(client, namespace)
 
 	}
 	pods = make(map[string]string)
@@ -152,22 +156,10 @@ func setup() {
 
 }
 
-func assertExistsNamespace(cl *kubernetes.Clientset, ns string) {
-	if nl, err := cl.Core().Namespaces().List(v1.ListOptions{}); err != nil {
+func assertNamespaceExists(cl *kubernetes.Clientset, name string) {
+	if _, err := cl.Core().Namespaces().Get(name, meta_v1.GetOptions{}); err != nil {
 		check(err)
-	} else {
-		found := false
-		for _, ns := range nl.Items {
-			if ns.GetName() == namespace {
-				found = true
-				break
-			}
-		}
-		if !found {
-			check(fmt.Errorf("namespace \"%s\" not found, create it before running.", ns))
-		}
 	}
-
 }
 
 // check function correctly cleans up on failure
@@ -185,7 +177,7 @@ func teardown() {
 		dumpProxyLogs(pods["a"])
 		dumpProxyLogs(pods["b"])
 	}
-	if namespace != "" && namespace != "default" {
+	if nameSpaceCreated {
 		deleteNamespace(client, namespace)
 		namespace = ""
 	}
@@ -798,15 +790,11 @@ func generateNamespace(cl *kubernetes.Clientset) (string, error) {
 		return "", err
 	}
 	log.Printf("Created namespace %s\n", ns.Name)
-	cleanupNameSpace = true
+	nameSpaceCreated = true
 	return ns.Name, nil
 }
 
 func deleteNamespace(cl *kubernetes.Clientset, ns string) {
-	// do not cleanup namespace that we did not create
-	if !cleanupNameSpace {
-		return
-	}
 	if cl != nil && ns != "" && ns != "default" {
 		if err := cl.Core().Namespaces().Delete(ns, &v1.DeleteOptions{}); err != nil {
 			log.Printf("Error deleting namespace: %v\n", err)
