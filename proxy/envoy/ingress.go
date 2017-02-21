@@ -281,4 +281,3 @@ func extractPortAndTags(dst *config.DestinationWeight) (*model.Port, model.Tags,
 
 	return port, tags, nil
 }
-
