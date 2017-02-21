@@ -91,7 +91,8 @@ func init() {
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
-	flag.StringVarP(&mixerTag, "mixerTag", "", "",
+	// manually update default mixer build tag.
+	flag.StringVarP(&mixerTag, "mixerTag", "", "ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e",
 		"Mixer Docker tag")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
