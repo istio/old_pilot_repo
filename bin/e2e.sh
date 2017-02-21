@@ -1,7 +1,6 @@
 #!/bin/bash
 
 hub="gcr.io/istio-testing"
-tag=$(whoami)_$(date +%Y%m%d_%H%M%S)
 namespace=""
 debug_suffix=""
 
@@ -23,6 +22,24 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+set -ex
+
+
+if [[ -z $SKIP_BUILD ]];then
+	if [[ -z $tag ]];then
+		# generate tag if performing a build.
+		tag=$(whoami)_$(date +%Y%m%d_%H%M%S)
+	fi
+	if [[ "$hub" =~ ^gcr\.io ]]; then
+		gcloud docker --authorize-only
+	fi
+	for image in app init runtime; do
+		bazel $BAZEL_ARGS run //docker:$image$debug_suffix
+		docker tag istio/docker:$image$debug_suffix $hub/$image:$tag
+		docker push $hub/$image:$tag
+	done
+fi
+
 [[ ! -z "$tag" ]]       && args=$args" -t $tag"
 [[ ! -z "$hub" ]]       && args=$args" -h $hub"
 [[ ! -z "$namespace" ]] && args=$args" -n $namespace"
@@ -30,18 +47,5 @@ done
 # mixerTag will never be empty
 args=$args" --mixerTag $mixerTag"
 
-set -ex
-
-
-if [[ -z $SKIP_BUILD ]];then
-	if [[ "$hub" =~ ^gcr\.io ]]; then
-		gcloud docker --authorize-only
-	fi
-	for image in app init runtime; do
-		bazel run //docker:$image$debug_suffix
-		docker tag istio/docker:$image$debug_suffix $hub/$image:$tag
-		docker push $hub/$image:$tag
-	done
-fi
 
 bazel $BAZEL_ARGS run //test/integration -- $args --norouting
