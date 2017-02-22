@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "driver.go",
         "reachability.go",
+        "routing.go",
     ],
     deps = [
         "//model:go_default_library",

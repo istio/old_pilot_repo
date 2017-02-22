@@ -17,7 +17,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,7 +25,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -35,7 +33,6 @@ import (
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 	"github.com/ghodss/yaml"
-	"github.com/golang/sync/errgroup"
 	flag "github.com/spf13/pflag"
 
 	"istio.io/manager/model"
@@ -63,7 +60,6 @@ var (
 	mixerImage string
 	namespace  string
 	verbose    bool
-	norouting  bool
 	parallel   bool
 
 	client      *kubernetes.Clientset
@@ -89,8 +85,6 @@ func init() {
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.BoolVarP(&verbose, "dump", "d", false,
 		"Dump proxy logs and request logs")
-	flag.BoolVar(&norouting, "norouting", false,
-		"Disable route rule tests")
 	flag.BoolVar(&parallel, "parallel", true,
 		"Run requests in parallel")
 }
@@ -154,8 +148,7 @@ func check(err error) {
 // teardown removes resources
 func teardown() {
 	if verbose {
-		dumpProxyLogs(pods["a"])
-		dumpProxyLogs(pods["b"])
+		log.Print(podLogs(pods["a"], "proxy"))
 	}
 	if nameSpaceCreated {
 		deleteNamespace(client, namespace)
@@ -200,163 +193,6 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 	return run("kubectl apply -f " + configFile + " -n " + namespace)
 }
 
-func testRouting() error {
-	if norouting {
-		return nil
-	}
-
-	// First test default routing
-	// Create a bytes buffer to hold the YAML form of rules
-	log.Println("Routing all traffic to world-v1 and verifying..")
-	var defaultRoute bytes.Buffer
-	w := bufio.NewWriter(&defaultRoute)
-
-	if err := write("test/integration/rule-default-route.yaml.tmpl", map[string]string{
-		"destination": "world",
-		"namespace":   namespace,
-	}, w); err != nil {
-		return err
-	}
-
-	if err := w.Flush(); err != nil {
-		return err
-	}
-
-	epoch, err := getRestartEpoch("hello")
-	if err != nil {
-		return err
-	}
-
-	if err = addRule(defaultRoute.Bytes(), model.RouteRule, "default-route", namespace); err != nil {
-		return err
-	}
-
-	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
-		return err
-	}
-
-	if err = verifyRouting("hello", "world", "", "",
-		100, map[string]int{
-			"v1": 100,
-			"v2": 0,
-		}); err != nil {
-		return err
-	}
-	log.Println("Success!")
-
-	log.Println("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
-	// Create a bytes buffer to hold the YAML form of rules
-	var weightedRoute bytes.Buffer
-	w = bufio.NewWriter(&weightedRoute)
-
-	if err = write("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
-		"destination": "world",
-		"namespace":   namespace,
-	}, w); err != nil {
-		return err
-	}
-
-	if err = w.Flush(); err != nil {
-		return err
-	}
-
-	epoch, err = getRestartEpoch("hello")
-	if err != nil {
-		return err
-	}
-
-	if err = addRule(weightedRoute.Bytes(), model.RouteRule, "weighted-route", namespace); err != nil {
-		return err
-	}
-
-	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
-		return err
-	}
-
-	if err = verifyRouting("hello", "world", "", "",
-		100, map[string]int{
-			"v1": 75,
-			"v2": 25,
-		}); err != nil {
-		return err
-	}
-	log.Println("Success!")
-
-	log.Println("Routing 100 percent to world-v2 using header based routing and verifying..")
-	// Create a bytes buffer to hold the YAML form of rules
-	var contentRoute bytes.Buffer
-	w = bufio.NewWriter(&contentRoute)
-
-	if err = write("test/integration/rule-content-route.yaml.tmpl", map[string]string{
-		"destination": "world",
-		"namespace":   namespace,
-	}, w); err != nil {
-		return err
-	}
-
-	if err = w.Flush(); err != nil {
-		return err
-	}
-
-	epoch, err = getRestartEpoch("hello")
-	if err != nil {
-		return err
-	}
-
-	if err = addRule(contentRoute.Bytes(), model.RouteRule, "content-route", namespace); err != nil {
-		return err
-	}
-
-	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
-		return err
-	}
-
-	if err = verifyRouting("hello", "world", "version", "v2",
-		100, map[string]int{
-			"v1": 0,
-			"v2": 100,
-		}); err != nil {
-		return err
-	}
-	log.Println("Success!")
-
-	log.Println("Testing fault injection..")
-	// Create a bytes buffer to hold the YAML form of rules
-	var faultPolicy bytes.Buffer
-	w = bufio.NewWriter(&faultPolicy)
-
-	if err = write("test/integration/policy-fault-injection.yaml.tmpl", map[string]string{
-		"destination": "world",
-		"namespace":   namespace,
-	}, w); err != nil {
-		return err
-	}
-
-	if err = w.Flush(); err != nil {
-		return err
-	}
-
-	epoch, err = getRestartEpoch("hello")
-	if err != nil {
-		return err
-	}
-
-	if err = addRule(faultPolicy.Bytes(), model.Destination, "fault-policy", namespace); err != nil {
-		return err
-	}
-
-	if err = waitForNewRestartEpoch("hello", epoch); err != nil {
-		return err
-	}
-
-	if err = verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503); err != nil {
-		return err
-	}
-	log.Println("Success!")
-
-	return nil
-}
-
 func waitForNewRestartEpoch(pod string, start int) error {
 	log.Println("Waiting for Envoy restart epoch to increment...")
 	for n := 0; n < budget; n++ {
@@ -394,29 +230,28 @@ func getRestartEpoch(pod string) (int, error) {
 	return 0, fmt.Errorf("could not obtain envoy restart epoch")
 }
 
-func addRule(ruleConfig []byte, kind string, name string, namespace string) error {
-
-	out, err := yaml.YAMLToJSON(ruleConfig)
-	if err != nil {
-		return fmt.Errorf("Cannot convert YAML rule to JSON: %v", err)
-	}
-
+func addConfig(config []byte, kind, name, namespace string) {
+	log.Println("add config: %s", string(config))
+	out, err := yaml.YAMLToJSON(config)
+	check(err)
 	istioKind, ok := model.IstioConfig[kind]
 	if !ok {
-		return fmt.Errorf("Invalid kind %s", kind)
+		check(fmt.Errorf("Invalid kind %s", kind))
 	}
 	v, err := istioKind.FromJSON(string(out))
-	if err != nil {
-		return fmt.Errorf("Cannot parse proto message from JSON: %v", err)
-	}
-
-	err = istioClient.Put(model.Key{
+	check(err)
+	check(istioClient.Put(model.Key{
 		Kind:      kind,
 		Name:      name,
 		Namespace: namespace,
-	}, v)
+	}, v))
+}
 
-	return err
+func deployConfig(config []byte, kind, name, namespace string, envoy string) {
+	epoch, err := getRestartEpoch(envoy)
+	check(err)
+	addConfig(config, kind, name, namespace)
+	check(waitForNewRestartEpoch(envoy, epoch))
 }
 
 func write(in string, data map[string]string, out io.Writer) error {
@@ -428,6 +263,20 @@ func write(in string, data map[string]string, out io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func writeString(in string, data map[string]string) ([]byte, error) {
+	var bytes bytes.Buffer
+	w := bufio.NewWriter(&bytes)
+	if err := write(in, data, w); err != nil {
+		return nil, err
+	}
+
+	if err := w.Flush(); err != nil {
+		return nil, err
+	}
+
+	return bytes.Bytes(), nil
 }
 
 func run(command string) error {
@@ -491,7 +340,7 @@ func setPods() error {
 
 		if n > budget {
 			for _, pod := range items {
-				dumpProxyLogs(pod.Name)
+				log.Print(podLogs(pod.Name, "proxy"))
 			}
 			return fmt.Errorf("exceeded budget for checking pod status")
 		}
@@ -508,107 +357,18 @@ func setPods() error {
 	return nil
 }
 
-func dumpProxyLogs(name string) {
+// podLogs gets pod logs by container
+func podLogs(name string, container string) string {
 	log.Println("Pod proxy logs", name)
 	raw, err := client.Pods(namespace).
-		GetLogs(name, &v1.PodLogOptions{Container: "proxy"}).
+		GetLogs(name, &v1.PodLogOptions{Container: container}).
 		Do().Raw()
 	if err != nil {
 		log.Println("Request error", err)
-	} else {
-		log.Println(string(raw))
-	}
-}
-
-// verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func verifyRouting(src, dst, headerKey, headerVal string,
-	samples int, expectedCount map[string]int) error {
-	var mu sync.Mutex
-	count := make(map[string]int)
-	for version := range expectedCount {
-		count[version] = 0
+		return ""
 	}
 
-	url := fmt.Sprintf("http://%s/%s", dst, src)
-	log.Printf("Making %d requests (%s) from %s...\n", samples, url, src)
-
-	var g errgroup.Group
-	for i := 0; i < samples; i++ {
-		cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s", pods[src], namespace, url, headerKey, headerVal)
-		g.Go(func() error {
-			request, err := shell(cmd, false)
-			if err != nil {
-				return err
-			}
-			if verbose {
-				log.Println(request)
-			}
-			match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 {
-				id := match[1]
-				mu.Lock()
-				count[id]++
-				mu.Unlock()
-			}
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	epsilon := 5
-
-	var failures int
-	for version, expected := range expectedCount {
-		if count[version] > expected+epsilon || count[version] < expected-epsilon {
-			log.Printf("Expected %v requests (+/-%v) to reach %s => Got %v\n", expected, epsilon, version, count[version])
-			failures++
-		}
-	}
-
-	if failures > 0 {
-		return errors.New("routing verification failed")
-	}
-	return nil
-}
-
-// verifyFaultInjection verifies if the fault filter was setup properly
-func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal string,
-	respTime time.Duration, respCode int) error {
-
-	url := fmt.Sprintf("http://%s/%s", dst, src)
-	log.Printf("Making 1 request (%s) from %s...\n", url, src)
-	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s", pods[src], namespace, url, headerKey, headerVal)
-
-	start := time.Now()
-	request, err := shell(cmd, false)
-	elapsed := time.Since(start)
-	if err != nil {
-		return err
-	}
-	if verbose {
-		log.Println(request)
-	}
-
-	match := regexp.MustCompile("StatusCode=(.*)").FindStringSubmatch(request)
-	statusCode := 0
-	if len(match) > 1 {
-		statusCode, err = strconv.Atoi(match[1])
-		if err != nil {
-			statusCode = -1
-		}
-	}
-
-	// +/- 1s variance
-	epsilon := time.Second * 2
-	log.Printf("Response time is %s with status code %d\n", elapsed, statusCode)
-	log.Printf("Expected response time is %s +/- %s with status code %d\n", respTime, epsilon, respCode)
-	if elapsed > respTime+epsilon || elapsed < respTime-epsilon || respCode != statusCode {
-		return errors.New("fault injection verification failed")
-	}
-	return nil
+	return string(raw)
 }
 
 func generateNamespace(cl *kubernetes.Clientset) (string, error) {
