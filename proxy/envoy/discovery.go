@@ -22,12 +22,16 @@ import (
 	"github.com/golang/glog"
 
 	"istio.io/manager/model"
+	"sort"
 )
 
 // DiscoveryService publishes services, clusters, and routes for proxies
 type DiscoveryService struct {
+	mesh *MeshConfig
+	addrs map[string]bool
 	services model.ServiceDiscovery
 	server   *http.Server
+	registry *model.IstioRegistry
 }
 
 type hosts struct {
@@ -43,13 +47,23 @@ type host struct {
 }
 
 type clusters struct {
-	Clusters []Cluster `json:"clusters"`
+	Clusters []*Cluster `json:"clusters"`
+}
+
+type virtualHosts struct {
+	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(services model.ServiceDiscovery, port int) *DiscoveryService {
+func NewDiscoveryService(services model.ServiceDiscovery, registry *model.IstioRegistry, identity *ProxyNode, port int) *DiscoveryService {
+	addrs := make(map[string]bool)
+	if identity.IP != "" {
+		addrs[identity.IP] = true
+	}
+	glog.V(2).Infof("Local instance address: %#v", addrs)
 	out := &DiscoveryService{
 		services: services,
+		registry: registry,
 	}
 	container := restful.NewContainer()
 	out.Register(container)
@@ -71,9 +85,17 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		GET("/v1/clusters/{service-cluster}/{service-node}").
 		To(ds.ListClusters).
 		Doc("CDS registration").
-		Param(ws.PathParameter("service-cluster", "").DataType("string")).
-		Param(ws.PathParameter("service-node", "").DataType("string")).
+		Param(ws.PathParameter("service-cluster", "service cluster").DataType("string")).
+		Param(ws.PathParameter("service-node", "service node").DataType("string")).
 		Writes(clusters{}))
+	ws.Route(ws.
+		GET("/v1/routes/{route-config-name}/{service-cluster}/{service-node}").
+		To(ds.ListHosts).
+		Doc("RDS registration").
+		Param(ws.PathParameter("route-config-name", "route configuration name").DataType("string")).
+		Param(ws.PathParameter("service-cluster", "service cluster").DataType("string")).
+		Param(ws.PathParameter("service-node", "service node").DataType("string")).
+		Writes(virtualHosts{}))
 	container.Add(ws)
 }
 
@@ -103,11 +125,69 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 
 // ListClusters responds to CDS requests
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
-	_ = ds.services.Services()
-	// TODO: fix this
-	/*
-		if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {
-			glog.Warning(err)
+	routeConfigs := ds.buildRouteConfigs()
+
+	// collect clusters
+	out := make(Clusters, 0)
+	for _, routeConfig := range routeConfigs {
+		out = append(out, routeConfig.clusters()...)
+	}
+
+	if err := response.WriteEntity(clusters{out}); err != nil {
+		glog.Warning(err)
+	}
+}
+
+// ListHosts responds to RDS requests
+func (ds *DiscoveryService) ListHosts(request *restful.Request, response *restful.Response) {
+	key := request.PathParameter("route-config-name")
+
+	port, err := strconv.ParseInt(key, 10, 32)
+	if err != nil {
+		glog.Warning(err)
+		response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// TODO: this is very inefficient, since we only care about specific port
+	routeConfigs := ds.buildRouteConfigs()
+
+	var out []*VirtualHost
+	if routeConfig, exists := routeConfigs[int(port)]; exists {
+		out = routeConfig.VirtualHosts
+		sort.Sort(HostsByName(out))
+	}
+
+	if err := response.WriteEntity(virtualHosts{out}); err != nil {
+		glog.Warning(err)
+	}
+}
+
+// TODO: de-duplicate this code.
+// TODO: move logic out of the API
+func (ds *DiscoveryService) buildRouteConfigs() HTTPRouteConfigs {
+	services := ds.services.Services()
+	instances := ds.services.HostInstances(ds.addrs)
+
+	outbound := buildOutboundFilters(instances, services, ds.registry, ds.mesh)
+	inbound := buildInboundFilters(instances)
+
+	// merge the two sets of route configs
+	routeConfigs := make(HTTPRouteConfigs)
+	for port, routeConfig := range inbound {
+		routeConfigs[port] = routeConfig
+	}
+
+	for port, outgoing := range outbound {
+		if incoming, ok := routeConfigs[port]; ok {
+			// If the traffic is sent to a service that has instances co-located with the proxy,
+			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
+			// Note that this may not be a problem if the service port and its endpoint port are distinct.
+			routeConfigs[port] = incoming.merge(outgoing)
+		} else {
+			routeConfigs[port] = outgoing
 		}
-	*/
+	}
+
+	return routeConfigs
 }

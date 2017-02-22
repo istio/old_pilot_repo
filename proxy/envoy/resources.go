@@ -173,6 +173,13 @@ type VirtualHost struct {
 	Routes  []*HTTPRoute `json:"routes"`
 }
 
+// RDS definition
+type RDS struct {
+	Cluster         string `json:"cluster"`
+	RefreshDelayMS  int    `json:"refresh_delay_ms"`
+	RouteConfigName string `json:"route_config_name"`
+}
+
 // HTTPRouteConfig definition
 type HTTPRouteConfig struct {
 	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
@@ -219,6 +226,7 @@ type HTTPFilterConfig struct {
 	StatPrefix        string           `json:"stat_prefix"`
 	GenerateRequestID bool             `json:"generate_request_id,omitempty"`
 	RouteConfig       *HTTPRouteConfig `json:"route_config"`
+	RDS               *RDS             `json:"rds,omitempty"`
 	Filters           []HTTPFilter     `json:"filters"`
 	AccessLog         []AccessLog      `json:"access_log"`
 }
@@ -453,10 +461,17 @@ type SDS struct {
 	RefreshDelayMs int      `json:"refresh_delay_ms"`
 }
 
+// CDS is a cluster discovery definition
+type CDS struct {
+	Cluster        *Cluster `json:"cluster"`
+	RefreshDelayMs int     `json:"refresh_delay_ms"`
+}
+
 // ClusterManager definition
 type ClusterManager struct {
 	Clusters []*Cluster `json:"clusters"`
 	SDS      SDS        `json:"sds"`
+	CDS      CDS        `json:"cds"`
 }
 
 // ByName implements sort

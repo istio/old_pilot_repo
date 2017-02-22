@@ -73,7 +73,7 @@ func (conf *Config) Write(w io.Writer) error {
 // Generate Envoy sidecar proxy configuration
 func Generate(instances []*model.ServiceInstance, services []*model.Service,
 	config *model.IstioRegistry, mesh *MeshConfig) *Config {
-	listeners, clusters := build(instances, services, config, mesh)
+	listeners, _ := build(instances, services, config, mesh) // TODO: clusters are not needed anymore
 
 	// inject mixer filter
 	if mesh.MixerAddress != "" {
@@ -101,9 +101,15 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 			Port:          mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
-			Clusters: clusters,
+			Clusters: []*Cluster{
+				buildRDSCluster(mesh),
+			},
 			SDS: SDS{
 				Cluster:        buildSDSCluster(mesh),
+				RefreshDelayMs: 1000,
+			},
+			CDS: CDS{
+				Cluster: buildCDSCluster(mesh),
 				RefreshDelayMs: 1000,
 			},
 		},
@@ -147,6 +153,7 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 			Config: FilterRouterConfig{},
 		})
 
+		// TODO: RDS is used instead of route config by the listener.
 		listener := &Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
@@ -158,7 +165,11 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 					AccessLog: []AccessLog{{
 						Path: DefaultAccessLog,
 					}},
-					RouteConfig: routeConfig,
+					RDS: &RDS{
+						Cluster: "rds",
+						RefreshDelayMS: 1000,
+						RouteConfigName: fmt.Sprintf("%v", port), // TODO: generate unique route config name per listener
+					},
 					Filters:     filters,
 				},
 			}},
