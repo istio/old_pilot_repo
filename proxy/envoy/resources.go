@@ -227,9 +227,9 @@ type HTTPFilterConfig struct {
 type TCPRoute struct {
 	Cluster           string   `json:"cluster"`
 	DestinationIPList []string `json:"destination_ip_list,omitempty"`
-	DestinationPorts  []string `json:"destination_ports,omitempty"`
+	DestinationPorts  string   `json:"destination_ports,omitempty"`
 	SourceIPList      []string `json:"source_ip_list,omitempty"`
-	SourcePorts       []string `json:"source_ports,omitempty"`
+	SourcePorts       string   `json:"source_ports,omitempty"`
 }
 
 // TCPRouteConfigs provides routes by port
@@ -267,7 +267,7 @@ type NetworkFilter struct {
 type Listener struct {
 	Port           int              `json:"port"`
 	Filters        []*NetworkFilter `json:"filters"`
-	BindToPort     bool             `json:"bind_to_port,omitempty"`
+	BindToPort     bool             `json:"bind_to_port"`
 	UseOriginalDst bool             `json:"use_original_dst,omitempty"`
 }
 
