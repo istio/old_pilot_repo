@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Basic template engine using go templates
-
 package main
 
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,21 +48,23 @@ const (
 	egressProxy          = "egress-proxy"
 	app                  = "app"
 	appProxyManagerAgent = "app-proxy-manager-agent"
+
 	// budget is the maximum number of retries with 1s delays
 	budget = 30
+
+	// Mixer SHA *update manually*
+	mixerSHA = "ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e"
 )
 
 var (
-	kubeconfig       string
-	inClusterConfig  bool
-	hub              string
-	tag              string
-	mixerImage       string
-	namespace        string
-	verbose          bool
-	norouting        bool
-	parallel         bool
-	nameSpaceCreated bool
+	kubeconfig string
+	hub        string
+	tag        string
+	mixerImage string
+	namespace  string
+	verbose    bool
+	norouting  bool
+	parallel   bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -73,11 +72,8 @@ var (
 	// pods is a mapping from app name to a pod name (write once, read only)
 	pods map[string]string
 
-	// accessLogs is a mapping from app name to a list of request ids that should be present in it
-	accessLogs map[string][]string
-
-	// mu protects mutable global state
-	mu sync.Mutex
+	// indicates whether the namespace is auto-generated
+	nameSpaceCreated bool
 )
 
 func init() {
@@ -87,8 +83,7 @@ func init() {
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
-	// manually update default mixer build tag.
-	flag.StringVar(&mixerImage, "mixerImage", "gcr.io/istio-testing/mixer:ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e",
+	flag.StringVar(&mixerImage, "mixerImage", "gcr.io/istio-testing/mixer:"+mixerSHA,
 		"Mixer Docker image")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
@@ -119,15 +114,16 @@ func setup() {
 
 	check(setupClient())
 
+	var err error
 	if namespace == "" {
-		var err error
 		if namespace, err = generateNamespace(client); err != nil {
 			check(err)
 		}
 	} else {
-		assertNamespaceExists(client, namespace)
-
+		_, err = client.Core().Namespaces().Get(namespace, meta_v1.GetOptions{})
+		check(err)
 	}
+
 	pods = make(map[string]string)
 
 	// deploy istio-infra
@@ -136,27 +132,14 @@ func setup() {
 	check(deploy("mixer", "mixer", mixer, namespace, "8080", "80", "unversioned"))
 	check(deploy("istio-egress", "istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
 
-	//deploy a healthy mix of apps, with and without proxy
+	// deploy a healthy mix of apps, with and without proxy
 	check(deploy("t", "t", app, namespace, "8080", "80", "unversioned"))
 	check(deploy("a", "a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
 	check(deploy("b", "b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
 	check(deploy("hello", "hello", appProxyManagerAgent, namespace, "8080", "80", "v1"))
 	check(deploy("world-v1", "world", appProxyManagerAgent, namespace, "80", "8000", "v1"))
 	check(deploy("world-v2", "world", appProxyManagerAgent, namespace, "80", "8000", "v2"))
-
 	check(setPods())
-
-	accessLogs = make(map[string][]string)
-	for app := range pods {
-		accessLogs[app] = make([]string, 0)
-	}
-
-}
-
-func assertNamespaceExists(cl *kubernetes.Clientset, name string) {
-	if _, err := cl.Core().Namespaces().Get(name, meta_v1.GetOptions{}); err != nil {
-		check(err)
-	}
 }
 
 // check function correctly cleans up on failure
@@ -215,23 +198,6 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 	}
 
 	return run("kubectl apply -f " + configFile + " -n " + namespace)
-}
-
-func testBasicReachability() error {
-	log.Printf("Verifying basic reachability across pods/services (a, b, and t)..")
-	err := makeRequests()
-	if err != nil {
-		return err
-	}
-	if verbose {
-		log.Println("requests:", accessLogs)
-	}
-	err = checkAccessLogs()
-	if err != nil {
-		return err
-	}
-	log.Println("Success!")
-	return nil
 }
 
 func testRouting() error {
@@ -554,122 +520,6 @@ func dumpProxyLogs(name string) {
 	}
 }
 
-// makeRequest creates a function to make requests; done should return true to quickly exit the retry loop
-func makeRequest(src, dst, port, domain string, done func() bool) func() error {
-	return func() error {
-		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-		for n := 0; n < budget; n++ {
-			log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
-
-			request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[src], namespace, url), verbose)
-			if err != nil {
-				return err
-			}
-			if verbose {
-				log.Println(request)
-			}
-			match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 {
-				id := match[1]
-				if verbose {
-					log.Printf("id=%s\n", id)
-				}
-				mu.Lock()
-				accessLogs[src] = append(accessLogs[src], id)
-				accessLogs[dst] = append(accessLogs[dst], id)
-				mu.Unlock()
-				return nil
-			}
-
-			// Expected no match
-			if src == "t" && dst == "t" {
-				if verbose {
-					log.Println("Expected no match for t->t")
-				}
-				return nil
-			}
-			if done() {
-				return nil
-			}
-		}
-		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
-	}
-}
-
-// makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func makeRequests() error {
-	log.Printf("makeRequests parallel=%t\n", parallel)
-	g, ctx := errgroup.WithContext(context.Background())
-	testPods := []string{"a", "b", "t"}
-	for _, src := range testPods {
-		for _, dst := range testPods {
-			for _, port := range []string{"", ":80", ":8080"} {
-				for _, domain := range []string{"", "." + namespace} {
-					if parallel {
-						g.Go(makeRequest(src, dst, port, domain, func() bool {
-							select {
-							case <-time.After(time.Second):
-								// try again
-							case <-ctx.Done():
-								return true
-							}
-							return false
-						}))
-					} else {
-						if err := makeRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
-							return err
-						}
-					}
-				}
-			}
-		}
-	}
-	if parallel {
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func checkAccessLogs() error {
-	log.Println("Checking access logs of pods to correlate request IDs...")
-	for n := 0; ; n++ {
-		found := true
-		for _, pod := range []string{"a", "b"} {
-			if verbose {
-				log.Printf("Checking access log of %s\n", pod)
-			}
-			access, err := shell(fmt.Sprintf("kubectl logs %s -n %s -c proxy", pods[pod], namespace), false)
-			if err != nil {
-				return err
-			}
-			for _, id := range accessLogs[pod] {
-				if !strings.Contains(access, id) {
-					if verbose {
-						log.Printf("Failed to find request id %s in log of %s\n", id, pod)
-					}
-					found = false
-					break
-				}
-			}
-			if !found {
-				break
-			}
-		}
-
-		if found {
-			return nil
-		}
-
-		if n > budget {
-			return fmt.Errorf("exceeded budget for checking access logs")
-		}
-
-		time.Sleep(time.Second)
-	}
-}
-
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
 func verifyRouting(src, dst, headerKey, headerVal string,
 	samples int, expectedCount map[string]int) error {
@@ -762,7 +612,6 @@ func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal
 }
 
 func generateNamespace(cl *kubernetes.Clientset) (string, error) {
-
 	ns, err := cl.Core().Namespaces().Create(&v1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "istio-integration-",
