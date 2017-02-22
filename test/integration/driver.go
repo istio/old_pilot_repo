@@ -55,12 +55,14 @@ const (
 
 var (
 	kubeconfig string
+
 	hub        string
 	tag        string
 	mixerImage string
 	namespace  string
-	verbose    bool
-	parallel   bool
+
+	verbose  bool
+	parallel bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -173,10 +175,7 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 	w = bufio.NewWriter(f)
 
 	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
-		"hub":        hub,
-		"tag":        tag,
 		"mixerImage": mixerImage,
-		"namespace":  namespace,
 		"service":    svcName,
 		"name":       name,
 		"port1":      port1,
@@ -231,7 +230,8 @@ func getRestartEpoch(pod string) (int, error) {
 }
 
 func addConfig(config []byte, kind, name, namespace string) {
-	log.Println("add config: %s", string(config))
+	log.Println("Add config")
+	log.Println(string(config))
 	out, err := yaml.YAMLToJSON(config)
 	check(err)
 	istioKind, ok := model.IstioConfig[kind]
@@ -256,6 +256,10 @@ func deployConfig(config []byte, kind, name, namespace string, envoy string) {
 
 func write(in string, data map[string]string, out io.Writer) error {
 	tmpl, err := template.ParseFiles(in)
+	data["namespace"] = namespace
+	data["hub"] = hub
+	data["tag"] = tag
+
 	if err != nil {
 		return err
 	}
