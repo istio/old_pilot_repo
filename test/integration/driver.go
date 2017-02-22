@@ -117,7 +117,7 @@ func setup() {
 		log.Fatal("No docker tag specified with -t or --tag")
 	}
 	if mixerImage == "" {
-		log.Fatal("No mixer tag specified with --mixerImage, 'latest?'")
+		log.Fatal("No mixer image specified with --mixerImage, 'latest?'")
 	}
 	log.Printf("hub %v, tag %v", hub, tag)
 
