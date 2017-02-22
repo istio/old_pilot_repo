@@ -176,11 +176,6 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 	return listeners, clusters
 }
 
-// TODO(ayj) - refactor filter builder functions to build both HTTP and TCP
-// filters. Does RouteRule's precedence apply to al protocols such,
-// for example, we need to handle ordering between HTTP and TCP, or should
-// we enforce explicit ordering, e.g. HTTP before TCP?
-
 // buildOutboundFilters creates route configs indexed by ports for the traffic outbound
 // from the proxy instance
 func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
