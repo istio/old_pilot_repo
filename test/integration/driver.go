@@ -36,8 +36,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/sync/errgroup"
@@ -84,15 +82,13 @@ var (
 
 func init() {
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
-		"kube config file (ignored if --in_cluster_config is set")
-	flag.BoolVar(&inClusterConfig, "in_cluster_config", false,
-		"Use in-cluster kube config")
+		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
 	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
 		"Docker hub")
 	flag.StringVarP(&tag, "tag", "t", "",
 		"Docker tag")
 	// manually update default mixer build tag.
-	flag.StringVarP(&mixerImage, "mixerImage", "", "gcr.io/istio-testing/mixer:ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e",
+	flag.StringVar(&mixerImage, "mixerImage", "gcr.io/istio-testing/mixer:ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e",
 		"Mixer Docker image")
 	flag.StringVarP(&namespace, "namespace", "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
@@ -496,26 +492,11 @@ func shell(command string, printCmd bool) (string, error) {
 // connect to K8S cluster and register TPRs
 func setupClient() error {
 	var err error
-	var config *rest.Config
-	if inClusterConfig {
-		config, err = rest.InClusterConfig()
-	} else {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	}
-	if err != nil {
-		return err
-	}
-
-	client, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
 	istioClient, err = kube.NewClient(kubeconfig, model.IstioConfig)
 	if err != nil {
 		return err
 	}
-
+	client = istioClient.GetKubernetesClient()
 	return istioClient.RegisterResources()
 }
 
