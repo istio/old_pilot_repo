@@ -35,7 +35,7 @@ set -ex
 for image in $images; do
     bazel $BAZEL_ARGS run //docker:$image
     for tag in $tags; do
-        docker tag istio/docker:init $hub/$image:$tag
+        docker tag istio/docker:$image $hub/$image:$tag
         docker push $hub/$image:$tag
     done
 done
