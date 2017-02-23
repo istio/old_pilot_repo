@@ -2,7 +2,7 @@
 
 # Example usage:
 #
-# docker/release-docker --hub docker.io/istio --tags $(git rev-parse --short HEAD),$(date +%Y%m%d%H%M%S)"
+# docker/release-docker --hub docker.io/istio --tags $(git rev-parse --short # HEAD),$(date +%Y%m%d%H%M%S),latest"
 
 function usage() {
     echo "$0 --hub <docker image repository> --tags <comma seperated list of docker image tags>"
@@ -33,11 +33,9 @@ fi
 set -ex
 
 for image in $images; do
+    bazel $BAZEL_ARGS run //docker:$image
     for tag in $tags; do
-        bazel $BAZEL_ARGS run //docker:$image $hub/$image:$tag
+        docker tag istio/docker:init $hub/$image:$tag
         docker push $hub/$image:$tag
-
-        docker tag $hub/$image:$tag $hub/$image:latest
-        docker push $hub/$image:latest
     done
 done
