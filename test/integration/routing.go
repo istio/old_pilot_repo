@@ -22,12 +22,9 @@ import (
 	"log"
 	"regexp"
 	"strconv"
-	"sync"
 	"time"
 
 	"istio.io/manager/model"
-
-	"github.com/golang/sync/errgroup"
 )
 
 func testRouting() error {
@@ -38,7 +35,7 @@ func testRouting() error {
 		"destination": "world",
 	})
 	check(err)
-	deployConfig(config, model.RouteRule, "default-route", namespace, "hello")
+	deployConfig(config, model.RouteRule, "default-route", "hello")
 	check(verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 100,
@@ -51,7 +48,7 @@ func testRouting() error {
 		"destination": "world",
 	})
 	check(err)
-	deployConfig(config, model.RouteRule, "weighted-route", namespace, "hello")
+	deployConfig(config, model.RouteRule, "weighted-route", "hello")
 	check(verifyRouting("hello", "world", "", "",
 		100, map[string]int{
 			"v1": 75,
@@ -64,7 +61,7 @@ func testRouting() error {
 		"destination": "world",
 	})
 	check(err)
-	deployConfig(config, model.RouteRule, "content-route", namespace, "hello")
+	deployConfig(config, model.RouteRule, "content-route", "hello")
 	check(verifyRouting("hello", "world", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
@@ -77,7 +74,7 @@ func testRouting() error {
 		"destination": "world",
 	})
 	check(err)
-	deployConfig(config, model.Destination, "fault-policy", namespace, "hello")
+	deployConfig(config, model.Destination, "fault-policy", "hello")
 	check(verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503))
 	log.Println("Success!")
 
@@ -86,7 +83,6 @@ func testRouting() error {
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
 func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
-	var mu sync.Mutex
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0
@@ -95,30 +91,19 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	log.Printf("Making %d requests (%s) from %s...\n", samples, url, src)
 
-	var g errgroup.Group
-	for i := 0; i < samples; i++ {
-		cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s", pods[src], namespace, url, headerKey, headerVal)
-		g.Go(func() error {
-			request, err := shell(cmd, false)
-			if err != nil {
-				return err
-			}
-			if verbose {
-				log.Println(request)
-			}
-			match := regexp.MustCompile("ServiceVersion=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 {
-				id := match[1]
-				mu.Lock()
-				count[id]++
-				mu.Unlock()
-			}
-			return nil
-		})
+	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client %s %s %s --count %d",
+		pods[src], params.namespace, url, headerKey, headerVal, samples)
+	request, err := shell(cmd, false)
+	if err != nil {
+		return err
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
+	matches := regexp.MustCompile("ServiceVersion=(.*)").FindAllStringSubmatch(request, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			id := match[1]
+			count[id]++
+		}
 	}
 
 	epsilon := 5
@@ -143,7 +128,8 @@ func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal
 
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	log.Printf("Making 1 request (%s) from %s...\n", url, src)
-	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s", pods[src], namespace, url, headerKey, headerVal)
+	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s %s %s",
+		pods[src], params.namespace, url, headerKey, headerVal)
 
 	start := time.Now()
 	request, err := shell(cmd, false)

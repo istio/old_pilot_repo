@@ -53,13 +53,18 @@ const (
 	mixerSHA = "ea3a8d3e2feb9f06256f92cda5194cc1ea6b599e"
 )
 
-var (
-	kubeconfig string
-
+// params contain default template parameter values
+type parameters struct {
 	hub        string
 	tag        string
 	mixerImage string
 	namespace  string
+}
+
+var (
+	params parameters
+
+	kubeconfig string
 
 	verbose  bool
 	parallel bool
@@ -75,16 +80,16 @@ var (
 )
 
 func init() {
+	flag.StringVarP(&params.hub, "hub", "h", "gcr.io/istio-testing",
+		"Docker hub")
+	flag.StringVarP(&params.tag, "tag", "t", "",
+		"Docker tag")
+	flag.StringVar(&params.mixerImage, "mixerImage", "gcr.io/istio-testing/mixer:"+mixerSHA,
+		"Mixer Docker image")
+	flag.StringVarP(&params.namespace, "namespace", "n", "",
+		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.StringVarP(&kubeconfig, "config", "c", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
-	flag.StringVarP(&hub, "hub", "h", "gcr.io/istio-testing",
-		"Docker hub")
-	flag.StringVarP(&tag, "tag", "t", "",
-		"Docker tag")
-	flag.StringVar(&mixerImage, "mixerImage", "gcr.io/istio-testing/mixer:"+mixerSHA,
-		"Mixer Docker image")
-	flag.StringVarP(&namespace, "namespace", "n", "",
-		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.BoolVarP(&verbose, "dump", "d", false,
 		"Dump proxy logs and request logs")
 	flag.BoolVar(&parallel, "parallel", true,
@@ -94,47 +99,46 @@ func init() {
 func main() {
 	flag.Parse()
 	setup()
-	check(testBasicReachability())
+	check((&reachability{}).run())
 	check(testRouting())
 	teardown()
 }
 
 func setup() {
-	if tag == "" {
+	if params.tag == "" {
 		log.Fatal("No docker tag specified with -t or --tag")
 	}
-	if mixerImage == "" {
+	if params.mixerImage == "" {
 		log.Fatal("No mixer image specified with --mixerImage, 'latest?'")
 	}
-	log.Printf("hub %v, tag %v", hub, tag)
+	log.Printf("params %#v", params)
 
 	check(setupClient())
 
 	var err error
-	if namespace == "" {
-		if namespace, err = generateNamespace(client); err != nil {
+	if params.namespace == "" {
+		if params.namespace, err = generateNamespace(client); err != nil {
 			check(err)
 		}
 	} else {
-		_, err = client.Core().Namespaces().Get(namespace, meta_v1.GetOptions{})
+		_, err = client.Core().Namespaces().Get(params.namespace, meta_v1.GetOptions{})
 		check(err)
 	}
 
 	pods = make(map[string]string)
 
 	// deploy istio-infra
-	check(deploy("http-discovery", "http-discovery", managerDiscovery, namespace,
-		"8080", "80", "unversioned"))
-	check(deploy("mixer", "mixer", mixer, namespace, "8080", "80", "unversioned"))
-	check(deploy("istio-egress", "istio-egress", egressProxy, namespace, "8080", "80", "unversioned"))
+	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "unversioned"))
+	check(deploy("mixer", "mixer", mixer, "8080", "80", "unversioned"))
+	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "unversioned"))
 
 	// deploy a healthy mix of apps, with and without proxy
-	check(deploy("t", "t", app, namespace, "8080", "80", "unversioned"))
-	check(deploy("a", "a", appProxyManagerAgent, namespace, "8080", "80", "unversioned"))
-	check(deploy("b", "b", appProxyManagerAgent, namespace, "80", "8080", "unversioned"))
-	check(deploy("hello", "hello", appProxyManagerAgent, namespace, "8080", "80", "v1"))
-	check(deploy("world-v1", "world", appProxyManagerAgent, namespace, "80", "8000", "v1"))
-	check(deploy("world-v2", "world", appProxyManagerAgent, namespace, "80", "8000", "v2"))
+	check(deploy("t", "t", app, "8080", "80", "unversioned"))
+	check(deploy("a", "a", appProxyManagerAgent, "8080", "80", "unversioned"))
+	check(deploy("b", "b", appProxyManagerAgent, "80", "8080", "unversioned"))
+	check(deploy("hello", "hello", appProxyManagerAgent, "8080", "80", "v1"))
+	check(deploy("world-v1", "world", appProxyManagerAgent, "80", "8000", "v1"))
+	check(deploy("world-v2", "world", appProxyManagerAgent, "80", "8000", "v2"))
 	check(setPods())
 }
 
@@ -153,12 +157,12 @@ func teardown() {
 		log.Print(podLogs(pods["a"], "proxy"))
 	}
 	if nameSpaceCreated {
-		deleteNamespace(client, namespace)
-		namespace = ""
+		deleteNamespace(client, params.namespace)
+		params.namespace = ""
 	}
 }
 
-func deploy(name, svcName, dType, namespace, port1, port2, version string) error {
+func deploy(name, svcName, dType, port1, port2, version string) error {
 	// write template
 	configFile := name + "-" + dType + ".yaml"
 	var w *bufio.Writer
@@ -175,12 +179,11 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 	w = bufio.NewWriter(f)
 
 	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
-		"mixerImage": mixerImage,
-		"service":    svcName,
-		"name":       name,
-		"port1":      port1,
-		"port2":      port2,
-		"version":    version,
+		"service": svcName,
+		"name":    name,
+		"port1":   port1,
+		"port2":   port2,
+		"version": version,
 	}, w); err != nil {
 		return err
 	}
@@ -189,7 +192,7 @@ func deploy(name, svcName, dType, namespace, port1, port2, version string) error
 		return err
 	}
 
-	return run("kubectl apply -f " + configFile + " -n " + namespace)
+	return run("kubectl apply -f " + configFile + " -n " + params.namespace)
 }
 
 func waitForNewRestartEpoch(pod string, start int) error {
@@ -212,7 +215,7 @@ func waitForNewRestartEpoch(pod string, start int) error {
 // getRestartEpoch gets the current restart epoch of a pod by calling the Envoy admin API.
 func getRestartEpoch(pod string) (int, error) {
 	url := "http://localhost:5000/server_info"
-	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], namespace, url)
+	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], params.namespace, url)
 	out, err := shell(cmd, true)
 	if err != nil {
 		return 0, err
@@ -229,7 +232,7 @@ func getRestartEpoch(pod string) (int, error) {
 	return 0, fmt.Errorf("could not obtain envoy restart epoch")
 }
 
-func addConfig(config []byte, kind, name, namespace string) {
+func addConfig(config []byte, kind, name string) {
 	log.Println("Add config")
 	log.Println(string(config))
 	out, err := yaml.YAMLToJSON(config)
@@ -243,27 +246,33 @@ func addConfig(config []byte, kind, name, namespace string) {
 	check(istioClient.Put(model.Key{
 		Kind:      kind,
 		Name:      name,
-		Namespace: namespace,
+		Namespace: params.namespace,
 	}, v))
 }
 
-func deployConfig(config []byte, kind, name, namespace string, envoy string) {
+func deployConfig(config []byte, kind, name string, envoy string) {
 	epoch, err := getRestartEpoch(envoy)
 	check(err)
-	addConfig(config, kind, name, namespace)
+	addConfig(config, kind, name)
 	check(waitForNewRestartEpoch(envoy, epoch))
 }
 
 func write(in string, data map[string]string, out io.Writer) error {
+	// fallback to params values in data
+	values := make(map[string]string)
+	values["hub"] = params.hub
+	values["tag"] = params.tag
+	values["mixerImage"] = params.mixerImage
+	values["namespace"] = params.namespace
+	for k, v := range data {
+		values[k] = v
+	}
 	tmpl, err := template.ParseFiles(in)
-	data["namespace"] = namespace
-	data["hub"] = hub
-	data["tag"] = tag
 
 	if err != nil {
 		return err
 	}
-	if err := tmpl.Execute(out, data); err != nil {
+	if err := tmpl.Execute(out, values); err != nil {
 		return err
 	}
 	return nil
@@ -323,7 +332,7 @@ func setPods() error {
 	items := make([]v1.Pod, 0)
 	for n := 0; ; n++ {
 		log.Println("Checking all pods are running...")
-		list, err := client.Pods(namespace).List(v1.ListOptions{})
+		list, err := client.Pods(params.namespace).List(v1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -364,7 +373,7 @@ func setPods() error {
 // podLogs gets pod logs by container
 func podLogs(name string, container string) string {
 	log.Println("Pod proxy logs", name)
-	raw, err := client.Pods(namespace).
+	raw, err := client.Pods(params.namespace).
 		GetLogs(name, &v1.PodLogOptions{Container: container}).
 		Do().Raw()
 	if err != nil {

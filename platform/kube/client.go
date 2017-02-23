@@ -117,7 +117,7 @@ func NewClient(kubeconfig string, km model.KindMap) (*Client, error) {
 	if kubeconfig != "" {
 		info, exists := os.Stat(kubeconfig)
 		if exists != nil {
-			return nil, fmt.Errorf("Empty kubernetes configuration file: %q", kubeconfig)
+			return nil, fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
 		}
 
 		// if it's an empty file, switch to in-cluster config

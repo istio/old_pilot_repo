@@ -28,29 +28,30 @@ import (
 	"github.com/golang/sync/errgroup"
 )
 
-var (
+type reachability struct {
+	accessMu sync.Mutex
+
 	// accessLogs is a mapping from app name to a list of request ids that should be present in it
 	accessLogs map[string][]string
-	accessMu   sync.Mutex
-)
+}
 
-func testBasicReachability() error {
+func (r *reachability) run() error {
 	log.Printf("Verifying basic reachability across pods/services (a, b, and t)..")
 
-	accessLogs = make(map[string][]string)
+	r.accessLogs = make(map[string][]string)
 	for app := range pods {
-		accessLogs[app] = make([]string, 0)
+		r.accessLogs[app] = make([]string, 0)
 	}
 
-	err := makeRequests()
+	err := r.makeRequests()
 	if err != nil {
 		return err
 	}
 	if verbose {
-		log.Println("requests:", accessLogs)
+		log.Println("requests:", r.accessLogs)
 	}
 
-	err = checkAccessLogs(accessLogs)
+	err = r.checkAccessLogs()
 	if err != nil {
 		return err
 	}
@@ -59,13 +60,14 @@ func testBasicReachability() error {
 }
 
 // makeRequest creates a function to make requests; done should return true to quickly exit the retry loop
-func makeRequest(src, dst, port, domain string, done func() bool) func() error {
+func (r *reachability) makeRequest(src, dst, port, domain string, done func() bool) func() error {
 	return func() error {
 		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 		for n := 0; n < budget; n++ {
 			log.Printf("Making a request %s from %s (attempt %d)...\n", url, src, n)
 
-			request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[src], namespace, url), verbose)
+			request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app client %s",
+				pods[src], params.namespace, url), verbose)
 			if err != nil {
 				return err
 			}
@@ -78,10 +80,10 @@ func makeRequest(src, dst, port, domain string, done func() bool) func() error {
 				if verbose {
 					log.Printf("id=%s\n", id)
 				}
-				accessMu.Lock()
-				accessLogs[src] = append(accessLogs[src], id)
-				accessLogs[dst] = append(accessLogs[dst], id)
-				accessMu.Unlock()
+				r.accessMu.Lock()
+				r.accessLogs[src] = append(r.accessLogs[src], id)
+				r.accessLogs[dst] = append(r.accessLogs[dst], id)
+				r.accessMu.Unlock()
 				return nil
 			}
 
@@ -101,16 +103,16 @@ func makeRequest(src, dst, port, domain string, done func() bool) func() error {
 }
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func makeRequests() error {
+func (r *reachability) makeRequests() error {
 	log.Printf("makeRequests parallel=%t\n", parallel)
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b", "t"}
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
-				for _, domain := range []string{"", "." + namespace} {
+				for _, domain := range []string{"", "." + params.namespace} {
 					if parallel {
-						g.Go(makeRequest(src, dst, port, domain, func() bool {
+						g.Go(r.makeRequest(src, dst, port, domain, func() bool {
 							select {
 							case <-time.After(time.Second):
 								// try again
@@ -120,7 +122,7 @@ func makeRequests() error {
 							return false
 						}))
 					} else {
-						if err := makeRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
+						if err := r.makeRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
 							return err
 						}
 					}
@@ -136,7 +138,7 @@ func makeRequests() error {
 	return nil
 }
 
-func checkAccessLogs(accessLogs map[string][]string) error {
+func (r *reachability) checkAccessLogs() error {
 	log.Println("Checking access logs of pods to correlate request IDs...")
 	for n := 0; ; n++ {
 		found := true
@@ -145,7 +147,7 @@ func checkAccessLogs(accessLogs map[string][]string) error {
 				log.Printf("Checking access log of %s\n", pod)
 			}
 			access := podLogs(pods[pod], "proxy")
-			for _, id := range accessLogs[pod] {
+			for _, id := range r.accessLogs[pod] {
 				if !strings.Contains(access, id) {
 					if verbose {
 						log.Printf("Failed to find request id %s in log of %s\n", id, pod)
