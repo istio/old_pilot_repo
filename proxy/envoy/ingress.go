@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"github.com/hashicorp/go-multierror"
 
 	"istio.io/manager/model"
 	"istio.io/manager/model/proxy/alphav1/config"
@@ -105,9 +106,14 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 	// Phase 2: create a VirtualHost for each host
 	vhosts := make([]*VirtualHost, 0, len(rulesByHost))
 	for host, hostRules := range rulesByHost {
-		routes := make([]*Route, 0, len(hostRules))
+		routes := make([]*HTTPRoute, 0, len(hostRules))
 		for _, rule := range hostRules {
-			routes = append(routes, buildIngressRoute(rule))
+			route, err := buildIngressRoute(rule)
+			if err != nil {
+				glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
+				continue
+			}
+			routes = append(routes, route)
 		}
 		sort.Sort(RoutesByPath(routes))
 		vhost := &VirtualHost{
@@ -119,7 +125,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 	}
 	sort.Sort(HostsByName(vhosts))
 
-	rConfig := &RouteConfig{VirtualHosts: vhosts}
+	rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
 
 	httpListener := &Listener{
 		Port:       80,
@@ -128,12 +134,12 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 			{
 				Type: "read",
 				Name: HTTPConnectionManager,
-				Config: NetworkFilterConfig{
+				Config: HTTPFilterConfig{
 					CodecType:   "auto",
 					StatPrefix:  "http",
 					AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
 					RouteConfig: rConfig,
-					Filters: []Filter{
+					Filters: []HTTPFilter{
 						{
 							Type:   "decoder",
 							Name:   "router",
@@ -167,14 +173,13 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(rule *config.RouteRule) *Route {
-	route := &Route{
-		Path:        "",
-		Prefix:      "/",
-		HostRewrite: rule.Destination,
+func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
+	route := &HTTPRoute{
+		Path:   "",
+		Prefix: "/",
 	}
 
-	if rule.Match != nil {
+	if rule.Match != nil && rule.Match.Http != nil {
 		if uri, ok := rule.Match.Http[HeaderURI]; ok {
 			switch m := uri.MatchType.(type) {
 			case *config.StringMatch_Exact:
@@ -184,7 +189,7 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 				route.Path = ""
 				route.Prefix = m.Prefix
 			case *config.StringMatch_Regex:
-				glog.Warningf("Unsupported route match condition: regex")
+				return nil, fmt.Errorf("unsupported route match condition: regex")
 			}
 		}
 	}
@@ -199,8 +204,7 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 
 		port, tags, err := extractPortAndTags(dst)
 		if err != nil {
-			glog.Warningf("Failed to extract routing rule destination port: %v", err)
-			continue
+			return nil, multierror.Append(fmt.Errorf("failed to extract routing rule destination port"), err)
 		}
 
 		cluster := buildOutboundCluster(destination, port, tags)
@@ -218,7 +222,24 @@ func buildIngressRoute(rule *config.RouteRule) *Route {
 		route.WeightedClusters = nil
 	}
 
-	return route
+	// Ensure all destination clusters have the same port number.
+	//
+	// This is currently required for doing host header rewrite (host:port),
+	// which is scoped to the entire route.
+	// This restriction can be relaxed by constructing multiple envoy.Route objects
+	// per config.RouteRule, and doing weighted load balancing using Runtime.
+	portSet := make(map[int]struct{}, 1)
+	for _, cluster := range route.clusters {
+		portSet[cluster.port.Port] = struct{}{}
+	}
+	if len(portSet) > 1 {
+		return nil, fmt.Errorf("unsupported multiple destination ports per ingress route rule")
+	}
+
+	// Rewrite the host header so that inbound proxies can match incoming traffic
+	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, route.clusters[0].port.Port)
+
+	return route, nil
 }
 
 // extractPortAndTags extracts the destination service port from the given destination,
