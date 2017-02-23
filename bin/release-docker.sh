@@ -36,5 +36,8 @@ for image in $images; do
     for tag in $tags; do
         bazel $BAZEL_ARGS run //docker:$image $hub/$image:$tag
         docker push $hub/$image:$tag
+
+        docker tag $hub/$image:$tag $hub/$image:latest
+        docker push $hub/$image:latest
     done
 done
