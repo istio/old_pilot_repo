@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@testing')
+@Library('testutils')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -60,14 +60,6 @@ def presubmit(gitUtils, bazel, utils) {
 
 def postsubmit(gitUtils, bazel, utils) {
   buildNode(gitUtils) {
-    stage('Bazel Tests') {
-      sh('touch platform/kube/config')
-      bazel.test('//...')
-    }
-    stage('Code Coverage') {
-      sh('bin/codecov.sh')
-      utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
-    }
     stage('Docker Push') {
       bazel.updateBazelRc()
       def images = 'init,init_debug,app,app_debug,runtime,runtime_debug'
