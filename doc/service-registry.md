@@ -3,9 +3,9 @@
 This file describes the abstract model of services (and their instances)
 as represented in Istio. This model is independent of the underlying
 platform (Kubernetes, Mesos, etc.). Platform specific adapters found
-under platform/ populate the model object with various fields, from the
+under [platform](../platform) populate the model object with various fields, from the
 metadata found in the platform.  The platform independent proxy code
-under proxy/ uses the representation in the model to generate the
+under [proxy](../proxy) uses the representation in the model to generate the
 configuration files for the Layer 7 proxy sidecar. The proxy code is
 specific to individual proxy implementations
 
@@ -32,7 +32,7 @@ with it, such that the DNS queries for the FQDN resolves to the virtual
 IP address (a load balancer IP).
 
 E.g., in kubernetes, a service foo is associated with
-foo.default.svc.cluster.local hostname, has a virtual IP of 10.0.1.1 and
+`foo.default.svc.cluster.local hostname`, has a virtual IP of 10.0.1.1 and
 listens on ports 80, 8080
 
 ### 2. Instances
