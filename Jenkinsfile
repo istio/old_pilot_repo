@@ -20,7 +20,7 @@ mainFlow(utils) {
     }
 
     if (utils.runStage('PRESUBMIT')) {
-      presubmit(gitUtils, bazel)
+      presubmit(gitUtils, bazel, utils)
     }
 
     if (utils.runStage('POSTSUBMIT')) {
