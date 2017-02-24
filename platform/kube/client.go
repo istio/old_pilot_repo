@@ -261,13 +261,36 @@ func (cl *Client) Get(key model.Key) (proto.Message, bool) {
 	return out, true
 }
 
-// Put implements registry operation
-func (cl *Client) Put(k model.Key, v proto.Message) error {
+// Post implements registry operation
+func (cl *Client) Post(k model.Key, v proto.Message) error {
+	if k.Kind == model.IngressRule {
+		return fmt.Errorf("unsupported operation: cannot put a config element of kind '%s'", k.Kind)
+	}
+
 	out, err := modelToKube(cl.mapping, &k, v)
 	if err != nil {
 		return err
 	}
+
 	return cl.dyn.Post().
+		Namespace(k.Namespace).
+		Resource(IstioKind + "s").
+		Body(out).
+		Do().Error()
+}
+
+// Put implements registry operation
+func (cl *Client) Put(k model.Key, v proto.Message) error {
+	if k.Kind == model.IngressRule {
+		return fmt.Errorf("unsupported operation: cannot put a config element of kind '%s'", k.Kind)
+	}
+
+	out, err := modelToKube(cl.mapping, &k, v)
+	if err != nil {
+		return err
+	}
+
+	return cl.dyn.Put().
 		Namespace(k.Namespace).
 		Resource(IstioKind + "s").
 		Body(out).
@@ -276,6 +299,10 @@ func (cl *Client) Put(k model.Key, v proto.Message) error {
 
 // Delete implements registry operation
 func (cl *Client) Delete(key model.Key) error {
+	if key.Kind == model.IngressRule {
+		return fmt.Errorf("unsupported operation: cannot delete a config element of kind '%s'", key.Kind)
+	}
+
 	if err := cl.mapping.ValidateKey(&key); err != nil {
 		return err
 	}

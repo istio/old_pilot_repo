@@ -18,37 +18,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sort"
 
 	"github.com/ghodss/yaml"
-
-	"k8s.io/client-go/pkg/api"
-
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/pkg/api"
 
+	"istio.io/manager/cmd"
 	"istio.io/manager/model"
 )
 
 var (
-	configCmd = &cobra.Command{
-		Use:   "config",
-		Short: "Istio configuration registry",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			kinds := make([]string, 0)
-			for kind := range model.IstioConfig {
-				kinds = append(kinds, kind)
-			}
-			sort.Strings(kinds)
-			fmt.Printf("Available configuration resources: %v\n", kinds)
-			return nil
-		},
-	}
-
 	putCmd = &cobra.Command{
 		Use:   "put [kind] [name]",
 		Short: "Store a configuration object from standard input YAML",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
@@ -56,8 +41,8 @@ var (
 			if !ok {
 				return fmt.Errorf("Missing kind %s", args[0])
 			}
-			if flags.namespace == "" {
-				flags.namespace = api.NamespaceDefault
+			if cmd.RootFlags.Namespace == "" {
+				cmd.RootFlags.Namespace = api.NamespaceDefault
 			}
 
 			// read stdin
@@ -76,10 +61,10 @@ var (
 				return fmt.Errorf("Cannot parse proto message: %v", err)
 			}
 
-			err = flags.client.Put(model.Key{
+			err = cmd.Client.Put(model.Key{
 				Kind:      args[0],
 				Name:      args[1],
-				Namespace: flags.namespace,
+				Namespace: cmd.RootFlags.Namespace,
 			}, v)
 
 			return err
@@ -89,17 +74,17 @@ var (
 	getCmd = &cobra.Command{
 		Use:   "get [kind] [name]",
 		Short: "Retrieve a configuration object",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
-			if flags.namespace == "" {
-				flags.namespace = api.NamespaceDefault
+			if cmd.RootFlags.Namespace == "" {
+				cmd.RootFlags.Namespace = api.NamespaceDefault
 			}
-			item, exists := flags.client.Get(model.Key{
+			item, exists := cmd.Client.Get(model.Key{
 				Kind:      args[0],
 				Name:      args[1],
-				Namespace: flags.namespace,
+				Namespace: cmd.RootFlags.Namespace,
 			})
 			if !exists {
 				return fmt.Errorf("Does not exist")
@@ -112,9 +97,12 @@ var (
 	listCmd = &cobra.Command{
 		Use:   "list [kind...]",
 		Short: "List configuration objects",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("Please specify kind (one or many of %v)", model.IstioConfig.Kinds())
+			}
 			for _, kind := range args {
-				list, err := flags.client.List(kind, flags.namespace)
+				list, err := cmd.Client.List(kind, cmd.RootFlags.Namespace)
 				if err != nil {
 					fmt.Printf("Error listing %s: %v\n", kind, err)
 				} else {
@@ -134,17 +122,17 @@ var (
 	deleteCmd = &cobra.Command{
 		Use:   "delete [kind] [name]",
 		Short: "Delete a configuration object",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
-			if flags.namespace == "" {
-				flags.namespace = api.NamespaceDefault
+			if cmd.RootFlags.Namespace == "" {
+				cmd.RootFlags.Namespace = api.NamespaceDefault
 			}
-			err := flags.client.Delete(model.Key{
+			err := cmd.Client.Delete(model.Key{
 				Kind:      args[0],
 				Name:      args[1],
-				Namespace: flags.namespace,
+				Namespace: cmd.RootFlags.Namespace,
 			})
 			return err
 		},
@@ -152,10 +140,20 @@ var (
 )
 
 func init() {
-	configCmd.AddCommand(putCmd)
-	configCmd.AddCommand(getCmd)
-	configCmd.AddCommand(listCmd)
-	configCmd.AddCommand(deleteCmd)
+	cmd.RootCmd.Use = "istioctl"
+	cmd.RootCmd.Long = fmt.Sprintf("Istio configuration command line utility. Available configuration kinds: %v",
+		model.IstioConfig.Kinds())
+	cmd.RootCmd.AddCommand(putCmd)
+	cmd.RootCmd.AddCommand(getCmd)
+	cmd.RootCmd.AddCommand(listCmd)
+	cmd.RootCmd.AddCommand(deleteCmd)
+}
+
+func main() {
+	if err := cmd.RootCmd.Execute(); err != nil {
+		glog.Error(err)
+		os.Exit(-1)
+	}
 }
 
 func print(kind string, item proto.Message) {

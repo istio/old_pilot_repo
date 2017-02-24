@@ -141,7 +141,7 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 	return out
 }
 
-// modelToKube translate Istio config to k8s config JSON
+// modelToKube validates and translates Istio config to k8s config JSON
 func modelToKube(km model.KindMap, k *model.Key, v proto.Message) (*Config, error) {
 	if err := km.ValidateConfig(k, v); err != nil {
 		return nil, err
