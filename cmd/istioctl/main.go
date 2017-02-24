@@ -16,10 +16,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
@@ -30,44 +31,45 @@ import (
 )
 
 var (
-	putCmd = &cobra.Command{
-		Use:   "put [kind] [name]",
-		Short: "Store a configuration object from standard input YAML",
+	// input file name
+	file string
+
+	key    model.Key
+	schema model.ProtoSchema
+
+	postCmd = &cobra.Command{
+		Use:   "post [kind] [name]",
+		Short: "Create a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
-			kind, ok := model.IstioConfig[args[0]]
-			if !ok {
-				return fmt.Errorf("Missing kind %s", args[0])
+			if err := setup(args[0], args[1]); err != nil {
+				return err
 			}
-			if cmd.RootFlags.Namespace == "" {
-				cmd.RootFlags.Namespace = api.NamespaceDefault
-			}
-
-			// read stdin
-			bytes, err := ioutil.ReadAll(os.Stdin)
+			v, err := readInput()
 			if err != nil {
-				return fmt.Errorf("Cannot read input: %v", err)
+				return err
 			}
+			return cmd.Client.Post(key, v)
+		},
+	}
 
-			out, err := yaml.YAMLToJSON(bytes)
+	putCmd = &cobra.Command{
+		Use:   "put [kind] [name]",
+		Short: "Update a configuration object",
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) != 2 {
+				return fmt.Errorf("Provide kind and name")
+			}
+			if err := setup(args[0], args[1]); err != nil {
+				return err
+			}
+			v, err := readInput()
 			if err != nil {
-				return fmt.Errorf("Cannot read YAML input: %v", err)
+				return err
 			}
-
-			v, err := kind.FromJSON(string(out))
-			if err != nil {
-				return fmt.Errorf("Cannot parse proto message: %v", err)
-			}
-
-			err = cmd.Client.Put(model.Key{
-				Kind:      args[0],
-				Name:      args[1],
-				Namespace: cmd.RootFlags.Namespace,
-			}, v)
-
-			return err
+			return cmd.Client.Put(key, v)
 		},
 	}
 
@@ -78,43 +80,18 @@ var (
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
-			if cmd.RootFlags.Namespace == "" {
-				cmd.RootFlags.Namespace = api.NamespaceDefault
+			if err := setup(args[0], args[1]); err != nil {
+				return err
 			}
-			item, exists := cmd.Client.Get(model.Key{
-				Kind:      args[0],
-				Name:      args[1],
-				Namespace: cmd.RootFlags.Namespace,
-			})
+			item, exists := cmd.Client.Get(key)
 			if !exists {
 				return fmt.Errorf("Does not exist")
 			}
-			print(args[0], item)
-			return nil
-		},
-	}
-
-	listCmd = &cobra.Command{
-		Use:   "list [kind...]",
-		Short: "List configuration objects",
-		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("Please specify kind (one or many of %v)", model.IstioConfig.Kinds())
+			out, err := schema.ToYAML(item)
+			if err != nil {
+				return err
 			}
-			for _, kind := range args {
-				list, err := cmd.Client.List(kind, cmd.RootFlags.Namespace)
-				if err != nil {
-					fmt.Printf("Error listing %s: %v\n", kind, err)
-				} else {
-					for key, item := range list {
-						fmt.Printf("kind: %s\n", key.Kind)
-						fmt.Printf("name: %s\n", key.Name)
-						fmt.Printf("namespace: %s\n", key.Namespace)
-						print(key.Kind, item)
-						fmt.Println("---")
-					}
-				}
-			}
+			fmt.Print(out)
 			return nil
 		},
 	}
@@ -126,23 +103,62 @@ var (
 			if len(args) != 2 {
 				return fmt.Errorf("Provide kind and name")
 			}
-			if cmd.RootFlags.Namespace == "" {
-				cmd.RootFlags.Namespace = api.NamespaceDefault
+			if err := setup(args[0], args[1]); err != nil {
+				return err
 			}
-			err := cmd.Client.Delete(model.Key{
-				Kind:      args[0],
-				Name:      args[1],
-				Namespace: cmd.RootFlags.Namespace,
-			})
+			err := cmd.Client.Delete(key)
 			return err
+		},
+	}
+
+	listCmd = &cobra.Command{
+		Use:   "list [kind]",
+		Short: "List configuration objects",
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return fmt.Errorf("Please specify kind (one of %v)", model.IstioConfig.Kinds())
+			}
+			if err := setup(args[0], ""); err != nil {
+				return err
+			}
+
+			list, err := cmd.Client.List(key.Kind, key.Namespace)
+			if err != nil {
+				return fmt.Errorf("Error listing %s: %v\n", key.Kind, err)
+			}
+
+			for key, item := range list {
+				out, err := schema.ToYAML(item)
+				if err != nil {
+					fmt.Println(err)
+				} else {
+					fmt.Printf("kind: %s\n", key.Kind)
+					fmt.Printf("name: %s\n", key.Name)
+					fmt.Printf("namespace: %s\n", key.Namespace)
+					fmt.Println("spec:")
+					lines := strings.Split(out, "\n")
+					for _, line := range lines {
+						if line != "" {
+							fmt.Printf("  %s\n", line)
+						}
+					}
+				}
+				fmt.Println("---")
+			}
+			return nil
 		},
 	}
 )
 
 func init() {
+	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
+		"Input file with the content of the configuration object (if not set, command reads from the standard input)")
+	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
+
 	cmd.RootCmd.Use = "istioctl"
 	cmd.RootCmd.Long = fmt.Sprintf("Istio configuration command line utility. Available configuration kinds: %v",
 		model.IstioConfig.Kinds())
+	cmd.RootCmd.AddCommand(postCmd)
 	cmd.RootCmd.AddCommand(putCmd)
 	cmd.RootCmd.AddCommand(getCmd)
 	cmd.RootCmd.AddCommand(listCmd)
@@ -156,16 +172,54 @@ func main() {
 	}
 }
 
-func print(kind string, item proto.Message) {
-	schema := model.IstioConfig[kind]
-	js, err := schema.ToJSON(item)
-	if err != nil {
-		fmt.Printf("Error converting to JSON: %v", err)
-		return
+func setup(kind, name string) error {
+	var ok bool
+	// set proto schema
+	schema, ok = model.IstioConfig[kind]
+	if !ok {
+		return fmt.Errorf("Missing kind %s", kind)
 	}
-	yml, err := yaml.JSONToYAML([]byte(js))
-	if err != nil {
-		fmt.Printf("Error converting to YAML: %v", err)
+
+	// use default namespace by default
+	if cmd.RootFlags.Namespace == "" {
+		cmd.RootFlags.Namespace = api.NamespaceDefault
 	}
-	fmt.Print(string(yml))
+
+	// set the config key
+	key = model.Key{
+		Kind:      kind,
+		Name:      name,
+		Namespace: cmd.RootFlags.Namespace,
+	}
+
+	return nil
+}
+
+// readInput reads from the input and checks with the schema
+func readInput() (proto.Message, error) {
+	var reader io.Reader
+	var err error
+
+	if file == "" {
+		reader = os.Stdin
+	} else {
+		reader, err = os.Open(file)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// read from reader
+	bytes, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read input: %v", err)
+	}
+
+	// convert
+	v, err := schema.FromYAML(string(bytes))
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse proto message: %v", err)
+	}
+
+	return v, nil
 }

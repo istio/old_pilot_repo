@@ -7,7 +7,6 @@ go_library(
     deps = [
         "//cmd:go_default_library",
         "//model:go_default_library",
-        "@com_github_ghodss_yaml//:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
