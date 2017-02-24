@@ -89,6 +89,10 @@ type ProtoSchema struct {
 	MessageName string
 	// Validate configuration as a protobuf message
 	Validate func(o proto.Message) error
+	// Internal flag indicates that the configuration type is derived
+	// from other configuration sources. This prohibits direct updates
+	// but allows listing and watching.
+	Internal bool
 }
 
 // Kinds lists all kinds in the kind schemas
@@ -128,6 +132,7 @@ var (
 		IngressRule: ProtoSchema{
 			MessageName: IngressRuleProto,
 			Validate:    ValidateIngressRule,
+			Internal:    true,
 		},
 		Destination: ProtoSchema{
 			MessageName: DestinationProto,

@@ -38,11 +38,11 @@ var (
 	schema model.ProtoSchema
 
 	postCmd = &cobra.Command{
-		Use:   "create [kind] [name]",
+		Use:   "create [type] [name]",
 		Short: "Create a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("provide kind and name")
+				return fmt.Errorf("provide configuration type and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -56,11 +56,11 @@ var (
 	}
 
 	putCmd = &cobra.Command{
-		Use:   "update [kind] [name]",
+		Use:   "update [type] [name]",
 		Short: "Update a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("provide kind and name")
+				return fmt.Errorf("provide configuration type and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -74,11 +74,11 @@ var (
 	}
 
 	getCmd = &cobra.Command{
-		Use:   "get [kind] [name]",
+		Use:   "get [type] [name]",
 		Short: "Retrieve a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("provide kind and name")
+				return fmt.Errorf("provide configuration type and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -97,11 +97,11 @@ var (
 	}
 
 	deleteCmd = &cobra.Command{
-		Use:   "delete [kind] [name]",
+		Use:   "delete [type] [name]",
 		Short: "Delete a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("provide kind and name")
+				return fmt.Errorf("provide configuration type and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -112,11 +112,11 @@ var (
 	}
 
 	listCmd = &cobra.Command{
-		Use:   "list [kind]",
+		Use:   "list [type]",
 		Short: "List configuration objects",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				return fmt.Errorf("please specify kind (one of %v)", model.IstioConfig.Kinds())
+				return fmt.Errorf("please specify configuration type (one of %v)", model.IstioConfig.Kinds())
 			}
 			if err := setup(args[0], ""); err != nil {
 				return err
@@ -156,7 +156,7 @@ func init() {
 	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
 
 	cmd.RootCmd.Use = "istioctl"
-	cmd.RootCmd.Long = fmt.Sprintf("Istio configuration command line utility. Available configuration kinds: %v",
+	cmd.RootCmd.Long = fmt.Sprintf("Istio configuration command line utility. Available configuration types: %v",
 		model.IstioConfig.Kinds())
 	cmd.RootCmd.AddCommand(postCmd)
 	cmd.RootCmd.AddCommand(putCmd)
@@ -177,7 +177,7 @@ func setup(kind, name string) error {
 	// set proto schema
 	schema, ok = model.IstioConfig[kind]
 	if !ok {
-		return fmt.Errorf("missing kind %s", kind)
+		return fmt.Errorf("missing configuration type %s", kind)
 	}
 
 	// use default namespace by default

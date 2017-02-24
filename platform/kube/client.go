@@ -263,8 +263,12 @@ func (cl *Client) Get(key model.Key) (proto.Message, bool) {
 
 // Post implements registry operation
 func (cl *Client) Post(key model.Key, v proto.Message) error {
-	if key.Kind == model.IngressRule {
-		return fmt.Errorf("unsupported operation: cannot put a config element of kind '%s'", key.Kind)
+	if err := cl.mapping.ValidateConfig(&key, v); err != nil {
+		return err
+	}
+
+	if cl.mapping[key.Kind].Internal {
+		return fmt.Errorf("unsupported operation: cannot post a derived config element of type %q", key.Kind)
 	}
 
 	out, err := modelToKube(cl.mapping, &key, v)
@@ -281,8 +285,12 @@ func (cl *Client) Post(key model.Key, v proto.Message) error {
 
 // Put implements registry operation
 func (cl *Client) Put(key model.Key, v proto.Message) error {
-	if key.Kind == model.IngressRule {
-		return fmt.Errorf("unsupported operation: cannot put a config element of kind '%s'", key.Kind)
+	if err := cl.mapping.ValidateConfig(&key, v); err != nil {
+		return err
+	}
+
+	if cl.mapping[key.Kind].Internal {
+		return fmt.Errorf("unsupported operation: cannot put a derived config element of type %q", key.Kind)
 	}
 
 	out, err := modelToKube(cl.mapping, &key, v)
@@ -300,12 +308,12 @@ func (cl *Client) Put(key model.Key, v proto.Message) error {
 
 // Delete implements registry operation
 func (cl *Client) Delete(key model.Key) error {
-	if key.Kind == model.IngressRule {
-		return fmt.Errorf("unsupported operation: cannot delete a config element of kind '%s'", key.Kind)
-	}
-
 	if err := cl.mapping.ValidateKey(&key); err != nil {
 		return err
+	}
+
+	if cl.mapping[key.Kind].Internal {
+		return fmt.Errorf("unsupported operation: cannot delete a derived config element of type %q", key.Kind)
 	}
 
 	return cl.dyn.Delete().

@@ -73,7 +73,9 @@ func init() {
 		switch gf.Name {
 		case "logtostderr":
 			err := gf.Value.Set("true")
-			fmt.Printf("missing logtostderr flag: %v", err)
+			if err != nil {
+				fmt.Printf("missing logtostderr flag: %v", err)
+			}
 		case "alsologtostderr", "log_dir", "stderrthreshold":
 			// always use stderr for logging
 		default:
