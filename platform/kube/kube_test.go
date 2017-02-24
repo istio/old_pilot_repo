@@ -134,7 +134,7 @@ func TestControllerCacheFreshness(t *testing.T) {
 	o := mock.Make(0)
 
 	// add and remove
-	glog.Infof("Calling Postt(%#v)", k)
+	glog.Infof("Calling Post(%#v)", k)
 	if err := ctl.Post(k, o); err != nil {
 		t.Error(err)
 	}
@@ -268,8 +268,7 @@ func TestProxyConfig(t *testing.T) {
 
 	key := model.Key{Kind: model.RouteRule, Name: "test", Namespace: ns}
 
-	err := cl.Post(key, rule)
-	if err != nil {
+	if err := cl.Post(key, rule); err != nil {
 		t.Errorf("cl.Post() => error %v, want no error", err)
 	}
 

@@ -38,11 +38,11 @@ var (
 	schema model.ProtoSchema
 
 	postCmd = &cobra.Command{
-		Use:   "post [kind] [name]",
+		Use:   "create [kind] [name]",
 		Short: "Create a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("Provide kind and name")
+				return fmt.Errorf("provide kind and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -56,11 +56,11 @@ var (
 	}
 
 	putCmd = &cobra.Command{
-		Use:   "put [kind] [name]",
+		Use:   "update [kind] [name]",
 		Short: "Update a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("Provide kind and name")
+				return fmt.Errorf("provide kind and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -78,14 +78,14 @@ var (
 		Short: "Retrieve a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("Provide kind and name")
+				return fmt.Errorf("provide kind and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
 			}
 			item, exists := cmd.Client.Get(key)
 			if !exists {
-				return fmt.Errorf("Does not exist")
+				return fmt.Errorf("does not exist")
 			}
 			out, err := schema.ToYAML(item)
 			if err != nil {
@@ -101,7 +101,7 @@ var (
 		Short: "Delete a configuration object",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return fmt.Errorf("Provide kind and name")
+				return fmt.Errorf("provide kind and name")
 			}
 			if err := setup(args[0], args[1]); err != nil {
 				return err
@@ -116,7 +116,7 @@ var (
 		Short: "List configuration objects",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				return fmt.Errorf("Please specify kind (one of %v)", model.IstioConfig.Kinds())
+				return fmt.Errorf("please specify kind (one of %v)", model.IstioConfig.Kinds())
 			}
 			if err := setup(args[0], ""); err != nil {
 				return err
@@ -124,7 +124,7 @@ var (
 
 			list, err := cmd.Client.List(key.Kind, key.Namespace)
 			if err != nil {
-				return fmt.Errorf("Error listing %s: %v", key.Kind, err)
+				return fmt.Errorf("error listing %s: %v", key.Kind, err)
 			}
 
 			for key, item := range list {
@@ -177,7 +177,7 @@ func setup(kind, name string) error {
 	// set proto schema
 	schema, ok = model.IstioConfig[kind]
 	if !ok {
-		return fmt.Errorf("Missing kind %s", kind)
+		return fmt.Errorf("missing kind %s", kind)
 	}
 
 	// use default namespace by default
@@ -212,13 +212,13 @@ func readInput() (proto.Message, error) {
 	// read from reader
 	bytes, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot read input: %v", err)
+		return nil, fmt.Errorf("cannot read input: %v", err)
 	}
 
 	// convert
 	v, err := schema.FromYAML(string(bytes))
 	if err != nil {
-		return nil, fmt.Errorf("Cannot parse proto message: %v", err)
+		return nil, fmt.Errorf("cannot parse proto message: %v", err)
 	}
 
 	return v, nil

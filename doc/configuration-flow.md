@@ -13,18 +13,18 @@ function can subscribe to receive object creation events for objects of a
 particular kind. The controller streams the events to the subscribers, and also
 maintains a local cache view of the entire store.
 
-The flow of configuration starts at the operator, continues to the
-platform-specific persistent store, and then triggers a notification event at
-the remote proxy component.
+The flow of configuration starts at the operator (1), continues to the
+platform-specific persistent store (2), and then triggers a notification event at
+the remote proxy component (3).
 
-## User input
+## 1. User input
 
 Istio Manager provides a command line interface called `istioctl` that exposes
 the REST-based configuration store interface.  The tool validates that its YAML
 input satisfies the schema for the registered Istio configuration kind, and
 stores the validated input in the store.
 
-## Configuration storage
+## 2. Configuration storage
 
 Istio configuration storage is platform-specific. Below, we focus on Kubernetes,
 since Istio Manager model is close to Kubernetes model of Third-Party
@@ -35,11 +35,11 @@ Each Istio configuration object is stored as a Kubernetes Third-Party resource
 of kind `istioconfig`. The name of the resource is a combination of Istio kind
 and configuration name, and namespaces are shared between Kubernetes and Istio.
 Internally, this means Kubernetes assigns a key subset in `etcd` to Istio,
-exposes an HTTP endpoint for streaming updated to the store, and provides the
+exposes an HTTP endpoint for streaming updates to the store, and provides the
 necessary API machinery for creating a cached controller interface.
 You should be able to query the key/value store using `kubectl get istioconfigs`.
 
-## Proxy agent
+## 3. Proxy re-configuration
 
 Once a configuration object is persisted in `etcd`, a notification is sent to
 the proxy agent controller about the update to the store.  Proxy agent reacts

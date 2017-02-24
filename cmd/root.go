@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,11 +51,11 @@ var (
 			if err != nil {
 				Client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
 				if err != nil {
-					return multierror.Prefix(err, "Failed to connect to Kubernetes API.")
+					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 				}
 			}
 			if err = Client.RegisterResources(); err != nil {
-				return multierror.Prefix(err, "Failed to register Third-Party Resources.")
+				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
 			return
 		},
@@ -72,8 +73,7 @@ func init() {
 		switch gf.Name {
 		case "logtostderr":
 			err := gf.Value.Set("true")
-			// cannot handle error here since logging is not initialized
-			_ = err
+			fmt.Printf("missing logtostderr flag: %v", err)
 		case "alsologtostderr", "log_dir", "stderrthreshold":
 			// always use stderr for logging
 		default:
