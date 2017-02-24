@@ -124,7 +124,7 @@ var (
 
 			list, err := cmd.Client.List(key.Kind, key.Namespace)
 			if err != nil {
-				return fmt.Errorf("Error listing %s: %v\n", key.Kind, err)
+				return fmt.Errorf("Error listing %s: %v", key.Kind, err)
 			}
 
 			for key, item := range list {
