@@ -243,7 +243,7 @@ func addConfig(config []byte, kind, name string) {
 	}
 	v, err := istioKind.FromJSON(string(out))
 	check(err)
-	check(istioClient.Put(model.Key{
+	check(istioClient.Post(model.Key{
 		Kind:      kind,
 		Name:      name,
 		Namespace: params.namespace,
