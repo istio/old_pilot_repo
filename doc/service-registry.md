@@ -100,7 +100,7 @@ groups the pods into unique sets -- each set representing a service
 version. In future, Istio will add support for pulling in similar
 information from Mesos registry and *potentially* other registries.
 
-## 4. Service version tags
+### 4. Service version tags
 
 When listing the various instances of a service, the tags partition
 the set of instances into disjoint subsets.  E.g., grouping pods by tags
