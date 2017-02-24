@@ -66,7 +66,18 @@ func init() {
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	RootCmd.PersistentFlags().StringVarP(&RootFlags.Namespace, "namespace", "n", "",
 		"Select a Kubernetes namespace")
-	RootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
+	// carry over glog flags with new defaults
+	flag.CommandLine.VisitAll(func(gf *flag.Flag) {
+		switch gf.Name {
+		case "logtostderr":
+			gf.Value.Set("true")
+		case "alsologtostderr", "log_dir", "stderrthreshold":
+			// always use stderr for logging
+		default:
+			RootCmd.PersistentFlags().AddGoFlag(gf)
+		}
+	})
 }
 
 // WaitSignal awaits for SIGINT or SIGTERM and closes the channel
