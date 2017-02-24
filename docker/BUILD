@@ -59,7 +59,7 @@ manager_docker_build(
         "@deb_iptables//file",
         "@deb_libnfnetlink//file",
         "@deb_libxtables//file",
-    ]
+    ],
     tars = [":prepare_proxy"],
 )
 
