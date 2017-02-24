@@ -71,7 +71,9 @@ func init() {
 	flag.CommandLine.VisitAll(func(gf *flag.Flag) {
 		switch gf.Name {
 		case "logtostderr":
-			gf.Value.Set("true")
+			err := gf.Value.Set("true")
+			// cannot handle error here since logging is not initialized
+			_ = err
 		case "alsologtostderr", "log_dir", "stderrthreshold":
 			// always use stderr for logging
 		default:

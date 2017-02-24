@@ -110,7 +110,7 @@ func CheckMapInvariant(r model.ConfigRegistry, t *testing.T, namespace string, n
 	// update all elements
 	for i := 0; i < n; i++ {
 		elts[i].Pairs[0].Value += "(updated)"
-		if err := r.Put(keys[i], elts[i]); err != nil {
+		if err = r.Put(keys[i], elts[i]); err != nil {
 			t.Error(err)
 		}
 	}
