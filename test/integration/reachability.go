@@ -75,9 +75,6 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 			if err != nil {
 				return err
 			}
-			if verbose {
-				log.Println(request)
-			}
 			match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
 			if len(match) > 1 {
 				id := match[1]
