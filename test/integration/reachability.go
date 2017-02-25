@@ -51,10 +51,14 @@ func (r *reachability) run() error {
 		log.Println("requests:", r.accessLogs)
 	}
 
-	err = r.checkAccessLogs()
-	if err != nil {
+	if err = r.checkAccessLogs(); err != nil {
 		return err
 	}
+
+	if err = r.checkMixerLogs(); err != nil {
+		return err
+	}
+
 	log.Println("Success!")
 	return nil
 }
@@ -140,18 +144,14 @@ func (r *reachability) makeRequests() error {
 
 func (r *reachability) checkAccessLogs() error {
 	log.Println("Checking access logs of pods to correlate request IDs...")
-	for n := 0; ; n++ {
+	for n := 0; n < budget; n++ {
 		found := true
 		for _, pod := range []string{"a", "b"} {
-			if verbose {
-				log.Printf("Checking access log of %s\n", pod)
-			}
+			log.Printf("Checking access log of %s\n", pod)
 			access := podLogs(pods[pod], "proxy")
 			for _, id := range r.accessLogs[pod] {
 				if !strings.Contains(access, id) {
-					if verbose {
-						log.Printf("Failed to find request id %s in log of %s\n", id, pod)
-					}
+					log.Printf("Failed to find request id %s in log of %s\n", id, pod)
 					found = false
 					break
 				}
@@ -165,10 +165,35 @@ func (r *reachability) checkAccessLogs() error {
 			return nil
 		}
 
-		if n > budget {
-			return fmt.Errorf("exceeded budget for checking access logs")
+		time.Sleep(time.Second)
+	}
+	return fmt.Errorf("exceeded budget for checking access logs")
+}
+
+func (r *reachability) checkMixerLogs() error {
+	log.Println("Checking mixer logs for request IDs...")
+
+	for n := 0; n < budget; n++ {
+		found := true
+		access := podLogs(pods["mixer"], "mixer")
+		for _, pod := range []string{"a", "b"} {
+			for _, id := range r.accessLogs[pod] {
+				if !strings.Contains(access, id) {
+					log.Printf("Failed to find request id %s in mixer logs\n", id)
+					found = false
+					break
+				}
+			}
+			if !found {
+				break
+			}
+		}
+
+		if found {
+			return nil
 		}
 
 		time.Sleep(time.Second)
 	}
+	return fmt.Errorf("exceeded budget for checking mixer logs")
 }
