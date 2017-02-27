@@ -232,7 +232,8 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 
 // buildOutboundFilters creates route configs indexed by ports for the traffic outbound
 // from the proxy instance
-func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service, config *model.IstioRegistry, mesh *MeshConfig) (HTTPRouteConfigs, TCPRouteConfigs) {
+func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
+	config *model.IstioRegistry, mesh *MeshConfig) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
