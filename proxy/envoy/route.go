@@ -19,6 +19,7 @@ package envoy
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -232,5 +233,14 @@ func sharedHost(parts ...[]string) []string {
 			out[i], out[j] = out[j], out[i]
 		}
 		return out
+	}
+}
+
+func buildTCPRoute(cluster *Cluster, address string, port int) TCPRoute {
+	return TCPRoute{
+		Cluster:           cluster.Name,
+		DestinationIPList: []string{address + "/32"},
+		DestinationPorts:  strconv.Itoa(port),
+		clusterRef:        cluster,
 	}
 }

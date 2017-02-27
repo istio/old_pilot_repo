@@ -113,8 +113,8 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 // build combines the outbound and inbound routes prioritizing the latter
 func build(instances []*model.ServiceInstance, services []*model.Service,
 	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
-	outbound := buildOutboundFilters(instances, services, config, mesh)
-	inbound := buildInboundFilters(instances)
+	outbound, tcpOutbound := buildOutboundFilters(instances, services, config, mesh)
+	inbound, tcpInbound := buildInboundFilters(instances)
 
 	// merge the two sets of route configs
 	routeConfigs := make(HTTPRouteConfigs)
@@ -132,9 +132,26 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 		}
 	}
 
+	// merge the two sets of route configs
+	tcpRouteConfigs := make(TCPRouteConfigs)
+	for port, tcpRouteConfig := range tcpInbound {
+		tcpRouteConfigs[port] = tcpRouteConfig
+	}
+	for port, outgoing := range tcpOutbound {
+		if incoming, ok := tcpRouteConfigs[port]; ok {
+			// If the traffic is sent to a service that has instances co-located with the proxy,
+			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
+			// Note that this may not be a problem if the service port and its endpoint port are distinct.
+			tcpRouteConfigs[port] = incoming.merge(outgoing)
+		} else {
+			tcpRouteConfigs[port] = outgoing
+		}
+	}
+
 	// canonicalize listeners and collect clusters
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
+
 	for port, routeConfig := range routeConfigs {
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
 		clusters = append(clusters, routeConfig.clusters()...)
@@ -163,6 +180,43 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 				},
 			}},
 		}
+
+		// Add TCP filters that share a port with HTTP filters.
+		if _, ok := tcpRouteConfigs[port]; ok {
+
+			// TCP and HTTP filter on the same port seems to cause
+			// envoy to assign all traffic to TCP filter regardless of
+			// the routing config. Temporarily drop TCP filters that
+			// share a port with HTTP (e.g. istio-egress) until this is
+			// root caused.
+
+			// listener.Filters = append(listener.Filters, &NetworkFilter{
+			// 	Type: "read",
+			// 	Name: TCPProxyFilter,
+			// 	Config: TCPProxyFilterConfig{
+			// 		StatPrefix:  "tcp",
+			// 		RouteConfig: tcpConfig,
+			// 	},
+			// })
+			// clusters = append(clusters, tcpConfig.clusters()...)
+			delete(tcpRouteConfigs, port)
+		}
+		listeners = append(listeners, listener)
+	}
+
+	for port, tcpConfig := range tcpRouteConfigs {
+		clusters = append(clusters, tcpConfig.clusters()...)
+		listener := &Listener{
+			Port: port,
+			Filters: []*NetworkFilter{{
+				Type: "read",
+				Name: TCPProxyFilter,
+				Config: TCPProxyFilterConfig{
+					StatPrefix:  "tcp",
+					RouteConfig: tcpConfig,
+				},
+			}},
+		}
 		listeners = append(listeners, listener)
 	}
 
@@ -178,11 +232,11 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 
 // buildOutboundFilters creates route configs indexed by ports for the traffic outbound
 // from the proxy instance
-func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
-	config *model.IstioRegistry, mesh *MeshConfig) HTTPRouteConfigs {
+func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service, config *model.IstioRegistry, mesh *MeshConfig) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
+	tcpConfigs := make(TCPRouteConfigs)
 
 	// get all the route rules applicable to the instances
 	rules := config.RouteRulesBySource("", instances)
@@ -209,21 +263,26 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 				host := buildVirtualHost(service, port, suffix, routes)
 				http := httpConfigs.EnsurePort(port.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
+			case model.ProtocolTCP:
+				cluster := buildOutboundCluster(service.Hostname, port, nil)
+				route := buildTCPRoute(cluster, service.Address, port.Port)
+				config := tcpConfigs.EnsurePort(port.Port)
+				config.Routes = append(config.Routes, route)
 			default:
 				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port.Port)
 			}
 		}
 	}
-
-	return httpConfigs
+	return httpConfigs, tcpConfigs
 }
 
 // buildInboundFilters creates route configs indexed by ports for the traffic inbound
 // to co-located service instances
-func buildInboundFilters(instances []*model.ServiceInstance) HTTPRouteConfigs {
+func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
+	tcpConfigs := make(TCPRouteConfigs)
 
 	// inbound connections/requests are redirected to the endpoint port but appear to be sent
 	// to the service port
@@ -243,10 +302,15 @@ func buildInboundFilters(instances []*model.ServiceInstance) HTTPRouteConfigs {
 
 			http := httpConfigs.EnsurePort(instance.Endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
+		case model.ProtocolTCP:
+			cluster := buildInboundCluster(instance.Endpoint.Port, port.Protocol)
+			route := buildTCPRoute(cluster, instance.Endpoint.Address, instance.Endpoint.Port)
+			config := tcpConfigs.EnsurePort(port.Port)
+			config.Routes = append(config.Routes, route)
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}
 	}
 
-	return httpConfigs
+	return httpConfigs, tcpConfigs
 }
