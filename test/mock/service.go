@@ -77,8 +77,8 @@ func MakeInstance(service *model.Service, port *model.Port, version int) *model.
 
 // MakeIP creates a fake IP address for a service and instance version
 func MakeIP(service *model.Service, version int) string {
-	ip := net.ParseIP(service.Address)
-	ip[2] = 1
+	ip := net.ParseIP(service.Address).To4()
+	ip[2] = byte(1)
 	ip[3] = byte(version)
 	return ip.String()
 }
