@@ -113,26 +113,26 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 // build combines the outbound and inbound routes prioritizing the latter
 func build(instances []*model.ServiceInstance, services []*model.Service,
 	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
-	outbound, tcpOutbound := buildOutboundFilters(instances, services, config, mesh)
-	inbound, tcpInbound := buildInboundFilters(instances)
+	httpOutbound, tcpOutbound := buildOutboundFilters(instances, services, config, mesh)
+	httpInbound, tcpInbound := buildInboundFilters(instances)
 
-	// merge the two sets of route configs
-	routeConfigs := make(HTTPRouteConfigs)
-	for port, routeConfig := range inbound {
-		routeConfigs[port] = routeConfig
+	// merge the two sets of HTTP route configs
+	httpRouteConfigs := make(HTTPRouteConfigs)
+	for port, routeConfig := range httpInbound {
+		httpRouteConfigs[port] = routeConfig
 	}
-	for port, outgoing := range outbound {
-		if incoming, ok := routeConfigs[port]; ok {
+	for port, outgoing := range httpOutbound {
+		if incoming, ok := httpRouteConfigs[port]; ok {
 			// If the traffic is sent to a service that has instances co-located with the proxy,
 			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
 			// Note that this may not be a problem if the service port and its endpoint port are distinct.
-			routeConfigs[port] = incoming.merge(outgoing)
+			httpRouteConfigs[port] = incoming.merge(outgoing)
 		} else {
-			routeConfigs[port] = outgoing
+			httpRouteConfigs[port] = outgoing
 		}
 	}
 
-	// merge the two sets of route configs
+	// merge the two sets of TCP route configs
 	tcpRouteConfigs := make(TCPRouteConfigs)
 	for port, tcpRouteConfig := range tcpInbound {
 		tcpRouteConfigs[port] = tcpRouteConfig
@@ -152,7 +152,7 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 
-	for port, routeConfig := range routeConfigs {
+	for port, routeConfig := range httpRouteConfigs {
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
 		clusters = append(clusters, routeConfig.clusters()...)
 
