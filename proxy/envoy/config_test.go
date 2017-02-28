@@ -87,9 +87,11 @@ func TestMockConfigGenerate(t *testing.T) {
 	if config == nil {
 		t.Fatalf("Failed to generate config")
 	}
-	config.WriteFile(envoyData)
+	err := config.WriteFile(envoyData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
 
-	// TODO: use difflib to obtain detailed diff
 	expected, err := ioutil.ReadFile(envoyGolden)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -98,6 +100,8 @@ func TestMockConfigGenerate(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+
+	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
 		t.Errorf("Envoy config master copy changed")
 	}

@@ -55,7 +55,7 @@ var (
 // MakeRegistry creates a mock config registry
 func MakeRegistry() *model.IstioRegistry {
 	return &model.IstioRegistry{
-		&ConfigRegistry{
+		ConfigRegistry: &ConfigRegistry{
 			data: make(map[model.Key]proto.Message),
 		}}
 }
