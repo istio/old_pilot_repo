@@ -26,6 +26,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    data = [
+        "testdata/envoy.json.golden",
+    ],
     size = "small",
     srcs = [
         "config_test.go",
