@@ -17,6 +17,8 @@ package envoy
 import (
 	"sort"
 	"testing"
+
+	"istio.io/manager/test/mock"
 )
 
 func TestRoutesByPath(t *testing.T) {
@@ -67,4 +69,14 @@ func TestRoutesByPath(t *testing.T) {
 			t.Errorf("Invalid sort order for case %d", i)
 		}
 	}
+}
+
+func TestMockConfigGenerate(t *testing.T) {
+	ds := mock.Discovery
+	r := mock.MakeRegistry()
+	config := Generate(
+		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
+		ds.Services(), r,
+		DefaultMeshConfig)
+	config.WriteFile("testdata/envoy.json")
 }

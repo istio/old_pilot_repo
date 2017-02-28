@@ -32,6 +32,7 @@ var (
 		},
 		versions: 2,
 	}
+	HostInstance = MakeIP(HelloService, 0)
 )
 
 // MakeService creates a mock service
@@ -47,16 +48,26 @@ func MakeService(hostname, address string) *model.Service {
 			Name:     "http-status",
 			Port:     81,
 			Protocol: model.ProtocolHTTP,
+		}, {
+			Name:     "custom",
+			Port:     90,
+			Protocol: model.ProtocolTCP,
 		}},
 	}
 }
 
 // MakeInstance creates a mock instance, version enumerates endpoints
 func MakeInstance(service *model.Service, port *model.Port, version int) *model.ServiceInstance {
+	// we make port 80 same as endpoint port, otherwise, it's distinct
+	target := port.Port
+	if target != 80 {
+		target = target + 1000
+	}
+
 	return &model.ServiceInstance{
 		Endpoint: model.NetworkEndpoint{
 			Address:     MakeIP(service, version),
-			Port:        port.Port + 1000,
+			Port:        target,
 			ServicePort: port,
 		},
 		Service: service,

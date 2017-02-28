@@ -32,4 +32,5 @@ go_test(
         "route_test.go",
     ],
     library = ":go_default_library",
+    deps = ["//test/mock:go_default_library"],
 )
