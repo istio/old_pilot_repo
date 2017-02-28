@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"io/ioutil"
 	"sort"
 	"testing"
 
@@ -71,6 +72,11 @@ func TestRoutesByPath(t *testing.T) {
 	}
 }
 
+const (
+	envoyData   = "testdata/envoy.json"
+	envoyGolden = "testdata/envoy.json.golden"
+)
+
 func TestMockConfigGenerate(t *testing.T) {
 	ds := mock.Discovery
 	r := mock.MakeRegistry()
@@ -78,5 +84,21 @@ func TestMockConfigGenerate(t *testing.T) {
 		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
 		ds.Services(), r,
 		DefaultMeshConfig)
-	config.WriteFile("testdata/envoy.json")
+	if config == nil {
+		t.Fatalf("Failed to generate config")
+	}
+	config.WriteFile(envoyData)
+
+	// TODO: use difflib to obtain detailed diff
+	expected, err := ioutil.ReadFile(envoyGolden)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	data, err := ioutil.ReadFile(envoyData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if string(expected) != string(data) {
+		t.Errorf("Envoy config master copy changed")
+	}
 }
