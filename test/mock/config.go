@@ -61,7 +61,7 @@ func Make(i int) *MockConfig {
 	}
 }
 
-// CheckMapInvariant validates operational invariants of a registry
+// CheckMapInvariant validates operational invariants of a config registry
 func CheckMapInvariant(r model.ConfigRegistry, t *testing.T, namespace string, n int) {
 	// create configuration objects
 	keys := make(map[int]model.Key, 0)
