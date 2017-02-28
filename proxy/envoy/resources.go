@@ -248,11 +248,11 @@ func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 	out := &TCPRouteConfig{}
 	set := make(map[string]bool)
 	for _, route := range rc.Routes {
-		set[route.Cluster] = true
+		set[route.clusterRef.hostname] = true
 		out.Routes = append(out.Routes, route)
 	}
 	for _, route := range that.Routes {
-		if !set[route.Cluster] {
+		if !set[route.clusterRef.hostname] {
 			out.Routes = append(out.Routes, route)
 		}
 	}
@@ -348,6 +348,7 @@ type Cluster struct {
 	hostname string
 	port     *model.Port
 	tags     model.Tags
+	outbound bool
 }
 
 // CircuitBreaker definition

@@ -118,8 +118,8 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 
 	// merge the two sets of HTTP route configs
 	httpRouteConfigs := make(HTTPRouteConfigs)
-	for port, routeConfig := range httpInbound {
-		httpRouteConfigs[port] = routeConfig
+	for port, httpRouteConfig := range httpInbound {
+		httpRouteConfigs[port] = httpRouteConfig
 	}
 	for port, outgoing := range httpOutbound {
 		if incoming, ok := httpRouteConfigs[port]; ok {
@@ -288,24 +288,26 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 	// inbound connections/requests are redirected to the endpoint port but appear to be sent
 	// to the service port
 	for _, instance := range instances {
-		port := instance.Endpoint.ServicePort
+		service := instance.Service
+		endpoint := instance.Endpoint
+		port := endpoint.ServicePort
 		switch port.Protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-			cluster := buildInboundCluster(instance.Endpoint.Port, port.Protocol)
+			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
 			route := buildDefaultRoute(cluster)
-			host := buildVirtualHost(instance.Service, port, suffix, []*HTTPRoute{route})
+			host := buildVirtualHost(service, port, suffix, []*HTTPRoute{route})
 
 			// insert explicit instance ip:port as a hostname field
-			host.Domains = append(host.Domains, fmt.Sprintf("%s:%d", instance.Endpoint.Address, instance.Endpoint.Port))
-			if instance.Endpoint.Port == 80 {
-				host.Domains = append(host.Domains, instance.Endpoint.Address)
+			host.Domains = append(host.Domains, fmt.Sprintf("%s:%d", endpoint.Address, endpoint.Port))
+			if endpoint.Port == 80 {
+				host.Domains = append(host.Domains, endpoint.Address)
 			}
 
-			http := httpConfigs.EnsurePort(instance.Endpoint.Port)
+			http := httpConfigs.EnsurePort(endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
 		case model.ProtocolTCP:
-			cluster := buildInboundCluster(instance.Endpoint.Port, port.Protocol)
-			route := buildTCPRoute(cluster, instance.Endpoint.Address, instance.Endpoint.Port)
+			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
+			route := buildTCPRoute(cluster, endpoint.Address, endpoint.Port)
 			config := tcpConfigs.EnsurePort(port.Port)
 			config.Routes = append(config.Routes, route)
 		default:
