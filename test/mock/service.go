@@ -21,18 +21,11 @@ import (
 	"istio.io/manager/model"
 )
 
-/*
-	config := Generate(
-		w.discovery.HostInstances(w.addrs),
-		w.discovery.Services(),
-		w.registry, w.mesh)
-*/
-
 // Mock values
 var (
-	HelloService = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
-	WorldService = MakeService("world.default.svc.cluster.local", "10.2.0.0")
-	Discovery    = &ServiceDiscovery{
+	HelloService                        = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
+	WorldService                        = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	Discovery    model.ServiceDiscovery = &ServiceDiscovery{
 		services: map[string]*model.Service{
 			HelloService.Hostname: HelloService,
 			WorldService.Hostname: WorldService,
@@ -58,7 +51,7 @@ func MakeService(hostname, address string) *model.Service {
 	}
 }
 
-// MakeInstance creates a mock instance for the first port
+// MakeInstance creates a mock instance, version enumerates endpoints
 func MakeInstance(service *model.Service, port *model.Port, version int) *model.ServiceInstance {
 	return &model.ServiceInstance{
 		Endpoint: model.NetworkEndpoint{
