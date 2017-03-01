@@ -181,24 +181,17 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 			}},
 		}
 
-		// Add TCP filters that share a port with HTTP filters.
-		if _, ok := tcpRouteConfigs[port]; ok {
-
-			// TCP and HTTP filter on the same port seems to cause
-			// envoy to assign all traffic to TCP filter regardless of
-			// the routing config. Temporarily drop TCP filters that
-			// share a port with HTTP (e.g. istio-egress) until this is
-			// root caused.
-
-			// listener.Filters = append(listener.Filters, &NetworkFilter{
-			// 	Type: "read",
-			// 	Name: TCPProxyFilter,
-			// 	Config: TCPProxyFilterConfig{
-			// 		StatPrefix:  "tcp",
-			// 		RouteConfig: tcpConfig,
-			// 	},
-			// })
-			// clusters = append(clusters, tcpConfig.clusters()...)
+		// Sharing tcp_proxy and http_connection_manager filters on
+		// the same port for different destination services doesn't work
+		// with Envoy (yet). When the tcp_proxy filter's route matching
+		// fails for the http service the connection is closed without
+		// falling back to the http_connection_manager.
+		//
+		// Temporary workaround is to not share ports between
+		// destination services. If the user does share ports, remove the
+		// TCP service from the envoy config and print a warning.
+		if config, ok := tcpRouteConfigs[port]; ok {
+			glog.Warningf("tcp and http services on the same port is not supported at this time - dropping tcp service %v on port %v from envoy config", config, port)
 			delete(tcpRouteConfigs, port)
 		}
 		listeners = append(listeners, listener)
