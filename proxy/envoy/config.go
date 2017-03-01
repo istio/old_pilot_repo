@@ -181,6 +181,8 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 			}},
 		}
 
+		// TODO(github.com/istio/manager/issues/237)
+		//
 		// Sharing tcp_proxy and http_connection_manager filters on
 		// the same port for different destination services doesn't work
 		// with Envoy (yet). When the tcp_proxy filter's route matching
@@ -191,7 +193,8 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 		// destination services. If the user does share ports, remove the
 		// TCP service from the envoy config and print a warning.
 		if config, ok := tcpRouteConfigs[port]; ok {
-			glog.Warningf("tcp and http services on the same port is not supported at this time - dropping tcp service %v on port %v from envoy config", config, port)
+			glog.Warningf("TCP and HTTP services on same port not supported")
+			glog.Warningf("Omitting tcp service %v on port %v", config, port)
 			delete(tcpRouteConfigs, port)
 		}
 		listeners = append(listeners, listener)
