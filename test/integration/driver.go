@@ -48,8 +48,8 @@ const (
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
 
-	// Mixer tag *update manually*
-	mixerTag = "demo"
+	// Mixer image tag is the short SHA *update manually*
+	mixerTag = "6655a67"
 )
 
 // params contain default template parameter values
