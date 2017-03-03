@@ -386,7 +386,7 @@ type Cluster struct {
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host            `json:"hosts,omitempty"`
 	Features                 string            `json:"features,omitempty"`
-	CircuitBreaker           *CircuitBreaker   `json:"circuit_breaker,omitempty"`
+	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
 
 	// special values used by the post-processing passes for outbound clusters
