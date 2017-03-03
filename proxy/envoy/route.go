@@ -87,6 +87,24 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 		Prefix: "/",
 	}
 
+	// setup timeouts for the route
+	if rule.HttpReqTimeout != nil &&
+		rule.HttpReqTimeout.GetSimpleTimeout() != nil &&
+		rule.HttpReqTimeout.GetSimpleTimeout().TimeoutSeconds > 0 {
+		// convert from float sec to ms
+		route.TimeoutMS = int(rule.HttpReqTimeout.GetSimpleTimeout().TimeoutSeconds * 1000)
+	}
+
+	// setup retries
+	if rule.HttpReqRetries != nil &&
+		rule.HttpReqRetries.GetSimpleRetry() != nil &&
+		rule.HttpReqRetries.GetSimpleRetry().Attempts > 0 {
+		route.RetryPolicy.NumRetries = int(rule.HttpReqRetries.GetSimpleRetry().Attempts)
+
+		// These are the safest retry policies as per envoy docs
+		route.RetryPolicy.Policy = "5xx,connect-failure,refused-stream"
+	}
+
 	if rule.Match != nil {
 		route.Headers = buildHeaders(rule.Match.Http)
 

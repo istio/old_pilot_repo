@@ -399,6 +399,11 @@ type Cluster struct {
 // CircuitBreaker definition
 // See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_circuit_breakers.html#circuit-breakers
 type CircuitBreaker struct {
+	Default DefaultCBPriority `json:"default"`
+}
+
+// DefaultCBPriority defines the circuit breaker for default cluster priority
+type DefaultCBPriority struct {
 	MaxConnections     int `json:"max_connections,omitempty"`
 	MaxPendingRequests int `json:"max_pending_requests,omitempty"`
 	MaxRequests        int `json:"max_requests,omitempty"`
@@ -408,7 +413,7 @@ type CircuitBreaker struct {
 // OutlierDetection definition
 // See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_runtime.html#outlier-detection
 type OutlierDetection struct {
-	ConsecutiveError   int `json:"consecutive_5xx,omitempty"`
+	ConsecutiveErrors  int `json:"consecutive_5xx,omitempty"`
 	IntervalMS         int `json:"interval_ms,omitempty"`
 	BaseEjectionTimeMS int `json:"base_ejection_time_ms,omitempty"`
 	MaxEjectionPercent int `json:"max_ejection_percent,omitempty"`
