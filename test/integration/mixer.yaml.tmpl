@@ -70,13 +70,9 @@ metadata:
 spec:
   ports:
   - name: tcp
-    protocol: TCP
     port: 9091
-    targetPort: 9091
   - name: prometheus
-    protocol: TCP
     port: 42422
-    targetPort: 42422
   selector:
     app: mixer
 ---
