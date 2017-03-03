@@ -3,6 +3,35 @@
 All contributions to Istio Manager should supply tests that cover new features and/or bug fixes.
 We strive to improve and maintain quality of the code with up-to-date samples, good coverage of the code, and static analyzers to detect problems early.
 
+## Getting started
+
+Manager tests require access to a Kubernetes cluster (version 1.5.2 or higher). Please
+configure your `kubectl` to point to a development cluster (e.g. minikube)
+before building or invoking the tests and add a symbolic link to your
+repository pointing to Kubernetes cluster credentials:
+
+    ln -s ~/.kube/config platform/kube/
+
+To run the complete set of tests, use the following commands:
+
+    bazel test //...
+    bin/e2e.sh [-h docker.io/<username>]
+    
+_Note1_: If you are running Bazel in a VM (e.g. in [Vagrant environment](build-vagrant.md)), copy
+the kube config file on the host to platform/kube instead of symlinking it,
+and change the paths to minikube certs.
+
+    cp ~/.kube/config platform/kube/
+    sed -i 's!/Users/<username>!/home/ubuntu!' platform/kube/config
+
+Also, copy the same file to `/home/ubuntu/.kube/config` in the VM, and make
+sure that the file is readable to user `ubuntu`.
+
+_Note2_: If you are using GKE, please make sure you are using static client
+certificates before fetching cluster credentials:
+
+    gcloud config set container/use_client_certificate True
+
 ## Code linters
 
 We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh).
@@ -12,6 +41,7 @@ We require that Istio Manager code contributions pass all linters defined by [th
 We follow Golang unit testing practice of creating `source_test.go` next to `source.go` files that provide sufficient coverage of the functionality. These tests can also be run using `bazel` with additional strict dependency declarations.
 
 For tests that require Kubernetes access, we rely on the client libraries and `.kube/config` file that needs to be linked into your repository directory as `platform/kube/config`. Kubernetes tests use this file to authenticate and access the cluster.
+Each test creates a temporary namespace and deletes it on completion.
 
 For tests that require systems integration, such as invoking the proxy with a special configuration, we capture the desired output as golden artifacts and save the artifacts in the repository. Validation tests compare generated output against the desired output. For example, [Envoy configuration test data](../proxy/envoy/testdata) contains auto-generated proxy configuration. If you make changes to the config generation, you also need to create or update the golden artifact in the same pull request.
 
