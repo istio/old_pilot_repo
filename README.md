@@ -4,8 +4,8 @@
 [![GoDoc](https://godoc.org/github.com/istio/manager?status.svg)](https://godoc.org/github.com/istio/manager)
 [![codecov.io](https://codecov.io/github/istio/manager/coverage.svg?branch=master)](https://codecov.io/github/istio/manager?branch=master)
 
-The Istio Manager is used to configure Istio and propagate configuration to the
-other components of the system, including the Istio mixer and the Istio proxy mesh.
+Istio Manager is used to configure Istio and propagate configuration to the
+other components of the system, including the Istio mixer and the Istio proxies. 
 
 [Contributing to the project](./CONTRIBUTING.md)
 
@@ -14,28 +14,11 @@ other components of the system, including the Istio mixer and the Istio proxy me
 If you have a question about the Istio Manager or have a problem using it, please
 [file an issue](https://github.com/istio/manager/issues/new).
 
-## Build instructions for Linux and Mac ##
+## Getting started ##
 
-We are using [Bazel 0.4.4](https://bazel.io) to build Istio Manager:
+Istio Manager [design](doc/design.md) gives an architectural overview of the manager components - cluster platform abstractions, service model, and the proxy controllers.
 
-    bazel build //cmd/manager
-
-Bazel uses `BUILD` files to keep track of dependencies between sources.  If you
-add a new source file or change the imports, please run the following command
-to update all `BUILD` files:
-
-    gazelle -go_prefix "istio.io/manager" --mode fix -repo_root .
-
-Gazelle binary is located in `bazel-bin/external` folder under the manager
-repository, after your initial bazel build:
-
-    bazel-bin/external/io_bazel_rules_go_repository_tools/bin/gazelle
-
-_Note_: If you cant find the gazelle binary in the path mentioned above,
-try to update the mlocate database and run `locate gazelle`. The gazelle
-binary should typically be in
-
-    $HOME/.cache/bazel/_bazel_<username>/<somelongfoldername>/external/io_bazel_rules_go_repository_tools/bin/gazelle
+If you are interested in contributing to the project, please take a look at the [build instructions](doc/build.md) and the [testing infrastructure](doc/testing.md).
 
 ## Test environment ##
 
