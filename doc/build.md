@@ -22,3 +22,16 @@ try to update the mlocate database and run `locate gazelle`. The gazelle
 binary should typically be in
 
     $HOME/.cache/bazel/_bazel_<username>/<somelongfoldername>/external/io_bazel_rules_go_repository_tools/bin/gazelle
+
+## Go tooling compatibility
+
+Bazel build environment is compatible with the standard Golang tooling, except you need to vendorize all dependencies in Istio Manager. If you have successfully built with Bazel, run the following script to put dependencies fetched by Bazel into `vendor` directory:
+
+    bin/init.sh
+    
+After running this command, you should be able to use standard go tools:
+
+    go build istio.io/manager/...
+    go test -v istio.io/manager/...
+    
+_Note_: these commands assume you have placed the repository clone into `$GOPATH`.
