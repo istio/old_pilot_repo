@@ -1,7 +1,7 @@
 
 # Vagrant build environment
 
-_Note:_ This section applies to Mac and Windows users only.
+_Note:_ This section applies to Mac and Windows users only. You can develop natively on Linux.
 
 ## Pre-requisites ##
 
@@ -14,9 +14,9 @@ _Note:_ This section applies to Mac and Windows users only.
 
 ## 1. Start Minikube
 
-Istio manager needs kubernetes versions 1.5.2 or higher.
+Istio Manager needs a recent kubernetes version (see [testing doc](testing.md)).
 
-    minikube config set kubernetes-version v1.5.2
+    minikube config set kubernetes-version v1.x.y
     minikube start
 
 Copy the kube config file to the platform/kube directory and update the paths
