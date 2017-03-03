@@ -299,22 +299,19 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 
 			http := httpConfigs.EnsurePort(endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
+
 		case model.ProtocolTCP:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
 			clusters = append(clusters, cluster)
 			route := buildTCPRoute(cluster, endpoint.Address, endpoint.Port)
 			config := tcpConfigs.EnsurePort(port.Port)
 			config.Routes = append(config.Routes, route)
+
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}
 	}
 
 	clusters = clusters.Normalize()
-	// TODO move to CDS
-	//for _, cluster := range clusters {
-	//	insertDestinationPolicy(config, cluster)
-	//}
-
 	return httpConfigs, tcpConfigs, clusters
 }

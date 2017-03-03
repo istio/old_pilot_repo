@@ -70,7 +70,6 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		hostname:         hostname,
 		port:             port,
 		tags:             tags,
-		outbound:         true,
 	}
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"

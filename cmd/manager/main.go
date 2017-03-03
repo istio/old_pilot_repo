@@ -46,7 +46,7 @@ var (
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			sds := envoy.NewDiscoveryService(controller, flags.sdsPort)
+			sds := envoy.NewDiscoveryService(controller, &model.IstioRegistry{ConfigRegistry: controller}, flags.sdsPort)
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()

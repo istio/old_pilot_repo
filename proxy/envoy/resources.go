@@ -324,7 +324,6 @@ type Cluster struct {
 	hostname string
 	port     *model.Port
 	tags     model.Tags
-	outbound bool
 }
 
 // CircuitBreaker definition
