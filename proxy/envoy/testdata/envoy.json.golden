@@ -287,39 +287,25 @@
             "url": "tcp://127.0.0.1:80"
           }
         ]
-      },
-      {
-        "name": "outbound:hello.default.svc.cluster.local:http-status",
-        "service_name": "hello.default.svc.cluster.local:http-status",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
-      },
-      {
-        "name": "outbound:world.default.svc.cluster.local:custom",
-        "service_name": "world.default.svc.cluster.local:custom",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
-      },
-      {
-        "name": "outbound:world.default.svc.cluster.local:http",
-        "service_name": "world.default.svc.cluster.local:http",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
-      },
-      {
-        "name": "outbound:world.default.svc.cluster.local:http-status",
-        "service_name": "world.default.svc.cluster.local:http-status",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
       }
     ],
     "sds": {
       "cluster": {
         "name": "sds",
+        "connect_timeout_ms": 1000,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://manager:8080"
+          }
+        ]
+      },
+      "refresh_delay_ms": 1000
+    },
+    "cds": {
+      "cluster": {
+        "name": "cds",
         "connect_timeout_ms": 1000,
         "type": "strict_dns",
         "lb_type": "round_robin",

@@ -161,7 +161,6 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 
 	// TODO: HTTPS listener
 	listeners := []*Listener{httpListener}
-	discovery := buildDiscoveryCluster(w.mesh)
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -170,11 +169,11 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 		},
 		ClusterManager: ClusterManager{
 			SDS: SDS{
-				Cluster:        discovery,
+				Cluster:        buildDiscoveryCluster(w.mesh, "sds"),
 				RefreshDelayMs: 1000,
 			},
 			CDS: CDS{
-				Cluster:        discovery,
+				Cluster:        buildDiscoveryCluster(w.mesh, "cds"),
 				RefreshDelayMs: 1000,
 			},
 		},
@@ -214,11 +213,11 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 		}
 
 		port, tags, err := extractPortAndTags(dst)
-		commonPort := port.Port
 		if err != nil {
 			return nil, multierror.Append(fmt.Errorf("failed to extract routing rule destination port"), err)
 		}
 
+		commonPort = port.Port
 		cluster := buildOutboundCluster(destination, port, tags)
 		clusters = append(clusters, &WeightedClusterEntry{
 			Name:   cluster.Name,

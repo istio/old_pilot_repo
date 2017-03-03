@@ -128,9 +128,9 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 	return route
 }
 
-func buildDiscoveryCluster(mesh *MeshConfig) *Cluster {
+func buildDiscoveryCluster(mesh *MeshConfig, name string) *Cluster {
 	return &Cluster{
-		Name:             "discovery",
+		Name:             name,
 		Type:             "strict_dns",
 		ConnectTimeoutMs: DefaultTimeoutMs,
 		LbType:           DefaultLbType,

@@ -244,15 +244,6 @@ func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 	return out
 }
 
-// Clusters aggregates clusters across routes
-func (rc *TCPRouteConfig) clusters() []*Cluster {
-	out := make([]*Cluster, 0)
-	for _, route := range rc.Routes {
-		out = append(out, route.clusterRef)
-	}
-	return out
-}
-
 // TCPRouteConfigs provides routes by port
 type TCPRouteConfigs map[int]*TCPRouteConfig
 

@@ -64,11 +64,13 @@ func buildFaultFilters(config *model.IstioRegistry, routeConfig *HTTPRouteConfig
 		return nil
 	}
 
+	faults := make([]HTTPFilter, 0)
+
+	/* TODO: disabled until fault filter is per route, not per cluster
 	var clusters Clusters
 	clusters = routeConfig.clusters()
 	clusters = clusters.Normalize()
 
-	faults := make([]HTTPFilter, 0)
 	for _, cluster := range clusters {
 		policies := config.DestinationPolicies(cluster.hostname, cluster.tags)
 		for _, policy := range policies {
@@ -77,6 +79,7 @@ func buildFaultFilters(config *model.IstioRegistry, routeConfig *HTTPRouteConfig
 			}
 		}
 	}
+	*/
 
 	return faults
 }
