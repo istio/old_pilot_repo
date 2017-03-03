@@ -34,7 +34,9 @@ certificates before fetching cluster credentials:
 
 ## Code linters
 
-We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh).
+We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh):
+
+    bin/check.sh
 
 ## Unit tests
 
