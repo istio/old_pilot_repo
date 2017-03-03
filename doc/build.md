@@ -2,9 +2,9 @@
 
 (For Windows and Mac instructions, we recommend using a virtual machine and/or [Vagrant-specific build instructions](build-vagrant.md); Go code compiles on Mac but docker and proxy tests will fail on Mac)
 
-We are using [Bazel 0.4.4](https://github.com/bazelbuild/bazel/releases) as the main build system in Istio Manager:
+We are using [Bazel 0.4.4](https://github.com/bazelbuild/bazel/releases) as the main build system in Istio Manager. The following commands builds all targets in Istio Manager:
 
-    bazel build //cmd/manager
+    bazel build //:all
 
 Bazel uses `BUILD` files to keep track of dependencies between sources.  If you
 add a new source file, change the imports, or add a data depenency, please run the following command
