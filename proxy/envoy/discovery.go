@@ -47,7 +47,7 @@ type clusters struct {
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(services model.ServiceDiscovery, port int) *DiscoveryService {
+func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioRegistry, port int) *DiscoveryService {
 	out := &DiscoveryService{
 		services: services,
 	}

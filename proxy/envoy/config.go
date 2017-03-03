@@ -93,6 +93,8 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
+	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, "rds"))
+
 	// add SDS cluster
 	return &Config{
 		Listeners: listeners,
@@ -103,7 +105,11 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: SDS{
-				Cluster:        buildSDSCluster(mesh),
+				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
+				RefreshDelayMs: 1000,
+			},
+			CDS: CDS{
+				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds"),
 				RefreshDelayMs: 1000,
 			},
 		},

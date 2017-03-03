@@ -34,9 +34,11 @@ type agent struct {
 	binary string
 	// Envoy config root
 	configRoot string
-	// serviceCluster is the first component of the local proxy identityi (cluster name)
+	// serviceCluster is the first component of the local proxy identity
+	// (cluster name, e.g. "istio-proxy")
 	serviceCluster string
-	// serviceNode is the second component of the local proxy identity (node name)
+	// serviceNode is the second component of the local proxy identity
+	// (node name, e.g. pod name)
 	serviceNode string
 
 	// Map of known running Envoy processes and their restart epochs.

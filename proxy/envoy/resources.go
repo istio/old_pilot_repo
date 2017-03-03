@@ -242,6 +242,7 @@ type HTTPFilterConfig struct {
 	StatPrefix        string           `json:"stat_prefix"`
 	GenerateRequestID bool             `json:"generate_request_id,omitempty"`
 	RouteConfig       *HTTPRouteConfig `json:"route_config"`
+	RDS               *RDS             `json:"rds,omitempty"`
 	Filters           []HTTPFilter     `json:"filters"`
 	AccessLog         []AccessLog      `json:"access_log"`
 }
@@ -555,10 +556,24 @@ type SDS struct {
 	RefreshDelayMs int      `json:"refresh_delay_ms"`
 }
 
+// CDS is a service discovery service definition
+type CDS struct {
+	Cluster        *Cluster `json:"cluster"`
+	RefreshDelayMs int      `json:"refresh_delay_ms"`
+}
+
+// RDS definition
+type RDS struct {
+	Cluster         string `json:"cluster"`
+	RefreshDelayMS  int    `json:"refresh_delay_ms"`
+	RouteConfigName string `json:"route_config_name"`
+}
+
 // ClusterManager definition
 type ClusterManager struct {
-	Clusters []*Cluster `json:"clusters"`
+	Clusters []*Cluster `json:"clusters,omitempty"`
 	SDS      SDS        `json:"sds"`
+	CDS      CDS        `json:"cds"`
 }
 
 // ByName implements sort

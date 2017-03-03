@@ -173,15 +173,15 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	return route, catchAll
 }
 
-func buildSDSCluster(mesh *MeshConfig) *Cluster {
+func buildDiscoveryCluster(address, name string) *Cluster {
 	return &Cluster{
-		Name:             "sds",
+		Name:             name,
 		Type:             "strict_dns",
 		ConnectTimeoutMs: DefaultTimeoutMs,
 		LbType:           DefaultLbType,
 		Hosts: []Host{
 			{
-				URL: "tcp://" + mesh.DiscoveryAddress,
+				URL: "tcp://" + address,
 			},
 		},
 	}

@@ -172,7 +172,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: SDS{
-				Cluster:        buildSDSCluster(w.mesh),
+				Cluster:        buildDiscoveryCluster(w.mesh.DiscoveryAddress, "sds"),
 				RefreshDelayMs: 1000,
 			},
 		},
