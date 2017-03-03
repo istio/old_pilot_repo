@@ -49,7 +49,7 @@ const (
 	budget = 90
 
 	// Mixer tag *update manually*
-	mixerTag = "2017-03-02-1010"
+	mixerTag = "demo"
 )
 
 // params contain default template parameter values
