@@ -29,10 +29,9 @@ import (
 
 // Config generation main functions.
 // The general flow of the generation process consists of the following steps:
-// - routes are created for each destination, with referenced clusters stored as a special field
+// - routes are created for each destination
 // - routes are grouped organized into listeners for inbound and outbound traffic
 // - the outbound and inbound listeners are merged with preference given to the inbound traffic
-// - clusters are aggregated and normalized.
 
 // Requirements for the additions to the generation routines:
 // - extra policies and filters should be added as additional passes over abstract config structures
@@ -93,7 +92,6 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	// add SDS cluster
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -103,7 +101,11 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: SDS{
-				Cluster:        buildSDSCluster(mesh),
+				Cluster:        buildDiscoveryCluster(mesh, "sds"),
+				RefreshDelayMs: 1000,
+			},
+			CDS: CDS{
+				Cluster:        buildDiscoveryCluster(mesh, "cds"),
 				RefreshDelayMs: 1000,
 			},
 		},
@@ -111,10 +113,11 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 }
 
 // build combines the outbound and inbound routes prioritizing the latter
+// build returns a list of inbound clusters
 func build(instances []*model.ServiceInstance, services []*model.Service,
 	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
 	httpOutbound, tcpOutbound := buildOutboundFilters(instances, services, config, mesh)
-	httpInbound, tcpInbound := buildInboundFilters(instances)
+	httpInbound, tcpInbound, clusters := buildInboundFilters(instances)
 
 	// merge the two sets of HTTP route configs
 	httpRouteConfigs := make(HTTPRouteConfigs)
@@ -148,13 +151,11 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 		}
 	}
 
-	// canonicalize listeners and collect clusters
-	clusters := make(Clusters, 0)
+	// canonicalize listeners
 	listeners := make([]*Listener, 0)
 
 	for port, routeConfig := range httpRouteConfigs {
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
-		clusters = append(clusters, routeConfig.clusters()...)
 
 		filters := buildFaultFilters(config, routeConfig)
 
@@ -201,7 +202,6 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 	}
 
 	for port, tcpConfig := range tcpRouteConfigs {
-		clusters = append(clusters, tcpConfig.clusters()...)
 		listener := &Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
@@ -217,12 +217,6 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 	}
 
 	sort.Sort(ListenersByPort(listeners))
-
-	clusters = clusters.Normalize()
-	for _, cluster := range clusters {
-		insertDestinationPolicy(config, cluster)
-	}
-
 	return listeners, clusters
 }
 
@@ -260,11 +254,13 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 				host := buildVirtualHost(service, port, suffix, routes)
 				http := httpConfigs.EnsurePort(port.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
+
 			case model.ProtocolTCP:
 				cluster := buildOutboundCluster(service.Hostname, port, nil)
 				route := buildTCPRoute(cluster, service.Address, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
 				config.Routes = append(config.Routes, route)
+
 			default:
 				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port.Port)
 			}
@@ -275,11 +271,12 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 
 // buildInboundFilters creates route configs indexed by ports for the traffic inbound
 // to co-located service instances
-func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, TCPRouteConfigs) {
+func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, TCPRouteConfigs, Clusters) {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
 	tcpConfigs := make(TCPRouteConfigs)
+	clusters := make(Clusters, 0)
 
 	// inbound connections/requests are redirected to the endpoint port but appear to be sent
 	// to the service port
@@ -290,6 +287,7 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 		switch port.Protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
+			clusters = append(clusters, cluster)
 			route := buildDefaultRoute(cluster)
 			host := buildVirtualHost(service, port, suffix, []*HTTPRoute{route})
 
@@ -301,15 +299,19 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 
 			http := httpConfigs.EnsurePort(endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
+
 		case model.ProtocolTCP:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
+			clusters = append(clusters, cluster)
 			route := buildTCPRoute(cluster, endpoint.Address, endpoint.Port)
 			config := tcpConfigs.EnsurePort(port.Port)
 			config.Routes = append(config.Routes, route)
+
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}
 	}
 
-	return httpConfigs, tcpConfigs
+	clusters = clusters.Normalize()
+	return httpConfigs, tcpConfigs, clusters
 }

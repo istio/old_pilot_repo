@@ -38,9 +38,8 @@ const (
 
 func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 	return &HTTPRoute{
-		Prefix:   "/",
-		Cluster:  cluster.Name,
-		clusters: []*Cluster{cluster},
+		Prefix:  "/",
+		Cluster: cluster.Name,
 	}
 }
 
@@ -71,7 +70,6 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		hostname:         hostname,
 		port:             port,
 		tags:             tags,
-		outbound:         true,
 	}
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -117,7 +115,6 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 			Name:   cluster.Name,
 			Weight: int(dst.Weight),
 		})
-		route.clusters = append(route.clusters, cluster)
 	}
 	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
 
@@ -130,9 +127,9 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 	return route
 }
 
-func buildSDSCluster(mesh *MeshConfig) *Cluster {
+func buildDiscoveryCluster(mesh *MeshConfig, name string) *Cluster {
 	return &Cluster{
-		Name:             "sds",
+		Name:             name,
 		Type:             "strict_dns",
 		ConnectTimeoutMs: DefaultTimeoutMs,
 		LbType:           DefaultLbType,

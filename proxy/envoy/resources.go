@@ -148,10 +148,6 @@ type HTTPRoute struct {
 	Headers     Headers      `json:"headers,omitempty"`
 	TimeoutMS   int          `json:"timeout_ms,omitempty"`
 	RetryPolicy *RetryPolicy `json:"retry_policy,omitempty"`
-
-	// clusters contains the set of referenced clusters in the route; the field is special
-	// and used only to aggregate cluster information after composing routes
-	clusters []*Cluster
 }
 
 // RetryPolicy definition
@@ -203,17 +199,6 @@ func (rc *HTTPRouteConfig) merge(that *HTTPRouteConfig) *HTTPRouteConfig {
 	return out
 }
 
-// Clusters aggregates clusters across routes
-func (rc *HTTPRouteConfig) clusters() []*Cluster {
-	out := make([]*Cluster, 0)
-	for _, host := range rc.VirtualHosts {
-		for _, route := range host.Routes {
-			out = append(out, route.clusters...)
-		}
-	}
-	return out
-}
-
 // AccessLog definition.
 type AccessLog struct {
 	Path   string `json:"path"`
@@ -255,15 +240,6 @@ func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 		if !set[route.clusterRef.hostname] {
 			out.Routes = append(out.Routes, route)
 		}
-	}
-	return out
-}
-
-// Clusters aggregates clusters across routes
-func (rc *TCPRouteConfig) clusters() []*Cluster {
-	out := make([]*Cluster, 0)
-	for _, route := range rc.Routes {
-		out = append(out, route.clusterRef)
 	}
 	return out
 }
@@ -348,7 +324,6 @@ type Cluster struct {
 	hostname string
 	port     *model.Port
 	tags     model.Tags
-	outbound bool
 }
 
 // CircuitBreaker definition
@@ -490,10 +465,17 @@ type SDS struct {
 	RefreshDelayMs int      `json:"refresh_delay_ms"`
 }
 
+// CDS is a cluster discovery service definition
+type CDS struct {
+	Cluster        *Cluster `json:"cluster"`
+	RefreshDelayMs int      `json:"refresh_delay_ms"`
+}
+
 // ClusterManager definition
 type ClusterManager struct {
-	Clusters []*Cluster `json:"clusters"`
+	Clusters []*Cluster `json:"clusters,omitempty"`
 	SDS      SDS        `json:"sds"`
+	CDS      CDS        `json:"cds"`
 }
 
 // ByName implements sort

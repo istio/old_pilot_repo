@@ -39,22 +39,20 @@ func insertMixerFilter(listeners []*Listener, mixer string) {
 	}
 }
 
+// insertDestinationPolicy applies policies to outbound clusters
 func insertDestinationPolicy(config *model.IstioRegistry, cluster *Cluster) {
 	// not all clusters are for outbound services
-	if cluster != nil && cluster.hostname != "" && cluster.outbound {
-		for _, policy := range config.DestinationPolicies(cluster.hostname, cluster.tags) {
-			if policy.LoadBalancing != nil {
-				switch policy.LoadBalancing.GetName() {
-				case proxyconfig.LoadBalancing_ROUND_ROBIN:
-					cluster.LbType = LbTypeRoundRobin
-				case proxyconfig.LoadBalancing_LEAST_CONN:
-					cluster.LbType = "least_request"
-				case proxyconfig.LoadBalancing_RANDOM:
-					cluster.LbType = "random"
-				}
+	for _, policy := range config.DestinationPolicies(cluster.hostname, cluster.tags) {
+		if policy.LoadBalancing != nil {
+			switch policy.LoadBalancing.GetName() {
+			case proxyconfig.LoadBalancing_ROUND_ROBIN:
+				cluster.LbType = LbTypeRoundRobin
+			case proxyconfig.LoadBalancing_LEAST_CONN:
+				cluster.LbType = "least_request"
+			case proxyconfig.LoadBalancing_RANDOM:
+				cluster.LbType = "random"
 			}
 		}
-
 	}
 }
 
@@ -64,11 +62,13 @@ func buildFaultFilters(config *model.IstioRegistry, routeConfig *HTTPRouteConfig
 		return nil
 	}
 
+	faults := make([]HTTPFilter, 0)
+
+	/* TODO: disabled until fault filter is per route, not per cluster
 	var clusters Clusters
 	clusters = routeConfig.clusters()
 	clusters = clusters.Normalize()
 
-	faults := make([]HTTPFilter, 0)
 	for _, cluster := range clusters {
 		policies := config.DestinationPolicies(cluster.hostname, cluster.tags)
 		for _, policy := range policies {
@@ -77,6 +77,7 @@ func buildFaultFilters(config *model.IstioRegistry, routeConfig *HTTPRouteConfig
 			}
 		}
 	}
+	*/
 
 	return faults
 }

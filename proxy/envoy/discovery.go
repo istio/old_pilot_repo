@@ -27,6 +27,7 @@ import (
 // DiscoveryService publishes services, clusters, and routes for proxies
 type DiscoveryService struct {
 	services model.ServiceDiscovery
+	registry *model.IstioRegistry
 	server   *http.Server
 }
 
@@ -47,9 +48,10 @@ type clusters struct {
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(services model.ServiceDiscovery, port int) *DiscoveryService {
+func NewDiscoveryService(services model.ServiceDiscovery, registry *model.IstioRegistry, port int) *DiscoveryService {
 	out := &DiscoveryService{
 		services: services,
+		registry: registry,
 	}
 	container := restful.NewContainer()
 	out.Register(container)
@@ -71,8 +73,8 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		GET("/v1/clusters/{service-cluster}/{service-node}").
 		To(ds.ListClusters).
 		Doc("CDS registration").
-		Param(ws.PathParameter("service-cluster", "").DataType("string")).
-		Param(ws.PathParameter("service-node", "").DataType("string")).
+		Param(ws.PathParameter("service-cluster", "client proxy cluster").DataType("string")).
+		Param(ws.PathParameter("service-node", "client proxy node").DataType("string")).
 		Writes(clusters{}))
 	container.Add(ws)
 }
@@ -103,11 +105,42 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 
 // ListClusters responds to CDS requests
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
-	_ = ds.services.Services()
-	// TODO: fix this
-	/*
-		if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {
-			glog.Warning(err)
+	clusters := make(Clusters, 0)
+
+	// each service, port corresponds to a cluster
+	for _, service := range ds.services.Services() {
+		for _, port := range service.Ports {
+			clusters = append(clusters, buildOutboundCluster(service.Hostname, port, nil))
 		}
-	*/
+	}
+
+	// clusters correspond to services and service versions
+	// we need to list all routing rules to identify possible version tags
+	// future optimization will list only clusters referenced in the route table for the client proxy
+	for _, rule := range ds.registry.RouteRules("") {
+		for _, dst := range rule.Route {
+			destination := dst.Destination
+
+			// fallback to rule destination
+			if destination == "" {
+				destination = rule.Destination
+			}
+
+			service, ok := ds.services.GetService(destination)
+			if ok {
+				for _, port := range service.Ports {
+					clusters = append(clusters, buildOutboundCluster(destination, port, dst.Tags))
+				}
+			}
+		}
+	}
+
+	// deduplicate and sort
+	clusters = clusters.Normalize()
+
+	// apply destination policies
+	for _, cluster := range clusters {
+		insertDestinationPolicy(ds.registry, cluster)
+	}
+
 }
