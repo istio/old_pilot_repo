@@ -161,8 +161,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 
 	// TODO: HTTPS listener
 	listeners := []*Listener{httpListener}
-	clusters := Clusters(rConfig.clusters()).Normalize()
-
+	discovery := buildDiscoveryCluster(w.mesh)
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -170,9 +169,12 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 			Port:          w.mesh.AdminPort,
 		},
 		ClusterManager: ClusterManager{
-			Clusters: clusters,
 			SDS: SDS{
-				Cluster:        buildSDSCluster(w.mesh),
+				Cluster:        discovery,
+				RefreshDelayMs: 1000,
+			},
+			CDS: CDS{
+				Cluster:        discovery,
 				RefreshDelayMs: 1000,
 			},
 		},
@@ -203,6 +205,7 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 	}
 
 	clusters := make([]*WeightedClusterEntry, 0)
+	var commonPort int
 	for _, dst := range rule.Route {
 		// fetch route destination, or fallback to rule destination
 		destination := dst.Destination
@@ -211,6 +214,7 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 		}
 
 		port, tags, err := extractPortAndTags(dst)
+		commonPort := port.Port
 		if err != nil {
 			return nil, multierror.Append(fmt.Errorf("failed to extract routing rule destination port"), err)
 		}
@@ -220,7 +224,6 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 			Name:   cluster.Name,
 			Weight: int(dst.Weight),
 		})
-		route.clusters = append(route.clusters, cluster)
 	}
 	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
 
@@ -236,16 +239,19 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 	// which is scoped to the entire route.
 	// This restriction can be relaxed by constructing multiple envoy.Route objects
 	// per config.RouteRule, and doing weighted load balancing using Runtime.
-	portSet := make(map[int]struct{}, 1)
-	for _, cluster := range route.clusters {
-		portSet[cluster.port.Port] = struct{}{}
-	}
-	if len(portSet) > 1 {
-		return nil, fmt.Errorf("unsupported multiple destination ports per ingress route rule")
-	}
+
+	// TODO: do this validation during construction
+	// Due to restructing for CDS, clusters are no longer constructed in the local config
+	// portSet := make(map[int]struct{}, 1)
+	// for _, cluster := range route.clusters {
+	// 	portSet[cluster.port.Port] = struct{}{}
+	// }
+	// if len(portSet) > 1 {
+	// 	 return nil, fmt.Errorf("unsupported multiple destination ports per ingress route rule")
+	// }
 
 	// Rewrite the host header so that inbound proxies can match incoming traffic
-	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, route.clusters[0].port.Port)
+	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, commonPort)
 
 	return route, nil
 }
