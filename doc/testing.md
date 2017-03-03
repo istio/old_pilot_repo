@@ -55,11 +55,24 @@ For tests that require systems integration, such as invoking the proxy with a sp
 
 Istio Manager runs end-to-end tests as part of the presubmit check. The test driver is a [Golang program](../test/integration) that creates a temporary namespace, deploys Istio components, send requests from apps in the cluster, and checks that traffic obeys the desired routing policies. The end-to-end test is entirely hermetic: test applications and Istio Manager docker images are generated on each run. This means you need to have a docker registry to host your images, which then needs to be passed with `-h` flag. The test driver is invoked using [the e2e script](../bin/e2e.sh).
 
-## Debug docker images
+## Docker images
 
-Istio Manager produces debug images in addition to default images. These images have suffix `_debug` and include additional tools such as `curl` in the base image and debug-enabled Envoy builds.
+The following Bazel command generates Docker images for the proxy agent and proxy container:
+
+    bazel run //docker:runtime
+
+Istio Manager also produces debug images in addition to the default bare images. These images have suffix `_debug` and include additional tools such as `curl` in the base image as well as debug-enabled Envoy builds. You might need to grant security privileges to the container spec for root access:
+
+    securityContext:
+      privileged: true
+
+The proxy injection process redirects *all* inbound and outbound traffic through
+the proxy via iptables. This can sometimes be undesirable while debugging, e.g.
+trying to install additional test tools via apt-get. Use
+`proxy-redirection-clear` to temporarily disable the iptable redirection rules
+and `proxy-redirection-restore` to restore them.
 
 ## Test logging
 
-Istio Manager uses [glog](https://godoc.org/github.com/golang/glog) library for all its logging. We encourage extensive logging at the appropriate log levels. As a hint to log level selection, level 10 is the most verbose (Kubernetes will show all its HTTP requests), level 2 is used by default in the integration tests, level 4 turns on extensive logging in the proxy.
+Istio Manager uses [glog](https://godoc.org/github.com/golang/glog) library for all its logging. We encourage extensive logging at the appropriate log levels. As a hint to the log level selection, level 10 is the most verbose (Kubernetes will show all its HTTP requests), level 2 is used by default in the integration tests, level 4 turns on extensive logging in the proxy.
 
