@@ -32,6 +32,8 @@ certificates before fetching cluster credentials:
 
     gcloud config set container/use_client_certificate True
 
+_Note3_: The optional `-h` flag should point to a Docker registry that you have access to push images.
+
 ## Code linters
 
 We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh):
