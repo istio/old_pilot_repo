@@ -1,7 +1,7 @@
 # Istio Manager testing infrastructure
 
 All contributions to Istio Manager should supply tests that cover new features and/or bug fixes.
-We strive to improve and maintain quality of the code with up-to-date samples, good coverage of the code, and code analyzers to detect problems in the code early.
+We strive to improve and maintain quality of the code with up-to-date samples, good coverage of the code, and static analyzers to detect problems early.
 
 ## Code linters
 
