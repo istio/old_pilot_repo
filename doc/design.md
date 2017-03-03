@@ -2,6 +2,8 @@
 
 Istio Manager is responsible for consuming and propagating Istio configuration to Istio components. It also provides an abstraction layer over the underlying cluster management platform, such as Kubernetes, and proxy controllers for dynamic reconfiguration of Istio proxies.
 
+![architecture](manager.svg)
+
 ## Services model
 
 The overview of the services model in Istio Manager is [here](service-registry.md).
