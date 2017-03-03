@@ -39,6 +39,8 @@ _Note3_: The optional `-h` flag should point to a Docker registry that you have 
 We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh):
 
     bin/check.sh
+    
+_Note_: You need to set up Go-compatible build environment first, since the linters do not use Bazel. 
 
 ## Unit tests
 
