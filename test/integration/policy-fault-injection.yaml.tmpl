@@ -9,3 +9,13 @@ http_fault:
   abort:
     percent: 100
     http_status: 503
+circuit_breaker:
+  simple_cb:
+    max_connections: 100
+    sleep_window_seconds: 15.5
+    http_max_requests: 1024
+    http_max_requests_per_connection: 1024
+    http_max_pending_requests: 1024
+    http_consecutive_errors: 100
+    http_detection_interval_seconds: 30
+    http_max_ejection_percent: 100
