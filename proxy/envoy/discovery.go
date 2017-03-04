@@ -27,11 +27,20 @@ import (
 // DiscoveryService publishes services, clusters, and routes for proxies
 type DiscoveryService struct {
 	services model.ServiceDiscovery
+	config   *model.IstioRegistry
 	server   *http.Server
 }
 
 type hosts struct {
-	Hosts []host `json:"hosts"`
+	Hosts []*host `json:"hosts,omitempty"`
+}
+
+type clusters struct {
+	Clusters []*Cluster `json:"clusters,omitempty"`
+}
+
+type virtualHosts struct {
+	VirtualHosts []*VirtualHost `json:"virtual_hosts,omitempty"`
 }
 
 type host struct {
@@ -42,14 +51,11 @@ type host struct {
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
 
-type clusters struct {
-	Clusters []Cluster `json:"clusters"`
-}
-
 // NewDiscoveryService creates an Envoy discovery service on a given port
 func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioRegistry, port int) *DiscoveryService {
 	out := &DiscoveryService{
 		services: services,
+		config:   config,
 	}
 	container := restful.NewContainer()
 	out.Register(container)
@@ -61,19 +67,31 @@ func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioReg
 func (ds *DiscoveryService) Register(container *restful.Container) {
 	ws := &restful.WebService{}
 	ws.Produces(restful.MIME_JSON)
+
 	ws.Route(ws.
 		GET("/v1/registration/{service-key}").
 		To(ds.ListEndpoints).
 		Doc("SDS registration").
 		Param(ws.PathParameter("service-key", "tuple of service name and tag name").DataType("string")).
 		Writes(hosts{}))
+
 	ws.Route(ws.
 		GET("/v1/clusters/{service-cluster}/{service-node}").
 		To(ds.ListClusters).
 		Doc("CDS registration").
-		Param(ws.PathParameter("service-cluster", "").DataType("string")).
-		Param(ws.PathParameter("service-node", "").DataType("string")).
+		Param(ws.PathParameter("service-cluster", "client proxy service cluster").DataType("string")).
+		Param(ws.PathParameter("service-node", "client proxy service node").DataType("string")).
 		Writes(clusters{}))
+
+	ws.Route(ws.
+		GET("/v1/routes/{route-config-name}/{service-cluster}/{service-node}").
+		To(ds.ListRoutes).
+		Doc("RDS registration").
+		Param(ws.PathParameter("route-config-name", "route configuration name").DataType("string")).
+		Param(ws.PathParameter("service-cluster", "client proxy service cluster").DataType("string")).
+		Param(ws.PathParameter("service-node", "client proxy service node").DataType("string")).
+		Writes(virtualHosts{}))
+
 	container.Add(ws)
 }
 
@@ -89,14 +107,14 @@ func (ds *DiscoveryService) Run() {
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
 	key := request.PathParameter("service-key")
 	hostname, ports, tags := model.ParseServiceKey(key)
-	out := make([]host, 0)
+	out := &hosts{}
 	for _, ep := range ds.services.Instances(hostname, ports.GetNames(), tags) {
-		out = append(out, host{
+		out.Hosts = append(out.Hosts, &host{
 			Address: ep.Endpoint.Address,
 			Port:    ep.Endpoint.Port,
 		})
 	}
-	if err := response.WriteEntity(hosts{out}); err != nil {
+	if err := response.WriteEntity(out); err != nil {
 		glog.Warning(err)
 	}
 }
@@ -110,4 +128,9 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			glog.Warning(err)
 		}
 	*/
+}
+
+// ListRoutes responds to RDS requests
+func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restful.Response) {
+
 }

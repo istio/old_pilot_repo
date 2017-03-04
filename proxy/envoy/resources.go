@@ -54,6 +54,7 @@ const (
 	DefaultLbType    = LbTypeRoundRobin
 	DefaultAccessLog = "/dev/stdout"
 	LbTypeRoundRobin = "round_robin"
+	RDSName          = "rds"
 
 	// HTTPConnectionManager is the name of HTTP filter.
 	HTTPConnectionManager = "http_connection_manager"
@@ -241,7 +242,7 @@ type HTTPFilterConfig struct {
 	CodecType         string           `json:"codec_type"`
 	StatPrefix        string           `json:"stat_prefix"`
 	GenerateRequestID bool             `json:"generate_request_id,omitempty"`
-	RouteConfig       *HTTPRouteConfig `json:"route_config"`
+	RouteConfig       *HTTPRouteConfig `json:"route_config,omitempty"`
 	RDS               *RDS             `json:"rds,omitempty"`
 	Filters           []HTTPFilter     `json:"filters"`
 	AccessLog         []AccessLog      `json:"access_log"`
@@ -372,11 +373,11 @@ type Listener struct {
 type HTTPRouteConfigs map[int]*HTTPRouteConfig
 
 // EnsurePort creates a route config if necessary
-func (hosts HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
-	config, ok := hosts[port]
+func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
+	config, ok := routes[port]
 	if !ok {
 		config = &HTTPRouteConfig{}
-		hosts[port] = config
+		routes[port] = config
 	}
 	return config
 }

@@ -93,7 +93,7 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, "rds"))
+	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName))
 
 	// add SDS cluster
 	return &Config{
