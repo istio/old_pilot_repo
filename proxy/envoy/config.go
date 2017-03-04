@@ -308,10 +308,10 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 			// Local services can be accessed at one of three
 			// addresses: localhost, endpoint IP, and service
 			// VIP. Localhost bypasses the proxy and doesn't need any TCP
-			// route config. Endpoint IP and Service VIP access is
+			// route config. Endpoint IP and Service VIP routes are
 			// handled below.
 			//
-			// Omit the destination port here since TCP routes are
+			// Also, omit the destination port here since TCP routes are
 			// already declared in the scope of a particular listener
 			// port.
 
