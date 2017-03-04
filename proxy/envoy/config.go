@@ -305,7 +305,7 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 		case model.ProtocolTCP:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, protocol)
 
-			// Local services can be accessed at one of three
+			// Local service instances can be accessed through one of three
 			// addresses: localhost, endpoint IP, and service
 			// VIP. Localhost bypasses the proxy and doesn't need any TCP
 			// route config. Endpoint IP and Service VIP routes are
