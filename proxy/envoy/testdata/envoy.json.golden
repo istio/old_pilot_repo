@@ -169,17 +169,9 @@
                 {
                   "cluster": "inbound:1090",
                   "destination_ip_list": [
-                    "10.1.1.0/32"
-                  ],
-                  "destination_ports": "1090"
-                },
-                {
-                  "cluster": "inbound:1090",
-                  "destination_ip_list": [
-                    "10.1.0.0/32",
-                    "10.1.1.0/32"
-                  ],
-                  "destination_ports": "90"
+                    "10.1.1.0/32",
+                    "10.1.0.0/32"
+                  ]
                 },
                 {
                   "cluster": "outbound:world.default.svc.cluster.local:custom",

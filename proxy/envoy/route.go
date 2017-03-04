@@ -240,9 +240,11 @@ func sharedHost(parts ...[]string) []string {
 
 func buildTCPRoute(cluster *Cluster, addresses []string, port int) TCPRoute {
 	route := TCPRoute{
-		Cluster:          cluster.Name,
-		DestinationPorts: strconv.Itoa(port),
-		clusterRef:       cluster,
+		Cluster:    cluster.Name,
+		clusterRef: cluster,
+	}
+	if port >= 0 {
+		route.DestinationPorts = strconv.Itoa(port)
 	}
 	for _, addr := range addresses {
 		route.DestinationIPList = append(route.DestinationIPList, addr+"/32")

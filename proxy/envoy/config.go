@@ -303,11 +303,13 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 			http.VirtualHosts = append(http.VirtualHosts, host)
 		case model.ProtocolTCP:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, port.Protocol)
+
+			// Omit destination port from TCP route since inbound TCP
+			// routes are already mapped to a listener on a specific
+			// port.
+			route := buildTCPRoute(cluster, []string{endpoint.Address, service.Address}, -1)
 			config := tcpConfigs.EnsurePort(port.Port)
-			config.Routes = append(config.Routes,
-				buildTCPRoute(cluster, []string{endpoint.Address}, endpoint.Port),
-				buildTCPRoute(cluster, []string{service.Address, endpoint.Address}, port.Port),
-			)
+			config.Routes = append(config.Routes, route)
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %d", port.Protocol, port)
 		}

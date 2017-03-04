@@ -46,6 +46,11 @@ func (r *reachability) run() error {
 	if err := r.makeRequests(); err != nil {
 		return err
 	}
+
+	if err := r.verifyTCPRouting(); err != nil {
+		return err
+	}
+
 	if verbose {
 		log.Println("requests:", r.accessLogs)
 	}
@@ -55,10 +60,6 @@ func (r *reachability) run() error {
 	}
 
 	if err := r.checkMixerLogs(); err != nil {
-		return err
-	}
-
-	if err := r.verifyTCPRouting(); err != nil {
 		return err
 	}
 
