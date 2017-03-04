@@ -20,6 +20,7 @@ import (
 	"sort"
 	"testing"
 
+	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
 )
 
@@ -211,13 +212,39 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyData   = "testdata/envoy.json"
-	envoyGolden = "testdata/envoy.json.golden"
+	envoyData          = "testdata/envoy.json"
+	//envoyGolden        = "testdata/envoy.json.golden"
+	envoyTimeoutGolden = "testdata/envoy-timeout.json.golden"
+	routeRule          = "testdata/route-rule.json.golden"
 )
 
 func TestMockConfigGenerate(t *testing.T) {
 	ds := mock.Discovery
 	r := mock.MakeRegistry()
+
+	rTemp, err := ioutil.ReadFile(routeRule)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	routeRule := string(rTemp)
+
+	ps := model.IstioConfig[model.RouteRule]
+	rule, err := ps.FromJSON(routeRule)
+
+	if err != nil {
+		t.Errorf("Failed to translate timeout route rule %v", err)
+	}
+
+	key := model.Key{
+		Kind:      model.RouteRule,
+		Name:      "timeouts",
+		Namespace: "",
+	}
+
+	if err = r.Post(key, rule); err != nil {
+		t.Errorf("Failed to add route rule to config registry %v", err)
+	}
+
 	config := Generate(
 		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
 		ds.Services(), r,
@@ -225,12 +252,12 @@ func TestMockConfigGenerate(t *testing.T) {
 	if config == nil {
 		t.Fatalf("Failed to generate config")
 	}
-	err := config.WriteFile(envoyData)
+	err = config.WriteFile(envoyData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	expected, err := ioutil.ReadFile(envoyGolden)
+	expected, err := ioutil.ReadFile(envoyTimeoutGolden)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

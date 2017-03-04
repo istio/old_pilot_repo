@@ -81,11 +81,13 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 }
 
 // buildHTTPRoute translates a route rule to an Envoy route
-func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
+func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, bool) {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",
 	}
+
+	catchAll := true
 
 	// setup timeouts for the route
 	if rule.HttpReqTimeout != nil &&
@@ -99,10 +101,11 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 	if rule.HttpReqRetries != nil &&
 		rule.HttpReqRetries.GetSimpleRetry() != nil &&
 		rule.HttpReqRetries.GetSimpleRetry().Attempts > 0 {
-		route.RetryPolicy.NumRetries = int(rule.HttpReqRetries.GetSimpleRetry().Attempts)
-
-		// These are the safest retry policies as per envoy docs
-		route.RetryPolicy.Policy = "5xx,connect-failure,refused-stream"
+		route.RetryPolicy = &RetryPolicy{
+			NumRetries: int(rule.HttpReqRetries.GetSimpleRetry().Attempts),
+			// These are the safest retry policies as per envoy docs
+			Policy: "5xx,connect-failure,refused-stream",
+		}
 	}
 
 	if rule.Match != nil {
@@ -120,33 +123,46 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 				glog.Warningf("Unsupported route match condition: regex")
 			}
 		}
+
+		if len(route.Headers) > 0 || route.Path != "" || route.Prefix != "/" {
+			catchAll = false
+		}
 	}
 
-	clusters := make([]*WeightedClusterEntry, 0)
-	for _, dst := range rule.Route {
-		destination := dst.Destination
+	if len(rule.Route) > 0 {
+		clusters := make([]*WeightedClusterEntry, 0)
+		for _, dst := range rule.Route {
+			destination := dst.Destination
 
-		// fallback to rule destination
-		if destination == "" {
-			destination = rule.Destination
+			// fallback to rule destination
+			if destination == "" {
+				destination = rule.Destination
+			}
+
+			cluster := buildOutboundCluster(destination, port, dst.Tags)
+			clusters = append(clusters, &WeightedClusterEntry{
+				Name:   cluster.Name,
+				Weight: int(dst.Weight),
+			})
+			route.clusters = append(route.clusters, cluster)
 		}
+		route.WeightedClusters = &WeightedCluster{Clusters: clusters}
 
-		cluster := buildOutboundCluster(destination, port, dst.Tags)
-		clusters = append(clusters, &WeightedClusterEntry{
-			Name:   cluster.Name,
-			Weight: int(dst.Weight),
-		})
+		// rewrite to a single cluster if it's one weighted cluster
+		if len(rule.Route) == 1 {
+			route.Cluster = route.WeightedClusters.Clusters[0].Name
+			route.WeightedClusters = nil
+		}
+	} else {
+		route.WeightedClusters = nil
+		// default route for the destination
+		cluster := buildOutboundCluster(rule.Destination, port, nil)
+		route.Cluster = cluster.Name
+		route.clusters = make([]*Cluster, 0)
 		route.clusters = append(route.clusters, cluster)
 	}
-	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
 
-	// rewrite to a single cluster if it's one weighted cluster
-	if len(rule.Route) == 1 {
-		route.Cluster = route.WeightedClusters.Clusters[0].Name
-		route.WeightedClusters = nil
-	}
-
-	return route
+	return route, catchAll
 }
 
 func buildSDSCluster(mesh *MeshConfig) *Cluster {
