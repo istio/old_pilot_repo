@@ -256,7 +256,7 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 				// destination and we will not add the default route after of the for loop.
 				// TODO: This is still not working
 				catchAll := false
-				var httpRoute *HTTPRoute = nil
+				var httpRoute *HTTPRoute
 
 				// collect route rules
 				for _, rule := range rules {

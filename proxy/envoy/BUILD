@@ -29,7 +29,9 @@ go_test(
     data = [
         "testdata/envoy-no-route-rule.json.golden",
         "testdata/envoy-timeout-rule.json.golden",
-        "testdata/timeout-route-rule.json.golden",        
+        "testdata/envoy-cb-policy.json.golden",
+        "testdata/timeout-route-rule.json.golden",
+        "testdata/cb-policy.json.golden",
     ],
     size = "small",
     srcs = [
