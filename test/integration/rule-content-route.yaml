@@ -1,7 +1,0 @@
-destination: world.default.svc.cluster.local
-precedence: 2
-match:
-  source: hello.world.svc.cluster.local
-route:
-  - tags:
-       version: v2
