@@ -254,7 +254,7 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 				// "catchAll" flag indicating if the route that was built was a catch all route.
 				// When such a route is encountered, we stop building further routes for the
 				// destination and we will not add the default route after of the for loop.
-				// TODO: This is still not working
+
 				catchAll := false
 				var httpRoute *HTTPRoute
 
