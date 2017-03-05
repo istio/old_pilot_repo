@@ -55,12 +55,7 @@
                   "routes": [
                     {
                       "prefix": "/",
-                      "cluster": "outbound:world.default.svc.cluster.local:http",
-                      "timeout_ms": 30000,
-                      "retry_policy": {
-                        "retry_on": "5xx,connect-failure,refused-stream",
-                        "num_retries": 1
-                      }
+                      "cluster": "outbound:world.default.svc.cluster.local:http"
                     }
                   ]
                 }

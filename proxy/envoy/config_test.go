@@ -212,13 +212,45 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyData          = "testdata/envoy.json"
-	//envoyGolden        = "testdata/envoy.json.golden"
-	envoyTimeoutGolden = "testdata/envoy-timeout.json.golden"
-	routeRule          = "testdata/route-rule.json.golden"
+	envoyData              = "testdata/envoy.json"
+	envoyPlainGolden       = "testdata/envoy-no-route-rule.json.golden"
+	envoyTimeoutRuleGolden = "testdata/envoy-timeout-rule.json.golden"
+	routeRule              = "testdata/timeout-route-rule.json.golden"
 )
 
-func TestMockConfigGenerate(t *testing.T) {
+func TestMockConfigGeneratePlain(t *testing.T) {
+	ds := mock.Discovery
+	r := mock.MakeRegistry()
+
+	config := Generate(
+		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
+		ds.Services(), r,
+		DefaultMeshConfig)
+	if config == nil {
+		t.Fatal("Failed to generate config in non-route rule case")
+	}
+
+	err := config.WriteFile(envoyData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	expected, err := ioutil.ReadFile(envoyPlainGolden)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	data, err := ioutil.ReadFile(envoyData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	// TODO: use difflib to obtain detailed diff
+	if string(expected) != string(data) {
+		t.Error("Envoy config differs from master copy for Plain config")
+	}
+}
+
+func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 	ds := mock.Discovery
 	r := mock.MakeRegistry()
 
@@ -242,7 +274,7 @@ func TestMockConfigGenerate(t *testing.T) {
 	}
 
 	if err = r.Post(key, rule); err != nil {
-		t.Errorf("Failed to add route rule to config registry %v", err)
+		t.Errorf("Failed to add timeout route rule to config registry %v", err)
 	}
 
 	config := Generate(
@@ -250,14 +282,14 @@ func TestMockConfigGenerate(t *testing.T) {
 		ds.Services(), r,
 		DefaultMeshConfig)
 	if config == nil {
-		t.Fatalf("Failed to generate config")
+		t.Fatal("Failed to generate config for timeout route rule")
 	}
 	err = config.WriteFile(envoyData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	expected, err := ioutil.ReadFile(envoyTimeoutGolden)
+	expected, err := ioutil.ReadFile(envoyTimeoutRuleGolden)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -268,6 +300,6 @@ func TestMockConfigGenerate(t *testing.T) {
 
 	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
-		t.Errorf("Envoy config master copy changed")
+		t.Error("Envoy config master copy changed")
 	}
 }
