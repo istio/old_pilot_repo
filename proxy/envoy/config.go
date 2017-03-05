@@ -156,7 +156,7 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
 		clusters = append(clusters, routeConfig.clusters()...)
 
-		filters := buildFaultFilters(config, routeConfig)
+		filters := buildFaultFilters(routeConfig)
 
 		filters = append(filters, HTTPFilter{
 			Type:   "decoder",

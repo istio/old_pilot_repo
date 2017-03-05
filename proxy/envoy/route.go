@@ -109,9 +109,9 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	}
 
 	if rule.Match != nil {
-		route.Headers = buildHeaders(rule.Match.Http)
+		route.Headers = buildHeaders(rule.Match.HttpHeaders)
 
-		if uri, ok := rule.Match.Http[HeaderURI]; ok {
+		if uri, ok := rule.Match.HttpHeaders[HeaderURI]; ok {
 			switch m := uri.MatchType.(type) {
 			case *proxyconfig.StringMatch_Exact:
 				route.Path = m.Exact
@@ -160,6 +160,14 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 		route.Cluster = cluster.Name
 		route.clusters = make([]*Cluster, 0)
 		route.clusters = append(route.clusters, cluster)
+	}
+
+	// Add the fault filters, one per cluster defined in weighted cluster or cluster
+	if rule.HttpFault != nil {
+		route.faults = make([]*HTTPFilter, 0)
+		for _, c := range route.clusters {
+			route.faults = append(route.faults, buildHTTPFaultFilter(c.Name, rule.HttpFault))
+		}
 	}
 
 	return route, catchAll

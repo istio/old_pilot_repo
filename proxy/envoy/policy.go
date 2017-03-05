@@ -96,31 +96,23 @@ func insertDestinationPolicy(config *model.IstioRegistry, cluster *Cluster) {
 }
 
 // buildFaultFilters builds a list of fault filters for the http route
-func buildFaultFilters(config *model.IstioRegistry, routeConfig *HTTPRouteConfig) []HTTPFilter {
+// TODO dedup fault filters, however there is no unique name across fault filters.
+func buildFaultFilters(routeConfig *HTTPRouteConfig) []HTTPFilter {
 	if routeConfig == nil {
 		return nil
 	}
 
-	var clusters Clusters
-	clusters = routeConfig.clusters()
-	clusters = clusters.Normalize()
-
 	faults := make([]HTTPFilter, 0)
-	for _, cluster := range clusters {
-		policies := config.DestinationPolicies(cluster.hostname, cluster.tags)
-		for _, policy := range policies {
-			if policy.HttpFault != nil {
-				faults = append(faults, buildHTTPFaultFilter(cluster.Name, policy.HttpFault))
-			}
-		}
+	for _, f := range routeConfig.faults() {
+		faults = append(faults, *f)
 	}
 
 	return faults
 }
 
 // buildFaultFilter builds a single fault filter for envoy cluster
-func buildHTTPFaultFilter(cluster string, faultRule *proxyconfig.HTTPFaultInjection) HTTPFilter {
-	return HTTPFilter{
+func buildHTTPFaultFilter(cluster string, faultRule *proxyconfig.HTTPFaultInjection) *HTTPFilter {
+	return &HTTPFilter{
 		Type: "decoder",
 		Name: "fault",
 		Config: FilterFaultConfig{
