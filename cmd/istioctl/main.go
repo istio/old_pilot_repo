@@ -36,11 +36,12 @@ import (
 	"k8s.io/client-go/pkg/util/yaml"
 )
 
-type InputDoc struct {
+// Each entry in the multi-doc YAML file used by `istioctl create -f` MUST have this format
+type inputDoc struct {
 	Type string
 	Name string
-	// Spec istio.proxy.v1alpha.config.RouteRule
-	Spec     interface{}
+	// Spec is usually, but not always, a istio.proxy.v1alpha.config.RouteRule
+	Spec       interface{}
 	ParsedSpec proto.Message
 }
 
@@ -67,7 +68,9 @@ var (
 				return errors.New("Nothing to create")
 			}
 			for _, v := range varr {
-				setup(v.Type, v.Name)
+				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
 				err = cmd.Client.Post(key, v.ParsedSpec)
 				if err != nil {
 					return err
@@ -249,7 +252,7 @@ func readInput() (proto.Message, error) {
 }
 
 // readInput reads multiple documents from the input and checks with the schema
-func readInputs() ([]InputDoc, error) {
+func readInputs() ([]inputDoc, error) {
 
 	var reader io.Reader
 	var err error
@@ -263,12 +266,12 @@ func readInputs() ([]InputDoc, error) {
 		}
 	}
 
-	var varr []InputDoc
+	var varr []inputDoc
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
-	var yamlDecoder *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
+	yamlDecoder := yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
-		v := InputDoc{}
+		v := inputDoc{}
 		err = yamlDecoder.Decode(&v)
 		if err == io.EOF {
 			break
@@ -279,6 +282,10 @@ func readInputs() ([]InputDoc, error) {
 
 		// Do a second decode pass, to get the data into structured format
 		byteRule, err := json.Marshal(v.Spec)
+		if err != nil {
+			return nil, fmt.Errorf("Could not encode Spec: %v", err)
+		}
+
 		reader2 := bytes.NewReader(byteRule)
 
 		schema, ok := model.IstioConfig[v.Type]
@@ -290,7 +297,7 @@ func readInputs() ([]InputDoc, error) {
 			return nil, fmt.Errorf("cannot create pbt from %v", v.Type)
 		}
 		rr := reflect.New(pbt.Elem()).Interface().(proto.Message)
-		var yamlDecoder2 *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader2, 512*1024)
+		yamlDecoder2 := yaml.NewYAMLOrJSONDecoder(reader2, 512*1024)
 		err = yamlDecoder2.Decode(&rr)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
