@@ -243,6 +243,50 @@ type TCPRoute struct {
 	clusterRef *Cluster
 }
 
+type TCPRouteByRoute []TCPRoute
+
+func (r TCPRouteByRoute) Len() int {
+	return len(r)
+}
+
+func (r TCPRouteByRoute) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r TCPRouteByRoute) Less(i, j int) bool {
+	if r[i].Cluster != r[j].Cluster {
+		return r[i].Cluster < r[j].Cluster
+	}
+
+	compare := func(a, b []string) bool {
+		lenA, lenB := len(a), len(b)
+		max := lenA
+		if max > lenB {
+			max = lenB
+		}
+		for i := 0; i < max; i++ {
+			if a[i] != b[i] {
+				return a[i] < b[i]
+			}
+		}
+		return lenA < lenB
+	}
+
+	if less := compare(r[i].DestinationIPList, r[j].DestinationIPList); less {
+		return less
+	}
+	if r[i].DestinationPorts != r[j].DestinationPorts {
+		return r[i].DestinationPorts < r[j].DestinationPorts
+	}
+	if less := compare(r[i].SourceIPList, r[j].SourceIPList); less {
+		return less
+	}
+	if r[i].SourcePorts != r[j].SourcePorts {
+		return r[i].SourcePorts < r[j].SourcePorts
+	}
+	return false
+}
+
 // Merge operation selects a union of two route configs prioritizing the first.
 func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 	out := &TCPRouteConfig{}
