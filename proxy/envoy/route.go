@@ -166,7 +166,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	if rule.HttpFault != nil {
 		route.faults = make([]*HTTPFilter, 0)
 		for _, c := range route.clusters {
-			route.faults = append(route.faults, buildHTTPFaultFilter(c.Name, rule.HttpFault))
+			route.faults = append(route.faults, buildHTTPFaultFilter(c.Name, rule.HttpFault, route.Headers))
 		}
 	}
 

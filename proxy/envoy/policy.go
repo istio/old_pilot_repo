@@ -22,8 +22,6 @@ import (
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
-// TODO: apply fault filter by destination as a post-processing step
-
 func insertMixerFilter(listeners []*Listener, mixer string) {
 	for _, l := range listeners {
 		for _, f := range l.Filters {
@@ -92,59 +90,5 @@ func insertDestinationPolicy(config *model.IstioRegistry, cluster *Cluster) {
 			}
 		}
 
-	}
-}
-
-// buildFaultFilters builds a list of fault filters for the http route
-// TODO dedup fault filters, however there is no unique name across fault filters.
-func buildFaultFilters(routeConfig *HTTPRouteConfig) []HTTPFilter {
-	if routeConfig == nil {
-		return nil
-	}
-
-	faults := make([]HTTPFilter, 0)
-	for _, f := range routeConfig.faults() {
-		faults = append(faults, *f)
-	}
-
-	return faults
-}
-
-// buildFaultFilter builds a single fault filter for envoy cluster
-func buildHTTPFaultFilter(cluster string, faultRule *proxyconfig.HTTPFaultInjection) *HTTPFilter {
-	return &HTTPFilter{
-		Type: "decoder",
-		Name: "fault",
-		Config: FilterFaultConfig{
-			UpstreamCluster: cluster,
-			Headers:         buildHeaders(faultRule.Headers),
-			Abort:           buildAbortConfig(faultRule.Abort),
-			Delay:           buildDelayConfig(faultRule.Delay),
-		},
-	}
-}
-
-// buildAbortConfig builds the envoy config related to abort spec in a fault filter
-func buildAbortConfig(abortRule *proxyconfig.HTTPFaultInjection_Abort) *AbortFilter {
-	if abortRule == nil || abortRule.GetHttpStatus() == 0 {
-		return nil
-	}
-
-	return &AbortFilter{
-		Percent:    int(abortRule.Percent),
-		HTTPStatus: int(abortRule.GetHttpStatus()),
-	}
-}
-
-// buildDelayConfig builds the envoy config related to delay spec in a fault filter
-func buildDelayConfig(delayRule *proxyconfig.HTTPFaultInjection_Delay) *DelayFilter {
-	if delayRule == nil || delayRule.GetFixedDelay() == nil {
-		return nil
-	}
-
-	return &DelayFilter{
-		Type:     "fixed",
-		Percent:  int(delayRule.GetFixedDelay().Percent),
-		Duration: int(delayRule.GetFixedDelay().FixedDelaySeconds * 1000),
 	}
 }

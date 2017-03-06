@@ -12,6 +12,7 @@ go_library(
         "resources.go",
         "route.go",
         "watcher.go",
+        "fault.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
