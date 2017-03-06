@@ -243,6 +243,7 @@ type TCPRoute struct {
 	clusterRef *Cluster
 }
 
+// TCPRouteByRoute sorts TCP routes over all route sub fields.
 type TCPRouteByRoute []TCPRoute
 
 func (r TCPRouteByRoute) Len() int {
