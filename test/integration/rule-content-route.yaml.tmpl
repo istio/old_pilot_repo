@@ -4,7 +4,7 @@ match:
   source: {{.source}}.{{.namespace}}.svc.cluster.local
   source_tags:
     version: v1
-  http:
+  httpHeaders:
     version:
       exact: v2
 route:
