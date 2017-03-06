@@ -187,6 +187,36 @@ func buildSDSCluster(mesh *MeshConfig) *Cluster {
 	}
 }
 
+func buildCDSCluster(mesh *MeshConfig) *Cluster {
+	return &Cluster{
+		Name:             "cds",
+		Type:             "strict_dns",
+		ConnectTimeoutMs: DefaultTimeoutMs,
+		LbType:           DefaultLbType,
+		Hosts: []Host{
+			{
+				URL: "tcp://" + mesh.DiscoveryAddress,
+			},
+		},
+		MaxRequestsPerConnection: 1,
+	}
+}
+
+func buildRDSCluster(mesh *MeshConfig) *Cluster {
+	return &Cluster{
+		Name:             "rds",
+		Type:             "strict_dns",
+		ConnectTimeoutMs: DefaultTimeoutMs,
+		LbType:           DefaultLbType,
+		Hosts: []Host{
+			{
+				URL: "tcp://" + mesh.DiscoveryAddress,
+			},
+		},
+		MaxRequestsPerConnection: 1,
+	}
+}
+
 // buildVirtualHost constructs an entry for VirtualHost for a destination service.
 // The unique name for a virtual host is a combination of the destination service and the port, e.g.
 // "svc.ns.svc.cluster.local:http".

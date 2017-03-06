@@ -34,7 +34,7 @@ type agent struct {
 	binary string
 	// Envoy config root
 	configRoot string
-	// serviceCluster is the first component of the local proxy identityi (cluster name)
+	// serviceCluster is the first component of the local proxy identity (cluster name)
 	serviceCluster string
 	// serviceNode is the second component of the local proxy identity (node name)
 	serviceNode string
