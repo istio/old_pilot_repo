@@ -260,11 +260,11 @@ func (r TCPRouteByRoute) Less(i, j int) bool {
 
 	compare := func(a, b []string) bool {
 		lenA, lenB := len(a), len(b)
-		max := lenA
-		if max > lenB {
-			max = lenB
+		min := lenA
+		if min > lenB {
+			min = lenB
 		}
-		for i := 0; i < max; i++ {
+		for i := 0; i < min; i++ {
 			if a[i] != b[i] {
 				return a[i] < b[i]
 			}
