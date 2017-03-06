@@ -15,15 +15,15 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
-    "reflect"
-    "errors"
-    "encoding/json"
-    "bytes"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -33,10 +33,6 @@ import (
 	"istio.io/manager/cmd"
 	"istio.io/manager/model"
 
-	// Note that to get this package I had to do
-	//     cd $GOPATH/src/k8s.io/client-go
-	//     git checkout v2.0.0
-	// because the default branch that `go get` uses couldn't find this package.
 	"k8s.io/client-go/pkg/util/yaml"
 )
 
@@ -44,8 +40,8 @@ type MetadataAndRule struct {
 	Type string
 	Name string
 	// Spec istio.proxy.v1alpha.config.RouteRule
-	Spec interface{}
-	Rule proto.Message
+	Spec     interface{}
+	InputDoc proto.Message
 }
 
 var (
@@ -71,16 +67,13 @@ var (
 				return errors.New("Nothing to create")
 			}
 			for _, v := range varr {
-				fmt.Printf("About to setup using %v with name %v\n", v.Type, v.Name)
 				setup(v.Type, v.Name)
-				fmt.Printf("About to Post rule %v\n", v.Rule)
-				err = cmd.Client.Post(key, v.Rule)
+				err = cmd.Client.Post(key, v.InputDoc)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Posted rule\n")
+				fmt.Printf("Posted rule %v\n", v.Name)
 			}
-			fmt.Printf("Posted %v rules\n", len(varr))
 
 			return nil
 		},
@@ -273,16 +266,16 @@ func readInputs() ([]MetadataAndRule, error) {
 	var varr []MetadataAndRule
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
-	var yamlDecoder *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader, 512 * 1024)
+	var yamlDecoder *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
 		v := MetadataAndRule{}
 		err = yamlDecoder.Decode(&v)
 		if err == io.EOF {
-			break;
+			break
 		}
 		if err != nil {
 			fmt.Printf("cannot parse proto message: %v", err)
-			os.Exit(5)
+			os.Exit(-1)
 		}
 		fmt.Printf("Parsed, value=%v\n", v)
 
@@ -290,27 +283,25 @@ func readInputs() ([]MetadataAndRule, error) {
 		byteRule, err := json.Marshal(v.Spec)
 		reader2 := bytes.NewReader(byteRule)
 
-		fmt.Printf("Creating pbt from %v\n", v.Type)
 		schema, ok := model.IstioConfig[v.Type]
 		if !ok {
 			fmt.Printf("Unknown spec type %s", v.Type)
-			os.Exit(7)
+			os.Exit(-1)
 		}
 		pbt := proto.MessageType(schema.MessageName)
 		if pbt == nil {
 			fmt.Printf("cannot create pbt from %v", v.Type)
-			os.Exit(6)
+			os.Exit(-1)
 		}
 		rr := reflect.New(pbt.Elem()).Interface().(proto.Message)
-		var yamlDecoder2 *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader2, 512 * 1024)
+		var yamlDecoder2 *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader2, 512*1024)
 		err = yamlDecoder2.Decode(&rr)
 		if err != nil {
 			fmt.Printf("cannot parse proto message: %v", err)
-			os.Exit(5)
+			os.Exit(-1)
 		}
 
-		v.Rule = rr
-		fmt.Printf("After second decoding, value=%v\n", v)
+		v.InputDoc = rr
 
 		varr = append(varr, v)
 	}
