@@ -16,8 +16,6 @@ package main
 
 import (
 	"testing"
-
-	"istio.io/manager/cmd"
 )
 
 func TestCreateInvalidFile(t *testing.T) {

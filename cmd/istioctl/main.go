@@ -36,12 +36,12 @@ import (
 	"k8s.io/client-go/pkg/util/yaml"
 )
 
-type MetadataAndRule struct {
+type InputDoc struct {
 	Type string
 	Name string
 	// Spec istio.proxy.v1alpha.config.RouteRule
 	Spec     interface{}
-	InputDoc proto.Message
+	ParsedSpec proto.Message
 }
 
 var (
@@ -68,7 +68,7 @@ var (
 			}
 			for _, v := range varr {
 				setup(v.Type, v.Name)
-				err = cmd.Client.Post(key, v.InputDoc)
+				err = cmd.Client.Post(key, v.ParsedSpec)
 				if err != nil {
 					return err
 				}
@@ -249,7 +249,7 @@ func readInput() (proto.Message, error) {
 }
 
 // readInput reads multiple documents from the input and checks with the schema
-func readInputs() ([]MetadataAndRule, error) {
+func readInputs() ([]InputDoc, error) {
 
 	var reader io.Reader
 	var err error
@@ -263,12 +263,12 @@ func readInputs() ([]MetadataAndRule, error) {
 		}
 	}
 
-	var varr []MetadataAndRule
+	var varr []InputDoc
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
 	var yamlDecoder *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
-		v := MetadataAndRule{}
+		v := InputDoc{}
 		err = yamlDecoder.Decode(&v)
 		if err == io.EOF {
 			break
@@ -277,7 +277,6 @@ func readInputs() ([]MetadataAndRule, error) {
 			fmt.Printf("cannot parse proto message: %v", err)
 			os.Exit(-1)
 		}
-		fmt.Printf("Parsed, value=%v\n", v)
 
 		// Do a second decode pass, to get the data into structured format
 		byteRule, err := json.Marshal(v.Spec)
@@ -301,7 +300,7 @@ func readInputs() ([]MetadataAndRule, error) {
 			os.Exit(-1)
 		}
 
-		v.InputDoc = rr
+		v.ParsedSpec = rr
 
 		varr = append(varr, v)
 	}
