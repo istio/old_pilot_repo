@@ -265,9 +265,9 @@ func (r TCPRouteByRoute) Less(i, j int) bool {
 		if min > lenB {
 			min = lenB
 		}
-		for i := 0; i < min; i++ {
-			if a[i] != b[i] {
-				return a[i] < b[i]
+		for k := 0; k < min; k++ {
+			if a[k] != b[k] {
+				return a[k] < b[k]
 			}
 		}
 		return lenA < lenB
