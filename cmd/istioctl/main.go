@@ -72,7 +72,7 @@ var (
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Posted rule %v\n", v.Name)
+				fmt.Printf("Posted %v %v\n", v.Type, v.Name)
 			}
 
 			return nil
@@ -274,8 +274,7 @@ func readInputs() ([]InputDoc, error) {
 			break
 		}
 		if err != nil {
-			fmt.Printf("cannot parse proto message: %v", err)
-			os.Exit(-1)
+			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
 
 		// Do a second decode pass, to get the data into structured format
@@ -284,20 +283,17 @@ func readInputs() ([]InputDoc, error) {
 
 		schema, ok := model.IstioConfig[v.Type]
 		if !ok {
-			fmt.Printf("Unknown spec type %s", v.Type)
-			os.Exit(-1)
+			return nil, fmt.Errorf("Unknown spec type %s", v.Type)
 		}
 		pbt := proto.MessageType(schema.MessageName)
 		if pbt == nil {
-			fmt.Printf("cannot create pbt from %v", v.Type)
-			os.Exit(-1)
+			return nil, fmt.Errorf("cannot create pbt from %v", v.Type)
 		}
 		rr := reflect.New(pbt.Elem()).Interface().(proto.Message)
 		var yamlDecoder2 *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader2, 512*1024)
 		err = yamlDecoder2.Decode(&rr)
 		if err != nil {
-			fmt.Printf("cannot parse proto message: %v", err)
-			os.Exit(-1)
+			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
 
 		v.ParsedSpec = rr

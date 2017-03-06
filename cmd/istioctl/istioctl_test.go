@@ -20,8 +20,7 @@ import (
 
 func TestCreateInvalidFile(t *testing.T) {
 	file = "does-not-exist.yaml"
-	err := postCmd.RunE(postCmd, []string{})
-	if err == nil {
+	if err := postCmd.RunE(postCmd, []string{}); err == nil {
 		t.Fatalf("Did not fail looking for file")
 	}
 }
