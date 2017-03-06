@@ -20,6 +20,10 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+    "reflect"
+    "errors"
+    "encoding/json"
+    "bytes"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -28,7 +32,21 @@ import (
 
 	"istio.io/manager/cmd"
 	"istio.io/manager/model"
+
+	// Note that to get this package I had to do
+	//     cd $GOPATH/src/k8s.io/client-go
+	//     git checkout v2.0.0
+	// because the default branch that `go get` uses couldn't find this package.
+	"k8s.io/client-go/pkg/util/yaml"
 )
+
+type MetadataAndRule struct {
+	Type string
+	Name string
+	// Spec istio.proxy.v1alpha.config.RouteRule
+	Spec interface{}
+	Rule proto.Message
+}
 
 var (
 	// input file name
@@ -38,20 +56,33 @@ var (
 	schema model.ProtoSchema
 
 	postCmd = &cobra.Command{
-		Use:   "create [type] [name]",
-		Short: "Create a configuration object",
+		Use:   "create",
+		Short: "Create configuration objects",
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return fmt.Errorf("provide configuration type and name")
+			if len(args) != 0 {
+				return fmt.Errorf("create takes no arguments")
 			}
-			if err := setup(args[0], args[1]); err != nil {
-				return err
-			}
-			v, err := readInput()
+			// Initialize schema global
+			varr, err := readInputs()
 			if err != nil {
 				return err
 			}
-			return cmd.Client.Post(key, v)
+			if len(varr) == 0 {
+				return errors.New("Nothing to create")
+			}
+			for _, v := range varr {
+				fmt.Printf("About to setup using %v with name %v\n", v.Type, v.Name)
+				setup(v.Type, v.Name)
+				fmt.Printf("About to Post rule %v\n", v.Rule)
+				err = cmd.Client.Post(key, v.Rule)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Posted rule\n")
+			}
+			fmt.Printf("Posted %v rules\n", len(varr))
+
+			return nil
 		},
 	}
 
@@ -222,4 +253,67 @@ func readInput() (proto.Message, error) {
 	}
 
 	return v, nil
+}
+
+// readInput reads multiple documents from the input and checks with the schema
+func readInputs() ([]MetadataAndRule, error) {
+
+	var reader io.Reader
+	var err error
+
+	if file == "" {
+		reader = os.Stdin
+	} else {
+		reader, err = os.Open(file)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var varr []MetadataAndRule
+
+	// We store route-rules as a YaML stream; there may be more than one decoder.
+	var yamlDecoder *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader, 512 * 1024)
+	for {
+		v := MetadataAndRule{}
+		err = yamlDecoder.Decode(&v)
+		if err == io.EOF {
+			break;
+		}
+		if err != nil {
+			fmt.Printf("cannot parse proto message: %v", err)
+			os.Exit(5)
+		}
+		fmt.Printf("Parsed, value=%v\n", v)
+
+		// Do a second decode pass, to get the data into structured format
+		byteRule, err := json.Marshal(v.Spec)
+		reader2 := bytes.NewReader(byteRule)
+
+		fmt.Printf("Creating pbt from %v\n", v.Type)
+		schema, ok := model.IstioConfig[v.Type]
+		if !ok {
+			fmt.Printf("Unknown spec type %s", v.Type)
+			os.Exit(7)
+		}
+		pbt := proto.MessageType(schema.MessageName)
+		if pbt == nil {
+			fmt.Printf("cannot create pbt from %v", v.Type)
+			os.Exit(6)
+		}
+		rr := reflect.New(pbt.Elem()).Interface().(proto.Message)
+		var yamlDecoder2 *yaml.YAMLOrJSONDecoder = yaml.NewYAMLOrJSONDecoder(reader2, 512 * 1024)
+		err = yamlDecoder2.Decode(&rr)
+		if err != nil {
+			fmt.Printf("cannot parse proto message: %v", err)
+			os.Exit(5)
+		}
+
+		v.Rule = rr
+		fmt.Printf("After second decoding, value=%v\n", v)
+
+		varr = append(varr, v)
+	}
+
+	return varr, nil
 }
