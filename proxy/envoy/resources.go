@@ -566,8 +566,8 @@ type CDS struct {
 // RDS definition
 type RDS struct {
 	Cluster         string `json:"cluster"`
-	RefreshDelayMS  int    `json:"refresh_delay_ms"`
 	RouteConfigName string `json:"route_config_name"`
+	RefreshDelayMs  int    `json:"refresh_delay_ms"`
 }
 
 // ClusterManager definition

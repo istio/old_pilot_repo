@@ -64,10 +64,10 @@ const (
 	// proxy instance
 	ParentShutdownTimeSeconds = 45
 
-	// ServiceCluster defines the name for the service_cluster that is shared by
+	// IstioServiceCluster defines the name for the service_cluster that is shared by
 	// all proxy instances. Since Istio does not assign a local service/service version
 	// to each proxy instance, the name is same for all of them
-	ServiceCluster = "istio-proxy"
+	IstioServiceCluster = "istio-proxy"
 )
 
 // NewAgent creates a new proxy instance agent for a config root and a local node name
@@ -75,7 +75,7 @@ func NewAgent(binary string, configRoot string, nodeName string) Agent {
 	return &agent{
 		binary:         binary,
 		configRoot:     configRoot,
-		serviceCluster: ServiceCluster,
+		serviceCluster: IstioServiceCluster,
 		serviceNode:    nodeName,
 		cmdMap:         make(map[*exec.Cmd]instance),
 	}

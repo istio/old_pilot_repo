@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -35,6 +36,14 @@ type hosts struct {
 	Hosts []*host `json:"hosts,omitempty"`
 }
 
+type host struct {
+	Address string `json:"ip_address"`
+	Port    int    `json:"port"`
+
+	// Weight is an integer in the range [1, 100] or empty
+	Weight int `json:"load_balancing_weight,omitempty"`
+}
+
 type clusters struct {
 	Clusters []*Cluster `json:"clusters,omitempty"`
 }
@@ -43,13 +52,12 @@ type virtualHosts struct {
 	VirtualHosts []*VirtualHost `json:"virtual_hosts,omitempty"`
 }
 
-type host struct {
-	Address string `json:"ip_address"`
-	Port    int    `json:"port"`
-
-	// Weight is an integer in the range [1, 100] or empty
-	Weight int `json:"load_balancing_weight,omitempty"`
-}
+// Request variables for discovery services
+const (
+	ServiceKey     = "service-key"
+	ServiceCluster = "service-cluster"
+	ServiceNode    = "service-node"
+)
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
 func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioRegistry, port int) *DiscoveryService {
@@ -69,7 +77,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 	ws.Produces(restful.MIME_JSON)
 
 	ws.Route(ws.
-		GET("/v1/registration/{service-key}").
+		GET(fmt.Sprintf("/v1/registration/{%s}", Service-Key)).
 		To(ds.ListEndpoints).
 		Doc("SDS registration").
 		Param(ws.PathParameter("service-key", "tuple of service name and tag name").DataType("string")).

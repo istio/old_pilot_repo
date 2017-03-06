@@ -71,9 +71,9 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 // Generate Envoy sidecar proxy configuration
-func Generate(instances []*model.ServiceInstance, services []*model.Service,
-	config *model.IstioRegistry, mesh *MeshConfig) *Config {
-	listeners, clusters := build(instances, services, config, mesh)
+func Generate(context *ProxyContext) *Config {
+	mesh := context.MeshConfig
+	listeners, clusters := build(context)
 
 	// inject mixer filter
 	if mesh.MixerAddress != "" {
@@ -115,42 +115,8 @@ func Generate(instances []*model.ServiceInstance, services []*model.Service,
 }
 
 // build combines the outbound and inbound routes prioritizing the latter
-func build(instances []*model.ServiceInstance, services []*model.Service,
-	config *model.IstioRegistry, mesh *MeshConfig) ([]*Listener, Clusters) {
-	httpOutbound, tcpOutbound := buildOutboundFilters(instances, services, config, mesh)
-	httpInbound, tcpInbound := buildInboundFilters(instances)
-
-	// merge the two sets of HTTP route configs
-	httpRouteConfigs := make(HTTPRouteConfigs)
-	for port, httpRouteConfig := range httpInbound {
-		httpRouteConfigs[port] = httpRouteConfig
-	}
-	for port, outgoing := range httpOutbound {
-		if incoming, ok := httpRouteConfigs[port]; ok {
-			// If the traffic is sent to a service that has instances co-located with the proxy,
-			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
-			// Note that this may not be a problem if the service port and its endpoint port are distinct.
-			httpRouteConfigs[port] = incoming.merge(outgoing)
-		} else {
-			httpRouteConfigs[port] = outgoing
-		}
-	}
-
-	// merge the two sets of TCP route configs
-	tcpRouteConfigs := make(TCPRouteConfigs)
-	for port, tcpRouteConfig := range tcpInbound {
-		tcpRouteConfigs[port] = tcpRouteConfig
-	}
-	for port, outgoing := range tcpOutbound {
-		if incoming, ok := tcpRouteConfigs[port]; ok {
-			// If the traffic is sent to a service that has instances co-located with the proxy,
-			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
-			// Note that this may not be a problem if the service port and its endpoint port are distinct.
-			tcpRouteConfigs[port] = incoming.merge(outgoing)
-		} else {
-			tcpRouteConfigs[port] = outgoing
-		}
-	}
+func build(context *ProxyContext) ([]*Listener, Clusters) {
+	httpRouteConfigs, tcpRouteConfigs := buildRoutes(context)
 
 	// canonicalize listeners and collect clusters
 	clusters := make(Clusters, 0)
@@ -179,8 +145,12 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 					AccessLog: []AccessLog{{
 						Path: DefaultAccessLog,
 					}},
-					RouteConfig: routeConfig,
-					Filters:     filters,
+					RDS: &RDS{
+						Cluster:         RDSName,
+						RouteConfigName: fmt.Sprintf("%d", port),
+						RefreshDelayMs:  1000,
+					},
+					Filters: filters,
 				},
 			}},
 		}
@@ -225,15 +195,57 @@ func build(instances []*model.ServiceInstance, services []*model.Service,
 
 	clusters = clusters.Normalize()
 	for _, cluster := range clusters {
-		insertDestinationPolicy(config, cluster)
+		insertDestinationPolicy(context.Config, cluster)
 	}
 
 	return listeners, clusters
 }
 
-// buildOutboundFilters creates route configs indexed by ports for the traffic outbound
+// buildRoutes creates routes for both inbound and outbound traffic
+func buildRoutes(context *ProxyContext) (HTTPRouteConfigs, TCPRouteConfigs) {
+	instances := context.Discovery.HostInstances(context.Addrs)
+	services := context.Discovery.Services()
+	httpOutbound, tcpOutbound := buildOutboundRoutes(instances, services, context.Config, context.MeshConfig)
+	httpInbound, tcpInbound := buildInboundRoutes(instances)
+
+	// merge the two sets of HTTP route configs
+	httpRouteConfigs := make(HTTPRouteConfigs)
+	for port, httpRouteConfig := range httpInbound {
+		httpRouteConfigs[port] = httpRouteConfig
+	}
+	for port, outgoing := range httpOutbound {
+		if incoming, ok := httpRouteConfigs[port]; ok {
+			// If the traffic is sent to a service that has instances co-located with the proxy,
+			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
+			// Note that this may not be a problem if the service port and its endpoint port are distinct.
+			httpRouteConfigs[port] = incoming.merge(outgoing)
+		} else {
+			httpRouteConfigs[port] = outgoing
+		}
+	}
+
+	// merge the two sets of TCP route configs
+	tcpRouteConfigs := make(TCPRouteConfigs)
+	for port, tcpRouteConfig := range tcpInbound {
+		tcpRouteConfigs[port] = tcpRouteConfig
+	}
+	for port, outgoing := range tcpOutbound {
+		if incoming, ok := tcpRouteConfigs[port]; ok {
+			// If the traffic is sent to a service that has instances co-located with the proxy,
+			// we choose the local service instance since we cannot distinguish between inbound and outbound packets.
+			// Note that this may not be a problem if the service port and its endpoint port are distinct.
+			tcpRouteConfigs[port] = incoming.merge(outgoing)
+		} else {
+			tcpRouteConfigs[port] = outgoing
+		}
+	}
+
+	return httpRouteConfigs, tcpRouteConfigs
+}
+
+// buildOutboundRoutes creates route configs indexed by ports for the traffic outbound
 // from the proxy instance
-func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.Service,
+func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.Service,
 	config *model.IstioRegistry, mesh *MeshConfig) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
@@ -282,11 +294,13 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 				host := buildVirtualHost(service, port, suffix, routes)
 				http := httpConfigs.EnsurePort(port.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
+
 			case model.ProtocolTCP:
 				cluster := buildOutboundCluster(service.Hostname, port, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
 				config.Routes = append(config.Routes, route)
+
 			default:
 				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port.Port)
 			}
@@ -295,9 +309,9 @@ func buildOutboundFilters(instances []*model.ServiceInstance, services []*model.
 	return httpConfigs, tcpConfigs
 }
 
-// buildInboundFilters creates route configs indexed by ports for the traffic inbound
+// buildInboundRoutes creates route configs indexed by ports for the traffic inbound
 // to co-located service instances
-func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, TCPRouteConfigs) {
+func buildInboundRoutes(instances []*model.ServiceInstance) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
@@ -316,7 +330,7 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 			route := buildDefaultRoute(cluster)
 			host := buildVirtualHost(service, servicePort, suffix, []*HTTPRoute{route})
 
-			// insert explicit instance ip:port as a hostname field
+			// insert explicit instance (pod) ip:port as a hostname field
 			host.Domains = append(host.Domains, fmt.Sprintf("%s:%d", endpoint.Address, endpoint.Port))
 			if endpoint.Port == 80 {
 				host.Domains = append(host.Domains, endpoint.Address)
@@ -324,6 +338,7 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 
 			http := httpConfigs.EnsurePort(endpoint.Port)
 			http.VirtualHosts = append(http.VirtualHosts, host)
+
 		case model.ProtocolTCP:
 			cluster := buildInboundCluster(service.Hostname, endpoint.Port, protocol)
 
@@ -351,6 +366,7 @@ func buildInboundFilters(instances []*model.ServiceInstance) (HTTPRouteConfigs, 
 			config.Routes = append(config.Routes,
 				buildTCPRoute(cluster, []string{service.Address}, -1),
 			)
+
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %d", protocol, servicePort)
 		}
