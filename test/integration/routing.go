@@ -65,7 +65,7 @@ func testRouting() error {
 	log.Println("Success!")
 
 	log.Println("Testing fault injection..")
-	deployConfig("test/integration/route-fault-injection.yaml.tmpl", map[string]string{
+	deployConfig("test/integration/rule-fault-injection.yaml.tmpl", map[string]string{
 		"source":      "hello",
 		"destination": "world",
 	}, model.RouteRule, "fault-injection", "hello")
