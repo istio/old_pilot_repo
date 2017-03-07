@@ -20,15 +20,15 @@ package version
 // Note that DATE is omitted as bazel aims for reproducible builds and
 // seems to strip date information from the build process.
 var (
-	BUILD_APP_VERSION    string
-	BUILD_GIT_REVISION   string
-	BUILD_GIT_BRANCH     string
-	BUILD_USER           string
-	BUILD_HOST           string
-	BUILD_GOLANG_VERSION string
+	buildAppVersion    string
+	buildGitRevision   string
+	buildGitBranch     string
+	buildUser          string
+	buildHost          string
+	buildGolangVersion string
 )
 
-// BuildInfo provides information about the binary build.
+// BuildInfo describes version information about the binary build.
 type BuildInfo struct {
 	Version       string `json:"version"`
 	GitRevision   string `json:"revision"`
@@ -38,13 +38,14 @@ type BuildInfo struct {
 	GolangVersion string `json:"golang_version"`
 }
 
+// Info exports the build version information.
 var Info BuildInfo
 
 func init() {
-	Info.Version = BUILD_APP_VERSION
-	Info.GitRevision = BUILD_GIT_REVISION
-	Info.GitBranch = BUILD_GIT_BRANCH
-	Info.User = BUILD_USER
-	Info.Host = BUILD_HOST
-	Info.GolangVersion = BUILD_GOLANG_VERSION
+	Info.Version = buildAppVersion
+	Info.GitRevision = buildGitRevision
+	Info.GitBranch = buildGitBranch
+	Info.User = buildUser
+	Info.Host = buildHost
+	Info.GolangVersion = buildGolangVersion
 }
