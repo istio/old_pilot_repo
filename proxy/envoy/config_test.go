@@ -212,14 +212,12 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyPlain       = "testdata/envoy-no-route-rule.json"
-	envoyTimeoutRule = "testdata/envoy-timeout-rule.json"
-	envoyCBPolicy    = "testdata/envoy-cb-policy.json"
+	envoyConfig      = "testdata/envoy.json"
 	timeoutRouteRule = "testdata/timeout-route-rule.json.golden"
 	cbPolicy         = "testdata/cb-policy.json.golden"
 )
 
-func testConfig(r *model.IstioRegistry, envoyConfig string, t *testing.T) {
+func testConfig(r *model.IstioRegistry, envoyConfig, testCase string, t *testing.T) {
 	ds := mock.Discovery
 
 	config := Generate(&ProxyContext{
@@ -248,17 +246,13 @@ func testConfig(r *model.IstioRegistry, envoyConfig string, t *testing.T) {
 
 	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
-		t.Errorf("Envoy config differs from master copy for %q", envoyConfig)
+		t.Errorf("Envoy config differs from master copy for %q", testCase)
 	}
-}
-
-func TestMockConfigGeneratePlain(t *testing.T) {
-	r := mock.MakeRegistry()
-	testConfig(r, envoyPlain, t)
 }
 
 func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 	r := mock.MakeRegistry()
+	testConfig(r, envoyConfig, "default", t)
 
 	rTemp, err := ioutil.ReadFile(timeoutRouteRule)
 	if err != nil {
@@ -283,26 +277,22 @@ func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 		t.Errorf("Failed to add timeout route rule to config registry %v", err)
 	}
 
-	testConfig(r, envoyTimeoutRule, t)
-}
+	testConfig(r, envoyConfig, timeoutRouteRule, t)
 
-func TestMockConfigGenerateWithCBPolicy(t *testing.T) {
-	r := mock.MakeRegistry()
-
-	rTemp, err := ioutil.ReadFile(cbPolicy)
+	rTemp, err = ioutil.ReadFile(cbPolicy)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	policyRule := string(rTemp)
 
-	ps := model.IstioConfig[model.DestinationPolicy]
-	rule, err := ps.FromJSON(policyRule)
+	ps = model.IstioConfig[model.DestinationPolicy]
+	rule, err = ps.FromJSON(policyRule)
 
 	if err != nil {
 		t.Errorf("Failed to translate circuit breaker policy %v", err)
 	}
 
-	key := model.Key{
+	key = model.Key{
 		Kind:      model.DestinationPolicy,
 		Name:      "circuitBreaker",
 		Namespace: "",
@@ -312,5 +302,5 @@ func TestMockConfigGenerateWithCBPolicy(t *testing.T) {
 		t.Errorf("Failed to add circuit_breaker to config registry %v", err)
 	}
 
-	testConfig(r, envoyCBPolicy, t)
+	testConfig(r, envoyConfig, cbPolicy, t)
 }
