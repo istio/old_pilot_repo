@@ -77,10 +77,20 @@ func TestServiceDiscovery(t *testing.T) {
 }
 
 func TestClusterDiscovery(t *testing.T) {
+	registry := mock.MakeRegistry()
+	ds := makeDiscoveryService(registry)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", IstioServiceCluster, mock.HostInstance)
-	ds := makeDiscoveryService(mock.MakeRegistry())
 	response := makeDiscoveryRequest(ds, url, t)
 	compareResponse(response, "testdata/cds.json", t)
+}
+
+func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addCircuitBreaker(registry, t)
+	ds := makeDiscoveryService(registry)
+	url := fmt.Sprintf("/v1/clusters/%s/%s", IstioServiceCluster, mock.HostInstance)
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/cds-circuit-breaker.json", t)
 }
 
 func TestRouteDiscovery(t *testing.T) {

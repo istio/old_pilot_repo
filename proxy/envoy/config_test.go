@@ -250,10 +250,7 @@ func testConfig(r *model.IstioRegistry, envoyConfig, testCase string, t *testing
 	}
 }
 
-func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
-	r := mock.MakeRegistry()
-	testConfig(r, envoyConfig, "default", t)
-
+func addTimeout(r *model.IstioRegistry, t *testing.T) {
 	rTemp, err := ioutil.ReadFile(timeoutRouteRule)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -276,23 +273,23 @@ func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 	if err = r.Post(key, rule); err != nil {
 		t.Errorf("Failed to add timeout route rule to config registry %v", err)
 	}
+}
 
-	testConfig(r, envoyConfig, timeoutRouteRule, t)
-
-	rTemp, err = ioutil.ReadFile(cbPolicy)
+func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
+	rTemp, err := ioutil.ReadFile(cbPolicy)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	policyRule := string(rTemp)
 
-	ps = model.IstioConfig[model.DestinationPolicy]
-	rule, err = ps.FromJSON(policyRule)
+	ps := model.IstioConfig[model.DestinationPolicy]
+	rule, err := ps.FromJSON(policyRule)
 
 	if err != nil {
 		t.Errorf("Failed to translate circuit breaker policy %v", err)
 	}
 
-	key = model.Key{
+	key := model.Key{
 		Kind:      model.DestinationPolicy,
 		Name:      "circuitBreaker",
 		Namespace: "",
@@ -301,6 +298,15 @@ func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 	if err = r.Post(key, rule); err != nil {
 		t.Errorf("Failed to add circuit_breaker to config registry %v", err)
 	}
+}
 
+func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
+	r := mock.MakeRegistry()
+	testConfig(r, envoyConfig, "default", t)
+
+	addTimeout(r, t)
+	testConfig(r, envoyConfig, timeoutRouteRule, t)
+
+	addCircuitBreaker(r, t)
 	testConfig(r, envoyConfig, cbPolicy, t)
 }
