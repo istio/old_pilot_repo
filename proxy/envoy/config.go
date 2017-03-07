@@ -102,11 +102,11 @@ func Generate(context *ProxyContext) *Config {
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
-			SDS: SDS{
+			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
 				RefreshDelayMs: 1000,
 			},
-			CDS: CDS{
+			CDS: &CDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds"),
 				RefreshDelayMs: 1000,
 			},
@@ -115,12 +115,11 @@ func Generate(context *ProxyContext) *Config {
 }
 
 // build combines the outbound and inbound routes prioritizing the latter
-// build outputs inbound clusters as well
 func build(context *ProxyContext) ([]*Listener, Clusters) {
 	httpRouteConfigs, tcpRouteConfigs := buildRoutes(context)
 
 	// canonicalize listeners and collect inbound clusters
-	// outbound clusters are served with CDS
+	// HTTP outbound clusters are served with CDS
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 
@@ -181,7 +180,7 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 	for port, tcpConfig := range tcpRouteConfigs {
 		sort.Sort(TCPRouteByRoute(tcpConfig.Routes))
 		clusters = append(clusters, tcpConfig.filterClusters(func(cluster *Cluster) bool {
-			return !cluster.outbound
+			return true
 		})...)
 		listener := &Listener{
 			Port: port,
@@ -199,9 +198,6 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 
 	sort.Sort(ListenersByPort(listeners))
 	clusters = clusters.Normalize()
-	for _, cluster := range clusters {
-		insertDestinationPolicy(context.Config, cluster)
-	}
 
 	return listeners, clusters
 }

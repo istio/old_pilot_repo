@@ -45,10 +45,6 @@ type host struct {
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
 
-type clusters struct {
-	Clusters []*Cluster `json:"clusters,omitempty"`
-}
-
 // Request parameters for discovery services
 const (
 	ServiceKey      = "service-key"
@@ -88,7 +84,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Doc("CDS registration").
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")).
-		Writes(clusters{}))
+		Writes(ClusterManager{}))
 
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/routes/{%s}/{%s}/{%s}", RouteConfigName, ServiceCluster, ServiceNode)).
@@ -125,18 +121,47 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	}
 }
 
-// ListClusters responds to CDS requests
+// ListClusters responds to CDS requests for outbound HTTP clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
-	_ = ds.services.Services()
-	// TODO: fix this
-	/*
-		if err := response.WriteEntity(clusters{buildClusters(svc)}); err != nil {
-			glog.Warning(err)
-		}
-	*/
+	if serviceCluster := request.PathParameter(ServiceCluster); serviceCluster != IstioServiceCluster {
+		errorResponse(fmt.Sprintf("Unexpected %s %q", ServiceCluster, serviceCluster), response)
+		return
+	}
+
+	// service-node holds the IP address
+	ip := request.PathParameter(ServiceNode)
+
+	// CDS computes clusters that are referenced by RDS routes for a particular proxy node
+	// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
+	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
+	// skip computing the actual HTTP routes
+	httpRouteConfigs, _ := buildRoutes(&ProxyContext{
+		Discovery:  ds.services,
+		Config:     ds.config,
+		MeshConfig: ds.mesh,
+		Addrs:      map[string]bool{ip: true},
+	})
+
+	clusters := make(Clusters, 0)
+	for _, httpRouteConfig := range httpRouteConfigs {
+		clusters = append(clusters, httpRouteConfig.filterClusters(func(cluster *Cluster) bool {
+			return cluster.outbound
+		})...)
+	}
+
+	// de-duplicate and canonicalize clusters
+	clusters = clusters.Normalize()
+
+	for _, cluster := range clusters {
+		insertDestinationPolicy(ds.config, cluster)
+	}
+
+	if err := response.WriteEntity(ClusterManager{Clusters: clusters}); err != nil {
+		glog.Warning(err)
+	}
 }
 
-// ListRoutes responds to RDS requests
+// ListRoutes responds to RDS requests, used by HTTP routes
 func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restful.Response) {
 	if serviceCluster := request.PathParameter(ServiceCluster); serviceCluster != IstioServiceCluster {
 		errorResponse(fmt.Sprintf("Unexpected %s %q", ServiceCluster, serviceCluster), response)

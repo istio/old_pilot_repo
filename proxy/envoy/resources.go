@@ -579,8 +579,8 @@ type RDS struct {
 // ClusterManager definition
 type ClusterManager struct {
 	Clusters []*Cluster `json:"clusters,omitempty"`
-	SDS      SDS        `json:"sds"`
-	CDS      CDS        `json:"cds"`
+	SDS      *SDS       `json:"sds,omitempty"`
+	CDS      *CDS       `json:"cds,omitempty"`
 }
 
 // ByName implements sort
