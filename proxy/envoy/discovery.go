@@ -169,6 +169,8 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 }
 
 // ListRoutes responds to RDS requests, used by HTTP routes
+// Routes correspond to HTTP routes and use the listener port as the route name
+// to identify HTTP filters in the config. Service node value holds the local proxy identity.
 func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restful.Response) {
 	if serviceCluster := request.PathParameter(ServiceCluster); serviceCluster != IstioServiceCluster {
 		errorResponse(fmt.Sprintf("Unexpected %s %q", ServiceCluster, serviceCluster), response)
