@@ -123,7 +123,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	}
 }
 
-// ListClusters responds to CDS requests for outbound HTTP clusters
+// ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	if serviceCluster := request.PathParameter(ServiceCluster); serviceCluster != IstioServiceCluster {
 		errorResponse(fmt.Sprintf("Unexpected %s %q", ServiceCluster, serviceCluster), response)
@@ -137,7 +137,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 	// skip computing the actual HTTP routes
-	httpRouteConfigs, _ := buildRoutes(&ProxyContext{
+	httpRouteConfigs, tcpRouteConfigs := buildRoutes(&ProxyContext{
 		Discovery:  ds.services,
 		Config:     ds.config,
 		MeshConfig: ds.mesh,
@@ -147,6 +147,11 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	clusters := make(Clusters, 0)
 	for _, httpRouteConfig := range httpRouteConfigs {
 		clusters = append(clusters, httpRouteConfig.filterClusters(func(cluster *Cluster) bool {
+			return cluster.outbound
+		})...)
+	}
+	for _, tcpRouteConfig := range tcpRouteConfigs {
+		clusters = append(clusters, tcpRouteConfig.filterClusters(func(cluster *Cluster) bool {
 			return cluster.outbound
 		})...)
 	}

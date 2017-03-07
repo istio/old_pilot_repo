@@ -70,8 +70,8 @@ func compareResponse(body []byte, file string, t *testing.T) {
 }
 
 func TestServiceDiscovery(t *testing.T) {
-	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0], nil)
 	ds := makeDiscoveryService(mock.MakeRegistry())
+	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0], nil)
 	response := makeDiscoveryRequest(ds, url, t)
 	compareResponse(response, "testdata/sds.json", t)
 }
@@ -94,8 +94,17 @@ func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
 }
 
 func TestRouteDiscovery(t *testing.T) {
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", IstioServiceCluster, mock.HostInstance)
 	ds := makeDiscoveryService(mock.MakeRegistry())
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", IstioServiceCluster, mock.HostInstance)
 	response := makeDiscoveryRequest(ds, url, t)
 	compareResponse(response, "testdata/rds.json", t)
+}
+
+func TestRouteDiscoveryTimeout(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addTimeout(registry, t)
+	ds := makeDiscoveryService(registry)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", IstioServiceCluster, mock.HostInstance)
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/rds-timeout.json", t)
 }

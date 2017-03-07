@@ -115,11 +115,14 @@ func Generate(context *ProxyContext) *Config {
 }
 
 // build combines the outbound and inbound routes prioritizing the latter
+// build also returns all inbound clusters, and outbound clusters referenced by TCP proxy
+// (due to lack of RDS support for TCP proxy filter, all referenced clusters in the routes
+// must be present, the policy application is still performed by CDS rather than local agent)
 func build(context *ProxyContext) ([]*Listener, Clusters) {
 	httpRouteConfigs, tcpRouteConfigs := buildRoutes(context)
 
 	// canonicalize listeners and collect inbound clusters
-	// HTTP outbound clusters are served with CDS
+	// all outbound clusters are served with CDS
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 

@@ -33,16 +33,7 @@ go_test(
         "discovery_test.go",
         "route_test.go",
     ],
-    data = [
-        "testdata/cb-policy.json.golden",
-        "testdata/cds.json.golden",
-        "testdata/envoy-cb-policy.json.golden",
-        "testdata/envoy-no-route-rule.json.golden",
-        "testdata/envoy-timeout-rule.json.golden",
-        "testdata/rds.json.golden",
-        "testdata/sds.json.golden",
-        "testdata/timeout-route-rule.json.golden",
-    ],
+    data = glob(["testdata/*.json.golden"]),
     library = ":go_default_library",
     deps = [
         "//model:go_default_library",
