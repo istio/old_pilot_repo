@@ -35,6 +35,7 @@ go_test(
     ],
     data = [
         "testdata/cb-policy.json.golden",
+        "testdata/cds.json.golden",
         "testdata/envoy-cb-policy.json.golden",
         "testdata/envoy-no-route-rule.json.golden",
         "testdata/envoy-timeout-rule.json.golden",
