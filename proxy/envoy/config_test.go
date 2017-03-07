@@ -212,48 +212,52 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyData              = "testdata/envoy.json"
-	envoyPlainGolden       = "testdata/envoy-no-route-rule.json.golden"
-	envoyTimeoutRuleGolden = "testdata/envoy-timeout-rule.json.golden"
-	envoyCBPolicyGolden    = "testdata/envoy-cb-policy.json.golden"
-	timeoutRouteRule       = "testdata/timeout-route-rule.json.golden"
-	cbPolicy               = "testdata/cb-policy.json.golden"
+	envoyPlain       = "testdata/envoy-no-route-rule.json"
+	envoyTimeoutRule = "testdata/envoy-timeout-rule.json"
+	envoyCBPolicy    = "testdata/envoy-cb-policy.json"
+	timeoutRouteRule = "testdata/timeout-route-rule.json.golden"
+	cbPolicy         = "testdata/cb-policy.json.golden"
 )
 
-func TestMockConfigGeneratePlain(t *testing.T) {
+func testConfig(r *model.IstioRegistry, envoyConfig string, t *testing.T) {
 	ds := mock.Discovery
-	r := mock.MakeRegistry()
 
-	config := Generate(
-		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
-		ds.Services(), r,
-		DefaultMeshConfig)
+	config := Generate(&ProxyContext{
+		Discovery:  ds,
+		Config:     r,
+		MeshConfig: DefaultMeshConfig,
+		Addrs:      map[string]bool{mock.HostInstance: true},
+	})
 	if config == nil {
-		t.Fatal("Failed to generate config in non-route rule case")
+		t.Fatal("Failed to generate config")
 	}
 
-	err := config.WriteFile(envoyData)
+	err := config.WriteFile(envoyConfig)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	data, err := ioutil.ReadFile(envoyConfig)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	expected, err := ioutil.ReadFile(envoyPlainGolden)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	data, err := ioutil.ReadFile(envoyData)
+	expected, err := ioutil.ReadFile(envoyConfig + ".golden")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
 	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
-		t.Error("Envoy config differs from master copy for Plain config")
+		t.Error("Envoy config differs from master copy")
 	}
 }
 
+func TestMockConfigGeneratePlain(t *testing.T) {
+	r := mock.MakeRegistry()
+	testConfig(r, envoyPlain, t)
+}
+
 func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
-	ds := mock.Discovery
 	r := mock.MakeRegistry()
 
 	rTemp, err := ioutil.ReadFile(timeoutRouteRule)
@@ -279,35 +283,10 @@ func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 		t.Errorf("Failed to add timeout route rule to config registry %v", err)
 	}
 
-	config := Generate(
-		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
-		ds.Services(), r,
-		DefaultMeshConfig)
-	if config == nil {
-		t.Fatal("Failed to generate config for timeout route rule")
-	}
-	err = config.WriteFile(envoyData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	expected, err := ioutil.ReadFile(envoyTimeoutRuleGolden)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	data, err := ioutil.ReadFile(envoyData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// TODO: use difflib to obtain detailed diff
-	if string(expected) != string(data) {
-		t.Error("Envoy config differs from master config for timeout rule")
-	}
+	testConfig(r, envoyTimeoutRule, t)
 }
 
 func TestMockConfigGenerateWithCBPolicy(t *testing.T) {
-	ds := mock.Discovery
 	r := mock.MakeRegistry()
 
 	rTemp, err := ioutil.ReadFile(cbPolicy)
@@ -333,29 +312,5 @@ func TestMockConfigGenerateWithCBPolicy(t *testing.T) {
 		t.Errorf("Failed to add circuit_breaker to config registry %v", err)
 	}
 
-	config := Generate(
-		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
-		ds.Services(), r,
-		DefaultMeshConfig)
-	if config == nil {
-		t.Fatal("Failed to generate config for circuit breaker")
-	}
-	err = config.WriteFile(envoyData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	expected, err := ioutil.ReadFile(envoyCBPolicyGolden)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	data, err := ioutil.ReadFile(envoyData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// TODO: use difflib to obtain detailed diff
-	if string(expected) != string(data) {
-		t.Error("Envoy config differs from master config for Circuit Breaker policy")
-	}
+	testConfig(r, envoyCBPolicy, t)
 }
