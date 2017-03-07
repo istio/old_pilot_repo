@@ -25,7 +25,7 @@ import (
 	"istio.io/manager/model"
 )
 
-// DiscoveryService publishes services, clusters, and routes for proxies
+// DiscoveryService publishes services, clusters, and routes for all proxies
 type DiscoveryService struct {
 	services model.ServiceDiscovery
 	config   *model.IstioRegistry
@@ -112,8 +112,7 @@ func (ds *DiscoveryService) Run() {
 
 // ListEndpoints responds to SDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
-	key := request.PathParameter(ServiceKey)
-	hostname, ports, tags := model.ParseServiceKey(key)
+	hostname, ports, tags := model.ParseServiceKey(request.PathParameter(ServiceKey))
 	out := &hosts{}
 	for _, ep := range ds.services.Instances(hostname, ports.GetNames(), tags) {
 		out.Hosts = append(out.Hosts, &host{

@@ -254,21 +254,12 @@ func addConfig(config []byte, kind, name string, create bool) {
 	}
 }
 
-func deployConfig(in string, data map[string]string, kind, name string, envoy string) {
-	config, err := writeString(in, data)
-	check(err)
-	epoch, err := getRestartEpoch(envoy)
-	check(err)
-	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.namespace})
-	addConfig(config, kind, name, !exists)
-	check(waitForNewRestartEpoch(envoy, epoch))
-}
-
 func deployDynamicConfig(in string, data map[string]string, kind, name, envoy string) {
 	config, err := writeString(in, data)
 	check(err)
 	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.namespace})
 	addConfig(config, kind, name, !exists)
+	log.Println("Sleeping for the config to propagate")
 	time.Sleep(3 * time.Second)
 }
 
