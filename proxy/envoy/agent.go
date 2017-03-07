@@ -39,6 +39,10 @@ type agent struct {
 	serviceCluster string
 	// serviceNode is the second component of the local proxy identity
 	// (node name, e.g. pod name)
+	// The value is used by the proxy to identify its set of local instances to RDS for
+	// source-based routing. For example, if proxy sends its IP address, the RDS
+	// can compute routes that are relative to the service instances located at that
+	// IP address.
 	serviceNode string
 
 	// Map of known running Envoy processes and their restart epochs.
