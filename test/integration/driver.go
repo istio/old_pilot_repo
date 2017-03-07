@@ -22,8 +22,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"regexp"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -196,6 +194,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string) er
 	return run("kubectl apply -f " + configFile + " -n " + params.namespace)
 }
 
+/*
 func waitForNewRestartEpoch(pod string, start int) error {
 	log.Println("Waiting for Envoy restart epoch to increment from ", start)
 	for n := 0; n < budget; n++ {
@@ -232,6 +231,7 @@ func getRestartEpoch(pod string) (int, error) {
 
 	return 0, fmt.Errorf("could not obtain envoy restart epoch")
 }
+*/
 
 func addConfig(config []byte, kind, name string, create bool) {
 	log.Println("Add config")

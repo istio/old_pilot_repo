@@ -54,7 +54,8 @@ const (
 )
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioRegistry, mesh *MeshConfig, port int) *DiscoveryService {
+func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioRegistry,
+	mesh *MeshConfig, port int) *DiscoveryService {
 	out := &DiscoveryService{
 		services: services,
 		config:   config,
