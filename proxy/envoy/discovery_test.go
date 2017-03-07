@@ -123,3 +123,12 @@ func TestRouteDiscoveryTimeout(t *testing.T) {
 	response := makeDiscoveryRequest(ds, url, t)
 	compareResponse(response, "testdata/rds-timeout.json", t)
 }
+
+func TestRouteDiscoveryWeighted(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addWeightedRoute(registry, t)
+	ds := makeDiscoveryService(registry)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", IstioServiceCluster, mock.HostInstance)
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/rds-weighted.json", t)
+}

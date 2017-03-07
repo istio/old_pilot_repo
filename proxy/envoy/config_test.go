@@ -212,9 +212,10 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyConfig      = "testdata/envoy.json"
-	timeoutRouteRule = "testdata/timeout-route-rule.json.golden"
-	cbPolicy         = "testdata/cb-policy.json.golden"
+	envoyConfig       = "testdata/envoy.json"
+	cbPolicy          = "testdata/cb-policy.yaml.golden"
+	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
+	weightedRouteRule = "testdata/weighted-route.yaml.golden"
 )
 
 func testConfig(r *model.IstioRegistry, envoyConfig, testCase string, t *testing.T) {
@@ -250,53 +251,36 @@ func testConfig(r *model.IstioRegistry, envoyConfig, testCase string, t *testing
 	}
 }
 
-func addTimeout(r *model.IstioRegistry, t *testing.T) {
-	rTemp, err := ioutil.ReadFile(timeoutRouteRule)
+func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.DestinationPolicy, cbPolicy)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
-	routeRule := string(rTemp)
-
-	ps := model.IstioConfig[model.RouteRule]
-	rule, err := ps.FromJSON(routeRule)
-
-	if err != nil {
-		t.Errorf("Failed to translate timeout route rule %v", err)
-	}
-
-	key := model.Key{
-		Kind:      model.RouteRule,
-		Name:      "timeouts",
-		Namespace: "",
-	}
-
-	if err = r.Post(key, rule); err != nil {
-		t.Errorf("Failed to add timeout route rule to config registry %v", err)
+	if err = r.Post(model.Key{
+		Kind: model.DestinationPolicy,
+		Name: "circuit-breaker"},
+		msg); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
-	rTemp, err := ioutil.ReadFile(cbPolicy)
+func addTimeout(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.RouteRule, timeoutRouteRule)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
-	policyRule := string(rTemp)
+	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "timeouts"}, msg); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	ps := model.IstioConfig[model.DestinationPolicy]
-	rule, err := ps.FromJSON(policyRule)
-
+func addWeightedRoute(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.RouteRule, weightedRouteRule)
 	if err != nil {
-		t.Errorf("Failed to translate circuit breaker policy %v", err)
+		t.Fatal(err)
 	}
-
-	key := model.Key{
-		Kind:      model.DestinationPolicy,
-		Name:      "circuitBreaker",
-		Namespace: "",
-	}
-
-	if err = r.Post(key, rule); err != nil {
-		t.Errorf("Failed to add circuit_breaker to config registry %v", err)
+	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "weighted-route"}, msg); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -309,4 +293,7 @@ func TestMockConfigGenerateWithTimeoutRules(t *testing.T) {
 
 	addCircuitBreaker(r, t)
 	testConfig(r, envoyConfig, cbPolicy, t)
+
+	addWeightedRoute(r, t)
+	testConfig(r, envoyConfig, weightedRouteRule, t)
 }
