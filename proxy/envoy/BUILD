@@ -33,6 +33,7 @@ go_test(
         "discovery_test.go",
         "route_test.go",
     ],
+
     data = glob(["testdata/*.golden"]),
     library = ":go_default_library",
     deps = [
