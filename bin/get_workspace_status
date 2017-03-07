@@ -1,0 +1,20 @@
+#!/bin/bash
+
+BUILD_GIT_REVISION=$(git rev-parse --short HEAD 2> /dev/null)
+if [[  $? == 0 ]]; then
+    git diff-index --quiet HEAD
+    if [[  $? != 0 ]]; then
+        BUILD_GIT_REVISION=${BUILD_GIT_REVISION}"-dirty"
+    fi
+else
+    BUILD_GIT_REVISION=unknown
+fi
+
+echo BUILD_APP_VERSION    $(git describe 2> /dev/null || echo unknown)
+echo BUILD_GIT_REVISION   "${BUILD_GIT_REVISION}"
+echo BUILD_GIT_BRANCH     $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+echo BUILD_USER           ${whoami}
+echo BUILD_HOST           ${hostname -f}
+# TODO this is wrong! We need to use bazel's golang toolchain version and not
+# the user's system golang version.
+echo BUILD_GOLANG_VERSION $(go version | cut -f3 -d ' ')
