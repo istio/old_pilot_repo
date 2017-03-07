@@ -248,7 +248,7 @@ func testConfig(r *model.IstioRegistry, envoyConfig string, t *testing.T) {
 
 	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
-		t.Error("Envoy config differs from master copy")
+		t.Errorf("Envoy config differs from master copy for %q", envoyConfig)
 	}
 }
 
