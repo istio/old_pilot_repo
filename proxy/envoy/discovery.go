@@ -34,7 +34,7 @@ type DiscoveryService struct {
 }
 
 type hosts struct {
-	Hosts []*host `json:"hosts,omitempty"`
+	Hosts []*host `json:"hosts"`
 }
 
 type host struct {
@@ -110,14 +110,15 @@ func (ds *DiscoveryService) Run() {
 // ListEndpoints responds to SDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
 	hostname, ports, tags := model.ParseServiceKey(request.PathParameter(ServiceKey))
-	out := &hosts{}
+	// envoy expects an empty array if no hosts are available
+	out := make([]*host, 0)
 	for _, ep := range ds.services.Instances(hostname, ports.GetNames(), tags) {
-		out.Hosts = append(out.Hosts, &host{
+		out = append(out, &host{
 			Address: ep.Endpoint.Address,
 			Port:    ep.Endpoint.Port,
 		})
 	}
-	if err := response.WriteEntity(out); err != nil {
+	if err := response.WriteEntity(hosts{Hosts: out}); err != nil {
 		glog.Warning(err)
 	}
 }
