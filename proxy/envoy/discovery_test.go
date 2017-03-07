@@ -76,6 +76,21 @@ func TestServiceDiscovery(t *testing.T) {
 	compareResponse(response, "testdata/sds.json", t)
 }
 
+func TestServiceDiscoveryVersion(t *testing.T) {
+	ds := makeDiscoveryService(mock.MakeRegistry())
+	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0],
+		map[string]string{"version": "v1"})
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/sds-version.json", t)
+}
+
+func TestServiceDiscoveryEmpty(t *testing.T) {
+	ds := makeDiscoveryService(mock.MakeRegistry())
+	url := "/v1/registration/nonexistent"
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/sds-empty.json", t)
+}
+
 func TestClusterDiscovery(t *testing.T) {
 	registry := mock.MakeRegistry()
 	ds := makeDiscoveryService(registry)
