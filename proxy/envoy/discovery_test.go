@@ -77,6 +77,10 @@ func TestServiceDiscovery(t *testing.T) {
 }
 
 func TestClusterDiscovery(t *testing.T) {
+	url := fmt.Sprintf("/v1/clusters/%s/%s", IstioServiceCluster, mock.HostInstance)
+	ds := makeDiscoveryService(mock.MakeRegistry())
+	response := makeDiscoveryRequest(ds, url, t)
+	compareResponse(response, "testdata/cds.json", t)
 }
 
 func TestRouteDiscovery(t *testing.T) {
