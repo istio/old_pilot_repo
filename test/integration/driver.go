@@ -264,6 +264,14 @@ func deployConfig(in string, data map[string]string, kind, name string, envoy st
 	check(waitForNewRestartEpoch(envoy, epoch))
 }
 
+func deployDynamicConfig(in string, data map[string]string, kind, name, envoy string) {
+	config, err := writeString(in, data)
+	check(err)
+	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.namespace})
+	addConfig(config, kind, name, !exists)
+	time.Sleep(3 * time.Second)
+}
+
 func write(in string, data map[string]string, out io.Writer) error {
 	// fallback to params values in data
 	values := make(map[string]string)
