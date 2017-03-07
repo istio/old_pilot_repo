@@ -59,8 +59,12 @@ func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 	}
 	glog.V(2).Infof("Local instance address: %#v", addrs)
 
+	// Use proxy node IP as the node name
+	// This parameter is used as the value for "service-node"
+	agent := NewAgent(mesh.BinaryPath, mesh.ConfigPath, identity.IP)
+
 	out := &watcher{
-		agent: NewAgent(mesh.BinaryPath, mesh.ConfigPath, identity.Name),
+		agent: agent,
 		context: &ProxyContext{
 			Discovery:  discovery,
 			Config:     registry,
