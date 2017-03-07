@@ -209,11 +209,15 @@ func (rc *HTTPRouteConfig) merge(that *HTTPRouteConfig) *HTTPRouteConfig {
 }
 
 // Clusters aggregates clusters across HTTP routes
-func (rc *HTTPRouteConfig) clusters() []*Cluster {
+func (rc *HTTPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
 	out := make([]*Cluster, 0)
 	for _, host := range rc.VirtualHosts {
 		for _, route := range host.Routes {
-			out = append(out, route.clusters...)
+			for _, cluster := range route.clusters {
+				if f(cluster) {
+					out = append(out, cluster)
+				}
+			}
 		}
 	}
 	return out
@@ -321,11 +325,13 @@ func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 	return out
 }
 
-// Clusters aggregates clusters across TCP routes
-func (rc *TCPRouteConfig) clusters() []*Cluster {
+// filterClusters aggregates clusters across TCP routes
+func (rc *TCPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
 	out := make([]*Cluster, 0)
 	for _, route := range rc.Routes {
-		out = append(out, route.clusterRef)
+		if f(route.clusterRef) {
+			out = append(out, route.clusterRef)
+		}
 	}
 	return out
 }

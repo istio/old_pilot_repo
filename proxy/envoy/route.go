@@ -53,6 +53,7 @@ func buildInboundCluster(hostname string, port int, protocol model.Protocol) *Cl
 		LbType:           DefaultLbType,
 		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
 		hostname:         hostname,
+		outbound:         false,
 	}
 	if protocol == model.ProtocolGRPC || protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"

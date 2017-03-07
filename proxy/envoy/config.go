@@ -115,16 +115,20 @@ func Generate(context *ProxyContext) *Config {
 }
 
 // build combines the outbound and inbound routes prioritizing the latter
+// build outputs inbound clusters as well
 func build(context *ProxyContext) ([]*Listener, Clusters) {
 	httpRouteConfigs, tcpRouteConfigs := buildRoutes(context)
 
-	// canonicalize listeners and collect clusters
+	// canonicalize listeners and collect inbound clusters
+	// outbound clusters are served with CDS
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 
 	for port, routeConfig := range httpRouteConfigs {
 		sort.Sort(HostsByName(routeConfig.VirtualHosts))
-		clusters = append(clusters, routeConfig.clusters()...)
+		clusters = append(clusters, routeConfig.filterClusters(func(cluster *Cluster) bool {
+			return !cluster.outbound
+		})...)
 
 		filters := buildFaultFilters(routeConfig)
 
@@ -176,7 +180,9 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 
 	for port, tcpConfig := range tcpRouteConfigs {
 		sort.Sort(TCPRouteByRoute(tcpConfig.Routes))
-		clusters = append(clusters, tcpConfig.clusters()...)
+		clusters = append(clusters, tcpConfig.filterClusters(func(cluster *Cluster) bool {
+			return !cluster.outbound
+		})...)
 		listener := &Listener{
 			Port: port,
 			Filters: []*NetworkFilter{{
@@ -192,7 +198,6 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 	}
 
 	sort.Sort(ListenersByPort(listeners))
-
 	clusters = clusters.Normalize()
 	for _, cluster := range clusters {
 		insertDestinationPolicy(context.Config, cluster)

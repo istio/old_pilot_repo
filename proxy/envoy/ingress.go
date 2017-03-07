@@ -161,7 +161,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 
 	// TODO: HTTPS listener
 	listeners := []*Listener{httpListener}
-	clusters := Clusters(rConfig.clusters()).Normalize()
+	clusters := Clusters(rConfig.filterClusters(func(cl *Cluster) bool { return true })).Normalize()
 
 	return &Config{
 		Listeners: listeners,
