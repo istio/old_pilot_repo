@@ -38,11 +38,13 @@ import (
 
 // Each entry in the multi-doc YAML file used by `istioctl create -f` MUST have this format
 type inputDoc struct {
-	Type string
-	Name string
-	// Spec is usually, but not always, a istio.proxy.v1alpha.config.RouteRule
-	Spec       interface{}
-	ParsedSpec proto.Message
+	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, or destination-policy
+	Type string      `json:"type,omitempty"`
+	Name string      `json:"name,omitempty"`
+	Spec interface{} `json:"spec,omitempty"`
+	// ParsedSpec will be one of the messages in model.IstioConfig: for example an
+	// istio.proxy.v1alpha.config.RouteRule or DestinationPolicy
+	ParsedSpec proto.Message `json:"-"`
 }
 
 var (

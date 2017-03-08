@@ -24,3 +24,10 @@ func TestCreateInvalidFile(t *testing.T) {
 		t.Fatalf("Did not fail looking for file")
 	}
 }
+
+func TestInvalidType(t *testing.T) {
+	file = "testdata/invalid-type.yaml"
+	if err := postCmd.RunE(postCmd, []string{}); err == nil {
+		t.Fatalf("Did not fail when presented with invalid rule type")
+	}
+}
