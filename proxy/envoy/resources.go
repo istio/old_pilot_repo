@@ -54,6 +54,7 @@ const (
 	DefaultLbType    = LbTypeRoundRobin
 	DefaultAccessLog = "/dev/stdout"
 	LbTypeRoundRobin = "round_robin"
+	RDSName          = "rds"
 
 	// HTTPConnectionManager is the name of HTTP filter.
 	HTTPConnectionManager = "http_connection_manager"
@@ -152,6 +153,10 @@ type HTTPRoute struct {
 	// clusters contains the set of referenced clusters in the route; the field is special
 	// and used only to aggregate cluster information after composing routes
 	clusters []*Cluster
+
+	// faults contains the set of referenced faults in the route; the field is special
+	// and used only to aggregate fault filter information after composing routes
+	faults []*HTTPFilter
 }
 
 // RetryPolicy definition
@@ -183,7 +188,7 @@ type VirtualHost struct {
 
 // HTTPRouteConfig definition
 type HTTPRouteConfig struct {
-	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
+	VirtualHosts []*VirtualHost `json:"virtual_hosts,omitempty"`
 }
 
 // Merge operation selects a union of two route configs prioritizing the first.
@@ -203,12 +208,27 @@ func (rc *HTTPRouteConfig) merge(that *HTTPRouteConfig) *HTTPRouteConfig {
 	return out
 }
 
-// Clusters aggregates clusters across routes
-func (rc *HTTPRouteConfig) clusters() []*Cluster {
+// Clusters aggregates clusters across HTTP routes
+func (rc *HTTPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
 	out := make([]*Cluster, 0)
 	for _, host := range rc.VirtualHosts {
 		for _, route := range host.Routes {
-			out = append(out, route.clusters...)
+			for _, cluster := range route.clusters {
+				if f(cluster) {
+					out = append(out, cluster)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// Faults aggregates fault filters across virtual hosts in single http_conn_man
+func (rc *HTTPRouteConfig) faults() []*HTTPFilter {
+	out := make([]*HTTPFilter, 0)
+	for _, host := range rc.VirtualHosts {
+		for _, route := range host.Routes {
+			out = append(out, route.faults...)
 		}
 	}
 	return out
@@ -226,7 +246,8 @@ type HTTPFilterConfig struct {
 	CodecType         string           `json:"codec_type"`
 	StatPrefix        string           `json:"stat_prefix"`
 	GenerateRequestID bool             `json:"generate_request_id,omitempty"`
-	RouteConfig       *HTTPRouteConfig `json:"route_config"`
+	RouteConfig       *HTTPRouteConfig `json:"route_config,omitempty"`
+	RDS               *RDS             `json:"rds,omitempty"`
 	Filters           []HTTPFilter     `json:"filters"`
 	AccessLog         []AccessLog      `json:"access_log"`
 }
@@ -241,6 +262,51 @@ type TCPRoute struct {
 
 	// special value to retain dependent cluster definition for TCP routes.
 	clusterRef *Cluster
+}
+
+// TCPRouteByRoute sorts TCP routes over all route sub fields.
+type TCPRouteByRoute []TCPRoute
+
+func (r TCPRouteByRoute) Len() int {
+	return len(r)
+}
+
+func (r TCPRouteByRoute) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r TCPRouteByRoute) Less(i, j int) bool {
+	if r[i].Cluster != r[j].Cluster {
+		return r[i].Cluster < r[j].Cluster
+	}
+
+	compare := func(a, b []string) bool {
+		lenA, lenB := len(a), len(b)
+		min := lenA
+		if min > lenB {
+			min = lenB
+		}
+		for k := 0; k < min; k++ {
+			if a[k] != b[k] {
+				return a[k] < b[k]
+			}
+		}
+		return lenA < lenB
+	}
+
+	if less := compare(r[i].DestinationIPList, r[j].DestinationIPList); less {
+		return less
+	}
+	if r[i].DestinationPorts != r[j].DestinationPorts {
+		return r[i].DestinationPorts < r[j].DestinationPorts
+	}
+	if less := compare(r[i].SourceIPList, r[j].SourceIPList); less {
+		return less
+	}
+	if r[i].SourcePorts != r[j].SourcePorts {
+		return r[i].SourcePorts < r[j].SourcePorts
+	}
+	return false
 }
 
 // Merge operation selects a union of two route configs prioritizing the first.
@@ -259,11 +325,13 @@ func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
 	return out
 }
 
-// Clusters aggregates clusters across routes
-func (rc *TCPRouteConfig) clusters() []*Cluster {
+// filterClusters aggregates clusters across TCP routes
+func (rc *TCPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
 	out := make([]*Cluster, 0)
 	for _, route := range rc.Routes {
-		out = append(out, route.clusterRef)
+		if f(route.clusterRef) {
+			out = append(out, route.clusterRef)
+		}
 	}
 	return out
 }
@@ -311,11 +379,11 @@ type Listener struct {
 type HTTPRouteConfigs map[int]*HTTPRouteConfig
 
 // EnsurePort creates a route config if necessary
-func (hosts HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
-	config, ok := hosts[port]
+func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
+	config, ok := routes[port]
 	if !ok {
 		config = &HTTPRouteConfig{}
-		hosts[port] = config
+		routes[port] = config
 	}
 	return config
 }
@@ -341,7 +409,7 @@ type Cluster struct {
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host            `json:"hosts,omitempty"`
 	Features                 string            `json:"features,omitempty"`
-	CircuitBreaker           *CircuitBreaker   `json:"circuit_breaker,omitempty"`
+	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
 
 	// special values used by the post-processing passes for outbound clusters
@@ -354,6 +422,11 @@ type Cluster struct {
 // CircuitBreaker definition
 // See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_circuit_breakers.html#circuit-breakers
 type CircuitBreaker struct {
+	Default DefaultCBPriority `json:"default"`
+}
+
+// DefaultCBPriority defines the circuit breaker for default cluster priority
+type DefaultCBPriority struct {
 	MaxConnections     int `json:"max_connections,omitempty"`
 	MaxPendingRequests int `json:"max_pending_requests,omitempty"`
 	MaxRequests        int `json:"max_requests,omitempty"`
@@ -363,7 +436,7 @@ type CircuitBreaker struct {
 // OutlierDetection definition
 // See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_runtime.html#outlier-detection
 type OutlierDetection struct {
-	ConsecutiveError   int `json:"consecutive_5xx,omitempty"`
+	ConsecutiveErrors  int `json:"consecutive_5xx,omitempty"`
 	IntervalMS         int `json:"interval_ms,omitempty"`
 	BaseEjectionTimeMS int `json:"base_ejection_time_ms,omitempty"`
 	MaxEjectionPercent int `json:"max_ejection_percent,omitempty"`
@@ -490,10 +563,24 @@ type SDS struct {
 	RefreshDelayMs int      `json:"refresh_delay_ms"`
 }
 
+// CDS is a service discovery service definition
+type CDS struct {
+	Cluster        *Cluster `json:"cluster"`
+	RefreshDelayMs int      `json:"refresh_delay_ms"`
+}
+
+// RDS definition
+type RDS struct {
+	Cluster         string `json:"cluster"`
+	RouteConfigName string `json:"route_config_name"`
+	RefreshDelayMs  int    `json:"refresh_delay_ms"`
+}
+
 // ClusterManager definition
 type ClusterManager struct {
-	Clusters []*Cluster `json:"clusters"`
-	SDS      SDS        `json:"sds"`
+	Clusters []*Cluster `json:"clusters,omitempty"`
+	SDS      *SDS       `json:"sds,omitempty"`
+	CDS      *CDS       `json:"cds,omitempty"`
 }
 
 // ByName implements sort

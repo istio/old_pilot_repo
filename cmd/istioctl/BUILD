@@ -18,6 +18,7 @@ go_library(
 go_binary(
     name = "istioctl",
     library = ":go_default_library",
+    linkstamp = "istio.io/manager/cmd/version",
     visibility = ["//visibility:public"],
 )
 
