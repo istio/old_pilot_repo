@@ -47,8 +47,18 @@
       "cluster": "outbound:world.default.svc.cluster.local:http:version=v1",
       "headers": [
        {
-        "name": "version",
-        "value": "v0"
+        "name": "animal",
+        "value": "^dog.*",
+        "regex": true
+       },
+       {
+        "name": "name",
+        "value": "sco+do+",
+        "regex": true
+       },
+       {
+        "name": "scooby",
+        "value": "doo"
        }
       ]
      },

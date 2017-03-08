@@ -4,8 +4,12 @@ match:
   source_tags:
     version: v0
   httpHeaders:
-    version:
-      exact: v0
+    scooby:
+      exact: doo
+    animal:
+      prefix: dog
+    name:
+      regex: "sco+do+"
 route:
   - tags:
        version: v1
