@@ -16,9 +16,11 @@ package envoy
 
 import (
 	"io/ioutil"
+	"reflect"
 	"sort"
 	"testing"
 
+	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
 )
 
@@ -72,37 +74,260 @@ func TestRoutesByPath(t *testing.T) {
 	}
 }
 
+func TestTCPRouteConfigByRoute(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []TCPRoute
+		want []TCPRoute
+	}{
+		{
+			name: "sorted by cluster",
+			in: []TCPRoute{{
+				Cluster:           "cluster-b",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.2/32", "192.168.1.1/32"},
+				DestinationPorts:  "5000",
+			}},
+			want: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.2/32", "192.168.1.1/32"},
+				DestinationPorts:  "5000",
+			}, {
+				Cluster:           "cluster-b",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}},
+		},
+		{
+			name: "sorted by DestinationIPList",
+			in: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.2.1/32", "192.168.2.2/32"},
+				DestinationPorts:  "5000",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}},
+			want: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.2.1/32", "192.168.2.2/32"},
+				DestinationPorts:  "5000",
+			}},
+		},
+		{
+			name: "sorted by DestinationPorts",
+			in: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5001",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}},
+			want: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5001",
+			}},
+		},
+		{
+			name: "sorted by SourceIPList",
+			in: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.3.1/32", "192.168.3.2/32"},
+				SourcePorts:       "5002",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5002",
+			}},
+			want: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5002",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.3.1/32", "192.168.3.2/32"},
+				SourcePorts:       "5002",
+			}},
+		},
+		{
+			name: "sorted by SourcePorts",
+			in: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5003",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5002",
+			}},
+			want: []TCPRoute{{
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5002",
+			}, {
+				Cluster:           "cluster-a",
+				DestinationIPList: []string{"192.168.1.1/32", "192.168.1.2/32"},
+				DestinationPorts:  "5000",
+				SourceIPList:      []string{"192.168.2.1/32", "192.168.2.2/32"},
+				SourcePorts:       "5003",
+			}},
+		},
+	}
+
+	for _, c := range cases {
+		sort.Sort(TCPRouteByRoute(c.in))
+		if !reflect.DeepEqual(c.in, c.want) {
+			t.Errorf("Invalid sort order for case %q:\n got  %#v\n want %#v", c.name, c.in, c.want)
+		}
+	}
+}
+
 const (
-	envoyData   = "testdata/envoy.json"
-	envoyGolden = "testdata/envoy.json.golden"
+	envoyV0Config     = "testdata/envoy-v0.json"
+	envoyV1Config     = "testdata/envoy-v1.json"
+	envoyFaultConfig  = "testdata/envoy-fault.json"
+	cbPolicy          = "testdata/cb-policy.yaml.golden"
+	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
+	weightedRouteRule = "testdata/weighted-route.yaml.golden"
+	faultRouteRule    = "testdata/fault-route.yaml.golden"
 )
 
-func TestMockConfigGenerate(t *testing.T) {
+func testConfig(r *model.IstioRegistry, instance, envoyConfig, testCase string, t *testing.T) {
 	ds := mock.Discovery
-	r := mock.MakeRegistry()
-	config := Generate(
-		ds.HostInstances(map[string]bool{mock.HostInstance: true}),
-		ds.Services(), r,
-		DefaultMeshConfig)
+
+	config := Generate(&ProxyContext{
+		Discovery:  ds,
+		Config:     r,
+		MeshConfig: DefaultMeshConfig,
+		Addrs:      map[string]bool{instance: true},
+	})
 	if config == nil {
-		t.Fatalf("Failed to generate config")
+		t.Fatal("Failed to generate config")
 	}
-	err := config.WriteFile(envoyData)
+
+	err := config.WriteFile(envoyConfig)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	data, err := ioutil.ReadFile(envoyConfig)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	expected, err := ioutil.ReadFile(envoyGolden)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	data, err := ioutil.ReadFile(envoyData)
+	expected, err := ioutil.ReadFile(envoyConfig + ".golden")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
 	// TODO: use difflib to obtain detailed diff
 	if string(expected) != string(data) {
-		t.Errorf("Envoy config master copy changed")
+		t.Errorf("Envoy config %q differs from master copy for %q", envoyConfig, testCase)
 	}
+}
+
+func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.DestinationPolicy, cbPolicy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{
+		Kind: model.DestinationPolicy,
+		Name: "circuit-breaker"},
+		msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addTimeout(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.RouteRule, timeoutRouteRule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "timeouts"}, msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addWeightedRoute(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.RouteRule, weightedRouteRule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "weighted-route"}, msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
+	msg, err := model.IstioConfig.FromYAML(model.RouteRule, faultRouteRule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "fault-route"}, msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMockConfig(t *testing.T) {
+	r := mock.MakeRegistry()
+	testConfig(r, mock.HostInstanceV0, envoyV0Config, "default", t)
+	testConfig(r, mock.HostInstanceV1, envoyV1Config, "default", t)
+}
+
+func TestMockConfigTimeout(t *testing.T) {
+	r := mock.MakeRegistry()
+	addTimeout(r, t)
+	testConfig(r, mock.HostInstanceV0, envoyV0Config, timeoutRouteRule, t)
+	testConfig(r, mock.HostInstanceV1, envoyV1Config, timeoutRouteRule, t)
+}
+
+func TestMockConfigCircuitBreaker(t *testing.T) {
+	r := mock.MakeRegistry()
+	addCircuitBreaker(r, t)
+	testConfig(r, mock.HostInstanceV0, envoyV0Config, cbPolicy, t)
+	testConfig(r, mock.HostInstanceV1, envoyV1Config, cbPolicy, t)
+}
+
+func TestMockConfigWeighted(t *testing.T) {
+	r := mock.MakeRegistry()
+	addWeightedRoute(r, t)
+	testConfig(r, mock.HostInstanceV0, envoyV0Config, weightedRouteRule, t)
+	testConfig(r, mock.HostInstanceV1, envoyV1Config, weightedRouteRule, t)
+}
+
+func TestMockConfigFault(t *testing.T) {
+	r := mock.MakeRegistry()
+	addFaultRoute(r, t)
+	// Fault rule uses source condition
+	testConfig(r, mock.HostInstanceV0, envoyFaultConfig, faultRouteRule, t)
+	testConfig(r, mock.HostInstanceV1, envoyV1Config, faultRouteRule, t)
 }
