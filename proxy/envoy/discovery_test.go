@@ -81,7 +81,7 @@ func TestServiceDiscoveryVersion(t *testing.T) {
 	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0],
 		map[string]string{"version": "v1"})
 	response := makeDiscoveryRequest(ds, url, t)
-	compareResponse(response, "testdata/sds-version.json", t)
+	compareResponse(response, "testdata/sds-v1.json", t)
 }
 
 func TestServiceDiscoveryEmpty(t *testing.T) {
