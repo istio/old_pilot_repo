@@ -15,7 +15,7 @@ gometalinter --concurrency=4 --enable-gc --deadline=300s --disable-all\
   --enable=goimports\
   --enable=golint\
   --exclude=.pb.go\
-  --exclude=_test.go\
+  --exclude=mock_config_test.go\
   --enable=gosimple\
   --enable=gotype\
   --enable=ineffassign\
