@@ -1,5 +1,5 @@
 // Keep this in sync with the `//model:genmock` build target.
-//go:generate mockgen -source config.go -destination mock_config_test.go -package model
+//go:generate mockgen -source config.go -destination mock_config_gen_test.go -package model
 
 // Copyright 2017 Istio Authors
 //

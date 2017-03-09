@@ -31,7 +31,7 @@ go_library(
 genrule(
     name = "genmocks",
     srcs = ["config.go"],
-    outs = ["mock_config_test.go"],
+    outs = ["mock_config_gen_test.go"],
     cmd = " mockgen -source $< -destination $@ -package model",
 )
 
@@ -41,7 +41,7 @@ go_test(
     srcs = [
         "config_test.go",
         "service_test.go",
-        "mock_config_test.go",
+        "mock_config_gen_test.go",
     ],
     library = ":go_default_library",
     deps = [
