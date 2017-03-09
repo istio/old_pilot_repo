@@ -9,3 +9,4 @@ echo.yaml
 # Eclipse artifacts
 .project
 coverage.out
+*_gen_test.go # auto-generated test files, e.g. mockgen

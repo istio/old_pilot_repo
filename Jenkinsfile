@@ -35,7 +35,7 @@ def presubmit(gitUtils, bazel, utils) {
     stage('Bazel Build') {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('touch platform/kube/config')
-      sh('go get github.com/golang/mock/mockgen')
+      sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
