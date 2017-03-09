@@ -36,10 +36,12 @@ def presubmit(gitUtils, bazel, utils) {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('touch platform/kube/config')
       bazel.fetch('-k //...')
-      bazel.build('//...')
     }
-    stage('Go Build') {
+    stage('Go initialzation') {
       sh('bin/init.sh')
+    }
+    state('Go Build') {
+      bazel.build('//...')
     }
     stage('Code Check') {
       sh('bin/check.sh')
