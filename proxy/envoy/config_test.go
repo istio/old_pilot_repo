@@ -303,7 +303,7 @@ func addWeightedRoute(r *model.IstioRegistry, t *testing.T) {
 }
 
 func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
-	msg, err := model.IstioConfig.FromYAML(model.RouteRule, faultRouteRule)
+	msg, err := configObjectFromYAML(model.RouteRule, faultRouteRule)
 	if err != nil {
 		t.Fatal(err)
 	}
