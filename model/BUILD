@@ -14,7 +14,6 @@ go_library(
         "//model/proxy/alphav1/config:go_default_library",
         "@com_github_ghodss_yaml//:go_default_library",
         "@com_github_golang_glog//:go_default_library",
-        "@com_github_golang_mock//gomock:go_default_library",
         "@com_github_golang_protobuf//jsonpb:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
@@ -44,11 +43,11 @@ go_test(
         "service_test.go",
         "mock_config_test.go",
     ],
-    data = [":genmocks"],
     library = ":go_default_library",
     deps = [
         "//model/proxy/alphav1/config:go_default_library",
-        "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_davecgh_go_spew//spew:go_default_library",
+        "@com_github_golang_mock//gomock:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
     ],
 )
