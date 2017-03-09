@@ -6,7 +6,11 @@ vendor
 *.iml
 echo.yaml
 .vagrant
+
 # Eclipse artifacts
 .project
+
 coverage.out
-*_gen_test.go # auto-generated test files, e.g. mockgen
+
+# auto-generated test files, e.g. mockgen
+*_gen_test.go
