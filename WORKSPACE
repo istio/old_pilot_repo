@@ -268,6 +268,18 @@ new_go_repository(
     importpath = "k8s.io/client-go",
 )
 
+new_go_repository(
+    name = "com_github_golang_mock",
+    commit = "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
+    importpath = "github.com/golang/mock",
+)
+
+new_go_repository(
+    name = "com_github_davecgh_gospew_spew",
+    commit = "346938d642f2ec3594ed81d874461961cd0faa76", # v1.1.0
+    importpath = "github.com/davecgh/go-spew/spew",
+)
+
 ##
 ## Proxy build rules
 ##
