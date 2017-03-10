@@ -828,7 +828,7 @@ func TestTagsValidate(t *testing.T) {
 	}
 }
 
-func TestTestEquals(t *testing.T) {
+func TestTagsEquals(t *testing.T) {
 	cases := []struct {
 		a, b Tags
 		want bool
