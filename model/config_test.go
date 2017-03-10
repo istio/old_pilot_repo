@@ -536,7 +536,14 @@ func TestProtoSchemaConversions(t *testing.T) {
 		},
 	}
 
-	wantYAML := "destination: foo\nprecedence: 5\nroute:\n- destination: bar\n  weight: 75\n- destination: baz\n  weight: 25\n"
+	wantYAML := "destination: foo\n" +
+		"precedence: 5\n" +
+		"route:\n" +
+		"- destination: bar\n" +
+		"  weight: 75\n" +
+		"- destination: baz\n" +
+		"  weight: 25\n"
+
 	wantJSONMap := map[string]interface{}{
 		"destination": "foo",
 		"precedence":  5.0,
@@ -720,9 +727,13 @@ func TestServiceInstanceValidate(t *testing.T) {
 			instance: &ServiceInstance{
 				Service: service1,
 				Endpoint: NetworkEndpoint{
-					Address:     "192.168.1.2",
-					Port:        service1.Ports[1].Port,
-					ServicePort: &Port{Name: service1.Ports[1].Name + "-extra", Port: service1.Ports[1].Port, Protocol: service1.Ports[1].Protocol},
+					Address: "192.168.1.2",
+					Port:    service1.Ports[1].Port,
+					ServicePort: &Port{
+						Name:     service1.Ports[1].Name + "-extra",
+						Port:     service1.Ports[1].Port,
+						Protocol: service1.Ports[1].Protocol,
+					},
 				},
 			},
 		},
@@ -731,9 +742,13 @@ func TestServiceInstanceValidate(t *testing.T) {
 			instance: &ServiceInstance{
 				Service: service1,
 				Endpoint: NetworkEndpoint{
-					Address:     "192.168.1.2",
-					Port:        service1.Ports[1].Port,
-					ServicePort: &Port{Name: "http", Port: service1.Ports[1].Port + 1, Protocol: ProtocolGRPC},
+					Address: "192.168.1.2",
+					Port:    service1.Ports[1].Port,
+					ServicePort: &Port{
+						Name:     "http",
+						Port:     service1.Ports[1].Port + 1,
+						Protocol: ProtocolGRPC,
+					},
 				},
 			},
 		},
