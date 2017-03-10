@@ -301,7 +301,6 @@ gogoslick_proto_library(
     importmap = {
         "google/protobuf/any.proto": "github.com/gogo/protobuf/types",
         "google/protobuf/wrappers.proto": "github.com/gogo/protobuf/types",
-        "gogoproto/gogo.proto": "github.com/gogo/protobuf/gogoproto",
     },
     imports = [
         "../../external/com_github_gogo_protobuf",
@@ -317,7 +316,6 @@ gogoslick_proto_library(
     deps = [
         "@com_github_gogo_protobuf//types:go_default_library",
         "@com_github_gogo_protobuf//sortkeys:go_default_library",
-        "@com_github_gogo_protobuf//gogoproto:go_default_library",
     ],
     with_grpc = False,
     verbose = 0,

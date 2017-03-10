@@ -40,7 +40,6 @@ go_test(
     size = "small",
     srcs = [
         "config_test.go",
-        "mock_config_gen_test.go",
         "service_test.go",
     ],
     library = ":go_default_library",

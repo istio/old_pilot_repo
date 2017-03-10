@@ -23,7 +23,7 @@ import (
 
 	multierror "github.com/hashicorp/go-multierror"
 
-	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
+	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 const (
