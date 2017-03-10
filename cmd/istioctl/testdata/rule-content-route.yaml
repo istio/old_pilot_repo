@@ -1,5 +1,5 @@
 type: route-rule
-name: snaketest
+name: snaketest1
 spec:
   destination: snakecase.default.svc.cluster.local
   precedence: 2
