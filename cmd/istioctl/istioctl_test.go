@@ -16,6 +16,8 @@ package main
 
 import (
 	"testing"
+
+	"istio.io/manager/cmd"
 )
 
 func TestCreateInvalidFile(t *testing.T) {
@@ -36,5 +38,37 @@ func TestInvalidRuleStructure(t *testing.T) {
 	file = "testdata/invalid-dest-policy.yaml"
 	if err := postCmd.RunE(postCmd, []string{}); err == nil {
 		t.Fatalf("Did not fail when presented with invalid rule structure")
+	}
+}
+
+func TestCreateReplaceDeleteRoutes(t *testing.T) {
+	file = "testdata/four-route-rules.yaml"
+	if err := cmd.RootCmd.PersistentPreRunE(postCmd, []string{}); err != nil { // Set up Client
+		t.Fatalf("Could not set up root command: %v", err)
+	}
+	if err := postCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not create routes: %v", err)
+	}
+	if err := putCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not replace routes: %v", err)
+	}
+	if err := deleteCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not delete routes: %v", err)
+	}
+}
+
+func TestCreateReplaceDeletePolicy(t *testing.T) {
+	file = "testdata/dest-policy.yaml"
+	if err := cmd.RootCmd.PersistentPreRunE(postCmd, []string{}); err != nil { // Set up Client
+		t.Fatalf("Could not set up root command: %v", err)
+	}
+	if err := postCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not create destination policy: %v", err)
+	}
+	if err := putCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not replace destination policy: %v", err)
+	}
+	if err := deleteCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not delete destination policy: %v", err)
 	}
 }
