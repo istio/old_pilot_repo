@@ -16,6 +16,7 @@ package main
 
 import (
 	"testing"
+	"os"
 
 	"istio.io/manager/cmd"
 )
@@ -42,6 +43,9 @@ func TestInvalidRuleStructure(t *testing.T) {
 }
 
 func TestCreateReplaceDeleteRoutes(t *testing.T) {
+	dir, _ := os.Getwd()
+	t.Fatalf("Before setting up root command current directory is: %v", dir)
+
 	file = "testdata/four-route-rules.yaml"
 	if err := cmd.RootCmd.PersistentPreRunE(postCmd, []string{}); err != nil { // Set up Client
 		t.Fatalf("Could not set up root command: %v", err)
