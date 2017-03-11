@@ -15,8 +15,8 @@
 package main
 
 import (
-	"testing"
 	"os"
+	"testing"
 
 	"istio.io/manager/cmd"
 )
