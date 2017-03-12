@@ -49,11 +49,18 @@ func TestCreateReplaceDeleteRoutes(t *testing.T) {
 	if err := postCmd.RunE(postCmd, []string{}); err != nil {
 		t.Fatalf("Could not create routes: %v", err)
 	}
-	if err := putCmd.RunE(postCmd, []string{}); err != nil {
+	if err := listCmd.RunE(listCmd, []string{"route-rule"}); err != nil {
+		t.Fatalf("Could not list destination policies: %v", err)
+	}
+	if err := putCmd.RunE(putCmd, []string{}); err != nil {
 		t.Fatalf("Could not replace routes: %v", err)
 	}
-	if err := deleteCmd.RunE(postCmd, []string{}); err != nil {
+	if err := deleteCmd.RunE(deleteCmd, []string{}); err != nil {
 		t.Fatalf("Could not delete routes: %v", err)
+	}
+	// Try to delete again, to verify we fail if we delete a rule that exists
+	if err := deleteCmd.RunE(deleteCmd, []string{}); err == nil {
+		t.Fatalf("Second attempt to delete route rules did not fail")
 	}
 }
 
@@ -65,10 +72,17 @@ func TestCreateReplaceDeletePolicy(t *testing.T) {
 	if err := postCmd.RunE(postCmd, []string{}); err != nil {
 		t.Fatalf("Could not create destination policy: %v", err)
 	}
-	if err := putCmd.RunE(postCmd, []string{}); err != nil {
+	if err := listCmd.RunE(listCmd, []string{"destination-policy"}); err != nil {
+		t.Fatalf("Could not list destination policies: %v", err)
+	}
+	if err := putCmd.RunE(putCmd, []string{}); err != nil {
 		t.Fatalf("Could not replace destination policy: %v", err)
 	}
-	if err := deleteCmd.RunE(postCmd, []string{}); err != nil {
+	if err := deleteCmd.RunE(deleteCmd, []string{}); err != nil {
 		t.Fatalf("Could not delete destination policy: %v", err)
+	}
+	// Try to delete again, to verify we fail if we delete a policy that exists
+	if err := deleteCmd.RunE(deleteCmd, []string{}); err == nil {
+		t.Fatalf("Second attempt to delete destination policy did not fail")
 	}
 }
