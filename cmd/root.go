@@ -54,7 +54,7 @@ var (
 					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
 					RootFlags.Kubeconfig = os.Getenv("KUBECONFIG")
 				} else {
-					RootFlags.Kubeconfig = os.Getenv("HOME")+"/.kube/config"
+					RootFlags.Kubeconfig = os.Getenv("HOME") + "/.kube/config"
 				}
 			}
 
