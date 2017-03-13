@@ -155,7 +155,7 @@ var (
 
 			// As we did get a file option, make sure the command line did not include any resources to delete
 			if len(args) != 0 {
-				return fmt.Errorf("deleted takes no arguments when the file option is used")
+				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
 			varr, err := readInputs()
 			if err != nil {
