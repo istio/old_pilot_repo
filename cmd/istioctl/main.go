@@ -15,14 +15,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/golang/glog"
@@ -56,12 +53,11 @@ var (
 
 	postCmd = &cobra.Command{
 		Use:   "create",
-		Short: "Create configuration objects",
+		Short: "Create policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return fmt.Errorf("create takes no arguments")
 			}
-			// Initialize schema global
 			varr, err := readInputs()
 			if err != nil {
 				return err
@@ -85,26 +81,37 @@ var (
 	}
 
 	putCmd = &cobra.Command{
-		Use:   "update [type] [name]",
-		Short: "Update a configuration object",
+		Use:   "replace",
+		Short: "Replace policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return fmt.Errorf("provide configuration type and name")
+			if len(args) != 0 {
+				return fmt.Errorf("replace takes no arguments")
 			}
-			if err := setup(args[0], args[1]); err != nil {
-				return err
-			}
-			v, err := readInput()
+			varr, err := readInputs()
 			if err != nil {
 				return err
 			}
-			return cmd.Client.Put(key, v)
+			if len(varr) == 0 {
+				return errors.New("Nothing to replace")
+			}
+			for _, v := range varr {
+				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				err = cmd.Client.Put(key, v.ParsedSpec)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Put %v %v\n", v.Type, v.Name)
+			}
+
+			return nil
 		},
 	}
 
 	getCmd = &cobra.Command{
-		Use:   "get [type] [name]",
-		Short: "Retrieve a configuration object",
+		Use:   "get <type> <name>",
+		Short: "Retrieve a policy or rule",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf("provide configuration type and name")
@@ -126,23 +133,55 @@ var (
 	}
 
 	deleteCmd = &cobra.Command{
-		Use:   "delete [type] [name]",
-		Short: "Delete a configuration object",
+		Use:   "delete <type> <name> [<name2> ... <nameN>]",
+		Short: "Delete policies or rules",
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return fmt.Errorf("provide configuration type and name")
+			// If we did not receive a file option, get names of resources to delete from command line
+			if file == "" {
+				if len(args) < 2 {
+					return fmt.Errorf("provide configuration type and name or -f option")
+				}
+				for i := 1; i < len(args); i++ {
+					if err := setup(args[0], args[i]); err != nil {
+						return err
+					}
+					if err := cmd.Client.Delete(key); err != nil {
+						return err
+					}
+					fmt.Printf("Deleted %v %v\n", args[0], args[i])
+				}
+				return nil
 			}
-			if err := setup(args[0], args[1]); err != nil {
+
+			// As we did get a file option, make sure the command line did not include any resources to delete
+			if len(args) != 0 {
+				return fmt.Errorf("delete takes no arguments when the file option is used")
+			}
+			varr, err := readInputs()
+			if err != nil {
 				return err
 			}
-			err := cmd.Client.Delete(key)
-			return err
+			if len(varr) == 0 {
+				return errors.New("Nothing to delete")
+			}
+			for _, v := range varr {
+				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				err = cmd.Client.Delete(key)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Deleted %v %v\n", v.Type, v.Name)
+			}
+
+			return nil
 		},
 	}
 
 	listCmd = &cobra.Command{
-		Use:   "list [type]",
-		Short: "List configuration objects",
+		Use:   "list <type>",
+		Short: "List policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf("please specify configuration type (one of %v)", model.IstioConfig.Kinds())
@@ -181,8 +220,9 @@ var (
 
 func init() {
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
-		"Input file with the content of the configuration object (if not set, command reads from the standard input)")
+		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
 	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
+	deleteCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
 
 	cmd.RootCmd.Use = "istioctl"
 	cmd.RootCmd.Long = fmt.Sprintf("Istio configuration command line utility. Available configuration types: %v",
@@ -206,7 +246,7 @@ func setup(kind, name string) error {
 	// set proto schema
 	schema, ok = model.IstioConfig[kind]
 	if !ok {
-		return fmt.Errorf("missing configuration type %s", kind)
+		return fmt.Errorf("unknown configuration type %s; use one of %v", kind, model.IstioConfig.Kinds())
 	}
 
 	// use default namespace by default
@@ -224,36 +264,7 @@ func setup(kind, name string) error {
 	return nil
 }
 
-// readInput reads from the input and checks with the schema
-func readInput() (proto.Message, error) {
-	var reader io.Reader
-	var err error
-
-	if file == "" {
-		reader = os.Stdin
-	} else {
-		reader, err = os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// read from reader
-	bytes, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read input: %v", err)
-	}
-
-	// convert
-	v, err := schema.FromYAML(string(bytes))
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse proto message: %v", err)
-	}
-
-	return v, nil
-}
-
-// readInput reads multiple documents from the input and checks with the schema
+// readInputs reads multiple documents from the input and checks with the schema
 func readInputs() ([]inputDoc, error) {
 
 	var reader io.Reader
@@ -288,22 +299,15 @@ func readInputs() ([]inputDoc, error) {
 			return nil, fmt.Errorf("Could not encode Spec: %v", err)
 		}
 
-		reader2 := bytes.NewReader(byteRule)
-
 		schema, ok := model.IstioConfig[v.Type]
 		if !ok {
 			return nil, fmt.Errorf("Unknown spec type %s", v.Type)
 		}
-		pbt := proto.MessageType(schema.MessageName)
-		if pbt == nil {
-			return nil, fmt.Errorf("cannot create pbt from %v", v.Type)
-		}
-		rr := reflect.New(pbt.Elem()).Interface().(proto.Message)
-		yamlDecoder2 := yaml.NewYAMLOrJSONDecoder(reader2, 512*1024)
-		err = yamlDecoder2.Decode(&rr)
+		rr, err := schema.FromJSON(string(byteRule))
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
+		glog.V(2).Info(fmt.Sprintf("Parsed %v %v into %v %v", v.Type, v.Name, schema.MessageName, rr))
 
 		v.ParsedSpec = rr
 
