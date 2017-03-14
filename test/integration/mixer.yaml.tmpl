@@ -91,6 +91,8 @@ spec:
       - name: mixer
         image: {{.mixerImage}}
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         ports:
         - containerPort: 9091
         - containerPort: 42422

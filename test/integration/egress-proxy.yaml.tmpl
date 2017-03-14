@@ -38,6 +38,8 @@ spec:
       - name: proxy
         image: {{.hub}}/runtime:{{.tag}}
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         args:
           - proxy
           - egress
