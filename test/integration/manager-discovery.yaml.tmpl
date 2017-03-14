@@ -27,9 +27,14 @@ spec:
       - name: manager
         image: {{.hub}}/runtime:{{.tag}}
         imagePullPolicy: Always
-        args: ["discovery", "-v", "2", "-n", "{{.namespace}}"]
+        args: ["discovery", "-v", "2", "-n", "$(POD_NAMESPACE)"]
         ports:
         - containerPort: 8080
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       - name: debug
         image: docker.io/istio/debug:test
         imagePullPolicy: Always
