@@ -18,7 +18,7 @@ spec:
     name: tcp
   - port: 9090
     targetPort: {{.port4}}
-    name: tcp-alternative
+    name: https
   selector:
     app: {{.service}}
 ---
@@ -75,7 +75,7 @@ spec:
           - -m
           - mixer:9091
           - -n
-          - {{.namespace}}
+          - $(POD_NAMESPACE)
           - -v
           - "2"
         env:
