@@ -54,7 +54,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh('bin/e2e.sh -t alpha' + gitUtils.GIT_SHA + ' -d')
+        sh('bin/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
   }
