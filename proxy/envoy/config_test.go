@@ -248,7 +248,7 @@ func compareJSON(jsonFile string, t *testing.T) {
 			Context:  2,
 		}
 		text, _ := difflib.GetUnifiedDiffString(diff)
-		fmt.Printf(text)
+		fmt.Println(text)
 		t.Errorf("Failed validating golden artifact %s.golden", jsonFile)
 	}
 }
