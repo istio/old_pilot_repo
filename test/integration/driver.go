@@ -331,7 +331,7 @@ func setupClient() error {
 }
 
 func setPods() error {
-	items := make([]v1.Pod, 0)
+	var items []v1.Pod
 	for n := 0; ; n++ {
 		glog.Info("Checking all pods are running...")
 		list, err := client.Pods(params.namespace).List(v1.ListOptions{})
