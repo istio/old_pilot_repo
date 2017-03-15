@@ -34,13 +34,21 @@ deploy_istio() {
 
 # Clean up the controlplane when we are done with it
 cleanup_istio(){
+    echo ""
+    echo "#################"
     echo "Cleaning up ISTIO"
+    echo "#################"
+    echo ""
     $K8CLI delete -f istio/controlplane.yaml
 }
 
 # Deploy the bookinfo microservices
 deploy_bookinfo(){
+    echo ""
+    echo "##########################"
     echo "Deploying BookInfo to kube"
+    echo "##########################"
+    echo ""
     $K8CLI create -f apps/bookinfo/bookinfo.yaml
     for (( i=0; i<=4; i++ ))
     do
@@ -58,21 +66,24 @@ deploy_bookinfo(){
 
 # Clean up bookinfo when we are done with it
 cleanup_bookinfo(){
+    echo ""
+    echo "####################"
     echo "Cleaning up BookInfo"
+    echo "####################"
+    echo ""
     $K8CLI delete -f apps/bookinfo/bookinfo.yaml
 }
 
 # Debug dump for failures
 dump_debug() {
-    # kubectl get pods
-    # kubectl get thirdpartyresources
-    # kubectl get thirdpartyresources -o json
-    # GATEWAY_PODNAME=$(kubectl get pods | grep istio-ingress | awk '{print $1}')
-    # kubectl logs $GATEWAY_PODNAME
-    # PRODUCTPAGE_PODNAME=$(kubectl get pods | grep productpage | awk '{print $1}')
-    # kubectl logs $PRODUCTPAGE_PODNAME -c productpage
-    # kubectl logs $PRODUCTPAGE_PODNAME -c proxy
-    # RULES_PODNAME=$(kubectl get pods | grep rules | awk '{print $1}')
-    # kubectl logs $RULES_PODNAME
-    echo
+    $K8CLI get pods
+    $K8CLI get thirdpartyresources
+    $K8CLI get thirdpartyresources -o json
+    GATEWAY_PODNAME=$($K8CLI get pods | grep istio-ingress | awk '{print $1}')
+    $K8CLI logs $GATEWAY_PODNAME
+    PRODUCTPAGE_PODNAME=$($K8CLI get pods | grep productpage | awk '{print $1}')
+    $K8CLI logs $PRODUCTPAGE_PODNAME -c productpage
+    $K8CLI logs $PRODUCTPAGE_PODNAME -c proxy
+    # RULES_PODNAME=$($K8CLI get pods | grep rules | awk '{print $1}')
+    # $K8CLI logs $RULES_PODNAME
 }

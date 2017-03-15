@@ -35,7 +35,11 @@ deploy_bookinfo
 GATEWAYIP=$(kubectl describe pod $(kubectl get pods | awk 'NR>1 {print $1}' | grep istio-ingress-controller) | grep Node | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")
 
 # Verify default routes
-echo "Testing default route behavior"
+echo ""
+echo "#################################"
+echo "Testing default route behavior..."
+echo "#################################"
+echo ""
 for (( i=0; i<=4; i++ ))
 do  
     response=$(curl --write-out %{http_code} --silent --output /dev/null http://$GATEWAYIP:32000/productpage)
@@ -55,7 +59,11 @@ do
 done
 
 # Test version routing
+echo ""
+echo "##########################"
 echo "Testing version routing..."
+echo "##########################"
+echo ""
 create_rule $RULESDIR/route-rule-all-v1.yaml
 create_rule $RULESDIR/route-rule-reviews-test-v2.yaml
 echo "Waiting for rules to propagate..."
@@ -65,8 +73,8 @@ test_version_routing_response() {
     USER=$1
     VERSION=$2
     echo "injecting traffic for user=$USER, expecting productpage-$USER-$VERSION..."
-    curl -s -b "foo=bar;user=$USER;" http://$GATEWAYIP:32000/productpage > /tmp/productpage-$USER-$VERSION.html
-    compare_output $EXAMPLESDIR/productpage-$USER-$VERSION.html /tmp/productpage-$USER-$VERSION.html $USER
+    curl -s -b "foo=bar;user=$USER;" http://$GATEWAYIP:32000/productpage > /tmp/productpage-$USER-$VERSION.json
+    compare_output $EXAMPLESDIR/productpage-$USER-$VERSION.json /tmp/productpage-$USER-$VERSION.json $USER
     if [ $? -ne 0 ]
     then
         PASS=false
@@ -77,7 +85,11 @@ test_version_routing_response "normal-user" "v1"
 test_version_routing_response "test-user" "v2"
 
 # Test fault injection
+echo ""
+echo "##########################"
 echo "Testing fault injection..."
+echo "##########################"
+echo ""
 create_rule $RULESDIR/route-rule-delay.yaml
 
 test_fault_delay() {
@@ -90,7 +102,7 @@ test_fault_delay() {
     do  
         echo "injecting traffic for user=$USER, expecting productpage-$USER-$VERSION in $EXP_MIN_DELAY to $EXP_MAX_DELAY seconds"
         before=$(date +"%s")
-        curl -s -b "foo=bar;user=$USER;" http://$GATEWAYIP:32000/productpage > /tmp/productpage-$USER-$VERSION.html
+        curl -s -b "foo=bar;user=$USER;" http://$GATEWAYIP:32000/productpage > /tmp/productpage-$USER-$VERSION.json
         after=$(date +"%s")
         delta=$(($after-$before))
         if [ $delta -ge $EXP_MIN_DELAY ] && [ $delta -le $EXP_MAX_DELAY ]
@@ -98,9 +110,9 @@ test_fault_delay() {
             echo "Success!"
             if [ $EXP_MIN_DELAY -gt 0 ]
             then
-                compare_output $EXAMPLESDIR/productpage-$USER-$VERSION-review-timeout.html /tmp/productpage-$USER-$VERSION.html $USER
+                compare_output $EXAMPLESDIR/productpage-$USER-$VERSION-review-timeout.json /tmp/productpage-$USER-$VERSION.json $USER
             else
-                compare_output $EXAMPLESDIR/productpage-$USER-$VERSION.html /tmp/productpage-$USER-$VERSION.html $USER
+                compare_output $EXAMPLESDIR/productpage-$USER-$VERSION.json /tmp/productpage-$USER-$VERSION.json $USER
             fi
             return 0
         elif [ $i -eq 4 ]
@@ -117,7 +129,12 @@ test_fault_delay "normal-user" "v1" 0 2
 test_fault_delay "test-user" "v1" 5 8
 
 # Remove fault injection and verify
+echo ""
+echo "###########################"
 echo "Deleting fault injection..."
+echo "###########################"
+echo ""
+
 delete_rule $RULESDIR/route-rule-delay.yaml
 echo "Waiting for rule clean up to propagate..."
 sleep 10
@@ -130,14 +147,18 @@ else
     PASS=false
 fi
 
-
-
 # Test gradual migration traffic to reviews:v3 for all users
 cleanup_all_rules
 
+echo ""
+echo "############################"
+echo "Testing gradual migration..."
+echo "############################"
+echo ""
+
 COMMAND_INPUT="curl -s -b 'foo=bar;user=normal-user;' http://$GATEWAYIP:32000/productpage"
-EXPECTED_OUTPUT1="$EXAMPLESDIR/productpage-normal-user-v1.html"
-EXPECTED_OUTPUT2="$EXAMPLESDIR/productpage-normal-user-v3.html"
+EXPECTED_OUTPUT1="$EXAMPLESDIR/productpage-normal-user-v1.json"
+EXPECTED_OUTPUT2="$EXAMPLESDIR/productpage-normal-user-v3.json"
 create_rule $RULESDIR/route-rule-reviews-50-v3.yaml
 echo "Expected percentage based routing is 50% to v1 and 50% to v3."
 sleep 10 # Give it a bit to process the request
@@ -151,12 +172,17 @@ then
 fi
 
 # Teardown
-cleanup_istio
-cleanup_bookinfo
 cleanup_all_rules
+cleanup_bookinfo
+cleanup_istio
 
+echo ""
 if [ $PASS == false ]
 then
     echo "ONE OR MORE TESTS HAVE FAILED"
+    echo ""
+    dump_debug
     exit 1
+else
+    echo "TESTS HAVE PASSED"
 fi

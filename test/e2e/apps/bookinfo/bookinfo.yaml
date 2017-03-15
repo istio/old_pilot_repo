@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
       - name: details
-        image: istio/examples-bookinfo-details-v1
+        image: istio/test-e2e-details-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -123,7 +123,7 @@ spec:
     spec:
       containers:
       - name: ratings
-        image: istio/examples-bookinfo-ratings-v1
+        image: istio/test-e2e-ratings-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -195,7 +195,7 @@ spec:
     spec:
       containers:
       - name: reviews
-        image: istio/examples-bookinfo-reviews-v1
+        image: istio/test-e2e-reviews-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -249,7 +249,7 @@ spec:
     spec:
       containers:
       - name: reviews
-        image: istio/examples-bookinfo-reviews-v2
+        image: istio/test-e2e-reviews-v2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -303,7 +303,7 @@ spec:
     spec:
       containers:
       - name: reviews
-        image: istio/examples-bookinfo-reviews-v3
+        image: istio/test-e2e-reviews-v3
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -375,7 +375,7 @@ spec:
     spec:
       containers:
       - name: productpage
-        image: istio/examples-bookinfo-productpage-v1
+        image: istio/test-e2e-productpage-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080

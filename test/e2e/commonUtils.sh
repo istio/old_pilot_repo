@@ -18,7 +18,13 @@ compare_output() {
     EXPECTED=$1
     RECEIVED=$2
     USER=$3
-    diff $1 $2
+    
+    # Sort JSON fields, or fallback to original text
+    file1=$(jq -S . $EXPECTED 2> /dev/null) || file1=$(cat $EXPECTED)
+    file2=$(jq -S . $RECEIVED 2> /dev/null) || file2=$(cat $RECEIVED)
+
+    # Diff, but ignore all whitespace
+    diff -Ewb <(echo $file1) <(echo $file2) #&>/dev/null
     if [ $? -gt 0 ]
     then   
         echo "Received product page does not match $EXPECTED for user=$USER"
@@ -71,11 +77,11 @@ check_routing_rules() {
         fi
 
         if [ $routing_retry_count -eq $((MAX_LOOP+1)) ]; then
-            echo "  Test failed"
+            echo "Test failed"
             echo ""
             return 1
         elif [ $routing_retry_count -eq 100 ]; then
-            echo "  Passed test"
+            echo "Passed test"
             echo ""
         fi
     done
