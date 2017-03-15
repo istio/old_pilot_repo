@@ -62,6 +62,7 @@ var (
 
 	kubeconfig string
 
+	debug    bool
 	parallel bool
 
 	client      *kubernetes.Clientset
@@ -83,8 +84,8 @@ func init() {
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.StringVar(&kubeconfig, "c", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
-	flag.BoolVar(&parallel, "parallel", true,
-		"Run requests in parallel")
+	flag.BoolVar(&debug, "debug", false, "Extra logging in the containers")
+	flag.BoolVar(&parallel, "parallel", true, "Run requests in parallel")
 }
 
 func main() {
@@ -264,6 +265,11 @@ func write(in string, data map[string]string, out io.Writer) error {
 	values["tag"] = params.tag
 	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
+	if debug {
+		values["verbosity"] = "3"
+	} else {
+		values["verbosity"] = "2"
+	}
 	for k, v := range data {
 		values[k] = v
 	}
@@ -370,7 +376,7 @@ func setPods() error {
 
 // podLogs gets pod logs by container
 func podLogs(name string, container string) string {
-	glog.Info("Pod proxy logs", name)
+	glog.Infof("Pod proxy logs %q", name)
 	raw, err := client.Pods(params.namespace).
 		GetLogs(name, &v1.PodLogOptions{Container: container}).
 		Do().Raw()

@@ -77,7 +77,7 @@ spec:
           - -n
           - $(POD_NAMESPACE)
           - -v
-          - "2"
+          - "{{.verbosity}}"
         env:
           - name: POD_NAME
             valueFrom:

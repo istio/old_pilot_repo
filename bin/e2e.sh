@@ -14,9 +14,9 @@ debug_suffix=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -hub) hub="$2"; shift ;;
         -tag) tag="$2"; shift ;;
-        -debug) debug_suffix="_debug" ;;
+        -hub) hub="$2"; args=$args" -hub $hub"; shift ;;
+        -debug) debug_suffix="_debug" ; args=$args" -debug" ;;
         *) args=$args" $1" ;;
     esac
     shift
@@ -32,7 +32,6 @@ args=$args" -tag $tag"
 if [[ "$hub" =~ ^gcr\.io ]]; then
   gcloud docker --authorize-only
 fi
-args=$args" -hub $hub"
 
 for image in app init runtime; do
   bazel $BAZEL_ARGS run //docker:$image$debug_suffix
