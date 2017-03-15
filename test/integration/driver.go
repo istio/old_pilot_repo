@@ -136,8 +136,9 @@ func check(err error) {
 	if err != nil {
 		glog.Info(err)
 		if glog.V(2) {
-			glog.Info(podLogs(pods["a"], "proxy"))
-			glog.Info(podLogs(pods["b"], "proxy"))
+			for _, pod := range pods {
+				glog.Info(podLogs(pod, "proxy"))
+			}
 		}
 		teardown()
 		os.Exit(1)
