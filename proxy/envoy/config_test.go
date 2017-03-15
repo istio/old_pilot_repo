@@ -241,11 +241,11 @@ func compareJSON(jsonFile string, t *testing.T) {
 
 	if data != expected {
 		diff := difflib.UnifiedDiff{
-			A:        difflib.SplitLines(data),
-			B:        difflib.SplitLines(expected),
-			FromFile: jsonFile,
-			ToFile:   jsonFile + ".golden",
-			Context:  3,
+			A:        difflib.SplitLines(expected),
+			B:        difflib.SplitLines(data),
+			FromFile: jsonFile + ".golden",
+			ToFile:   jsonFile,
+			Context:  2,
 		}
 		text, _ := difflib.GetUnifiedDiffString(diff)
 		fmt.Printf(text)
