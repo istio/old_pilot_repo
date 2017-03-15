@@ -97,10 +97,10 @@ func main() {
 
 func setup() {
 	if params.tag == "" {
-		glog.Fatal("No docker tag specified with -t or --tag")
+		glog.Fatal("No docker tag specified")
 	}
 	if params.mixerImage == "" {
-		glog.Fatal("No mixer image specified with --mixerImage, 'latest?'")
+		glog.Fatal("No mixer image specified")
 	}
 	glog.Infof("params %#v", params)
 
