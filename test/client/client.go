@@ -29,12 +29,12 @@ import (
 
 var (
 	count   int
-	timeout int
+	timeout time.Duration
 )
 
 func init() {
 	flag.IntVar(&count, "count", 1, "Number of times to make the request")
-	flag.IntVar(&timeout, "timeout", 60, "Timeout in seconds")
+	flag.DurationVar(&timeout, "timeout", 60*time.Second, "Request timeout")
 }
 
 func main() {
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	client := http.Client{
-		Timeout: time.Second * time.Duration(timeout),
+		Timeout: timeout,
 	}
 
 	for i := 0; i < count; i++ {
