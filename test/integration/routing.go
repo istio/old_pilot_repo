@@ -73,6 +73,9 @@ func testRouting() error {
 	check(verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503))
 	glog.Info("Success!")
 
+	glog.Info("Cleaning up route rules...")
+	check(run("kubectl delete istioconfigs --all -n " + params.namespace))
+
 	return nil
 }
 

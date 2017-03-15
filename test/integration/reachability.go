@@ -104,14 +104,13 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
 func (r *reachability) makeRequests() error {
-	glog.Infof("makeRequests parallel=%t\n", parallel)
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b", "t"}
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + params.namespace} {
-					if parallel {
+					if params.parallel {
 						g.Go(r.makeRequest(src, dst, port, domain, func() bool {
 							select {
 							case <-time.After(time.Second):
@@ -130,7 +129,7 @@ func (r *reachability) makeRequests() error {
 			}
 		}
 	}
-	if parallel {
+	if params.parallel {
 		if err := g.Wait(); err != nil {
 			return err
 		}
@@ -223,14 +222,13 @@ func (r *reachability) makeTCPRequest(src, dst, port, domain string, done func()
 }
 
 func (r *reachability) verifyTCPRouting() error {
-	glog.Infof("verifyTCPRouting parallel=%t\n", parallel)
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b", "t"}
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{":90", ":9090"} {
 				for _, domain := range []string{"", "." + params.namespace} {
-					if parallel {
+					if params.parallel {
 						g.Go(r.makeTCPRequest(src, dst, port, domain, func() bool {
 							select {
 							case <-time.After(time.Second):
@@ -250,7 +248,7 @@ func (r *reachability) verifyTCPRouting() error {
 			}
 		}
 	}
-	if parallel {
+	if params.parallel {
 		if err := g.Wait(); err != nil {
 			return err
 		}

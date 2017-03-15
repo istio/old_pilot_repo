@@ -49,21 +49,18 @@ const (
 	mixerTag = "6655a67"
 )
 
-// params contain default template parameter values
 type parameters struct {
 	hub        string
 	tag        string
 	mixerImage string
 	namespace  string
+	kubeconfig string
+	debug      bool
+	parallel   bool
 }
 
 var (
 	params parameters
-
-	kubeconfig string
-
-	debug    bool
-	parallel bool
 
 	client      *kubernetes.Clientset
 	istioClient *kube.Client
@@ -82,10 +79,10 @@ func init() {
 		"Mixer Docker image")
 	flag.StringVar(&params.namespace, "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
-	flag.StringVar(&kubeconfig, "c", "platform/kube/config",
+	flag.StringVar(&params.kubeconfig, "c", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
-	flag.BoolVar(&debug, "debug", false, "Extra logging in the containers")
-	flag.BoolVar(&parallel, "parallel", true, "Run requests in parallel")
+	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
+	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 }
 
 func main() {
@@ -138,6 +135,10 @@ func setup() {
 func check(err error) {
 	if err != nil {
 		glog.Info(err)
+		if glog.V(2) {
+			glog.Info(podLogs(pods["a"], "proxy"))
+			glog.Info(podLogs(pods["b"], "proxy"))
+		}
 		teardown()
 		os.Exit(1)
 	}
@@ -145,10 +146,6 @@ func check(err error) {
 
 // teardown removes resources
 func teardown() {
-	if glog.V(2) {
-		glog.Info(podLogs(pods["a"], "proxy"))
-		glog.Info(podLogs(pods["b"], "proxy"))
-	}
 	if nameSpaceCreated {
 		deleteNamespace(client, params.namespace)
 		params.namespace = ""
@@ -265,7 +262,7 @@ func write(in string, data map[string]string, out io.Writer) error {
 	values["tag"] = params.tag
 	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
-	if debug {
+	if params.debug {
 		values["verbosity"] = "3"
 	} else {
 		values["verbosity"] = "2"
@@ -324,7 +321,7 @@ func shell(command string) (string, error) {
 // connect to K8S cluster and register TPRs
 func setupClient() error {
 	var err error
-	istioClient, err = kube.NewClient(kubeconfig, model.IstioConfig)
+	istioClient, err = kube.NewClient(params.kubeconfig, model.IstioConfig)
 	if err != nil {
 		return err
 	}

@@ -22,16 +22,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	flag "github.com/spf13/pflag"
 )
 
 var (
-	count int
+	count   int
+	timeout int
 )
 
 func init() {
 	flag.IntVar(&count, "count", 1, "Number of times to make the request")
+	flag.IntVar(&timeout, "timeout", 60, "Timeout in seconds")
 }
 
 func main() {
@@ -55,7 +58,9 @@ func main() {
 		fmt.Printf("Header=%s:%s\n", headerKey, headerVal)
 	}
 
-	client := http.Client{}
+	client := http.Client{
+		Timeout: time.Second * time.Duration(timeout),
+	}
 
 	for i := 0; i < count; i++ {
 		fmt.Printf("ClientRequest=%d\n", i)
