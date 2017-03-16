@@ -32,9 +32,10 @@ mainFlow(utils) {
 def presubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
+    initTestingCluster(utils)
     stage('Bazel Build') {
       // Empty kube/config file signals to use in-cluster auto-configuration
-      sh('touch platform/kube/config')
+      sh('ln -s ~/.kube/config platform/kube/')
       sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
@@ -60,6 +61,15 @@ def presubmit(gitUtils, bazel, utils) {
   }
 }
 
+def initTestingCluster(utils) {
+  def cluster = utils.failIfNullOrEmpty(env.E2E_CLUSTER, 'E2E_CLUSTER is not set')
+  def zone = utils.failIfNullOrEmpty(env.E2E_CLUSTER_ZONE, 'E2E_CLUSTER_ZONE is not set')
+  def project = utils.failIfNullOrEmpty(env.PROJECT, 'PROJECT is not set')
+  sh('gcloud config set container/use_client_certificate True')
+  sh("gcloud container clusters get-credentials " +
+      "--project ${project} --zone ${zone} ${cluster}")
+
+}
 
 def postsubmit(gitUtils, bazel, utils) {
   buildNode(gitUtils) {
