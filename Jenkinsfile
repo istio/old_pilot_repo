@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-838b134')
+@Library('testutils@f4225e01821ffc52f5f542f7d3ff0e18e9243347')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -12,27 +12,24 @@ def utils = new Utilities()
 def bazel = new Bazel()
 
 mainFlow(utils) {
-  pullRequest(utils) {
+  node {
+    gitUtils.initialize()
+    bazel.setVars()
+  }
 
-    node {
-      gitUtils.initialize()
-      bazel.setVars()
-    }
+  if (utils.runStage('PRESUBMIT')) {
+    presubmit(gitUtils, bazel, utils)
+  }
 
-    if (utils.runStage('PRESUBMIT')) {
-      presubmit(gitUtils, bazel, utils)
-    }
-
-    if (utils.runStage('POSTSUBMIT')) {
-      postsubmit(gitUtils, bazel, utils)
-    }
+  if (utils.runStage('POSTSUBMIT')) {
+    postsubmit(gitUtils, bazel, utils)
   }
 }
 
 def presubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
-    initTestingCluster(utils)
+    utils.initTestingCluster()
     stage('Bazel Build') {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('ln -s ~/.kube/config platform/kube/')
@@ -59,16 +56,6 @@ def presubmit(gitUtils, bazel, utils) {
       }
     }
   }
-}
-
-def initTestingCluster(utils) {
-  def cluster = utils.failIfNullOrEmpty(env.E2E_CLUSTER, 'E2E_CLUSTER is not set')
-  def zone = utils.failIfNullOrEmpty(env.E2E_CLUSTER_ZONE, 'E2E_CLUSTER_ZONE is not set')
-  def project = utils.failIfNullOrEmpty(env.PROJECT, 'PROJECT is not set')
-  sh('gcloud config set container/use_client_certificate True')
-  sh("gcloud container clusters get-credentials " +
-      "--project ${project} --zone ${zone} ${cluster}")
-
 }
 
 def postsubmit(gitUtils, bazel, utils) {
