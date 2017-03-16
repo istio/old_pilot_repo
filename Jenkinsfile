@@ -43,7 +43,7 @@ def presubmit(gitUtils, bazel, utils) {
       sh('toolbox/scripts/init.sh')
     }
     stage('Code Check') {
-      sh('toolbox/script/check.sh')
+      sh('toolbox/scripts/check.sh')
     }
     stage('Bazel Tests') {
       bazel.test('//...')
