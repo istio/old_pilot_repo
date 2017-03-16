@@ -69,6 +69,12 @@ func makeRequest(i int) func() error {
 		log.Printf("[%d] StatusCode=%d\n", i, resp.StatusCode)
 
 		data, err := ioutil.ReadAll(resp.Body)
+		defer func() {
+			if err = resp.Body.Close(); err != nil {
+				log.Printf("[%d error] %s\n", i, err)
+			}
+		}()
+
 		if err != nil {
 			return err
 		}
@@ -79,7 +85,7 @@ func makeRequest(i int) func() error {
 			}
 		}
 
-		return resp.Body.Close()
+		return nil
 	}
 }
 
