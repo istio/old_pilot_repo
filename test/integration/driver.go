@@ -58,6 +58,7 @@ type parameters struct {
 	count      int
 	debug      bool
 	parallel   bool
+	logs       bool
 }
 
 var (
@@ -85,6 +86,7 @@ func init() {
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
+	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
 }
 
 func main() {

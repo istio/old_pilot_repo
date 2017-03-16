@@ -55,12 +55,13 @@ func (r *reachability) run() error {
 		glog.Infof("requests: %#v", r.accessLogs)
 	}
 
-	if err := r.checkAccessLogs(); err != nil {
-		return err
-	}
-
-	if err := r.checkMixerLogs(); err != nil {
-		return err
+	if params.logs {
+		if err := r.checkProxyAccessLogs(); err != nil {
+			return err
+		}
+		if err := r.checkMixerLogs(); err != nil {
+			return err
+		}
 	}
 
 	glog.Info("Success!")
@@ -137,7 +138,7 @@ func (r *reachability) makeRequests() error {
 	return nil
 }
 
-func (r *reachability) checkAccessLogs() error {
+func (r *reachability) checkProxyAccessLogs() error {
 	glog.Info("Checking access logs of pods to correlate request IDs...")
 	for n := 0; n < budget; n++ {
 		found := true
