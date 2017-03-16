@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@f4225e01821ffc52f5f542f7d3ff0e18e9243347')
+@Library('testutils@stable-afad32f')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -31,7 +31,7 @@ def presubmit(gitUtils, bazel, utils) {
     bazel.updateBazelRc()
     utils.initTestingCluster()
     stage('Bazel Build') {
-      // Empty kube/config file signals to use in-cluster auto-configuration
+      // Use Testing cluster
       sh('ln -s ~/.kube/config platform/kube/')
       sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
