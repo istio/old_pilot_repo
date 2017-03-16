@@ -55,6 +55,7 @@ type parameters struct {
 	mixerImage string
 	namespace  string
 	kubeconfig string
+	count      int
 	debug      bool
 	parallel   bool
 }
@@ -79,8 +80,9 @@ func init() {
 		"Mixer Docker image")
 	flag.StringVar(&params.namespace, "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
-	flag.StringVar(&params.kubeconfig, "c", "platform/kube/config",
+	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
+	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 }
@@ -88,9 +90,13 @@ func init() {
 func main() {
 	flag.Parse()
 	setup()
-	check((&reachability{}).run())
-	check(testRouting())
+	for i := 0; i < params.count; i++ {
+		glog.Infof("Test run: %d", i)
+		check((&reachability{}).run())
+		check(testRouting())
+	}
 	teardown()
+	glog.Infof("All tests passed %d time(s)!", params.count)
 }
 
 func setup() {
@@ -297,7 +303,7 @@ func writeString(in string, data map[string]string) ([]byte, error) {
 }
 
 func run(command string) error {
-	glog.V(2).Info(command)
+	glog.Info(command)
 	parts := strings.Split(command, " ")
 	/* #nosec */
 	c := exec.Command(parts[0], parts[1:]...)
@@ -307,7 +313,7 @@ func run(command string) error {
 }
 
 func shell(command string) (string, error) {
-	glog.V(2).Info(command)
+	glog.Info(command)
 	parts := strings.Split(command, " ")
 	/* #nosec */
 	c := exec.Command(parts[0], parts[1:]...)
