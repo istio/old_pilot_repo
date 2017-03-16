@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2017 Istio Authors
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +14,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-#!/bin/bash
-
 # Bring up control plane
 deploy_istio() {
-    echo "Deploying ISTIO"
+    print_block_echo "Deploying ISTIO"
     $K8CLI create -f istio/controlplane.yaml
     for (( i=0; i<=4; i++ ))
     do
@@ -34,21 +34,14 @@ deploy_istio() {
 
 # Clean up the controlplane when we are done with it
 cleanup_istio(){
-    echo ""
-    echo "#################"
-    echo "Cleaning up ISTIO"
-    echo "#################"
-    echo ""
+    print_block_echo "Cleaning up ISTIO"
     $K8CLI delete -f istio/controlplane.yaml
 }
 
 # Deploy the bookinfo microservices
 deploy_bookinfo(){
-    echo ""
-    echo "##########################"
-    echo "Deploying BookInfo to kube"
-    echo "##########################"
-    echo ""
+    print_block_echo "Deploying BookInfo to kube"
+
     $K8CLI create -f apps/bookinfo/bookinfo.yaml
     for (( i=0; i<=4; i++ ))
     do
@@ -66,16 +59,13 @@ deploy_bookinfo(){
 
 # Clean up bookinfo when we are done with it
 cleanup_bookinfo(){
-    echo ""
-    echo "####################"
-    echo "Cleaning up BookInfo"
-    echo "####################"
-    echo ""
+    print_block_echo "Cleaning up BookInfo"
     $K8CLI delete -f apps/bookinfo/bookinfo.yaml
 }
 
 # Debug dump for failures
 dump_debug() {
+    echo ""
     $K8CLI get pods
     $K8CLI get thirdpartyresources
     $K8CLI get thirdpartyresources -o json

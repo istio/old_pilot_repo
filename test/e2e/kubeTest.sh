@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2017 Istio Authors
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-#!/bin/bash
 
 # Local vars
 SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
@@ -23,8 +24,8 @@ EXAMPLESDIR=$SCRIPTDIR/apps/bookinfo/output
 PASS=true
 
 # Import relevant common utils
+. $SCRIPTDIR/commonUtils.sh # Must be first for print_block_echo in kubeUtils
 . $SCRIPTDIR/kubeUtils.sh
-. $SCRIPTDIR/commonUtils.sh
 . $SCRIPTDIR/istioUtils.sh
 
 # Setup
@@ -35,11 +36,7 @@ deploy_bookinfo
 GATEWAYIP=$(kubectl describe pod $(kubectl get pods | awk 'NR>1 {print $1}' | grep istio-ingress-controller) | grep Node | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")
 
 # Verify default routes
-echo ""
-echo "#################################"
-echo "Testing default route behavior..."
-echo "#################################"
-echo ""
+print_block_echo "Testing default route behavior..."
 for (( i=0; i<=4; i++ ))
 do  
     response=$(curl --write-out %{http_code} --silent --output /dev/null http://$GATEWAYIP:32000/productpage)
@@ -59,11 +56,7 @@ do
 done
 
 # Test version routing
-echo ""
-echo "##########################"
-echo "Testing version routing..."
-echo "##########################"
-echo ""
+print_block_echo "Testing version routing..."
 create_rule $RULESDIR/route-rule-all-v1.yaml
 create_rule $RULESDIR/route-rule-reviews-test-v2.yaml
 echo "Waiting for rules to propagate..."
@@ -78,6 +71,7 @@ test_version_routing_response() {
     if [ $? -ne 0 ]
     then
         PASS=false
+        dump_debug
     fi
 }
 
@@ -85,11 +79,8 @@ test_version_routing_response "normal-user" "v1"
 test_version_routing_response "test-user" "v2"
 
 # Test fault injection
-echo ""
-echo "##########################"
-echo "Testing fault injection..."
-echo "##########################"
-echo ""
+print_block_echo "Testing fault injection..."
+
 create_rule $RULESDIR/route-rule-delay.yaml
 
 test_fault_delay() {
@@ -119,6 +110,7 @@ test_fault_delay() {
         then
             echo "Productpage took $delta seconds to respond (expected between $EXP_MIN_DELAY and $EXP_MAX_DELAY) for user=$USER in fault injection phase"
             PASS=false
+            dump_debug
         fi
         sleep 10
     done
@@ -129,11 +121,7 @@ test_fault_delay "normal-user" "v1" 0 2
 test_fault_delay "test-user" "v1" 5 8
 
 # Remove fault injection and verify
-echo ""
-echo "###########################"
-echo "Deleting fault injection..."
-echo "###########################"
-echo ""
+print_block_echo "Deleting fault injection..."
 
 delete_rule $RULESDIR/route-rule-delay.yaml
 echo "Waiting for rule clean up to propagate..."
@@ -145,16 +133,12 @@ then
 else
     echo "Fault injection persisted"
     PASS=false
+    dump_debug
 fi
 
 # Test gradual migration traffic to reviews:v3 for all users
 cleanup_all_rules
-
-echo ""
-echo "############################"
-echo "Testing gradual migration..."
-echo "############################"
-echo ""
+print_block_echo "Testing gradual migration..."
 
 COMMAND_INPUT="curl -s -b 'foo=bar;user=normal-user;' http://$GATEWAYIP:32000/productpage"
 EXPECTED_OUTPUT1="$EXAMPLESDIR/productpage-normal-user-v1.json"
@@ -169,6 +153,7 @@ check_routing_rules "$COMMAND_INPUT" "$EXPECTED_OUTPUT1" "$EXPECTED_OUTPUT2" 50
 if [ $? -ne 0 ]
 then
     PASS=fail
+    dump_debug
 fi
 
 # Teardown
@@ -180,8 +165,6 @@ echo ""
 if [ $PASS == false ]
 then
     echo "ONE OR MORE TESTS HAVE FAILED"
-    echo ""
-    dump_debug
     exit 1
 else
     echo "TESTS HAVE PASSED"
