@@ -35,26 +35,26 @@ def presubmit(gitUtils, bazel, utils) {
     stage('Bazel Build') {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('touch platform/kube/config')
-      sh('bin/install-prereqs.sh')
+      sh('toolbox/scripts/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
     stage('Go Build') {
-      sh('bin/init.sh')
+      sh('toolbox/scripts/init.sh')
     }
     stage('Code Check') {
-      sh('bin/check.sh')
+      sh('toolbox/script/check.sh')
     }
     stage('Bazel Tests') {
       bazel.test('//...')
     }
     stage('Code Coverage') {
-      sh('bin/codecov.sh')
+      sh('toolbox/scripts/codecov.sh')
       utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh('bin/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh('toolbox/scripts/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
   }
@@ -73,7 +73,7 @@ def postsubmit(gitUtils, bazel, utils) {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('touch platform/kube/config')
       timeout(30) {
-        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh('toolbox/scripts/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
   }

@@ -2,4 +2,4 @@
 build --verbose_failures
 test --test_output=errors
 
-build --workspace_status_command=bin/get_workspace_status
+build --workspace_status_command=toolbox/scripts/get_workspace_status
