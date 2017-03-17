@@ -2,7 +2,7 @@
 set -ex
 
 # Vendorize bazel dependencies
-toolbox/scripts/bazel_to_go.py > /dev/null
+bin/bazel_to_go.py > /dev/null
 
 # Remove doubly-vendorized k8s dependencies
 rm -rf vendor/k8s.io/client-go/vendor
