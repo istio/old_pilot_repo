@@ -29,10 +29,10 @@ import (
 	"istio.io/manager/model/proxy/alphav1/config"
 
 	"io/ioutil"
-	"os"
+
+	"github.com/hashicorp/errwrap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/apis/meta/v1"
-	"github.com/hashicorp/errwrap"
 )
 
 type ingressWatcher struct {
@@ -49,7 +49,7 @@ type ingressWatcher struct {
 func NewIngressWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 	registry *model.IstioRegistry, client *kubernetes.Clientset, mesh *MeshConfig,
 	identity *ProxyNode, secret, namespace string,
-	) (Watcher, error) {
+) (Watcher, error) {
 
 	out := &ingressWatcher{
 		agent:     NewAgent(mesh.BinaryPath, mesh.ConfigPath, identity.Name),
@@ -204,7 +204,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 
 // TODO: with multiple keys/certs, these will have to be dynamic.
 const (
-	certChainFile = "/etc/envoy/tls.crt"
+	certChainFile  = "/etc/envoy/tls.crt"
 	privateKeyFile = "/etc/envoy/tls.key"
 )
 
@@ -212,7 +212,7 @@ func (w *ingressWatcher) buildSSLContext(secret string) (*SSLContext, error) {
 	// TODO: use cache
 	s, err := w.client.Core().Secrets(w.namespace).Get(secret, v1.GetOptions{})
 	if err != nil {
-		return nil, errwrap.Wrap(fmt.Errorf("could not get secret %s"), err)
+		return nil, errwrap.Wrap(fmt.Errorf("could not get secret %s", secret), err)
 	}
 
 	cert, exists := s.Data["tls.crt"]
@@ -226,13 +226,12 @@ func (w *ingressWatcher) buildSSLContext(secret string) (*SSLContext, error) {
 	}
 
 	// Write to files
-	// FIXME: sensible file permissions
-	os.MkdirAll("/etc/envoy", 0777)
-	ioutil.WriteFile(certChainFile, cert, 0777)
-	ioutil.WriteFile(privateKeyFile, key, 0777)
+	//os.MkdirAll("/etc/envoy", 0755)
+	ioutil.WriteFile(certChainFile, cert, 0755)
+	ioutil.WriteFile(privateKeyFile, key, 0755)
 
 	return &SSLContext{
-		CertChainFile: certChainFile,
+		CertChainFile:  certChainFile,
 		PrivateKeyFile: privateKeyFile,
 	}, nil
 }
