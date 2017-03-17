@@ -17,8 +17,11 @@ for d in $(go list ./... | grep -v vendor); do
     go test $options $d
 
     if [ -f profile.out ]; then
-        cat profile.out
         cat profile.out >> coverage.txt
         rm profile.out
     fi
 done
+
+echo ">>>>>>"
+cat coverage.txt
+echo ">>>>>>"
