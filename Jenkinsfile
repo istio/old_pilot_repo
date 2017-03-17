@@ -40,10 +40,10 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.build('//...')
     }
     stage('Go Build') {
-      sh('toolbox/scripts/init.sh')
+      sh('bin/init.sh')
     }
     stage('Code Check') {
-      sh('toolbox/scripts/check.sh')
+      sh('bin/check.sh')
     }
     stage('Bazel Tests') {
       bazel.test('//...')
@@ -54,7 +54,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh('toolbox/scripts/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh('bin/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
   }
@@ -73,7 +73,7 @@ def postsubmit(gitUtils, bazel, utils) {
       // Empty kube/config file signals to use in-cluster auto-configuration
       sh('touch platform/kube/config')
       timeout(30) {
-        sh('toolbox/scripts/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
   }

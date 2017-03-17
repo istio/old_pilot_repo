@@ -15,7 +15,7 @@ repository pointing to Kubernetes cluster credentials:
 To run the complete set of tests, use the following commands:
 
     bazel test //...
-    toolbox/scripts/e2e.sh [-hub docker.io/<username>]
+    bin/e2e.sh [-hub docker.io/<username>]
     
 _Note1_: If you are running Bazel in a VM (e.g. in [Vagrant environment](build-vagrant.md)), copy
 the kube config file on the host to platform/kube instead of symlinking it,
@@ -36,9 +36,9 @@ _Note3_: The optional `-h` flag should point to a Docker registry that you have 
 
 ## Code linters
 
-We require that Istio Manager code contributions pass all linters defined by [the check script](../toolbox/scripts/check.sh):
+We require that Istio Manager code contributions pass all linters defined by [the check script](../bin/check.sh):
 
-    toolbox/scripts/check.sh
+    bin/check.sh
     
 _Note_: You need to set up Go-compatible build environment first, since the linters do not use Bazel. 
 
@@ -53,7 +53,7 @@ For tests that require systems integration, such as invoking the proxy with a sp
 
 ## Integration tests
 
-Istio Manager runs end-to-end tests as part of the presubmit check. The test driver is a [Golang program](../test/integration) that creates a temporary namespace, deploys Istio components, send requests from apps in the cluster, and checks that traffic obeys the desired routing policies. The end-to-end test is entirely hermetic: test applications and Istio Manager docker images are generated on each run. This means you need to have a docker registry to host your images, which then needs to be passed with `-hub` flag. The test driver is invoked using [the e2e script](../toolbox/scripts/e2e.sh).
+Istio Manager runs end-to-end tests as part of the presubmit check. The test driver is a [Golang program](../test/integration) that creates a temporary namespace, deploys Istio components, send requests from apps in the cluster, and checks that traffic obeys the desired routing policies. The end-to-end test is entirely hermetic: test applications and Istio Manager docker images are generated on each run. This means you need to have a docker registry to host your images, which then needs to be passed with `-hub` flag. The test driver is invoked using [the e2e script](../bin/e2e.sh).
 
 ## Docker images
 

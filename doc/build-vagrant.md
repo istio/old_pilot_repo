@@ -55,7 +55,7 @@ into /home/ubuntu/config
 _Note the three dots_
 Create the vendored directories..
 
-    ./toolbox/scripts/init.sh
+    .bin/init.sh
 
 Login to your docker hub account
 
@@ -63,7 +63,7 @@ Login to your docker hub account
 
 Run a end to end test to make sure the VM can talk to minikube
 
-    ./toolbox/scripts/e2e.sh
+    .bin/e2e.sh
 
 ## 4. Use your favorite IDE on the host
 
@@ -76,6 +76,6 @@ commands described in the the build instructions section below.
 
 Run the end to end integration tests in the VM
 
-    ./toolbox/scripts/e2e.sh -hub docker.io/<yourusername>
+    ./e2e.sh -hub docker.io/<yourusername>
 
 Note that this script will push some images to your dockerhub account.
