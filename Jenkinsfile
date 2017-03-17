@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-838b134')
+@Library('testutils@stable-afad32f')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -12,30 +12,28 @@ def utils = new Utilities()
 def bazel = new Bazel()
 
 mainFlow(utils) {
-  pullRequest(utils) {
+  node {
+    gitUtils.initialize()
+    bazel.setVars()
+  }
 
-    node {
-      gitUtils.initialize()
-      bazel.setVars()
-    }
+  if (utils.runStage('PRESUBMIT')) {
+    presubmit(gitUtils, bazel, utils)
+  }
 
-    if (utils.runStage('PRESUBMIT')) {
-      presubmit(gitUtils, bazel, utils)
-    }
-
-    if (utils.runStage('POSTSUBMIT')) {
-      postsubmit(gitUtils, bazel, utils)
-    }
+  if (utils.runStage('POSTSUBMIT')) {
+    postsubmit(gitUtils, bazel, utils)
   }
 }
 
 def presubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
+    utils.initTestingCluster()
     stage('Bazel Build') {
-      // Empty kube/config file signals to use in-cluster auto-configuration
-      sh('touch platform/kube/config')
-      sh('toolbox/scripts/install-prereqs.sh')
+      // Use Testing cluster
+      sh('ln -s ~/.kube/config platform/kube/')
+      sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
@@ -60,19 +58,18 @@ def presubmit(gitUtils, bazel, utils) {
   }
 }
 
-
 def postsubmit(gitUtils, bazel, utils) {
   buildNode(gitUtils) {
+    bazel.updateBazelRc()
+    utils.initTestingCluster()
     stage('Docker Push') {
-      bazel.updateBazelRc()
       def images = 'init,init_debug,app,app_debug,runtime,runtime_debug'
       def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
       utils.publishDockerImages(images, tags)
     }
     stage('Integration Tests') {
-      // Empty kube/config file signals to use in-cluster auto-configuration
-      sh('touch platform/kube/config')
       timeout(30) {
+        sh('ln -s ~/.kube/config platform/kube/')
         sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
       }
     }
