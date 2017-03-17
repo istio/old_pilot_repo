@@ -70,15 +70,15 @@ def postsubmit(gitUtils, bazel, utils) {
       sh('bin/codecov.sh')
       utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
     }
-    stage('Integration Tests') {
-      timeout(30) {
-        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
-      }
-    }
     stage('Docker Push') {
       def images = 'init,init_debug,app,app_debug,runtime,runtime_debug'
       def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
       utils.publishDockerImages(images, tags)
+    }
+    stage('Integration Tests') {
+      timeout(30) {
+        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+      }
     }
   }
 }
