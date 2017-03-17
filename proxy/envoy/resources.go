@@ -103,7 +103,16 @@ type Header struct {
 
 // FilterMixerConfig definition
 type FilterMixerConfig struct {
+	// MixerServer specifies the address of the mixer server (e.g. "mixer:9090")
 	MixerServer string `json:"mixer_server"`
+
+	// MixerAttributes specifies the static list of attributes that are sent with
+	// each request to Mixer.
+	MixerAttributes string `json:"mixer_attributes,omitempty"`
+
+	// ForwardAttributes specifies the list of attribute keys and values that
+	// are forwarded as an HTTP header to the server side proxy
+	ForwardAttributes string `json:"forward_attributes,omitempty"`
 }
 
 // FilterFaultConfig definition

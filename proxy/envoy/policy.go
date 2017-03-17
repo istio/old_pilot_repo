@@ -28,7 +28,7 @@ func insertMixerFilter(listeners []*Listener, mixer string) {
 			if f.Name == HTTPConnectionManager {
 				http := (f.Config).(*HTTPFilterConfig)
 				http.Filters = append([]HTTPFilter{{
-					Type:   "both",
+					Type:   "decoder",
 					Name:   "mixer",
 					Config: &FilterMixerConfig{MixerServer: mixer},
 				}}, http.Filters...)
