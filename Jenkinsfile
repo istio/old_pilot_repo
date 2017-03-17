@@ -59,19 +59,26 @@ def presubmit(gitUtils, bazel, utils) {
 }
 
 def postsubmit(gitUtils, bazel, utils) {
-  buildNode(gitUtils) {
+  goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
     utils.initTestingCluster()
+    sh('ln -s ~/.kube/config platform/kube/')
+    stage('Code Coverage') {
+      sh('bin/install-prereqs.sh')
+      bazel.test('//...')
+      sh('bin/init.sh')
+      sh('bin/codecov.sh')
+      utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
+    }
+    stage('Integration Tests') {
+      timeout(30) {
+        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+      }
+    }
     stage('Docker Push') {
       def images = 'init,init_debug,app,app_debug,runtime,runtime_debug'
       def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
       utils.publishDockerImages(images, tags)
-    }
-    stage('Integration Tests') {
-      timeout(30) {
-        sh('ln -s ~/.kube/config platform/kube/')
-        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
-      }
     }
   }
 }
