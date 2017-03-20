@@ -388,9 +388,9 @@ type Listener struct {
 
 // SSLContext definition
 type SSLContext struct {
-	CertChainFile  string  `json:"cert_chain_file"`
-	PrivateKeyFile string  `json:"private_key_file"`
-	CACertFile     *string `json:"ca_cert_file,omitempty"`
+	CertChainFile  string `json:"cert_chain_file"`
+	PrivateKeyFile string `json:"private_key_file"`
+	CACertFile     string `json:"ca_cert_file,omitempty"`
 }
 
 // HTTPRouteConfigs provides routes by virtual host and port
@@ -427,7 +427,6 @@ type Cluster struct {
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host            `json:"hosts,omitempty"`
 	Features                 string            `json:"features,omitempty"`
-	SSLContext               *SSLContext       `json:"ssl_context,omitempty"`
 	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
 
