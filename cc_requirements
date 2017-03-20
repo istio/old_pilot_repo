@@ -1,0 +1,4 @@
+istio.io/manager/cmd/istioctl   66.4
+istio.io/manager/model  95
+istio.io/manager/platform/kube  50
+istio.io/manager/proxy/envoy    60

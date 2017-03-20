@@ -47,7 +47,9 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.test('//...')
     }
     stage('Code Coverage') {
-      sh('bin/codecov.sh')
+      sh('bin/codecov.sh > cc_report')
+      sh('cat cc_report')
+      sh('./bin/pkg_cc_check.py')
       utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
     }
     stage('Integration Tests') {
