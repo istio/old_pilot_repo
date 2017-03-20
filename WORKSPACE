@@ -1,3 +1,5 @@
+workspace(name = "com_github_istio_manager")
+
 git_repository(
     name = "io_bazel_rules_go",
     commit = "9496d79880a7d55b8e4a96f04688d70a374eaaf4",
@@ -278,7 +280,7 @@ new_go_repository(
 ## Proxy build rules
 ##
 
-PROXY = "52ef466a3fb296a4c1e11336fb92ab3f7064f102"  # Mar 16 2017
+PROXY = "95535f5fb6631adcb453b8f84a2e76d13ea23886"  # Mar 16 2017
 
 http_file(
     name = "istio_proxy",

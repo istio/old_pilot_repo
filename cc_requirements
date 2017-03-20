@@ -1,0 +1,6 @@
+istio.io/manager/cmd/istioctl   65.3
+istio.io/manager/model  95
+istio.io/manager/platform/kube  80.4
+istio.io/manager/proxy/envoy    66.3
+istio.io/manager/test/mock      50
+istio.io/manager/test/server	30
