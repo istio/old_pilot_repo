@@ -129,9 +129,9 @@ func setup() {
 	_, err = shell(fmt.Sprintf("kubectl -n %s create -f test/integration/ingress.yaml", params.namespace))
 	check(err)
 	_, err = shell(fmt.Sprintf(
-		"kubectl -n %s create secret generic ingress " +
-		"--from-file=tls.key=test/integration/cert.key " +
-		"--from-file=tls.crt=test/integration/cert.crt",
+		"kubectl -n %s create secret generic ingress "+
+			"--from-file=tls.key=test/integration/cert.key "+
+			"--from-file=tls.crt=test/integration/cert.crt",
 		params.namespace))
 	check(err)
 
