@@ -95,6 +95,7 @@ func makeRequest(i int) func() error {
 
 func main() {
 	flag.Parse()
+	/* #nosec */
 	client = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
