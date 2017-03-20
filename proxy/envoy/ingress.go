@@ -227,8 +227,12 @@ func (w *ingressWatcher) buildSSLContext(secret string) (*SSLContext, error) {
 
 	// Write to files
 	//os.MkdirAll("/etc/envoy", 0755)
-	ioutil.WriteFile(certChainFile, cert, 0755)
-	ioutil.WriteFile(privateKeyFile, key, 0755)
+	if err = ioutil.WriteFile(certChainFile, cert, 0755); err != nil {
+		return nil, err
+	}
+	if err = ioutil.WriteFile(privateKeyFile, key, 0755); err != nil {
+		return nil, err
+	}
 
 	return &SSLContext{
 		CertChainFile:  certChainFile,
