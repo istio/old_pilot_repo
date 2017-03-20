@@ -26,11 +26,13 @@ import (
 	"time"
 
 	"github.com/golang/sync/errgroup"
+	"crypto/tls"
 )
 
 var (
 	count    int
 	parallel bool
+	insecure bool
 	timeout  time.Duration
 	client   *http.Client
 
@@ -42,6 +44,7 @@ var (
 func init() {
 	flag.IntVar(&count, "count", 1, "Number of times to make the request")
 	flag.BoolVar(&parallel, "parallel", true, "Run requests in parallel")
+	flag.BoolVar(&insecure, "insecure", false, "Insecure requests")
 	flag.DurationVar(&timeout, "timeout", 60*time.Second, "Request timeout")
 	flag.StringVar(&url, "url", "", "Specify URL")
 	flag.StringVar(&headerKey, "key", "", "Header key")
@@ -91,7 +94,14 @@ func makeRequest(i int) func() error {
 
 func main() {
 	flag.Parse()
-	client = &http.Client{Timeout: timeout}
+	client = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: insecure,
+			},
+		},
+		Timeout: timeout,
+	}
 	g, _ := errgroup.WithContext(context.Background())
 	for i := 0; i < count; i++ {
 		if parallel {
