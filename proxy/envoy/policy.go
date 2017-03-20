@@ -18,19 +18,57 @@
 package envoy
 
 import (
+	"sort"
+	"strings"
+
 	"istio.io/manager/model"
 	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
 )
 
-func insertMixerFilter(listeners []*Listener, mixer string) {
+func insertMixerFilter(listeners []*Listener, context *ProxyContext) {
+	if context.MeshConfig.MixerAddress == "" {
+		return
+	}
+
+	// join IPs with a comma
+	ips := make([]string, 0)
+	for ip := range context.Addrs {
+		ips = append(ips, ip)
+	}
+	sort.Strings(ips)
+	id := strings.Join(ips, ",")
+
+	// join service names with a comma
+	instances := context.Discovery.HostInstances(context.Addrs)
+	serviceSet := make(map[string]bool)
+	for _, instance := range instances {
+		serviceSet[instance.Service.Hostname] = true
+	}
+	services := make([]string, 0)
+	for service := range serviceSet {
+		services = append(services, service)
+	}
+	sort.Strings(services)
+	service := strings.Join(services, ",")
+
 	for _, l := range listeners {
 		for _, f := range l.Filters {
 			if f.Name == HTTPConnectionManager {
 				http := (f.Config).(*HTTPFilterConfig)
 				http.Filters = append([]HTTPFilter{{
-					Type:   "both",
-					Name:   "mixer",
-					Config: &FilterMixerConfig{MixerServer: mixer},
+					Type: "decoder",
+					Name: "mixer",
+					Config: &FilterMixerConfig{
+						MixerServer: context.MeshConfig.MixerAddress,
+						MixerAttributes: map[string]string{
+							"target.uid":     id,
+							"target.service": service,
+						},
+						ForwardAttributes: map[string]string{
+							"source.uid":     id,
+							"source.service": service,
+						},
+					},
 				}}, http.Filters...)
 			}
 		}
