@@ -96,6 +96,7 @@ func main() {
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
 		check((&reachability{}).run())
+		check((&verifyIngress{}).run())
 		check(testRouting())
 	}
 	teardown()
@@ -124,16 +125,6 @@ func setup() {
 	}
 
 	pods = make(map[string]string)
-
-	// setup ingress config
-	_, err = shell(fmt.Sprintf("kubectl -n %s create -f test/integration/ingress.yaml", params.namespace))
-	check(err)
-	_, err = shell(fmt.Sprintf(
-		"kubectl -n %s create secret generic ingress "+
-			"--from-file=tls.key=test/integration/cert.key "+
-			"--from-file=tls.crt=test/integration/cert.crt",
-		params.namespace))
-	check(err)
 
 	// deploy istio-infra
 	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned"))

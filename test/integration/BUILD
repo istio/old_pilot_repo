@@ -6,6 +6,7 @@ go_library(
         "driver.go",
         "reachability.go",
         "routing.go",
+        "ingress.go",
     ],
     deps = [
         "//model:go_default_library",
