@@ -144,6 +144,12 @@ func init() {
 	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
 		"",
 		"Mixer DNS address (or empty to disable Mixer)")
+        proxyCmd.PersistentFlags().StringVarP(&flags.proxy.AuthMode, "auth_mode", "a",
+	        envoy.DefaultMeshConfig.AuthMode,
+		"The auth Envoy enforces for proxy-proxy traffic")
+        proxyCmd.PersistentFlags().StringVarP(&flags.proxy.AuthConfigPath, "auth_config_path", "d",
+	        envoy.DefaultMeshConfig.AuthConfigPath,
+		"The path Envoy uses to find files: cert_chain, private_key, ca_cert")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)

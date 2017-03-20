@@ -138,3 +138,10 @@ func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 	}
 	return out
 }
+
+func (sd *ServiceDiscovery) GetIstioServiceAccounts(hostname string) []string {
+	return []string{
+		"istio:accountA.namespace1.foo.com",
+		"istio:accountB.namespace1.foo.com",
+	}
+}

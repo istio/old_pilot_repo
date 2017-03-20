@@ -217,13 +217,14 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyV0Config     = "testdata/envoy-v0.json"
-	envoyV1Config     = "testdata/envoy-v1.json"
-	envoyFaultConfig  = "testdata/envoy-fault.json"
-	cbPolicy          = "testdata/cb-policy.yaml.golden"
-	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
-	weightedRouteRule = "testdata/weighted-route.yaml.golden"
-	faultRouteRule    = "testdata/fault-route.yaml.golden"
+	envoyV0Config         = "testdata/envoy-v0.json"
+	envoyV1Config         = "testdata/envoy-v1.json"
+	envoyFaultConfig      = "testdata/envoy-fault.json"
+	envoySslContextConfig = "testdata/envoy-ssl-context.json"
+	cbPolicy              = "testdata/cb-policy.yaml.golden"
+	timeoutRouteRule      = "testdata/timeout-route-rule.yaml.golden"
+	weightedRouteRule     = "testdata/weighted-route.yaml.golden"
+	faultRouteRule        = "testdata/fault-route.yaml.golden"
 )
 
 func compareJSON(jsonFile string, t *testing.T) {
@@ -272,6 +273,36 @@ func testConfig(r *model.IstioRegistry, instance, envoyConfig string, t *testing
 	}
 
 	compareJSON(envoyConfig, t)
+}
+
+func testConfigWithSslContext(r *model.IstioRegistry, instance, envoyConfig string, t *testing.T) {
+        ds := mock.Discovery
+        meshConfigWithSslContext := &MeshConfig{
+                DiscoveryAddress: DefaultMeshConfig.DiscoveryAddress,
+                MixerAddress:     DefaultMeshConfig.MixerAddress,
+                ProxyPort:        DefaultMeshConfig.ProxyPort,
+                AdminPort:        DefaultMeshConfig.AdminPort,
+                BinaryPath:       DefaultMeshConfig.BinaryPath,
+                ConfigPath:       DefaultMeshConfig.ConfigPath,
+                AuthMode:         "istio-tls",
+                AuthConfigPath:   "/etc/envoyauth",
+        }
+        config := Generate(&ProxyContext{
+                Discovery:  ds,
+                Config:     r,
+                MeshConfig: meshConfigWithSslContext,
+                Addrs:      map[string]bool{instance: true},
+        })
+        if config == nil {
+                t.Fatal("Failed to generate config")
+        }
+
+        err := config.WriteFile(envoyConfig)
+        if err != nil {
+                t.Fatalf(err.Error())
+        }
+
+        compareJSON(envoyConfig, t)
 }
 
 func configObjectFromYAML(kind, file string) (proto.Message, error) {
@@ -362,4 +393,9 @@ func TestMockConfigFault(t *testing.T) {
 	// Fault rule uses source condition, hence the different golden artifacts
 	testConfig(r, mock.HostInstanceV0, envoyFaultConfig, t)
 	testConfig(r, mock.HostInstanceV1, envoyV1Config, t)
+}
+
+func TestMockConfigSslContext(t *testing.T) {
+	r := mock.MakeRegistry()
+	testConfigWithSslContext(r, mock.HostInstanceV0, envoySslContextConfig, t)
 }

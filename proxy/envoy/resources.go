@@ -34,6 +34,10 @@ type MeshConfig struct {
 	BinaryPath string
 	// Envoy config root path
 	ConfigPath string
+	// The auth mode to enforce for proxy-proxy traffic
+	AuthMode string
+	// The path for auth config files
+	AuthConfigPath string
 }
 
 var (
@@ -45,6 +49,8 @@ var (
 		AdminPort:        5000,
 		BinaryPath:       "/usr/local/bin/envoy",
 		ConfigPath:       "/etc/envoy",
+		AuthMode:         "",
+		AuthConfigPath:   "/etc/envoyauth",
 	}
 )
 
@@ -408,6 +414,7 @@ type Cluster struct {
 	LbType                   string            `json:"lb_type"`
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host            `json:"hosts,omitempty"`
+	SslContext               *SslContext       `json:"ssl_context,omitempty"`
 	Features                 string            `json:"features,omitempty"`
 	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
@@ -417,6 +424,15 @@ type Cluster struct {
 	port     *model.Port
 	tags     model.Tags
 	outbound bool
+}
+
+// SslCntext definition
+// This is used for both Listener::ssl_context and Cluster::ssl_context.
+type SslContext struct {
+	CertChainFile            string            `json:"cert_chain_file"`
+	PrivateKeyFile           string            `json:"private_key_file"`
+	CaCertFile               string            `json:"ca_cert_file"`
+	VerifySubjectAltName     []string          `json:"verify_subject_alt_name"`
 }
 
 // CircuitBreaker definition

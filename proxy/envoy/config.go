@@ -207,7 +207,7 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 func buildRoutes(context *ProxyContext) (HTTPRouteConfigs, TCPRouteConfigs) {
 	instances := context.Discovery.HostInstances(context.Addrs)
 	services := context.Discovery.Services()
-	httpOutbound, tcpOutbound := buildOutboundRoutes(instances, services, context.Config, context.MeshConfig)
+	httpOutbound, tcpOutbound := buildOutboundRoutes(instances, services, context)
 	httpInbound, tcpInbound := buildInboundRoutes(instances)
 
 	// merge the two sets of HTTP route configs
@@ -248,14 +248,14 @@ func buildRoutes(context *ProxyContext) (HTTPRouteConfigs, TCPRouteConfigs) {
 // buildOutboundRoutes creates route configs indexed by ports for the traffic outbound
 // from the proxy instance
 func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.Service,
-	config *model.IstioRegistry, mesh *MeshConfig) (HTTPRouteConfigs, TCPRouteConfigs) {
+	context *ProxyContext) (HTTPRouteConfigs, TCPRouteConfigs) {
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 	httpConfigs := make(HTTPRouteConfigs)
 	tcpConfigs := make(TCPRouteConfigs)
 
 	// get all the route rules applicable to the instances
-	rules := config.RouteRulesBySource("", instances)
+	rules := context.Config.RouteRulesBySource("", instances)
 
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
@@ -279,7 +279,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				// collect route rules
 				for _, rule := range rules {
 					if rule.Destination == service.Hostname {
-						httpRoute, catchAll = buildHTTPRoute(rule, port)
+						httpRoute, catchAll = buildHTTPRoute(rule, port, nil)
 						routes = append(routes, httpRoute)
 						if catchAll {
 							break
@@ -289,7 +289,8 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 				if !catchAll {
 					// default route for the destination
-					cluster := buildOutboundCluster(service.Hostname, port, nil)
+					sslContext := buildSslContext(service.Hostname, context)
+					cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
@@ -298,7 +299,8 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				cluster := buildOutboundCluster(service.Hostname, port, nil)
+				sslContext := buildSslContext(service.Hostname, context)
+			        cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
 				config.Routes = append(config.Routes, route)
@@ -309,6 +311,20 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 		}
 	}
 	return httpConfigs, tcpConfigs
+}
+
+func buildSslContext(hostname string, context *ProxyContext) *SslContext {
+	mesh := context.MeshConfig
+	serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
+	if mesh.AuthMode == "istio-tls" {
+		return &SslContext {
+			CertChainFile:          mesh.AuthConfigPath + "/cert_chain",
+			PrivateKeyFile:         mesh.AuthConfigPath + "/private_key",
+			CaCertFile:             mesh.AuthConfigPath + "/ca_cert",
+			VerifySubjectAltName:   serviceAccounts,
+		}
+	}
+	return nil
 }
 
 // buildInboundRoutes creates route configs indexed by ports for the traffic inbound

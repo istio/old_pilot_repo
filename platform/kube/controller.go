@@ -28,6 +28,7 @@ import (
 
 	"istio.io/manager/model"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -564,6 +565,34 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 				}
 			}
 		}
+	}
+	return out
+}
+
+// TODO error indicator
+func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
+	fmt.Println("SecureNamingMappings called in Controller.")
+	out := []string{}
+	name, namespace, err := parseHostname(hostname)
+	if err != nil {
+		glog.V(2).Infof("parseHostname(%s) => error %v", hostname, err)
+		return out
+	}
+	svc, exists := c.serviceByKey(name, namespace)
+	if !exists {
+		glog.Errorf("Failed to get service for hostname %s.", hostname)
+		return out
+	}
+	lo := v1.ListOptions{
+		LabelSelector: labels.Set(svc.Spec.Selector).String(),
+	}
+	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
+	if err != nil {
+		glog.Errorf("Failed to get pods for service %s.", hostname)
+		return out
+	}
+	for _, p := range pods.Items {
+		out = append(out, "istio:" + p.Spec.ServiceAccountName + "." + namespace)
 	}
 	return out
 }
