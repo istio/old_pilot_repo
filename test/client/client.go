@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/sync/errgroup"
 	"crypto/tls"
+
+	"github.com/golang/sync/errgroup"
 )
 
 var (

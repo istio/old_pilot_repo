@@ -266,8 +266,8 @@ func (r *reachability) verifyTCPRouting() error {
 	return nil
 }
 
-
-// makeIngressRequest creates a function to make ingress requests; done should return true to quickly exit the retry loop
+// makeIngressRequest creates a function to make ingress requests; done should return true to quickly exit the
+// retry loop
 func (r *reachability) makeIngressRequest(src, dst string, done func() bool) func() error {
 	return func() error {
 		url := fmt.Sprintf("https://ingress:443/%s", dst)
