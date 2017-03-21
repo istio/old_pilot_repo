@@ -38,8 +38,8 @@ import (
 )
 
 const (
-	defaultInitImage    = "gcr.io/istio-testing/init:latest"
-	defaultRuntimeImage = "gcr.io/istio-testing/runtime:latest"
+	defaultInitImage    = "docker.io/istio/init_debug:latest"
+	defaultRuntimeImage = "docker.io/istio/runtime_debug:latest"
 
 	istioSidecarAnnotationKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationValue = "injected"
@@ -133,7 +133,9 @@ func injectIntoPodTemplateSpec(t *v1.PodTemplateSpec) error {
 			"imagePullPolicy": "Always",
 			"securityContext": map[string]interface{}{
 				"capabilities": map[string]interface{}{
-					"add": []string{"NET_ADMIN"},
+					"add": []string{
+						"NET_ADMIN",
+					},
 				},
 			},
 		},
