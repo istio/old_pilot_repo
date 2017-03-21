@@ -220,7 +220,7 @@ const (
 	envoyV0Config         = "testdata/envoy-v0.json"
 	envoyV1Config         = "testdata/envoy-v1.json"
 	envoyFaultConfig      = "testdata/envoy-fault.json"
-	envoySslContextConfig = "testdata/envoy-ssl-context.json"
+	envoySSLContextConfig = "testdata/envoy-ssl-context.json"
 	cbPolicy              = "testdata/cb-policy.yaml.golden"
 	timeoutRouteRule      = "testdata/timeout-route-rule.yaml.golden"
 	weightedRouteRule     = "testdata/weighted-route.yaml.golden"
@@ -275,9 +275,9 @@ func testConfig(r *model.IstioRegistry, instance, envoyConfig string, t *testing
 	compareJSON(envoyConfig, t)
 }
 
-func testConfigWithSslContext(r *model.IstioRegistry, instance, envoyConfig string, t *testing.T) {
+func testConfigWithSSLContext(r *model.IstioRegistry, instance, envoyConfig string, t *testing.T) {
         ds := mock.Discovery
-        meshConfigWithSslContext := &MeshConfig{
+        meshConfigWithSSLContext := &MeshConfig{
                 DiscoveryAddress: DefaultMeshConfig.DiscoveryAddress,
                 MixerAddress:     DefaultMeshConfig.MixerAddress,
                 ProxyPort:        DefaultMeshConfig.ProxyPort,
@@ -290,7 +290,7 @@ func testConfigWithSslContext(r *model.IstioRegistry, instance, envoyConfig stri
         config := Generate(&ProxyContext{
                 Discovery:  ds,
                 Config:     r,
-                MeshConfig: meshConfigWithSslContext,
+                MeshConfig: meshConfigWithSSLContext,
                 Addrs:      map[string]bool{instance: true},
         })
         if config == nil {
@@ -395,7 +395,7 @@ func TestMockConfigFault(t *testing.T) {
 	testConfig(r, mock.HostInstanceV1, envoyV1Config, t)
 }
 
-func TestMockConfigSslContext(t *testing.T) {
+func TestMockConfigSSLContext(t *testing.T) {
 	r := mock.MakeRegistry()
-	testConfigWithSslContext(r, mock.HostInstanceV0, envoySslContextConfig, t)
+	testConfigWithSSLContext(r, mock.HostInstanceV0, envoySSLContextConfig, t)
 }

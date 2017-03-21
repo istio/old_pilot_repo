@@ -45,8 +45,8 @@ var (
 	DefaultMeshConfig = &MeshConfig{
 		DiscoveryAddress: "manager:8080",
 		MixerAddress:     "mixer:9091",
-		ProxyPort:        5001,
-		AdminPort:        5000,
+		ProxyPort:        15001,
+		AdminPort:        15000,
 		BinaryPath:       "/usr/local/bin/envoy",
 		ConfigPath:       "/etc/envoy",
 		EnableAuth:       false,
@@ -387,8 +387,17 @@ type NetworkFilter struct {
 type Listener struct {
 	Port           int              `json:"port"`
 	Filters        []*NetworkFilter `json:"filters"`
+	SSLContext     *SSLContext      `json:"ssl_context,omitempty"`
 	BindToPort     bool             `json:"bind_to_port"`
 	UseOriginalDst bool             `json:"use_original_dst,omitempty"`
+}
+
+// SSLContext definition
+type SSLContext struct {
+	CertChainFile            string            `json:"cert_chain_file"`
+	PrivateKeyFile           string            `json:"private_key_file"`
+	CaCertFile               string            `json:"ca_cert_file,omitempty"`
+	VerifySubjectAltName     []string          `json:"verify_subject_alt_name,omitempty"`
 }
 
 // HTTPRouteConfigs provides routes by virtual host and port
@@ -424,7 +433,7 @@ type Cluster struct {
 	LbType                   string            `json:"lb_type"`
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
 	Hosts                    []Host            `json:"hosts,omitempty"`
-	SslContext               *SslContext       `json:"ssl_context,omitempty"`
+	SSLContext               *SSLContext       `json:"ssl_context,omitempty"`
 	Features                 string            `json:"features,omitempty"`
 	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
@@ -434,15 +443,6 @@ type Cluster struct {
 	port     *model.Port
 	tags     model.Tags
 	outbound bool
-}
-
-// SslContext definition
-// This is used for both Listener::ssl_context and Cluster::ssl_context.
-type SslContext struct {
-	CertChainFile            string            `json:"cert_chain_file"`
-	PrivateKeyFile           string            `json:"private_key_file"`
-	CaCertFile               string            `json:"ca_cert_file"`
-	VerifySubjectAltName     []string          `json:"verify_subject_alt_name"`
 }
 
 // CircuitBreaker definition

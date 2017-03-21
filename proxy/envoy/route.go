@@ -61,7 +61,7 @@ func buildInboundCluster(hostname string, port int, protocol model.Protocol) *Cl
 	return cluster
 }
 
-func buildOutboundCluster(hostname string, port *model.Port, ssl *SslContext, tags model.Tags) *Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, ssl *SSLContext, tags model.Tags) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tags)
 	cluster := &Cluster{
@@ -70,7 +70,7 @@ func buildOutboundCluster(hostname string, port *model.Port, ssl *SslContext, ta
 		Type:             "sds",
 		LbType:           DefaultLbType,
 		ConnectTimeoutMs: DefaultTimeoutMs,
-		SslContext:       ssl,
+		SSLContext:       ssl,
 		hostname:         hostname,
 		port:             port,
 		tags:             tags,
@@ -83,7 +83,7 @@ func buildOutboundCluster(hostname string, port *model.Port, ssl *SslContext, ta
 }
 
 // buildHTTPRoute translates a route rule to an Envoy route
-func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port, ssl *SslContext) (*HTTPRoute, bool) {
+func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port, ssl *SSLContext) (*HTTPRoute, bool) {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",

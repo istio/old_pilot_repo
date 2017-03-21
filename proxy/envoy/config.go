@@ -300,7 +300,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 				if !catchAll {
 					// default route for the destination
-					sslContext := buildSslContext(service.Hostname, context)
+					sslContext := buildSSLContext(service.Hostname, context)
 					cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
@@ -310,7 +310,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				sslContext := buildSslContext(service.Hostname, context)
+				sslContext := buildSSLContext(service.Hostname, context)
 			        cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
@@ -324,11 +324,11 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	return httpConfigs, tcpConfigs
 }
 
-func buildSslContext(hostname string, context *ProxyContext) *SslContext {
+func buildSSLContext(hostname string, context *ProxyContext) *SSLContext {
 	mesh := context.MeshConfig
 	if mesh.EnableAuth {
 		serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
-		return &SslContext {
+		return &SSLContext {
 			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
 			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",
 			CaCertFile:             mesh.AuthConfigPath + "/root-cert.pem",
