@@ -284,7 +284,7 @@ func testConfigWithSslContext(r *model.IstioRegistry, instance, envoyConfig stri
                 AdminPort:        DefaultMeshConfig.AdminPort,
                 BinaryPath:       DefaultMeshConfig.BinaryPath,
                 ConfigPath:       DefaultMeshConfig.ConfigPath,
-                AuthMode:         "istio-tls",
+                EnableAuth:       true,
                 AuthConfigPath:   "/etc/envoyauth",
         }
         config := Generate(&ProxyContext{

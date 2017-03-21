@@ -586,7 +586,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
 	lo := v1.ListOptions{
 		LabelSelector: labels.Set(svc.Spec.Selector).String(),
 	}
-	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
+	pods, err := c.client.client.Pods(svc.Namespace).List(lo)
 	if err != nil {
 		glog.Errorf("Failed to get pods for service %s.", hostname)
 		return saArray

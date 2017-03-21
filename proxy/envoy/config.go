@@ -326,8 +326,8 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 func buildSslContext(hostname string, context *ProxyContext) *SslContext {
 	mesh := context.MeshConfig
-	serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
-	if mesh.AuthMode == "istio-tls" {
+	if mesh.EnableAuth {
+		serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
 		return &SslContext {
 			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
 			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",

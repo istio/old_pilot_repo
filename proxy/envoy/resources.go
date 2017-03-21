@@ -34,8 +34,8 @@ type MeshConfig struct {
 	BinaryPath string
 	// Envoy config root path
 	ConfigPath string
-	// The auth mode to enforce for proxy-proxy traffic
-	AuthMode string
+	// Whether Envoy enforces auth for proxy-proxy traffic
+	EnableAuth bool
 	// The path for auth config files
 	AuthConfigPath string
 }
@@ -49,7 +49,7 @@ var (
 		AdminPort:        5000,
 		BinaryPath:       "/usr/local/bin/envoy",
 		ConfigPath:       "/etc/envoy",
-		AuthMode:         "",
+		EnableAuth:       false,
 		AuthConfigPath:   "/etc/envoyauth",
 	}
 )
