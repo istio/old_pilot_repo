@@ -49,6 +49,9 @@ type Service struct {
 	// Ports is the set of network ports where the service is listening for
 	// connections
 	Ports PortList `json:"ports,omitempty"`
+
+	// Istio Service accounts this service can run on.
+	ServiceAccounts []string `json:"serviceaccounts,omitempty"`
 }
 
 // Port represents a network port where a service is listening for
@@ -181,8 +184,8 @@ type ServiceDiscovery interface {
 	// Gets all the Istio service accounts mapped from service hostname, in istio identity format.
 	// For example,
 	// GetIstioServiceAccounts(catalog.myservice.com) -->
-	//      --> [istio:accountfoo.mynamespace, istio:accountbar.mynamespace]
-	// GetIstioServiceAccounts(backend.myservice.com) --> [istio:backendaccount.mynamespace]
+	//      --> [istio:serviceaccount1, istio:serviceaccount2]
+	// GetIstioServiceAccounts(backend.myservice.com) --> [istio:serviceaccount3]
 	GetIstioServiceAccounts(hostname string) []string
 }
 

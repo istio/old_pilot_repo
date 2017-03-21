@@ -329,9 +329,9 @@ func buildSslContext(hostname string, context *ProxyContext) *SslContext {
 	serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
 	if mesh.AuthMode == "istio-tls" {
 		return &SslContext {
-			CertChainFile:          mesh.AuthConfigPath + "/cert_chain",
-			PrivateKeyFile:         mesh.AuthConfigPath + "/private_key",
-			CaCertFile:             mesh.AuthConfigPath + "/ca_cert",
+			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
+			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",
+			CaCertFile:             mesh.AuthConfigPath + "/root-cert.pem",
 			VerifySubjectAltName:   serviceAccounts,
 		}
 	}

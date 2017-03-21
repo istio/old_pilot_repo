@@ -244,12 +244,12 @@
         "type": "sds",
         "lb_type": "round_robin",
         "ssl_context": {
-          "cert_chain_file": "/etc/envoyauth/cert_chain",
-          "private_key_file": "/etc/envoyauth/private_key",
-          "ca_cert_file": "/etc/envoyauth/ca_cert",
+          "cert_chain_file": "/etc/envoyauth/cert-chain.pem",
+          "private_key_file": "/etc/envoyauth/key.pem",
+          "ca_cert_file": "/etc/envoyauth/root-cert.pem",
           "verify_subject_alt_name": [
-            "istio:accountA.namespace1.foo.com",
-            "istio:accountB.namespace1.foo.com"
+            "istio:serviceaccount1",
+            "istio:serviceaccount2"
           ]
         }
       },

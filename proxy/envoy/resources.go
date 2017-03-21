@@ -436,7 +436,7 @@ type Cluster struct {
 	outbound bool
 }
 
-// SslCntext definition
+// SslContext definition
 // This is used for both Listener::ssl_context and Cluster::ssl_context.
 type SslContext struct {
 	CertChainFile            string            `json:"cert_chain_file"`

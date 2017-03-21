@@ -571,17 +571,17 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 
 // TODO error indicator
 func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
-	fmt.Println("SecureNamingMappings called in Controller.")
-	out := []string{}
+	saArray := []string{}
+	saSet := make(map[string]bool)
 	name, namespace, err := parseHostname(hostname)
 	if err != nil {
 		glog.V(2).Infof("parseHostname(%s) => error %v", hostname, err)
-		return out
+		return saArray
 	}
 	svc, exists := c.serviceByKey(name, namespace)
 	if !exists {
 		glog.Errorf("Failed to get service for hostname %s.", hostname)
-		return out
+		return saArray
 	}
 	lo := v1.ListOptions{
 		LabelSelector: labels.Set(svc.Spec.Selector).String(),
@@ -589,12 +589,16 @@ func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
 	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
 	if err != nil {
 		glog.Errorf("Failed to get pods for service %s.", hostname)
-		return out
+		return saArray
 	}
 	for _, p := range pods.Items {
-		out = append(out, "istio:" + p.Spec.ServiceAccountName + "." + namespace)
+		sa := "istio:" + p.Spec.ServiceAccountName + "." + namespace
+		if _, exists := saSet[sa]; exists {
+			saSet[sa] = true
+			saArray = append(saArray, sa)
+		}
 	}
-	return out
+	return saArray
 }
 
 // AppendServiceHandler implements a service catalog operation
