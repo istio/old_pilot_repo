@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -61,6 +62,8 @@ type parameters struct {
 	debug      bool
 	parallel   bool
 	logs       bool
+
+	verbosity int
 }
 
 var (
@@ -111,6 +114,12 @@ func setup() {
 		glog.Fatal("No mixer image specified")
 	}
 	glog.Infof("params %#v", params)
+
+	if params.debug {
+		params.verbosity = 3
+	} else {
+		params.verbosity = 2
+	}
 
 	check(setupClient())
 
@@ -206,15 +215,12 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		p := &inject.Params{
 			InitImage:        fmt.Sprintf("%s/init:%s", params.hub, params.tag),
 			RuntimeImage:     fmt.Sprintf("%s/runtime:%s", params.hub, params.tag),
-			RuntimeVerbosity: 2,
+			RuntimeVerbosity: params.verbosity,
 			DiscoveryPort:    inject.DefaultManagerDiscoveryPort,
 			MixerPort:        inject.DefaultMixerPort,
 			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
 			SidecarProxyPort: inject.DefaultSidecarProxyPort,
 			Version:          "manager-integration-test",
-		}
-		if params.debug {
-			p.RuntimeVerbosity = 3
 		}
 		if err := inject.IntoResourceFile(p, w, writer); err != nil {
 			return err
@@ -306,11 +312,8 @@ func write(in string, data map[string]string, out io.Writer) error {
 	values["tag"] = params.tag
 	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
-	if params.debug {
-		values["verbosity"] = "3"
-	} else {
-		values["verbosity"] = "2"
-	}
+	values["verbosity"] = strconv.Itoa(params.verbosity)
+
 	for k, v := range data {
 		values[k] = v
 	}
