@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 #This script checks if every package satisfied package code coverage requirment.
 
-helpinfo = "Usage: pkg_cc_check [cc report file] [cc requirement file]"
+import sys
+
+HELPINFO = "Usage: pkg_cc_check [cc report file] [cc requirement file]"
 
 class PkgChecker:
 
@@ -57,9 +59,8 @@ class PkgChecker:
 
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) != 3:
-        sys.exit("Wrong number of parameters \n" + helpinfo)
+        sys.exit("Wrong number of parameters \n" + HELPINFO)
     pkgcheck = PkgChecker(sys.argv[1], sys.argv[2])
     sys.exit(pkgcheck.check())
 

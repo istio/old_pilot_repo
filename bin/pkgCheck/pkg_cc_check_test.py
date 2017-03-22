@@ -56,11 +56,4 @@ class PkgCheckTestCase(unittest.TestCase):
         self.assertEqual(self.pkgChecker.check(), 2)
 
 if __name__ == "__main__":
-    suite = unittest.TestSuite()
-    suite.addTest(PkgCheckTestCase("testParseReport"))
-    suite.addTest(PkgCheckTestCase("testcompRequire"))
-    suite.addTest(PkgCheckTestCase("testCheck"))
-
-    runner = unittest.TextTestRunner()
-    runner.run(suite)
-
+    unittest.main()
