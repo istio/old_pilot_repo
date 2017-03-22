@@ -25,7 +25,7 @@ import (
 
 // Agent manages the restarts and the life cycle of a proxy binary.  Agent
 // keeps track of all running proxy processes and their configurations.  Hot
-// restarts are performed by launching a new Envoy process with a strictly
+// restarts are performed by launching a new proxy process with a strictly
 // incremented restart epoch.  This matches Envoy semantics for restart epochs:
 // To successfully launch a new Envoy process that will replace the running
 // Envoy processes, the restart epoch of the new process must be exactly 1
@@ -45,10 +45,10 @@ type Agent interface {
 	Run(stop <-chan struct{})
 }
 
-// NewAgent creates a new proxy instance agent for a "run" function is a
-// blocking call to start the proxy, "cleanup" function is called after "run"
-// finishes.  Both functions take the epoch as an argument. Retry is budgeted
-// and uses an exponential back-off from the initial delay.
+// NewAgent creates a new proxy instance agent.  "run" function is a blocking
+// call to start the proxy. "cleanup" function is called after "run" finishes.
+// Both functions take the proxy  epoch as an argument. Retry is budgeted and
+// uses an exponential back-off from the initial delay.
 func NewAgent(run func(interface{}, int) error, cleanup func(int),
 	initialRetryBudget int, initialRetryDelay time.Duration) Agent {
 	return &agent{
