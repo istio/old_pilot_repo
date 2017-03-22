@@ -57,10 +57,10 @@ Usage:
 Flags:
       --discoveryPort int     Manager discovery port (default 8080)
   -f, --filename string       Unmodified input kubernetes resource filename
-      --initImage string      Istio init image (default "docker.io/istio/init_debug:latest")
+      --initImage string      Istio init image (default "docker.io/istio/init:latest")
       --mixerPort int         Mixer port (default 9091)
   -o, --output string         Modified output kubernetes resource filename
-      --runtimeImage string   Istio runtime image (default "docker.io/istio/runtime_debug:latest")
+      --runtimeImage string   Istio runtime image (default "docker.io/istio/runtime:latest")
       --sidecarProxyUID int   Sidecar proxy UID (default 1337)
       --verbosity int         Runtime verbosity (default 2)
 ```

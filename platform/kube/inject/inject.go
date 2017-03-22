@@ -37,8 +37,8 @@ import (
 // Reasonable defaults values for injecting istio proxy into
 // kubernetes resources.
 const (
-	DefaultInitImage            = "docker.io/istio/init_debug:latest"
-	DefaultRuntimeImage         = "docker.io/istio/runtime_debug:latest"
+	DefaultInitImage            = "docker.io/istio/init:latest"
+	DefaultRuntimeImage         = "docker.io/istio/runtime:latest"
 	DefaultManagerDiscoveryPort = 8080
 	DefaultMixerPort            = 9091
 	DefaultSidecarProxyUID      = int64(1337)
