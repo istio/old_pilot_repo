@@ -5,7 +5,7 @@
 Istio's goal is transparent proxy injection into end-user deployments
 with minimal effort from the end-user. Ideally, a kubernetes admission
 controller would rewrite specs to include the necessary init and proxy
-containers before they are committed, but his currently requires
+containers before they are committed, but this currently requires
 upstreaming changes to kubernetes which we would like to avoid for
 now. Instead, it would be better if a dynamic plug-in mechanism
 existed whereby admisson controllers could be maintained
