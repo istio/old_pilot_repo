@@ -19,36 +19,36 @@ by [Kubernetes Admission Controller for proxy injection](https://github.com/isti
 ## Manual injection
 
 A short term workaround for the lack of a proper istio admision
-controller is client-side injection. Use `istioutil inject` to add the
+controller is client-side injection. Use `istioctl kube-inject` to add the
 necessary configurations to a kubernetes resource files.
 
-    istioutil inject -f deployment.yaml -o deployment-with-istio.yaml
+    istioctl kube-inject -f deployment.yaml -o deployment-with-istio.yaml
 
 Or update the resource on the fly before applying.
 
-    istioutil inject -f depoyment.yaml | kubectl appy -f -
+    istioctl kube-inject -f depoyment.yaml | kubectl appy -f -
 
 Or update an existing deployment.
 
-    kubectl get deployment -o yaml | istioutil inject -f - | kubectl apply -f -
+    kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 
-`istioutil inject` will update
+`istioctl kube-inject` will update
 the [PodTemplateSpec](https://kubernetes.io/docs/api-reference/v1/definitions/#_v1_podtemplatespec) in
 kubernetes Job, DaemonSet, ReplicaSet, and Deployment YAML resource
 documents. Support for additional pod-based resource types can be
 added as necessary.
 
 Unsupported resources are left unmodified so, for example, it is safe
-to run `istioutil inject` over a single file that contains multiple
+to run `istioctl kube-inject` over a single file that contains multiple
 Service, ConfigMap, and Deployment definitions for a complex
 application.
 
 The Istio project is continually evolving so the low-level proxy
-configuration may change unannounced. When it doubt re-run `istioutil
-inject` on your original deployments.
+configuration may change unannounced. When it doubt re-run `istioctl kube-inject`
+on your original deployments.
 
 ```
-$ istioutil inject --help
+$ istioctl kube-inject --help
 Inject istio runtime into existing kubernete resources
 
 Usage:
