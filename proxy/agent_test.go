@@ -15,11 +15,12 @@
 package proxy
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 )
 
+// TestStartStop tests basic start, cleanup sequence
 func TestStartStop(t *testing.T) {
 	current := -1
 	stop := make(chan struct{})
@@ -48,10 +49,11 @@ func TestStartStop(t *testing.T) {
 	}
 	a := NewAgent(start, cleanup, 10, time.Millisecond)
 	go a.Run(stop)
-	a.Apply(desired)
+	a.ScheduleConfigUpdate(desired)
 	<-stop
 }
 
+// TestApplyTwice tests that scheduling the same config does not trigger a restart
 func TestApplyTwice(t *testing.T) {
 	stop := make(chan struct{})
 	desired := "config"
@@ -65,13 +67,12 @@ func TestApplyTwice(t *testing.T) {
 	cleanup := func(epoch int) {}
 	a := NewAgent(start, cleanup, 10, time.Millisecond)
 	go a.Run(stop)
-	a.Apply(desired)
-	a.Apply(desired)
+	a.ScheduleConfigUpdate(desired)
+	a.ScheduleConfigUpdate(desired)
 	close(stop)
 }
 
-// TestApplyThrice checks that the current config prevents restart even if the bad config was supplied
-// in between.
+// TestApplyThrice applies same config twice but if a bad config between them
 func TestApplyThrice(t *testing.T) {
 	stop := make(chan struct{})
 	good := "good"
@@ -80,7 +81,7 @@ func TestApplyThrice(t *testing.T) {
 	var a Agent
 	start := func(config interface{}, epoch int) error {
 		if config == bad {
-			return fmt.Errorf(bad)
+			return errors.New(bad)
 		}
 		if config == good && applied {
 			t.Errorf("Config has already been applied")
@@ -90,10 +91,10 @@ func TestApplyThrice(t *testing.T) {
 		return nil
 	}
 	cleanup := func(epoch int) {
-		// we should expect to see three epochs only: 0 for good, 1 for bad, 2 for good
+		// we should expect to see three epochs only: 0 for good, 1 for bad
 		if epoch == 1 {
 			go func() {
-				a.Apply(good)
+				a.ScheduleConfigUpdate(good)
 				close(stop)
 			}()
 		} else if epoch != 0 {
@@ -102,8 +103,8 @@ func TestApplyThrice(t *testing.T) {
 	}
 	a = NewAgent(start, cleanup, 0, time.Millisecond)
 	go a.Run(stop)
-	a.Apply(good)
-	a.Apply(bad)
+	a.ScheduleConfigUpdate(good)
+	a.ScheduleConfigUpdate(bad)
 	<-stop
 }
 
@@ -114,10 +115,10 @@ func TestStartFail(t *testing.T) {
 	start := func(config interface{}, epoch int) error {
 		if epoch == 0 && retry == 0 {
 			retry++
-			return fmt.Errorf("Injected error on first try")
+			return errors.New("Injected error on first try")
 		} else if epoch == 0 && retry == 1 {
 			retry++
-			return fmt.Errorf("Injected error on second try")
+			return errors.New("Injected error on second try")
 		} else if epoch == 0 && retry == 2 {
 			retry++
 			close(stop)
@@ -130,7 +131,7 @@ func TestStartFail(t *testing.T) {
 	cleanup := func(epoch int) {}
 	a := NewAgent(start, cleanup, 10, time.Millisecond)
 	go a.Run(stop)
-	a.Apply("test")
+	a.ScheduleConfigUpdate("test")
 	<-stop
 }
 
@@ -141,10 +142,10 @@ func TestExceedBudget(t *testing.T) {
 	start := func(config interface{}, epoch int) error {
 		if epoch == 0 && retry == 0 {
 			retry++
-			return fmt.Errorf("Injected error on first try")
+			return errors.New("Injected error on first try")
 		} else if epoch == 0 && retry == 1 {
 			retry++
-			return fmt.Errorf("Injected error on second try")
+			return errors.New("Injected error on second try")
 		} else {
 			t.Errorf("Unexpected epoch %d and retry %d", epoch, retry)
 			close(stop)
@@ -166,7 +167,7 @@ func TestExceedBudget(t *testing.T) {
 	}
 	a := NewAgent(start, cleanup, 1, time.Millisecond)
 	go a.Run(stop)
-	a.Apply("test")
+	a.ScheduleConfigUpdate("test")
 	<-stop
 }
 
@@ -219,8 +220,8 @@ func TestStartTwiceStop(t *testing.T) {
 	}
 	a := NewAgent(start, cleanup, 10, time.Millisecond)
 	go a.Run(stop)
-	a.Apply(desired0)
-	a.Apply(desired1)
-	a.Apply(desired2)
+	a.ScheduleConfigUpdate(desired0)
+	a.ScheduleConfigUpdate(desired1)
+	a.ScheduleConfigUpdate(desired2)
 	<-stop
 }

@@ -24,41 +24,59 @@ import (
 )
 
 // Agent manages the restarts and the life cycle of a proxy binary.  Agent
-// keeps track of all running proxy processes and their configurations.  Hot
+// keeps track of all running proxy epochs and their configurations.  Hot
 // restarts are performed by launching a new proxy process with a strictly
-// incremented restart epoch.  This matches Envoy semantics for restart epochs:
-// To successfully launch a new Envoy process that will replace the running
-// Envoy processes, the restart epoch of the new process must be exactly 1
-// greater than the highest restart epoch of the currently running Envoy
-// processes. The initial epoch is 0.
+// incremented restart epoch. It is up to the proxy to ensure that older epochs
+// gracefully shutdown and carry over all the necessary state to the latest
+// epoch.  The agent does not terminate older epochs. The initial epoch is 0.
 //
-// Envoy hot restart documentation:
-// https://lyft.github.io/envoy/docs/intro/arch_overview/hot_restart.html
+// The restart protocol matches Envoy semantics for restart epochs: to
+// successfully launch a new Envoy process that will replace the running Envoy
+// processes, the restart epoch of the new process must be exactly 1 greater
+// than the highest restart epoch of the currently running Envoy processes.
+// See https://lyft.github.io/envoy/docs/intro/arch_overview/hot_restart.html
+// for more information about the Envoy hot restart protocol.
+//
+// Agent requires two functions "run" and "cleanup". Run function is a call to
+// start the proxy and must block until the proxy exits. Cleanup function is
+// executed immediately after the proxy exits and must be non-blocking since it
+// is executed synchronously in the main agent control loop. Both functions
+// take the proxy epoch as an argument. A typical scenario would involve epoch
+// 0 followed by a failed epoch 1 start. The agent then attempts to start epoch
+// 1 again.
+//
+// Whenever the run function returns an error, the agent assumes that the proxy
+// failed to start and attempts to restart the proxy several times with an
+// exponential back-off. The subsequent restart attempts may reuse the epoch
+// from the failed attempt.
+//
+// Agent executes a single control loop that receives notifications about
+// scheduled configuration updates, exits from older proxy epochs, and retry
+// attempt timers. The call to schedule a configuration update will block until
+// the control loop is ready to accept and process the configuration update.
 type Agent interface {
-	// Apply sets the desired configuration for the proxy.  Agent compares the
-	// current active configuration to the desired state and initiates a restart
-	// if necessary. If the restart fails, the agent attempts to retry with an
-	// exponential back-off.
-	Apply(config interface{})
+	// ScheduleConfigUpdate sets the desired configuration for the proxy.  Agent
+	// compares the current active configuration to the desired state and
+	// initiates a restart if necessary. If the restart fails, the agent attempts
+	// to retry with an exponential back-off.
+	ScheduleConfigUpdate(config interface{})
 
-	// Run starts the agent and awaits for a signal on the input channel
+	// Run starts the agent control loop and awaits for a signal on the input
+	// channel to exit the loop.
 	Run(stop <-chan struct{})
 }
 
-// NewAgent creates a new proxy instance agent.  "run" function is a blocking
-// call to start the proxy. "cleanup" function is called after "run" finishes.
-// Both functions take the proxy  epoch as an argument. Retry is budgeted and
-// uses an exponential back-off from the initial delay.
+// NewAgent creates a new proxy agent for the proxy start-up and clean-up functions.
 func NewAgent(run func(interface{}, int) error, cleanup func(int),
-	initialRetryBudget int, initialRetryDelay time.Duration) Agent {
+	maxRetries int, retryInterval time.Duration) Agent {
 	return &agent{
-		run:                run,
-		cleanup:            cleanup,
-		epochs:             make(map[int]interface{}),
-		config:             make(chan interface{}),
-		status:             make(chan exitStatus),
-		initialRetryBudget: initialRetryBudget,
-		initialRetryDelay:  initialRetryDelay,
+		run:           run,
+		cleanup:       cleanup,
+		epochs:        make(map[int]interface{}),
+		config:        make(chan interface{}),
+		status:        make(chan exitStatus),
+		maxRetries:    maxRetries,
+		retryInterval: retryInterval,
 	}
 }
 
@@ -84,12 +102,15 @@ type agent struct {
 	// channel for proxy exit notifications
 	status chan exitStatus
 
-	// retry budget count
+	// number of times to attempts left to retry applying the latest desired configuration
 	retryBudget int
 
-	// total budget available
-	initialRetryBudget int
-	initialRetryDelay  time.Duration
+	// maximum number of retries
+	maxRetries int
+
+	// delay between the first restart, from then on it is multiplied by a factor of 2
+	// for each subsequent retry
+	retryInterval time.Duration
 }
 
 type exitStatus struct {
@@ -97,15 +118,15 @@ type exitStatus struct {
 	err   error
 }
 
-func (a *agent) Apply(config interface{}) {
+func (a *agent) ScheduleConfigUpdate(config interface{}) {
 	a.config <- config
 }
 
-// Run executes the reloads until stop channel closes
 func (a *agent) Run(stop <-chan struct{}) {
 	glog.V(2).Info("Starting proxy agent")
 
-	// Throttle processing up to smoothed 1 qps with bursts up to 10 qps
+	// Throttle processing up to smoothed 1 qps with bursts up to 10 qps.
+	// High QPS is needed to process messages on all channels.
 	rateLimiter := flowcontrol.NewTokenBucketRateLimiter(float32(1), 10)
 
 	// Set default delay to a long duration - reconciliation is a no-op in the regular case.
@@ -120,7 +141,7 @@ func (a *agent) Run(stop <-chan struct{}) {
 		case config := <-a.config:
 			// reset retry budget if and only if the desired config changes
 			if !reflect.DeepEqual(a.desired, config) {
-				a.retryBudget = a.initialRetryBudget
+				a.retryBudget = a.maxRetries
 				delay = defaultDelay
 				a.desired = config
 				a.reconcile()
@@ -143,11 +164,12 @@ func (a *agent) Run(stop <-chan struct{}) {
 			// schedule a retry for a transient error
 			if status.err != nil && !reflect.DeepEqual(a.desired, a.current) {
 				if a.retryBudget > 0 {
-					delay = a.initialRetryDelay * (2 << uint(a.initialRetryBudget-a.retryBudget))
+					delay = a.retryInterval * (2 << uint(a.maxRetries-a.retryBudget))
 					a.retryBudget = a.retryBudget - 1
 					glog.V(2).Infof("Schedule retry after %v (budget %d)", delay, a.retryBudget)
 				} else {
 					glog.Warningf("Permanent error: budget exhausted trying to fulfill the desired configuration")
+					// TODO: update proxy agent monitoring status about this error
 					delay = defaultDelay
 				}
 			}
@@ -157,8 +179,8 @@ func (a *agent) Run(stop <-chan struct{}) {
 			a.reconcile()
 
 		case _, more := <-stop:
-			// TODO: Proxy instances continue running, should be SIGed
 			if !more {
+				// TODO: Proxy instances continue running, should be SIGed
 				glog.V(2).Info("Agent terminating")
 				return
 			}

@@ -122,7 +122,7 @@ func (w *watcher) reload() {
 	// even though the function is called on every modification event,
 	// the actual config is generated from the latest cache view
 	config := Generate(w.context)
-	w.agent.Apply(config)
+	w.agent.ScheduleConfigUpdate(config)
 }
 
 const (

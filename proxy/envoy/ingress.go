@@ -77,7 +77,7 @@ func (w *ingressWatcher) reload() {
 		glog.Warningf("Failed to generate Envoy configuration: %v", err)
 		return
 	}
-	w.agent.Apply(config)
+	w.agent.ScheduleConfigUpdate(config)
 }
 
 func (w *ingressWatcher) Run(stop <-chan struct{}) {
