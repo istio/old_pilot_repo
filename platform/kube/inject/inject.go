@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package inject
 
 // NOTE: This tool only exists because kubernetes does not support
 // dynamic/out-of-tree admission controller for transparent proxy
@@ -22,10 +22,8 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	"k8s.io/client-go/pkg/api/v1"
@@ -33,91 +31,45 @@ import (
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 	"github.com/ghodss/yaml"
-	"github.com/spf13/cobra"
 	yamlDecoder "k8s.io/client-go/pkg/util/yaml"
 )
 
 const (
-	defaultInitImage    = "docker.io/istio/init_debug:latest"
-	defaultRuntimeImage = "docker.io/istio/runtime_debug:latest"
-
-	istioSidecarAnnotationKey   = "alpha.istio.io/sidecar"
-	istioSidecarAnnotationValue = "injected"
-
-	initContainerName           = "istio-init"
-	runtimeContainerName        = "istio-proxy"
-	defaultManagerDiscoveryPort = 8080
-	defaultMixerPort            = 9091
-	defaultSidecarProxyUID      = int64(1337)
-	defaultRuntimeVerbosity     = 2
+	DefaultInitImage            = "docker.io/istio/init_debug:latest"
+	DefaultRuntimeImage         = "docker.io/istio/runtime_debug:latest"
+	DefaultManagerDiscoveryPort = 8080
+	DefaultMixerPort            = 9091
+	DefaultSidecarProxyUID      = int64(1337)
+	DefaultRuntimeVerbosity     = 2
 )
 
-var (
-	initImage        string
-	runtimeImage     string
-	inFilename       string
-	outFilename      string
-	runtimeVerbosity int
-	discoveryPort    int
-	mixerPort        int
-	sidecarProxyUID  int64
-
-	injectCmd = &cobra.Command{
-		Use:   "inject",
-		Short: "Inject istio runtime into existing kubernete resources",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if inFilename == "" {
-				return errors.New("filename not specified (see --filename or -f)")
-			}
-			var reader io.Reader
-			if inFilename == "-" {
-				reader = os.Stdin
-			} else {
-				var err error
-				reader, err = os.Open(inFilename)
-				if err != nil {
-					return err
-				}
-			}
-
-			var writer io.Writer
-			if outFilename == "" {
-				writer = os.Stdout
-			} else {
-				file, err := os.Create(outFilename)
-				if err != nil {
-					return err
-				}
-				writer = file
-				defer file.Close()
-			}
-
-			return injectInfoFile(reader, writer)
-		},
-	}
+const (
+	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
+	istioSidecarAnnotationSidecarValue = "injected"
+	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
+	initContainerName                  = "istio-init"
+	runtimeContainerName               = "istio-proxy"
 )
 
-func init() {
-	injectCmd.PersistentFlags().StringVar(&initImage, "initImage", defaultInitImage, "Istio init image")
-	injectCmd.PersistentFlags().StringVar(&runtimeImage, "runtimeImage", defaultRuntimeImage, "Istio runtime image")
-	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f", "", "Input kubernetes resource filename")
-	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o", "", "Modified output kubernetes resource filename")
-	injectCmd.PersistentFlags().IntVar(&discoveryPort, "discoveryPort", defaultManagerDiscoveryPort, "Manager discovery port")
-	injectCmd.PersistentFlags().IntVar(&mixerPort, "mixerPort", defaultMixerPort, "Mixer port")
-	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity", defaultRuntimeVerbosity, "Runtime verbosity")
-	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID", defaultSidecarProxyUID, "Sidecar proxy UID")
-
-	rootCmd.AddCommand(injectCmd)
+type Params struct {
+	InitImage        string
+	RuntimeImage     string
+	RuntimeVerbosity int
+	DiscoveryPort    int
+	MixerPort        int
+	SidecarProxyUID  int64
+	Version          string
 }
 
-func injectIntoPodTemplateSpec(t *v1.PodTemplateSpec) error {
+func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	if t.Annotations == nil {
 		t.Annotations = make(map[string]string)
-	} else if _, ok := t.Annotations[istioSidecarAnnotationKey]; ok {
-		// Return unmodified resource if sidecar is already present.
+	} else if _, ok := t.Annotations[istioSidecarAnnotationSidecarKey]; ok {
+		// Return unmodified resource if sidecar is already present or ignored.
 		return nil
 	}
-	t.Annotations[istioSidecarAnnotationKey] = istioSidecarAnnotationValue
+	t.Annotations[istioSidecarAnnotationSidecarKey] = istioSidecarAnnotationSidecarValue
+	t.Annotations[istioSidecarAnnotationVersionKey] = p.Version
 
 	// init-container
 	var annotations []interface{}
@@ -129,7 +81,7 @@ func injectIntoPodTemplateSpec(t *v1.PodTemplateSpec) error {
 	annotations = append(annotations,
 		map[string]interface{}{
 			"name":            initContainerName,
-			"image":           initImage,
+			"image":           p.InitImage,
 			"imagePullPolicy": "Always",
 			"securityContext": map[string]interface{}{
 				"capabilities": map[string]interface{}{
@@ -150,14 +102,14 @@ func injectIntoPodTemplateSpec(t *v1.PodTemplateSpec) error {
 	t.Spec.Containers = append(t.Spec.Containers,
 		v1.Container{
 			Name:  runtimeContainerName,
-			Image: runtimeImage,
+			Image: p.RuntimeImage,
 			Args: []string{
 				"proxy",
 				"sidecar",
-				"-s", "manager:" + strconv.Itoa(discoveryPort),
-				"-m", "mixer:" + strconv.Itoa(mixerPort),
+				"-s", "manager:" + strconv.Itoa(p.DiscoveryPort),
+				"-m", "mixer:" + strconv.Itoa(p.MixerPort),
 				"-n", "$(POD_NAMESPACE)",
-				"-v", strconv.Itoa(runtimeVerbosity),
+				"-v", strconv.Itoa(p.RuntimeVerbosity),
 			},
 			Env: []v1.EnvVar{{
 				Name: "POD_NAME",
@@ -183,14 +135,15 @@ func injectIntoPodTemplateSpec(t *v1.PodTemplateSpec) error {
 			}},
 			ImagePullPolicy: v1.PullAlways,
 			SecurityContext: &v1.SecurityContext{
-				RunAsUser: &sidecarProxyUID,
+				RunAsUser: &p.SidecarProxyUID,
 			},
 		},
 	)
 	return nil
 }
 
-func injectInfoFile(in io.Reader, out io.Writer) error {
+// IntoResourceFile injects the istio runtime into the specified kubernetes YAML file.
+func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 	reader := yamlDecoder.NewYAMLReader(bufio.NewReaderSize(in, 4096))
 	for {
 		raw, err := reader.Read()
@@ -207,25 +160,25 @@ func injectInfoFile(in io.Reader, out io.Writer) error {
 			"Job": {
 				typ: &v1beta1.Job{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(&((typ.(*v1beta1.Job)).Spec.Template))
+					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.Job)).Spec.Template))
 				},
 			},
 			"DaemonSet": {
 				typ: &v1beta1.DaemonSet{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(&((typ.(*v1beta1.DaemonSet)).Spec.Template))
+					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.DaemonSet)).Spec.Template))
 				},
 			},
 			"ReplicaSet": {
 				typ: &v1beta1.ReplicaSet{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(&((typ.(*v1beta1.ReplicaSet)).Spec.Template))
+					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.ReplicaSet)).Spec.Template))
 				},
 			},
 			"Deployment": {
 				typ: &v1beta1.Deployment{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(&((typ.(*v1beta1.Deployment)).Spec.Template))
+					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.Deployment)).Spec.Template))
 				},
 			},
 		}
