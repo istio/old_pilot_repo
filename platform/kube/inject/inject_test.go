@@ -31,6 +31,7 @@ func TestIntoResourceFile(t *testing.T) {
 		DiscoveryPort:    DefaultManagerDiscoveryPort,
 		MixerPort:        DefaultMixerPort,
 		SidecarProxyUID:  DefaultSidecarProxyUID,
+		SidecarProxyPort: DefaultSidecarProxyPort,
 		Version:          "12345678",
 	}
 

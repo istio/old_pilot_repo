@@ -33,6 +33,7 @@ var (
 	discoveryPort    int
 	mixerPort        int
 	sidecarProxyUID  int64
+	sidecarProxyPort int
 	runtimeVerbosity int
 	versionStr       string // override build version
 
@@ -84,6 +85,7 @@ var (
 				DiscoveryPort:    discoveryPort,
 				MixerPort:        mixerPort,
 				SidecarProxyUID:  sidecarProxyUID,
+				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
@@ -108,6 +110,8 @@ func init() {
 		inject.DefaultRuntimeVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
 		inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
+	injectCmd.PersistentFlags().IntVar(&sidecarProxyPort, "sidecarProxyPort",
+		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
 	cmd.RootCmd.AddCommand(injectCmd)

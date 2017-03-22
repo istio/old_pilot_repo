@@ -34,14 +34,15 @@ import (
 	yamlDecoder "k8s.io/client-go/pkg/util/yaml"
 )
 
-// Reasonable defaults values for injecting istio proxy into
-// kubernetes resources.
+// Defaults values for injecting istio proxy into kubernetes
+// resources.
 const (
 	DefaultInitImage            = "docker.io/istio/init:latest"
 	DefaultRuntimeImage         = "docker.io/istio/runtime:latest"
 	DefaultManagerDiscoveryPort = 8080
 	DefaultMixerPort            = 9091
 	DefaultSidecarProxyUID      = int64(1337)
+	DefaultSidecarProxyPort     = 15001
 	DefaultRuntimeVerbosity     = 2
 )
 
@@ -62,6 +63,7 @@ type Params struct {
 	DiscoveryPort    int
 	MixerPort        int
 	SidecarProxyUID  int64
+	SidecarProxyPort int
 	Version          string
 }
 
@@ -84,8 +86,12 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	}
 	annotations = append(annotations,
 		map[string]interface{}{
-			"name":            initContainerName,
-			"image":           p.InitImage,
+			"name":  initContainerName,
+			"image": p.InitImage,
+			"args": []string{
+				"-p", strconv.Itoa(p.SidecarProxyPort),
+				"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
+			},
 			"imagePullPolicy": "Always",
 			"securityContext": map[string]interface{}{
 				"capabilities": map[string]interface{}{

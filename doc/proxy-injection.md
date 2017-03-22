@@ -26,7 +26,7 @@ necessary configurations to a kubernetes resource files.
 
 Or update the resource on the fly before applying.
 
-    istioctl kube-inject -f depoyment.yaml | kubectl appy -f -
+    istioctl kube-inject -f depoyment.yaml | kubectl apply -f -
 
 Or update an existing deployment.
 
@@ -44,7 +44,7 @@ Service, ConfigMap, and Deployment definitions for a complex
 application.
 
 The Istio project is continually evolving so the low-level proxy
-configuration may change unannounced. When it doubt re-run `istioctl kube-inject`
+configuration may change unannounced. When in doubt re-run `istioctl kube-inject`
 on your original deployments.
 
 ```
