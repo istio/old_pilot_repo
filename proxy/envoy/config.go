@@ -271,6 +271,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
+		sslContext := buildSSLContext(service.Hostname, context)
 		for _, port := range service.Ports {
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
@@ -290,7 +291,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				// collect route rules
 				for _, rule := range rules {
 					if rule.Destination == service.Hostname {
-						httpRoute, catchAll = buildHTTPRoute(rule, port, nil)
+						httpRoute, catchAll = buildHTTPRoute(rule, port, sslContext)
 						routes = append(routes, httpRoute)
 						if catchAll {
 							break
@@ -300,7 +301,6 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 				if !catchAll {
 					// default route for the destination
-					sslContext := buildSSLContext(service.Hostname, context)
 					cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
@@ -310,7 +310,6 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				sslContext := buildSSLContext(service.Hostname, context)
 			        cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)

@@ -593,7 +593,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
 	}
 	for _, p := range pods.Items {
 		sa := "istio:" + p.Spec.ServiceAccountName + "." + namespace
-		if _, exists := saSet[sa]; exists {
+		if _, exists := saSet[sa]; !exists {
 			saSet[sa] = true
 			saArray = append(saArray, sa)
 		}
