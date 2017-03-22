@@ -33,6 +33,7 @@ import (
 
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
+	"istio.io/manager/platform/kube/inject"
 )
 
 const (
@@ -136,18 +137,18 @@ func setup() {
 	check(err)
 
 	// deploy istio-infra
-	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("mixer", "mixer", mixer, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("istio-ingress", "istio-ingress", ingressProxy, "8080", "80", "9090", "90", "unversioned"))
+	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("mixer", "mixer", mixer, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("istio-ingress", "istio-ingress", ingressProxy, "8080", "80", "9090", "90", "unversioned", false))
 
 	// deploy a healthy mix of apps, with and without proxy
-	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("a", "a", appProxyManagerAgent, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("b", "b", appProxyManagerAgent, "80", "8080", "90", "9090", "unversioned"))
-	check(deploy("hello", "hello", appProxyManagerAgent, "8080", "80", "9090", "90", "v1"))
-	check(deploy("world-v1", "world", appProxyManagerAgent, "80", "8000", "90", "9090", "v1"))
-	check(deploy("world-v2", "world", appProxyManagerAgent, "80", "8000", "90", "9090", "v2"))
+	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("a", "a", app, "8080", "80", "9090", "90", "unversioned", true))
+	check(deploy("b", "b", app, "80", "8080", "90", "9090", "unversioned", true))
+	check(deploy("hello", "hello", app, "8080", "80", "9090", "90", "v1", true))
+	check(deploy("world-v1", "world", app, "80", "8000", "90", "9090", "v1", true))
+	check(deploy("world-v2", "world", app, "80", "8000", "90", "9090", "v2", true))
 	check(setPods())
 }
 
@@ -173,10 +174,10 @@ func teardown() {
 	}
 }
 
-func deploy(name, svcName, dType, port1, port2, port3, port4, version string) error {
+func deploy(name, svcName, dType, port1, port2, port3, port4, version string, injectProxy bool) error {
 	// write template
 	configFile := name + "-" + dType + ".yaml"
-	var w *bufio.Writer
+
 	f, err := os.Create(configFile)
 	if err != nil {
 		return err
@@ -187,8 +188,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string) er
 		}
 	}()
 
-	w = bufio.NewWriter(f)
-
+	w := &bytes.Buffer{}
 	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
 		"service": svcName,
 		"name":    name,
@@ -201,7 +201,30 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string) er
 		return err
 	}
 
-	if err := w.Flush(); err != nil {
+	writer := bufio.NewWriter(f)
+	if injectProxy {
+		p := &inject.Params{
+			InitImage:        fmt.Sprintf("%s/init:%s", params.hub, params.tag),
+			RuntimeImage:     fmt.Sprintf("%s/runtime:%s", params.hub, params.tag),
+			RuntimeVerbosity: 2,
+			DiscoveryPort:    inject.DefaultManagerDiscoveryPort,
+			MixerPort:        inject.DefaultMixerPort,
+			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
+			SidecarProxyPort: inject.DefaultSidecarProxyPort,
+			Version:          "manager-integration-test",
+		}
+		if params.debug {
+			p.RuntimeVerbosity = 3
+		}
+		if err := inject.IntoResourceFile(p, w, writer); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.Copy(writer, w); err != nil {
+			return err
+		}
+	}
+	if err := writer.Flush(); err != nil {
 		return err
 	}
 
