@@ -62,6 +62,10 @@ func TestIntoResourceFile(t *testing.T) {
 			in:   "testdata/hello-ignore.yaml",
 			want: "testdata/hello-ignore.yaml.injected",
 		},
+		{
+			in:   "testdata/multi-init.yaml",
+			want: "testdata/multi-init.yaml.injected",
+		},
 	}
 
 	for _, c := range cases {
@@ -69,9 +73,9 @@ func TestIntoResourceFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to open %q: %v", c.in, err)
 		}
-		defer in.Close()
+		defer func() { _ = in.Close() }()
 		var got bytes.Buffer
-		if err := IntoResourceFile(&params, in, &got); err != nil {
+		if err = IntoResourceFile(&params, in, &got); err != nil {
 			t.Fatalf("IntoResourceFile(%v) returned an error: %v", c.in, err)
 		}
 		want, err := ioutil.ReadFile(c.want)

@@ -92,14 +92,23 @@ var (
 )
 
 func init() {
-	injectCmd.PersistentFlags().StringVar(&initImage, "initImage", inject.DefaultInitImage, "Istio init image")
-	injectCmd.PersistentFlags().StringVar(&runtimeImage, "runtimeImage", inject.DefaultRuntimeImage, "Istio runtime image")
-	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f", "", "Input kubernetes resource filename")
-	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o", "", "Modified output kubernetes resource filename")
-	injectCmd.PersistentFlags().IntVar(&discoveryPort, "discoveryPort", inject.DefaultManagerDiscoveryPort, "Manager discovery port")
-	injectCmd.PersistentFlags().IntVar(&mixerPort, "mixerPort", inject.DefaultMixerPort, "Mixer port")
-	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity", inject.DefaultRuntimeVerbosity, "Runtime verbosity")
-	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID", inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
-	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString", "", "Override version info injected into resource")
+	injectCmd.PersistentFlags().StringVar(&initImage, "initImage",
+		inject.DefaultInitImage, "Istio init image")
+	injectCmd.PersistentFlags().StringVar(&runtimeImage, "runtimeImage",
+		inject.DefaultRuntimeImage, "Istio runtime image")
+	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
+		"", "Input kubernetes resource filename")
+	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
+		"", "Modified output kubernetes resource filename")
+	injectCmd.PersistentFlags().IntVar(&discoveryPort, "discoveryPort",
+		inject.DefaultManagerDiscoveryPort, "Manager discovery port")
+	injectCmd.PersistentFlags().IntVar(&mixerPort, "mixerPort",
+		inject.DefaultMixerPort, "Mixer port")
+	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity",
+		inject.DefaultRuntimeVerbosity, "Runtime verbosity")
+	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
+		inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
+	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
+		"", "Override version info injected into resource")
 	cmd.RootCmd.AddCommand(injectCmd)
 }

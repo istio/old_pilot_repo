@@ -34,6 +34,8 @@ import (
 	yamlDecoder "k8s.io/client-go/pkg/util/yaml"
 )
 
+// Reasonable defaults values for injecting istio proxy into
+// kubernetes resources.
 const (
 	DefaultInitImage            = "docker.io/istio/init_debug:latest"
 	DefaultRuntimeImage         = "docker.io/istio/runtime_debug:latest"
@@ -51,6 +53,8 @@ const (
 	runtimeContainerName               = "proxy"
 )
 
+// Params describes configurable parameters for injecting istio proxy
+// into kubernetes resource.
 type Params struct {
 	InitImage        string
 	RuntimeImage     string
@@ -142,7 +146,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	return nil
 }
 
-// IntoResourceFile injects the istio runtime into the specified kubernetes YAML file.
+// IntoResourceFile injects the istio runtime into the specified
+// kubernetes YAML file.
 func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 	reader := yamlDecoder.NewYAMLReader(bufio.NewReaderSize(in, 4096))
 	for {
@@ -184,17 +189,16 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 		}
 		var updated []byte
 		var meta metav1.TypeMeta
-		if err := yaml.Unmarshal(raw, &meta); err != nil {
+		if err = yaml.Unmarshal(raw, &meta); err != nil {
 			return err
 		}
 		if kind, ok := kinds[meta.Kind]; ok {
-			if err := yaml.Unmarshal(raw, kind.typ); err != nil {
+			if err = yaml.Unmarshal(raw, kind.typ); err != nil {
 				return err
 			}
-			if err := kind.inject(kind.typ); err != nil {
+			if err = kind.inject(kind.typ); err != nil {
 				return err
 			}
-			var err error
 			if updated, err = yaml.Marshal(kind.typ); err != nil {
 				return err
 			}
@@ -205,7 +209,9 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 		if _, err = out.Write(updated); err != nil {
 			return err
 		}
-		fmt.Fprint(out, "---\n")
+		if _, err = fmt.Fprint(out, "---\n"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
