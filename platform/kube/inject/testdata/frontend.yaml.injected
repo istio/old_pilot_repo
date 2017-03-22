@@ -25,7 +25,7 @@ spec:
       annotations:
         alpha.istio.io/sidecar: injected
         alpha.istio.io/version: "12345678"
-        pod.beta.kubernetes.io/init-containers: '[{"image":"docker.io/istio/init_debug:latest","imagePullPolicy":"Always","name":"istio-init","securityContext":{"capabilities":{"add":["NET_ADMIN"]}}}]'
+        pod.beta.kubernetes.io/init-containers: '[{"image":"docker.io/istio/init_debug:latest","imagePullPolicy":"Always","name":"init","securityContext":{"capabilities":{"add":["NET_ADMIN"]}}}]'
       creationTimestamp: null
       labels:
         app: hello
@@ -69,7 +69,7 @@ spec:
               fieldPath: status.podIP
         image: docker.io/istio/runtime_debug:latest
         imagePullPolicy: Always
-        name: istio-proxy
+        name: proxy
         resources: {}
         securityContext:
           runAsUser: 1337

@@ -47,8 +47,8 @@ const (
 	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationSidecarValue = "injected"
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
-	initContainerName                  = "istio-init"
-	runtimeContainerName               = "istio-proxy"
+	initContainerName                  = "init"
+	runtimeContainerName               = "proxy"
 )
 
 type Params struct {
