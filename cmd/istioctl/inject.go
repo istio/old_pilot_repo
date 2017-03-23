@@ -30,8 +30,8 @@ import (
 var (
 	initImage        string
 	runtimeImage     string
-	discoveryPort    int
-	mixerPort        int
+	discoveryAddr    string
+	mixerAddr        string
 	sidecarProxyUID  int64
 	sidecarProxyPort int
 	runtimeVerbosity int
@@ -82,8 +82,8 @@ var (
 				InitImage:        initImage,
 				RuntimeImage:     runtimeImage,
 				RuntimeVerbosity: runtimeVerbosity,
-				DiscoveryPort:    discoveryPort,
-				MixerPort:        mixerPort,
+				DiscoveryAddr:    discoveryAddr,
+				MixerAddr:        mixerAddr,
 				SidecarProxyUID:  sidecarProxyUID,
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
@@ -102,10 +102,10 @@ func init() {
 		"", "Input kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
 		"", "Modified output kubernetes resource filename")
-	injectCmd.PersistentFlags().IntVar(&discoveryPort, "discoveryPort",
-		inject.DefaultManagerDiscoveryPort, "Manager discovery port")
-	injectCmd.PersistentFlags().IntVar(&mixerPort, "mixerPort",
-		inject.DefaultMixerPort, "Mixer port")
+	injectCmd.PersistentFlags().StringVar(&discoveryAddr, "discoveryAddr",
+		inject.DefaultDiscoveryAddr, "Discovery service DNS address")
+	injectCmd.PersistentFlags().StringVar(&mixerAddr, "mixerAddr",
+		inject.DefaultMixerAddr, "Mixer DNS address")
 	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity",
 		inject.DefaultRuntimeVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
