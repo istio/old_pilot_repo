@@ -28,7 +28,7 @@ func TestIntoResourceFile(t *testing.T) {
 		InitImage:        DefaultInitImage,
 		RuntimeImage:     DefaultRuntimeImage,
 		RuntimeVerbosity: DefaultRuntimeVerbosity,
-		DiscoveryAddr:    DefaultDiscoveryAddr,
+		ManagerAddr:      DefaultManagerAddr,
 		MixerAddr:        DefaultMixerAddr,
 		SidecarProxyUID:  DefaultSidecarProxyUID,
 		SidecarProxyPort: DefaultSidecarProxyPort,

@@ -39,7 +39,7 @@ import (
 const (
 	DefaultInitImage        = "docker.io/istio/init:latest"
 	DefaultRuntimeImage     = "docker.io/istio/runtime:latest"
-	DefaultDiscoveryAddr    = "istio-manager:8080"
+	DefaultManagerAddr      = "istio-manager:8080"
 	DefaultMixerAddr        = "istio-mixer:9091"
 	DefaultSidecarProxyUID  = int64(1337)
 	DefaultSidecarProxyPort = 15001
@@ -60,7 +60,7 @@ type Params struct {
 	InitImage        string
 	RuntimeImage     string
 	RuntimeVerbosity int
-	DiscoveryAddr    string
+	ManagerAddr      string
 	MixerAddr        string
 	SidecarProxyUID  int64
 	SidecarProxyPort int
@@ -116,7 +116,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			Args: []string{
 				"proxy",
 				"sidecar",
-				"-s", p.DiscoveryAddr,
+				"-s", p.ManagerAddr,
 				"-m", p.MixerAddr,
 				"-n", "$(POD_NAMESPACE)",
 				"-v", strconv.Itoa(p.RuntimeVerbosity),
