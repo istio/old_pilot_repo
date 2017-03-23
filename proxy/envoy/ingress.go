@@ -31,8 +31,6 @@ import (
 	"io/ioutil"
 
 	"github.com/hashicorp/errwrap"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 type ingressWatcher struct {
@@ -40,7 +38,7 @@ type ingressWatcher struct {
 	ctl       model.Controller
 	discovery model.ServiceDiscovery
 	registry  *model.IstioRegistry
-	client    *kubernetes.Clientset
+	secrets   model.SecretRegistry
 	secret    string
 	namespace string
 	mesh      *MeshConfig
@@ -48,8 +46,8 @@ type ingressWatcher struct {
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
 func NewIngressWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
-	registry *model.IstioRegistry, client *kubernetes.Clientset, mesh *MeshConfig,
-	identity *ProxyNode, secret, namespace string,
+	registry *model.IstioRegistry, secrets model.SecretRegistry, mesh *MeshConfig,
+	secret, namespace string,
 ) (Watcher, error) {
 
 	out := &ingressWatcher{
@@ -57,7 +55,7 @@ func NewIngressWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 		ctl:       ctl,
 		discovery: discovery,
 		registry:  registry,
-		client:    client,
+		secrets:   secrets,
 		secret:    secret,
 		namespace: namespace,
 		mesh:      mesh,
@@ -165,7 +163,7 @@ func (w *ingressWatcher) generateConfig() (*Config, error) {
 
 	// configure for HTTPS if provided with a secret name
 	if w.secret != "" {
-		sslContext, err := w.buildSSLContext(w.secret)
+		sslContext, err := w.buildSSLContext()
 		if err != nil {
 			return nil, err
 		}
@@ -198,21 +196,28 @@ const (
 	privateKeyFile = "/etc/envoy/tls.key"
 )
 
-func (w *ingressWatcher) buildSSLContext(secret string) (*SSLContext, error) {
+func (w *ingressWatcher) buildSSLContext() (*SSLContext, error) {
+	var uri string
+	if w.namespace == "" {
+		uri = w.secret
+	} else {
+		uri = fmt.Sprintf("%s.%s", w.secret, w.namespace)
+	}
+
 	// TODO: use cache
-	s, err := w.client.Core().Secrets(w.namespace).Get(secret, v1.GetOptions{})
+	s, err := w.secrets.GetSecret(uri)
 	if err != nil {
-		return nil, errwrap.Wrap(fmt.Errorf("could not get secret %s", secret), err)
+		return nil, errwrap.Wrap(fmt.Errorf("could not get secret %q", uri), err)
 	}
 
-	cert, exists := s.Data["tls.crt"]
+	cert, exists := s["tls.crt"]
 	if !exists {
-		return nil, fmt.Errorf("could not find tls.crt in secret %s", w.secret)
+		return nil, fmt.Errorf("could not find tls.crt in secret %q", uri)
 	}
 
-	key, exists := s.Data["tls.key"]
+	key, exists := s["tls.key"]
 	if !exists {
-		return nil, fmt.Errorf("could not find tls.key in secret %s", w.secret)
+		return nil, fmt.Errorf("could not find tls.key in secret %q", uri)
 	}
 
 	// Write to files
