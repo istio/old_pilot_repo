@@ -61,11 +61,19 @@ func NewIngressWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
 		mesh:      mesh,
 	}
 
-	err := ctl.AppendConfigHandler(model.IngressRule,
-		func(model.Key, proto.Message, model.Event) { out.reload() })
-	if err != nil {
+	if err := ctl.AppendConfigHandler(model.IngressRule, func(model.Key, proto.Message, model.Event) {
+		out.reload()
+	}); err != nil {
 		return nil, err
 	}
+
+	// ingress rule listing depends on the service declaration being up to date
+	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) {
+		out.reload()
+	}); err != nil {
+		return nil, err
+	}
+
 	return out, nil
 }
 
