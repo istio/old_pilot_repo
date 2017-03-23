@@ -45,6 +45,13 @@ import (
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
+	if glog.V(2) {
+		glog.Infof("writing configuration to %s", fname)
+		if err := conf.Write(os.Stderr); err != nil {
+			glog.Error(err)
+		}
+	}
+
 	file, err := os.Create(fname)
 	if err != nil {
 		return err
@@ -122,7 +129,8 @@ func build(context *ProxyContext) ([]*Listener, Clusters) {
 	listeners := make([]*Listener, 0)
 
 	for port, routeConfig := range httpRouteConfigs {
-		sort.Sort(HostsByName(routeConfig.VirtualHosts))
+		hosts := routeConfig.VirtualHosts
+		sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
 		clusters = append(clusters, routeConfig.filterClusters(func(cluster *Cluster) bool {
 			return !cluster.outbound
 		})...)

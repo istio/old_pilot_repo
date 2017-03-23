@@ -24,27 +24,53 @@ import (
 type MeshConfig struct {
 	// DiscoveryAddress is the DNS address for Envoy discovery service
 	DiscoveryAddress string
+
 	// MixerAddress is the authority address for Istio Mixer service (HOST:PORT)
 	MixerAddress string
+
 	// ProxyPort is the Envoy proxy port
 	ProxyPort int
+
 	// AdminPort is the administrative interface port
 	AdminPort int
+
 	// Envoy binary path
 	BinaryPath string
+
 	// Envoy config root path
 	ConfigPath string
+
+	// DrainTimeSeconds is the duration of the grace period to drain connections
+	// from an older proxy instance
+	DrainTimeSeconds int
+
+	// ParentShutdownTimeSeconds is the duration to wait to shutdown the older
+	// proxy instance
+	ParentShutdownTimeSeconds int
+
+	// IstioServiceCluster defines the name for the service_cluster that is
+	// shared by all proxy instances. Since Istio does not assign a local
+	// service/service version to each proxy instance, the name is same for all
+	// of them. This setting corresponds to "--service-cluster" flag in Envoy.
+	// The value for "--service-node"  is used by the proxy to identify its set
+	// of local instances to RDS for source-based routing. For example, if proxy
+	// sends its IP address, the RDS can compute routes that are relative to the
+	// service instances located at that IP address.
+	IstioServiceCluster string
 }
 
 var (
 	// DefaultMeshConfig configuration
 	DefaultMeshConfig = &MeshConfig{
-		DiscoveryAddress: "manager:8080",
-		MixerAddress:     "mixer:9091",
-		ProxyPort:        15001,
-		AdminPort:        15000,
-		BinaryPath:       "/usr/local/bin/envoy",
-		ConfigPath:       "/etc/envoy",
+		DiscoveryAddress:          "manager:8080",
+		MixerAddress:              "mixer:9091",
+		ProxyPort:                 15001,
+		AdminPort:                 15000,
+		BinaryPath:                "/usr/local/bin/envoy",
+		ConfigPath:                "/etc/envoy",
+		DrainTimeSeconds:          30,
+		ParentShutdownTimeSeconds: 45,
+		IstioServiceCluster:       "istio-proxy",
 	}
 )
 
@@ -502,21 +528,6 @@ func (s Clusters) Normalize() Clusters {
 	}
 	sort.Sort(out)
 	return out
-}
-
-// HostsByName sorts VirtualHost's by name
-type HostsByName []*VirtualHost
-
-func (s HostsByName) Len() int {
-	return len(s)
-}
-
-func (s HostsByName) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s HostsByName) Less(i, j int) bool {
-	return s[i].Name < s[j].Name
 }
 
 // RoutesByPath sorts routes by their path and/or prefix, such that:
