@@ -38,12 +38,11 @@ import (
 )
 
 const (
-	managerDiscovery     = "manager-discovery"
-	mixer                = "mixer"
-	egressProxy          = "egress-proxy"
-	ingressProxy         = "ingress-proxy"
-	app                  = "app"
-	appProxyManagerAgent = "app-proxy-manager-agent"
+	managerDiscovery = "manager-discovery"
+	mixer            = "mixer"
+	egressProxy      = "egress-proxy"
+	ingressProxy     = "ingress-proxy"
+	app              = "app"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
