@@ -40,7 +40,9 @@ const (
 )
 
 var (
-	flags = &args{}
+	flags = &args{
+		proxy: *envoy.DefaultMeshConfig,
+	}
 
 	discoveryCmd = &cobra.Command{
 		Use:   "discovery",
@@ -70,7 +72,7 @@ var (
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			setFlagsFromEnv()
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			_, err = envoy.NewWatcher(controller,
+			w, err := envoy.NewWatcher(controller,
 				controller,
 				&model.IstioRegistry{ConfigRegistry: controller},
 				&flags.proxy,
@@ -79,7 +81,7 @@ var (
 				return
 			}
 			stop := make(chan struct{})
-			go controller.Run(stop)
+			go w.Run(stop)
 			cmd.WaitSignal(stop)
 			return
 		},
@@ -89,21 +91,15 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			setFlagsFromEnv()
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			_, err := envoy.NewIngressWatcher(controller,
-				controller,
+			w, err := envoy.NewIngressWatcher(controller, controller,
 				&model.IstioRegistry{ConfigRegistry: controller},
-				cmd.Client.GetKubernetesClient(),
-				&flags.proxy,
-				&flags.identity,
-				flags.ingressSecret,
-				cmd.RootFlags.Namespace)
+				cmd.Client, &flags.proxy, flags.ingressSecret, cmd.RootFlags.Namespace)
 			if err != nil {
 				return err
 			}
 			stop := make(chan struct{})
-			go controller.Run(stop)
+			go w.Run(stop)
 			cmd.WaitSignal(stop)
 			return nil
 		},
