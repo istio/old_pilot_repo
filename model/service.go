@@ -49,9 +49,6 @@ type Service struct {
 	// Ports is the set of network ports where the service is listening for
 	// connections
 	Ports PortList `json:"ports,omitempty"`
-
-	// Istio Service accounts this service can run on.
-	ServiceAccounts []string `json:"serviceaccounts,omitempty"`
 }
 
 // Port represents a network port where a service is listening for

@@ -312,6 +312,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "name4", "nsB", "acct4", t)
 
 	controller := NewController(&Client{ client: clientSet}, "default", 100 * time.Millisecond)
+
 	createService(controller, "svc1", "nsA", map[string]string{"app": "prod-app"}, t)
 	createService(controller, "svc2", "nsA", map[string]string{"app": "staging-app"}, t)
 
@@ -330,7 +331,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	if err != nil {
 		t.Error("Error returned: ", err)
 	} else if len(sa) != 0 {
-		t.Error("Failure: Expected to resolve 0 service accounts: ", sa)
+		t.Error("Failure: Expected to resolve 0 service accounts, but got: ", sa)
 	}
 
 	hostname = serviceHostname("svc1", "nsB")
