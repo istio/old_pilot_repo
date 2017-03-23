@@ -139,9 +139,9 @@ func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 	return out
 }
 
-func (sd *ServiceDiscovery) GetIstioServiceAccounts(hostname string) []string {
+func (sd *ServiceDiscovery) GetIstioServiceAccounts(hostname string) ([]string, error) {
 	return []string{
 		"istio:serviceaccount1",
 		"istio:serviceaccount2",
-	}
+	}, nil
 }

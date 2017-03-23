@@ -39,7 +39,7 @@ type ingressWatcher struct {
 	agent     Agent
 	discovery model.ServiceDiscovery
 	registry  *model.IstioRegistry
-	client    *kubernetes.Clientset
+	client    kubernetes.Interface
 	secret    string
 	namespace string
 	mesh      *MeshConfig
@@ -47,7 +47,7 @@ type ingressWatcher struct {
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
 func NewIngressWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
-	registry *model.IstioRegistry, client *kubernetes.Clientset, mesh *MeshConfig,
+	registry *model.IstioRegistry, client kubernetes.Interface, mesh *MeshConfig,
 	identity *ProxyNode, secret, namespace string,
 ) (Watcher, error) {
 

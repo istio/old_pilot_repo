@@ -76,26 +76,26 @@ func NewController(
 
 	out.services = out.createInformer(&v1.Service{}, resyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.Services(namespace).List(opts)
+			return client.client.CoreV1().Services(namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.Services(namespace).Watch(opts)
+			return client.client.CoreV1().Services(namespace).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, resyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.Endpoints(namespace).List(opts)
+			return client.client.CoreV1().Endpoints(namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.Endpoints(namespace).Watch(opts)
+			return client.client.CoreV1().Endpoints(namespace).Watch(opts)
 		})
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, resyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.Pods(namespace).List(opts)
+			return client.client.CoreV1().Pods(namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.Pods(namespace).Watch(opts)
+			return client.client.CoreV1().Pods(namespace).Watch(opts)
 		}))
 
 	out.ingresses = out.createInformer(&v1beta1.Ingress{}, resyncPeriod,
@@ -569,36 +569,47 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 	return out
 }
 
-// TODO error indicator
-func (c *Controller) GetIstioServiceAccounts(hostname string) []string {
-	saArray := []string{}
-	saSet := make(map[string]bool)
+const (
+	IstioServiceAccountPrefix = "istio:"
+	LocalDomain = "local"
+)
+
+// GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
+// An empty array is returned if no pod is found for the service.
+func (c *Controller) GetIstioServiceAccounts(hostname string) ([]string, error) {
 	name, namespace, err := parseHostname(hostname)
 	if err != nil {
-		glog.V(2).Infof("parseHostname(%s) => error %v", hostname, err)
-		return saArray
+		glog.Errorf("parseHostname(%s) => error %v", hostname, err)
+		return nil, err
 	}
 	svc, exists := c.serviceByKey(name, namespace)
 	if !exists {
-		glog.Errorf("Failed to get service for hostname %s.", hostname)
-		return saArray
+		err := fmt.Sprintf("Failed to get service for hostname %s.", hostname)
+		glog.Errorf(err)
+		return nil, errors.New(err)
 	}
 	lo := v1.ListOptions{
 		LabelSelector: labels.Set(svc.Spec.Selector).String(),
 	}
-	pods, err := c.client.client.Pods(svc.Namespace).List(lo)
+	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
 	if err != nil {
 		glog.Errorf("Failed to get pods for service %s.", hostname)
-		return saArray
+		return nil, err
 	}
+	saArray := []string{}
 	for _, p := range pods.Items {
-		sa := "istio:" + p.Spec.ServiceAccountName + "." + namespace
+		saSet := make(map[string]bool)
+		sa := makeIstioServiceAccount(p.Spec.ServiceAccountName, namespace, LocalDomain)
 		if _, exists := saSet[sa]; !exists {
 			saSet[sa] = true
 			saArray = append(saArray, sa)
 		}
 	}
-	return saArray
+	return saArray, nil
+}
+
+func makeIstioServiceAccount(sa string, ns string, domain string) string {
+	return IstioServiceAccountPrefix + sa + "." + ns + "." + domain
 }
 
 // AppendServiceHandler implements a service catalog operation

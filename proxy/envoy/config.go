@@ -271,7 +271,11 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
-		sslContext := buildSSLContext(service.Hostname, context)
+		sslContext, err := buildSSLContext(service.Hostname, context)
+		if err != nil {
+			glog.Errorf("Error generating SSL context for service: %s. Skip.", service.Hostname)
+			continue
+		}
 		for _, port := range service.Ports {
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
@@ -323,18 +327,21 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	return httpConfigs, tcpConfigs
 }
 
-func buildSSLContext(hostname string, context *ProxyContext) *SSLContext {
+func buildSSLContext(hostname string, context *ProxyContext) (*SSLContext, error) {
 	mesh := context.MeshConfig
 	if mesh.EnableAuth {
-		serviceAccounts := context.Discovery.GetIstioServiceAccounts(hostname)
+		serviceAccounts, err := context.Discovery.GetIstioServiceAccounts(hostname)
+		if err != nil {
+			return nil, err
+		}
 		return &SSLContext {
 			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
 			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",
 			CaCertFile:             mesh.AuthConfigPath + "/root-cert.pem",
 			VerifySubjectAltName:   serviceAccounts,
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // buildInboundRoutes creates route configs indexed by ports for the traffic inbound

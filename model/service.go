@@ -186,7 +186,7 @@ type ServiceDiscovery interface {
 	// GetIstioServiceAccounts(catalog.myservice.com) -->
 	//      --> [istio:serviceaccount1, istio:serviceaccount2]
 	// GetIstioServiceAccounts(backend.myservice.com) --> [istio:serviceaccount3]
-	GetIstioServiceAccounts(hostname string) []string
+	GetIstioServiceAccounts(hostname string) ([]string, error)
 }
 
 // SubsetOf is true if the tag has identical values for the keys
