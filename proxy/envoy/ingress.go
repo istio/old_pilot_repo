@@ -199,7 +199,7 @@ const (
 func (w *ingressWatcher) buildSSLContext() (*SSLContext, error) {
 	var uri string
 	if w.namespace == "" {
-		uri = w.secret
+		uri = w.secret + ".default"
 	} else {
 		uri = fmt.Sprintf("%s.%s", w.secret, w.namespace)
 	}
