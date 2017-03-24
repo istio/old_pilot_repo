@@ -570,9 +570,9 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 }
 
 const (
-	// The Istio service account prefix.
+	// IstioServiceAccountPrefix is always the prefix for Istio service accounts.
 	IstioServiceAccountPrefix = "istio:"
-	// The local domain in Istio service account.
+	// LocalDomain is the domain name Istio service account uses for internal traffic.
 	LocalDomain               = "local"
 )
 
