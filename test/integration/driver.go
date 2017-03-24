@@ -98,14 +98,12 @@ func init() {
 func main() {
 	flag.Parse()
 	setup()
+
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
 		check((&reachability{}).run())
 		check(testRouting())
 	}
-
-	glog.Info("Cleaning up ingress secret.")
-	check(run("kubectl delete secret ingress -n " + params.namespace))
 
 	teardown()
 	glog.Infof("All tests passed %d time(s)!", params.count)
@@ -182,6 +180,11 @@ func check(err error) {
 
 // teardown removes resources
 func teardown() {
+	glog.Info("Cleaning up ingress secret.")
+	if err := run("kubectl delete secret ingress -n " + params.namespace); err != nil {
+		glog.Warning(err)
+	}
+
 	if nameSpaceCreated {
 		deleteNamespace(client, params.namespace)
 		params.namespace = ""
