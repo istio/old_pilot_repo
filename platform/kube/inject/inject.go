@@ -37,8 +37,8 @@ import (
 // Defaults values for injecting istio proxy into kubernetes
 // resources.
 const (
-	DefaultInitImage            = "docker.io/istio/init:latest"
-	DefaultRuntimeImage         = "docker.io/istio/runtime:latest"
+	DefaultHub                  = "docker.io"
+	DefaultTag                  = "2017-03-22-17.30.06"
 	DefaultManagerDiscoveryPort = 8080
 	DefaultMixerPort            = 9091
 	DefaultSidecarProxyUID      = int64(1337)
@@ -53,6 +53,9 @@ const (
 	initContainerName                  = "init"
 	runtimeContainerName               = "proxy"
 )
+
+func InitImageName(hub, tag string) string    { return hub + "/init:" + tag }
+func RuntimeImageName(hub, tag string) string { return hub + "/runtime:" + tag }
 
 // Params describes configurable parameters for injecting istio proxy
 // into kubernetes resource.
