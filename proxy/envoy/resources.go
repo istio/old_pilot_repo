@@ -422,17 +422,17 @@ type Listener struct {
 
 // SSLContext definition
 type SSLContext struct {
-	CertChainFile            string            `json:"cert_chain_file"`
-	PrivateKeyFile           string            `json:"private_key_file"`
-	CaCertFile               string            `json:"ca_cert_file,omitempty"`
+	CertChainFile  string `json:"cert_chain_file"`
+	PrivateKeyFile string `json:"private_key_file"`
+	CaCertFile     string `json:"ca_cert_file,omitempty"`
 }
 
 // SSLContext definition, VerifySubjectAltName cannot be nil.
 type SSLContextWithSAN struct {
-	CertChainFile            string            `json:"cert_chain_file"`
-	PrivateKeyFile           string            `json:"private_key_file"`
-	CaCertFile               string            `json:"ca_cert_file,omitempty"`
-	VerifySubjectAltName     []string          `json:"verify_subject_alt_name"`
+	CertChainFile        string   `json:"cert_chain_file"`
+	PrivateKeyFile       string   `json:"private_key_file"`
+	CaCertFile           string   `json:"ca_cert_file,omitempty"`
+	VerifySubjectAltName []string `json:"verify_subject_alt_name"`
 }
 
 // HTTPRouteConfigs provides routes by virtual host and port

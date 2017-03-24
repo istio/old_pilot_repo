@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"net"
 
-	"istio.io/manager/model"
 	"errors"
+	"istio.io/manager/model"
 )
 
 // Mock values

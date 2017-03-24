@@ -306,12 +306,12 @@ func makeService(n, ns string, cl kubernetes.Interface, t *testing.T) {
 func TestController_GetIstioServiceAccounts(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
 
-	createPod(clientSet, map[string]string{"app": "test-app"},"name1","nsA","acct1", t)
-	createPod(clientSet, map[string]string{"app": "prod-app"},"name2", "nsA", "acct2", t)
+	createPod(clientSet, map[string]string{"app": "test-app"}, "name1", "nsA", "acct1", t)
+	createPod(clientSet, map[string]string{"app": "prod-app"}, "name2", "nsA", "acct2", t)
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "name3", "nsA", "acct3", t)
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "name4", "nsB", "acct4", t)
 
-	controller := NewController(&Client{ client: clientSet}, "default", 100 * time.Millisecond)
+	controller := NewController(&Client{client: clientSet}, "default", 100*time.Millisecond)
 
 	createService(controller, "svc1", "nsA", map[string]string{"app": "prod-app"}, t)
 	createService(controller, "svc2", "nsA", map[string]string{"app": "staging-app"}, t)
@@ -321,8 +321,8 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	if err != nil {
 		t.Error("Error returned: ", err)
 	} else if len(sa) != 2 ||
-		  !(sa[0] == "istio:acct2.nsA.local" && sa[1] == "istio:acct3.nsA.local" ||
-		    sa[0] == "istio:acct3.nsA.local" && sa[1] == "istio:acct2.nsA.local") {
+		!(sa[0] == "istio:acct2.nsA.local" && sa[1] == "istio:acct3.nsA.local" ||
+			sa[0] == "istio:acct3.nsA.local" && sa[1] == "istio:acct2.nsA.local") {
 		t.Error("Failure: The resolved service accounts are not correct: ", sa)
 	}
 
@@ -362,7 +362,7 @@ func createService(controller *Controller, name, namespace string, selector map[
 }
 
 func createPod(client kubernetes.Interface, labels map[string]string, name string, namespace string,
-               serviceAccountName string, t *testing.T) {
+	serviceAccountName string, t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,

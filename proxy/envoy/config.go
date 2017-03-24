@@ -319,7 +319,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// TODO: Enable SSL context for TCP and HTTPS services.
-			        cluster := buildOutboundCluster(service.Hostname, port, nil, nil)
+				cluster := buildOutboundCluster(service.Hostname, port, nil, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
 				config.Routes = append(config.Routes, route)
@@ -338,11 +338,11 @@ func buildSSLContextWithSAN(hostname string, context *ProxyContext) *SSLContextW
 	mesh := context.MeshConfig
 	if mesh.EnableAuth {
 		serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
-		return &SSLContextWithSAN {
-			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
-			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",
-			CaCertFile:             mesh.AuthConfigPath + "/root-cert.pem",
-			VerifySubjectAltName:   serviceAccounts,
+		return &SSLContextWithSAN{
+			CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
+			PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
+			CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
+			VerifySubjectAltName: serviceAccounts,
 		}
 	}
 	return nil

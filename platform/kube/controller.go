@@ -571,7 +571,7 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 
 const (
 	IstioServiceAccountPrefix = "istio:"
-	LocalDomain = "local"
+	LocalDomain               = "local"
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.

@@ -217,13 +217,13 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyV0Config         = "testdata/envoy-v0.json"
-	envoyV1Config         = "testdata/envoy-v1.json"
-	envoyFaultConfig      = "testdata/envoy-fault.json"
-	cbPolicy              = "testdata/cb-policy.yaml.golden"
-	timeoutRouteRule      = "testdata/timeout-route-rule.yaml.golden"
-	weightedRouteRule     = "testdata/weighted-route.yaml.golden"
-	faultRouteRule        = "testdata/fault-route.yaml.golden"
+	envoyV0Config     = "testdata/envoy-v0.json"
+	envoyV1Config     = "testdata/envoy-v1.json"
+	envoyFaultConfig  = "testdata/envoy-fault.json"
+	cbPolicy          = "testdata/cb-policy.yaml.golden"
+	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
+	weightedRouteRule = "testdata/weighted-route.yaml.golden"
+	faultRouteRule    = "testdata/fault-route.yaml.golden"
 )
 
 func compareJSON(jsonFile string, t *testing.T) {
