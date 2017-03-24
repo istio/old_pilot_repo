@@ -46,7 +46,7 @@ var (
 		Use:   "kube-inject",
 		Short: "Inject istio sidecar proxy into kubernete resources",
 		Long: `
-Use kube-inject to Manually inject istio sidecar proxy into kubernetes
+Use kube-inject to manually inject istio sidecar proxy into kubernetes
 resource files. Unsupported resources are left unmodified so it is
 safe to run kube-inject over a single file that contains multiple
 Service, ConfigMap, Deployment, etc. definitions for a complex
