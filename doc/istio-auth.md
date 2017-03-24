@@ -11,10 +11,10 @@ cluster-wise, through istio manager command line flag.
 
 ### Command Line Flags
 
-Istio manager agent has the following flags to configure Istio auth:
+Istio manager agent uses the following flags to configure Istio auth:
 
-- **enable_auth** Default "false". When specified, enforces mTLS auth for all proxy-proxy traffic.
-- **auth_config_path** Default "/etc/envoyauth". When "enable_auth" is true, proxy reads mTLS config files from this path.
+- **enable_auth** Default value *false*. When true, enforces mTLS auth for all proxy-proxy traffic.
+- **auth_config_path** Default value *"/etc/certs"*. When "enable_auth" is true, proxy reads mTLS config files from this path.
 
 ### Auth Config Files
 

@@ -278,11 +278,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	// outbound connections/requests are redirected to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
-		sslContext, err := buildSSLContext(service.Hostname, context)
-		if err != nil {
-			glog.Errorf("Error generating SSL context for service: %s. Skip.", service.Hostname)
-			continue
-		}
+		sslContext := buildSSLContextWithSAN(service.Hostname, context)
 		for _, port := range service.Ports {
 			switch port.Protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
@@ -321,7 +317,8 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-			        cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
+				// TODO: Enable SSL context for TCP and HTTPS services.
+			        cluster := buildOutboundCluster(service.Hostname, port, nil, nil)
 				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
 				config := tcpConfigs.EnsurePort(port.Port)
 				config.Routes = append(config.Routes, route)
@@ -334,21 +331,20 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	return httpConfigs, tcpConfigs
 }
 
-func buildSSLContext(hostname string, context *ProxyContext) (*SSLContext, error) {
+// buildSSLContext returns an SSLContext struct with VerifySubjectAltName when auth is enabled.
+// Otherwise, it returns nil.
+func buildSSLContextWithSAN(hostname string, context *ProxyContext) *SSLContextWithSAN {
 	mesh := context.MeshConfig
 	if mesh.EnableAuth {
-		serviceAccounts, err := context.Discovery.GetIstioServiceAccounts(hostname)
-		if err != nil {
-			return nil, err
-		}
-		return &SSLContext {
+		serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
+		return &SSLContextWithSAN {
 			CertChainFile:          mesh.AuthConfigPath + "/cert-chain.pem",
 			PrivateKeyFile:         mesh.AuthConfigPath + "/key.pem",
 			CaCertFile:             mesh.AuthConfigPath + "/root-cert.pem",
 			VerifySubjectAltName:   serviceAccounts,
-		}, nil
+		}
 	}
-	return nil, nil
+	return nil
 }
 
 // buildInboundRoutes creates route configs indexed by ports for the traffic inbound

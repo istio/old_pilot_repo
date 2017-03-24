@@ -19,6 +19,7 @@ import (
 	"net"
 
 	"istio.io/manager/model"
+	"errors"
 )
 
 // Mock values
@@ -140,8 +141,11 @@ func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 }
 
 func (sd *ServiceDiscovery) GetIstioServiceAccounts(hostname string) ([]string, error) {
-	return []string{
-		"istio:serviceaccount1",
-		"istio:serviceaccount2",
-	}, nil
+	if hostname == "world.default.svc.cluster.local" {
+		return []string{
+			"istio:serviceaccount1",
+			"istio:serviceaccount2",
+		}, nil
+	}
+	return make([]string, 0), errors.New("Some error")
 }

@@ -575,28 +575,29 @@ const (
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
-// An empty array is returned if no pod is found for the service.
+// An empty array is always returned if an error occurs.
 func (c *Controller) GetIstioServiceAccounts(hostname string) ([]string, error) {
 	name, namespace, err := parseHostname(hostname)
+	saArray := make([]string, 0)
 	if err != nil {
-		glog.Errorf("parseHostname(%s) => error %v", hostname, err)
-		return nil, err
+		glog.Warningf("parseHostname(%s) => error %v", hostname, err)
+		return saArray, err
 	}
 	svc, exists := c.serviceByKey(name, namespace)
 	if !exists {
 		err := fmt.Sprintf("Failed to get service for hostname %s.", hostname)
-		glog.Errorf(err)
-		return nil, errors.New(err)
+		glog.Warningf(err)
+		return saArray, errors.New(err)
 	}
 	lo := v1.ListOptions{
 		LabelSelector: labels.Set(svc.Spec.Selector).String(),
 	}
+	// TODO: This is fragile, improve it.
 	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
 	if err != nil {
-		glog.Errorf("Failed to get pods for service %s.", hostname)
-		return nil, err
+		glog.Warningf("Failed to get pods for service %s.", hostname)
+		return saArray, err
 	}
-	saArray := []string{}
 	for _, p := range pods.Items {
 		saSet := make(map[string]bool)
 		sa := makeIstioServiceAccount(p.Spec.ServiceAccountName, namespace, LocalDomain)
