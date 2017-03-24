@@ -63,8 +63,8 @@ type Params struct {
 	InitImage        string
 	RuntimeImage     string
 	RuntimeVerbosity int
-	DiscoveryPort    int
-	MixerPort        int
+	ManagerAddr      string
+	MixerAddr        string
 	SidecarProxyUID  int64
 	SidecarProxyPort int
 	Version          string
@@ -119,8 +119,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			Args: []string{
 				"proxy",
 				"sidecar",
-				"-s", "manager:" + strconv.Itoa(p.DiscoveryPort),
-				"-m", "mixer:" + strconv.Itoa(p.MixerPort),
+				"-s", p.ManagerAddr,
+				"-m", p.MixerAddr,
 				"-n", "$(POD_NAMESPACE)",
 				"-v", strconv.Itoa(p.RuntimeVerbosity),
 			},
