@@ -30,8 +30,8 @@ import (
 var (
 	hub              string
 	tag              string
-	discoveryPort    int
-	mixerPort        int
+	managerAddr      string
+	mixerAddr        string
 	sidecarProxyUID  int64
 	sidecarProxyPort int
 	runtimeVerbosity int
