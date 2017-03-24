@@ -54,7 +54,12 @@ const (
 	runtimeContainerName               = "proxy"
 )
 
-func InitImageName(hub, tag string) string    { return hub + "/init:" + tag }
+// InitImageName returns the fully qualified image name for the istio
+// init image given a docker hub and tag.
+func InitImageName(hub, tag string) string { return hub + "/init:" + tag }
+
+// RuntimeImageName returns the fully qualified image name for the istio
+// runtime image given a docker hub and tag.
 func RuntimeImageName(hub, tag string) string { return hub + "/runtime:" + tag }
 
 // Params describes configurable parameters for injecting istio proxy
