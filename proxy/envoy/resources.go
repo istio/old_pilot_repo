@@ -413,7 +413,7 @@ type NetworkFilter struct {
 
 // Listener definition
 type Listener struct {
-	Port           int              `json:"port"`
+	Address        string           `json:"address"`
 	Filters        []*NetworkFilter `json:"filters"`
 	SSLContext     *SSLContext      `json:"ssl_context,omitempty"`
 	BindToPort     bool             `json:"bind_to_port"`
@@ -451,7 +451,7 @@ func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
 // Admin definition
 type Admin struct {
 	AccessLogPath string `json:"access_log_path"`
-	Port          int    `json:"port"`
+	Address       string `json:"address"`
 }
 
 // Host definition
@@ -503,21 +503,6 @@ type OutlierDetection struct {
 	MaxEjectionPercent int `json:"max_ejection_percent,omitempty"`
 }
 
-// ListenersByPort sorts listeners by port
-type ListenersByPort []*Listener
-
-func (l ListenersByPort) Len() int {
-	return len(l)
-}
-
-func (l ListenersByPort) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-
-func (l ListenersByPort) Less(i, j int) bool {
-	return l[i].Port < l[j].Port
-}
-
 // Clusters is a collection of clusters
 type Clusters []*Cluster
 
@@ -545,21 +530,6 @@ func (s Clusters) Normalize() Clusters {
 	}
 	sort.Sort(out)
 	return out
-}
-
-// HostsByName sorts VirtualHost's by name
-type HostsByName []*VirtualHost
-
-func (s HostsByName) Len() int {
-	return len(s)
-}
-
-func (s HostsByName) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s HostsByName) Less(i, j int) bool {
-	return s[i].Name < s[j].Name
 }
 
 // RoutesByPath sorts routes by their path and/or prefix, such that:
