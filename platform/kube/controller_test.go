@@ -335,7 +335,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	}
 
 	hostname = serviceHostname("svc1", "nsB")
-	sa, err = controller.GetIstioServiceAccounts(hostname)
+	_, err = controller.GetIstioServiceAccounts(hostname)
 	if err == nil {
 		t.Error("Failure: Expected error due to no service in namespace.")
 	} else if err.Error() != fmt.Sprintf("Failed to get service for hostname %s.", hostname) {
@@ -343,7 +343,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	}
 
 	hostname = serviceHostname("svc1", "nsC")
-	sa, err = controller.GetIstioServiceAccounts(hostname)
+	_, err = controller.GetIstioServiceAccounts(hostname)
 	if err == nil {
 		t.Error("Failure: Expected error due to namespace not exist.")
 	} else if err.Error() != fmt.Sprintf("Failed to get service for hostname %s.", hostname) {

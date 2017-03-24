@@ -427,7 +427,7 @@ type SSLContext struct {
 	CaCertFile     string `json:"ca_cert_file,omitempty"`
 }
 
-// SSLContext definition, VerifySubjectAltName cannot be nil.
+// SSLContextWithSAN definition, VerifySubjectAltName cannot be nil.
 type SSLContextWithSAN struct {
 	CertChainFile        string   `json:"cert_chain_file"`
 	PrivateKeyFile       string   `json:"private_key_file"`

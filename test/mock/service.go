@@ -15,10 +15,10 @@
 package mock
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
-	"errors"
 	"istio.io/manager/model"
 )
 
@@ -140,6 +140,7 @@ func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 	return out
 }
 
+// GetIstioServiceAccounts gets the Istio service accounts for a service hostname.
 func (sd *ServiceDiscovery) GetIstioServiceAccounts(hostname string) ([]string, error) {
 	if hostname == "world.default.svc.cluster.local" {
 		return []string{
