@@ -44,7 +44,7 @@ var (
 var (
 	injectCmd = &cobra.Command{
 		Use:   "kube-inject",
-		Short: "Inject istio sidecar proxy into kubernete resources",
+		Short: "Inject istio sidecar proxy into kubernetes resources",
 		Long: `
 Use kube-inject to manually inject istio sidecar proxy into kubernetes
 resource files. Unsupported resources are left unmodified so it is
