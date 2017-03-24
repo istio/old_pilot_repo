@@ -573,7 +573,7 @@ const (
 	// IstioServiceAccountPrefix is always the prefix for Istio service accounts.
 	IstioServiceAccountPrefix = "istio:"
 	// LocalDomain is the domain name Istio service account uses for internal traffic.
-	LocalDomain = "local"
+	LocalDomain = "cluster.local"
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
@@ -600,8 +600,8 @@ func (c *Controller) GetIstioServiceAccounts(hostname string) ([]string, error) 
 		glog.Warningf("Failed to get pods for service %s.", hostname)
 		return saArray, err
 	}
+	saSet := make(map[string]bool)
 	for _, p := range pods.Items {
-		saSet := make(map[string]bool)
 		sa := makeIstioServiceAccount(p.Spec.ServiceAccountName, namespace, LocalDomain)
 		if _, exists := saSet[sa]; !exists {
 			saSet[sa] = true

@@ -332,7 +332,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	return httpConfigs, tcpConfigs
 }
 
-// buildSSLContextWithSAN returns an SSLContext struct with VerifySubjectAltName when auth is enabled.
+// buildSSLContextWithSAN returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.
 // Otherwise, it returns nil.
 func buildSSLContextWithSAN(hostname string, context *ProxyContext) *SSLContextWithSAN {
 	mesh := context.MeshConfig
