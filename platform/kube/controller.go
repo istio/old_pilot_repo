@@ -573,7 +573,7 @@ const (
 	// IstioServiceAccountPrefix is always the prefix for Istio service accounts.
 	IstioServiceAccountPrefix = "istio:"
 	// LocalDomain is the domain name Istio service account uses for internal traffic.
-	LocalDomain               = "local"
+	LocalDomain = "local"
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
