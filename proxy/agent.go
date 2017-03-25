@@ -164,9 +164,9 @@ func (a *agent) Run(stop <-chan struct{}) {
 			// schedule a retry for a transient error
 			if status.err != nil && !reflect.DeepEqual(a.desired, a.current) {
 				if a.retryBudget > 0 {
-					delay = a.retryInterval * (2 << uint(a.maxRetries-a.retryBudget))
+					delay = a.retryInterval * (1 << uint(a.maxRetries-a.retryBudget))
 					a.retryBudget = a.retryBudget - 1
-					glog.V(2).Infof("Schedule retry after %v (budget %d)", delay, a.retryBudget)
+					glog.V(2).Infof("Schedule retry after %v (remaining budget %d)", delay, a.retryBudget)
 				} else {
 					glog.Warningf("Permanent error: budget exhausted trying to fulfill the desired configuration")
 					// TODO: update proxy agent monitoring status about this error
@@ -175,8 +175,14 @@ func (a *agent) Run(stop <-chan struct{}) {
 			}
 
 		case <-time.After(delay):
-			glog.V(2).Infof("Reconciling after delay %v", delay)
-			a.reconcile()
+			if reflect.DeepEqual(a.desired, a.current) {
+				glog.V(2).Info("Reconciliation not needed")
+				a.retryBudget = a.maxRetries
+				delay = defaultDelay
+			} else {
+				glog.V(2).Infof("Reconciling after delay %v", delay)
+				a.reconcile()
+			}
 
 		case _, more := <-stop:
 			if !more {
