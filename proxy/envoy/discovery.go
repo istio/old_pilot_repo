@@ -137,27 +137,18 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 	// skip computing the actual HTTP routes
-	httpRouteConfigs, tcpRouteConfigs := buildRoutes(&ProxyContext{
+	addrs := map[string]bool{ip: true}
+	instances := ds.services.HostInstances(addrs)
+	services := ds.services.Services()
+	httpRouteConfigs, _ := buildOutboundRoutes(instances, services, &ProxyContext{
 		Discovery:  ds.services,
 		Config:     ds.config,
 		MeshConfig: ds.mesh,
-		Addrs:      map[string]bool{ip: true},
+		Addrs:      addrs,
 	})
 
-	clusters := make(Clusters, 0)
-	for _, httpRouteConfig := range httpRouteConfigs {
-		clusters = append(clusters, httpRouteConfig.filterClusters(func(cluster *Cluster) bool {
-			return cluster.outbound
-		})...)
-	}
-	for _, tcpRouteConfig := range tcpRouteConfigs {
-		clusters = append(clusters, tcpRouteConfig.filterClusters(func(cluster *Cluster) bool {
-			return cluster.outbound
-		})...)
-	}
-
 	// de-duplicate and canonicalize clusters
-	clusters = clusters.Normalize()
+	clusters := httpRouteConfigs.clusters().Normalize()
 
 	for _, cluster := range clusters {
 		insertDestinationPolicy(ds.config, cluster)
@@ -188,11 +179,14 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		return
 	}
 
-	httpRouteConfigs, _ := buildRoutes(&ProxyContext{
+	addrs := map[string]bool{ip: true}
+	instances := ds.services.HostInstances(addrs)
+	services := ds.services.Services()
+	httpRouteConfigs, _ := buildOutboundRoutes(instances, services, &ProxyContext{
 		Discovery:  ds.services,
 		Config:     ds.config,
 		MeshConfig: ds.mesh,
-		Addrs:      map[string]bool{ip: true},
+		Addrs:      addrs,
 	})
 
 	routeConfig, ok := httpRouteConfigs[port]

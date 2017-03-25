@@ -102,7 +102,7 @@ const (
 // Config defines the schema for Envoy JSON configuration format
 type Config struct {
 	RootRuntime    *RootRuntime   `json:"runtime,omitempty"`
-	Listeners      []*Listener    `json:"listeners"`
+	Listeners      Listeners      `json:"listeners"`
 	Admin          Admin          `json:"admin"`
 	ClusterManager ClusterManager `json:"cluster_manager"`
 }
@@ -235,44 +235,45 @@ type HTTPRouteConfig struct {
 	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
 }
 
-// Merge operation selects a union of two route configs prioritizing the first.
-// It matches virtual hosts by name.
-func (rc *HTTPRouteConfig) merge(that *HTTPRouteConfig) *HTTPRouteConfig {
-	out := &HTTPRouteConfig{}
-	set := make(map[string]bool)
-	for _, host := range rc.VirtualHosts {
-		set[host.Name] = true
-		out.VirtualHosts = append(out.VirtualHosts, host)
+// HTTPRouteConfigs is a map from the port number to the route config
+type HTTPRouteConfigs map[int]*HTTPRouteConfig
+
+// EnsurePort creates a route config if necessary
+func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
+	config, ok := routes[port]
+	if !ok {
+		config = &HTTPRouteConfig{}
+		routes[port] = config
 	}
-	for _, host := range that.VirtualHosts {
-		if !set[host.Name] {
-			out.VirtualHosts = append(out.VirtualHosts, host)
-		}
+	return config
+}
+
+func (routes HTTPRouteConfigs) clusters() Clusters {
+	out := make(Clusters, 0)
+	for _, config := range routes {
+		out = append(out, config.clusters()...)
 	}
 	return out
 }
 
-// Clusters aggregates clusters across HTTP routes
-func (rc *HTTPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
-	out := make([]*Cluster, 0)
-	for _, host := range rc.VirtualHosts {
-		for _, route := range host.Routes {
-			for _, cluster := range route.clusters {
-				if f(cluster) {
-					out = append(out, cluster)
-				}
-			}
-		}
-	}
-	return out
-}
-
-// Faults aggregates fault filters across virtual hosts in single http_conn_man
+// faults aggregates fault filters across virtual hosts in single http_conn_man
 func (rc *HTTPRouteConfig) faults() []*HTTPFilter {
 	out := make([]*HTTPFilter, 0)
 	for _, host := range rc.VirtualHosts {
 		for _, route := range host.Routes {
 			out = append(out, route.faults...)
+		}
+	}
+	return out
+}
+
+func (rc *HTTPRouteConfig) clusters() Clusters {
+	out := make(Clusters, 0)
+	for _, host := range rc.VirtualHosts {
+		for _, route := range host.Routes {
+			for _, cluster := range route.clusters {
+				out = append(out, cluster)
+			}
 		}
 	}
 	return out
@@ -309,7 +310,7 @@ type TCPRoute struct {
 }
 
 // TCPRouteByRoute sorts TCP routes over all route sub fields.
-type TCPRouteByRoute []TCPRoute
+type TCPRouteByRoute []*TCPRoute
 
 func (r TCPRouteByRoute) Len() int {
 	return len(r)
@@ -353,40 +354,19 @@ func (r TCPRouteByRoute) Less(i, j int) bool {
 	return false
 }
 
-// Merge operation selects a union of two route configs prioritizing the first.
-func (rc *TCPRouteConfig) merge(that *TCPRouteConfig) *TCPRouteConfig {
-	out := &TCPRouteConfig{}
-	set := make(map[string]bool)
-	for _, route := range rc.Routes {
-		set[route.clusterRef.hostname] = true
-		out.Routes = append(out.Routes, route)
-	}
-	for _, route := range that.Routes {
-		if !set[route.clusterRef.hostname] {
-			out.Routes = append(out.Routes, route)
-		}
-	}
-	return out
+// TCPProxyFilterConfig definition
+type TCPProxyFilterConfig struct {
+	StatPrefix  string          `json:"stat_prefix"`
+	RouteConfig *TCPRouteConfig `json:"route_config"`
 }
-
-// filterClusters aggregates clusters across TCP routes
-func (rc *TCPRouteConfig) filterClusters(f func(*Cluster) bool) []*Cluster {
-	out := make([]*Cluster, 0)
-	for _, route := range rc.Routes {
-		if f(route.clusterRef) {
-			out = append(out, route.clusterRef)
-		}
-	}
-	return out
-}
-
-// TCPRouteConfigs provides routes by port
-type TCPRouteConfigs map[int]*TCPRouteConfig
 
 // TCPRouteConfig (or generalize as RouteConfig or L4RouteConfig for TCP/UDP?)
 type TCPRouteConfig struct {
-	Routes []TCPRoute `json:"routes"`
+	Routes []*TCPRoute `json:"routes"`
 }
+
+// TCPRouteConfigs is a map from the port number to the route config
+type TCPRouteConfigs map[int]*TCPRouteConfig
 
 // EnsurePort creates a route config if necessary
 func (hosts TCPRouteConfigs) EnsurePort(port int) *TCPRouteConfig {
@@ -398,10 +378,13 @@ func (hosts TCPRouteConfigs) EnsurePort(port int) *TCPRouteConfig {
 	return config
 }
 
-// TCPProxyFilterConfig definition
-type TCPProxyFilterConfig struct {
-	StatPrefix  string          `json:"stat_prefix"`
-	RouteConfig *TCPRouteConfig `json:"route_config"`
+// filterClusters aggregates clusters across TCP routes
+func (rc *TCPRouteConfig) clusters() Clusters {
+	out := make(Clusters, 0)
+	for _, route := range rc.Routes {
+		out = append(out, route.clusterRef)
+	}
+	return out
 }
 
 // NetworkFilter definition
@@ -420,6 +403,9 @@ type Listener struct {
 	UseOriginalDst bool             `json:"use_original_dst,omitempty"`
 }
 
+// Listeners is a collection of listeners
+type Listeners []*Listener
+
 // SSLContext definition
 type SSLContext struct {
 	CertChainFile  string `json:"cert_chain_file"`
@@ -433,19 +419,6 @@ type SSLContextWithSAN struct {
 	PrivateKeyFile       string   `json:"private_key_file"`
 	CaCertFile           string   `json:"ca_cert_file,omitempty"`
 	VerifySubjectAltName []string `json:"verify_subject_alt_name"`
-}
-
-// HTTPRouteConfigs provides routes by virtual host and port
-type HTTPRouteConfigs map[int]*HTTPRouteConfig
-
-// EnsurePort creates a route config if necessary
-func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
-	config, ok := routes[port]
-	if !ok {
-		config = &HTTPRouteConfig{}
-		routes[port] = config
-	}
-	return config
 }
 
 // Admin definition
@@ -477,7 +450,6 @@ type Cluster struct {
 	hostname string
 	port     *model.Port
 	tags     model.Tags
-	outbound bool
 }
 
 // CircuitBreaker definition

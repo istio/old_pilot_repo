@@ -171,7 +171,7 @@ func (w *ingressWatcher) generateConfig() *Config {
 	}
 
 	listeners := []*Listener{listener}
-	clusters := Clusters(rConfig.filterClusters(func(cl *Cluster) bool { return true })).Normalize()
+	clusters := rConfig.clusters().Normalize()
 
 	return &Config{
 		Listeners: listeners,

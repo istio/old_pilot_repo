@@ -37,6 +37,22 @@ const (
 	OutboundClusterPrefix = "out."
 )
 
+// buildSSLContextWithSAN returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.
+// Otherwise, it returns nil.
+func buildSSLContextWithSAN(hostname string, context *ProxyContext) *SSLContextWithSAN {
+	mesh := context.MeshConfig
+	if mesh.EnableAuth {
+		serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
+		return &SSLContextWithSAN{
+			CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
+			PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
+			CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
+			VerifySubjectAltName: serviceAccounts,
+		}
+	}
+	return nil
+}
+
 func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 	return &HTTPRoute{
 		Prefix:   "/",
@@ -53,7 +69,6 @@ func buildInboundCluster(hostname string, port int, protocol model.Protocol) *Cl
 		LbType:           DefaultLbType,
 		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
 		hostname:         hostname,
-		outbound:         false,
 	}
 	if protocol == model.ProtocolGRPC || protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -74,7 +89,6 @@ func buildOutboundCluster(hostname string, port *model.Port, ssl *SSLContextWith
 		hostname:         hostname,
 		port:             port,
 		tags:             tags,
-		outbound:         true,
 	}
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -283,8 +297,8 @@ func sharedHost(parts ...[]string) []string {
 	}
 }
 
-func buildTCPRoute(cluster *Cluster, addresses []string, port int) TCPRoute {
-	route := TCPRoute{
+func buildTCPRoute(cluster *Cluster, addresses []string, port int) *TCPRoute {
+	route := &TCPRoute{
 		Cluster:    cluster.Name,
 		clusterRef: cluster,
 	}
