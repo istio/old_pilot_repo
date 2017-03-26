@@ -42,6 +42,7 @@ import (
 // - HTTP pod port collision creates duplicate virtual host entries
 // - (bug) two service ports with the same target port create two virtual hosts with same domains
 //   (not allowed by envoy). FIXME - need to detect and eliminate such ports in validation
+// TODO: no RDS for TCP
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
@@ -80,8 +81,6 @@ func Generate(context *ProxyContext) *Config {
 	mesh := context.MeshConfig
 	listeners, clusters := buildListeners(context)
 
-	insertMixerFilter(listeners, context)
-
 	// set bind to port values to values for port redirection
 	for _, listener := range listeners {
 		listener.BindToPort = false
@@ -89,7 +88,7 @@ func Generate(context *ProxyContext) *Config {
 
 	// add an extra listener that binds to a port
 	listeners = append(listeners, &Listener{
-		Address:        fmt.Sprintf("tcp://0.0.0.0:%d", mesh.ProxyPort),
+		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyPort),
 		BindToPort:     true,
 		UseOriginalDst: true,
 		Filters:        make([]*NetworkFilter, 0),
@@ -100,7 +99,7 @@ func Generate(context *ProxyContext) *Config {
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://0.0.0.0:%d", mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.AdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
@@ -117,21 +116,20 @@ func Generate(context *ProxyContext) *Config {
 }
 
 // buildListeners produces a list of listeners and referenced clusters
-// build also returns all inbound clusters, and outbound clusters referenced by TCP proxy
-// (due to lack of RDS support for TCP proxy filter, all referenced clusters in the routes
+// (due to lack of RDS support for TCP proxy filter, all referenced clusters in TCP routes
 // must be present)
 func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 	// query the services model
 	instances := context.Discovery.HostInstances(context.Addrs)
 	services := context.Discovery.Services()
 
-	// canonicalize listeners and collect inbound clusters
 	inbound, inClusters := buildInboundListeners(instances, context.MeshConfig)
 	outbound, outClusters := buildOutboundListeners(instances, services, context)
+	listeners := append(inbound, outbound...).normalize()
+	clusters := append(inClusters, outClusters...).normalize()
 
-	listeners := append(inbound, outbound...)
-	sort.Slice(listeners, func(i, j int) bool { return listeners[i].Address < listeners[j].Address })
-	clusters := append(inClusters, outClusters...).Normalize()
+	// inject Mixer filter with proxy identities
+	insertMixerFilter(listeners, instances, context)
 
 	return listeners, clusters
 }
@@ -178,9 +176,6 @@ func buildHTTPListener(routeConfig *HTTPRouteConfig, ip string, port int, rds bo
 }
 
 // buildTCPListener constructs a listener for the TCP proxy
-// TODO: TCP and HTTP traffic cannot be captured in the same listener
-// currently in Envoy; we prioritize HTTP listeners in case of a conflict
-// TODO: RDS is not supported by TCP proxy filter
 func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener {
 	return &Listener{
 		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
@@ -220,12 +215,12 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 			glog.Warningf("Omitting tcp service %v on port %v", config, port)
 			delete(tcpOutbound, port)
 		}
-		listeners = append(listeners, buildHTTPListener(routeConfig, "0.0.0.0", port, true))
+		listeners = append(listeners, buildHTTPListener(routeConfig, WildcardAddress, port, true))
 	}
 
 	for port, tcpConfig := range tcpOutbound {
 		clusters = append(clusters, tcpConfig.clusters()...)
-		listeners = append(listeners, buildTCPListener(tcpConfig, "0.0.0.0", port))
+		listeners = append(listeners, buildTCPListener(tcpConfig, WildcardAddress, port))
 	}
 
 	return listeners, clusters
@@ -248,8 +243,9 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 	// map for each service port to define filters
 	for _, service := range services {
 		sslContext := buildSSLContextWithSAN(service.Hostname, context)
-		for _, port := range service.Ports {
-			switch port.Protocol {
+		for _, servicePort := range service.Ports {
+			protocol := servicePort.Protocol
+			switch protocol {
 			case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 				routes := make([]*HTTPRoute, 0)
 
@@ -267,7 +263,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				// collect route rules
 				for _, rule := range rules {
 					if rule.Destination == service.Hostname {
-						httpRoute, catchAll = buildHTTPRoute(rule, port, sslContext)
+						httpRoute, catchAll = buildHTTPRoute(rule, servicePort, sslContext)
 						routes = append(routes, httpRoute)
 						if catchAll {
 							break
@@ -277,23 +273,23 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 
 				if !catchAll {
 					// default route for the destination
-					cluster := buildOutboundCluster(service.Hostname, port, sslContext, nil)
+					cluster := buildOutboundCluster(service.Hostname, servicePort, sslContext, nil)
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
-				host := buildVirtualHost(service, port, suffix, routes)
-				http := httpConfigs.EnsurePort(port.Port)
+				host := buildVirtualHost(service, servicePort, suffix, routes)
+				http := httpConfigs.EnsurePort(servicePort.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// TODO: Enable SSL context for TCP and HTTPS services.
-				cluster := buildOutboundCluster(service.Hostname, port, nil, nil)
-				route := buildTCPRoute(cluster, []string{service.Address}, port.Port)
-				config := tcpConfigs.EnsurePort(port.Port)
+				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
+				route := buildTCPRoute(cluster, []string{service.Address}, servicePort.Port)
+				config := tcpConfigs.EnsurePort(servicePort.Port)
 				config.Routes = append(config.Routes, route)
 
 			default:
-				glog.Warningf("Unsupported outbound protocol %v for port %d", port.Protocol, port.Port)
+				glog.Warningf("Unsupported outbound protocol %v for port %#v", protocol, servicePort)
 			}
 		}
 	}
@@ -336,8 +332,8 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 		// Local service instances can be accessed through one of three
 		// addresses: localhost, endpoint IP, and service
 		// VIP. Localhost bypasses the proxy and doesn't need any TCP
-		// route config. Endpoint IP and Service VIP routes are
-		// handled below.
+		// route config. Endpoint IP is handled below and Service IP is handled
+		// by outbound routes.
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			route := buildDefaultRoute(cluster)
@@ -377,7 +373,7 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 			}, service.Address, servicePort.Port))
 
 		default:
-			glog.Warningf("Unsupported inbound protocol %v for port %d", protocol, servicePort)
+			glog.Warningf("Unsupported inbound protocol %v for port %#v", protocol, servicePort)
 		}
 	}
 

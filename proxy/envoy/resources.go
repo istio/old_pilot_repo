@@ -97,6 +97,9 @@ const (
 
 	// URI HTTP header
 	HeaderURI = "uri"
+
+	// WildcardAddress binds to all IP addresses
+	WildcardAddress = "0.0.0.0"
 )
 
 // Config defines the schema for Envoy JSON configuration format
@@ -406,6 +409,12 @@ type Listener struct {
 // Listeners is a collection of listeners
 type Listeners []*Listener
 
+// normalize outputs the canonical form (modifies the slice)
+func (listeners Listeners) normalize() Listeners {
+	sort.Slice(listeners, func(i, j int) bool { return listeners[i].Address < listeners[j].Address })
+	return listeners
+}
+
 // SSLContext definition
 type SSLContext struct {
 	CertChainFile  string `json:"cert_chain_file"`
@@ -478,20 +487,8 @@ type OutlierDetection struct {
 // Clusters is a collection of clusters
 type Clusters []*Cluster
 
-func (s Clusters) Len() int {
-	return len(s)
-}
-
-func (s Clusters) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s Clusters) Less(i, j int) bool {
-	return s[i].Name < s[j].Name
-}
-
-// Normalize deduplicates and sorts clusters
-func (s Clusters) Normalize() Clusters {
+// normalize deduplicates and sorts clusters
+func (s Clusters) normalize() Clusters {
 	out := make(Clusters, 0)
 	set := make(map[string]bool)
 	for _, cluster := range s {
@@ -500,7 +497,7 @@ func (s Clusters) Normalize() Clusters {
 			out = append(out, cluster)
 		}
 	}
-	sort.Sort(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 

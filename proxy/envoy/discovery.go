@@ -148,7 +148,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	})
 
 	// de-duplicate and canonicalize clusters
-	clusters := httpRouteConfigs.clusters().Normalize()
+	clusters := httpRouteConfigs.clusters().normalize()
 
 	for _, cluster := range clusters {
 		insertDestinationPolicy(ds.config, cluster)
