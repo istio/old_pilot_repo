@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -125,7 +124,10 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 
 	inbound, inClusters := buildInboundListeners(instances, context.MeshConfig)
 	outbound, outClusters := buildOutboundListeners(instances, services, context)
-	listeners := append(inbound, outbound...).normalize()
+
+	listeners := append(inbound, outbound...)
+	listeners.normalize()
+
 	clusters := append(inClusters, outClusters...).normalize()
 
 	// inject Mixer filter with proxy identities
@@ -190,48 +192,24 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 	}
 }
 
-// buildOutboundListeners combines HTTP and TCP outbound routes and creates listeners for them.
-// Returns TCP clusters
+// buildOutboundListeners combines HTTP routes and TCP listeners
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
 	context *ProxyContext) (Listeners, Clusters) {
-	listeners := make(Listeners, 0)
-	clusters := make(Clusters, 0)
-	httpOutbound, tcpOutbound := buildOutboundRoutes(instances, services, context)
+	httpOutbound := buildOutboundHTTPRoutes(instances, services, context)
+	listeners, clusters := buildOutboundTCPListeners(services)
 
 	for port, routeConfig := range httpOutbound {
-		// TODO(github.com/istio/manager/issues/237)
-		//
-		// Sharing tcp_proxy and http_connection_manager filters on
-		// the same port for different destination services doesn't work
-		// with Envoy (yet). When the tcp_proxy filter's route matching
-		// fails for the http service the connection is closed without
-		// falling back to the http_connection_manager.
-		//
-		// Temporary workaround is to not share ports between
-		// destination services. If the user does share ports, remove the
-		// TCP service from the envoy config and print a warning.
-		if config, ok := tcpOutbound[port]; ok {
-			glog.Warningf("TCP and HTTP services on same port not supported")
-			glog.Warningf("Omitting tcp service %v on port %v", config, port)
-			delete(tcpOutbound, port)
-		}
 		listeners = append(listeners, buildHTTPListener(routeConfig, WildcardAddress, port, true))
-	}
-
-	for port, tcpConfig := range tcpOutbound {
-		clusters = append(clusters, tcpConfig.clusters()...)
-		listeners = append(listeners, buildTCPListener(tcpConfig, WildcardAddress, port))
 	}
 
 	return listeners, clusters
 }
 
-// buildOutboundRoutes creates route configs indexed by ports for the traffic outbound
-// from the proxy instance
-func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.Service,
-	context *ProxyContext) (HTTPRouteConfigs, TCPRouteConfigs) {
+// buildOutboundHTTPRoutes creates HTTP route configs indexed by ports for the
+// traffic outbound from the proxy instance
+func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*model.Service,
+	context *ProxyContext) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
-	tcpConfigs := make(TCPRouteConfigs)
 
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
@@ -282,11 +260,7 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 				http.VirtualHosts = append(http.VirtualHosts, host)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				// TODO: Enable SSL context for TCP and HTTPS services.
-				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
-				route := buildTCPRoute(cluster, []string{service.Address}, servicePort.Port)
-				config := tcpConfigs.EnsurePort(servicePort.Port)
-				config.Routes = append(config.Routes, route)
+				// handled by buildOutboundTCPListeners
 
 			default:
 				glog.Warningf("Unsupported outbound protocol %v for port %#v", protocol, servicePort)
@@ -294,18 +268,40 @@ func buildOutboundRoutes(instances []*model.ServiceInstance, services []*model.S
 		}
 	}
 
-	// sort HTTP routes by virtual hosts
-	for _, routeConfig := range httpConfigs {
-		hosts := routeConfig.VirtualHosts
-		sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
-	}
+	httpConfigs.normalize()
+	return httpConfigs
+}
 
-	// sort TCP routes
-	for _, tcpConfig := range tcpConfigs {
-		sort.Sort(TCPRouteByRoute(tcpConfig.Routes))
+// buildOutboundTCPListeners lists listeners and referenced clusters for TCP
+// protocols (including HTTPS)
+//
+// TODO(github.com/istio/manager/issues/237)
+//
+// Sharing tcp_proxy and http_connection_manager filters on the same port for
+// different destination services doesn't work with Envoy (yet). When the
+// tcp_proxy filter's route matching fails for the http service the connection
+// is closed without falling back to the http_connection_manager.
+//
+// Temporary workaround is to add a listener for each service IP that requires
+// TCP routing
+func buildOutboundTCPListeners(services []*model.Service) (Listeners, Clusters) {
+	tcpListeners := make(Listeners, 0)
+	tcpClusters := make(Clusters, 0)
+	for _, service := range services {
+		for _, servicePort := range service.Ports {
+			switch servicePort.Protocol {
+			case model.ProtocolTCP, model.ProtocolHTTPS:
+				// TODO: Enable SSL context for TCP and HTTPS services.
+				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
+				route := buildTCPRoute(cluster, []string{service.Address})
+				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
+				listener := buildTCPListener(config, service.Address, servicePort.Port)
+				tcpClusters = append(tcpClusters, cluster)
+				tcpListeners = append(tcpListeners, listener)
+			}
+		}
 	}
-
-	return httpConfigs, tcpConfigs
+	return tcpListeners, tcpClusters
 }
 
 // buildInboundListeners creates listeners for the server-side (inbound)
@@ -334,6 +330,8 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 		// VIP. Localhost bypasses the proxy and doesn't need any TCP
 		// route config. Endpoint IP is handled below and Service IP is handled
 		// by outbound routes.
+		// Traffic sent to our service VIP is redirected by remote
+		// services' kubeproxy to our specific endpoint IP.
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			route := buildDefaultRoute(cluster)
@@ -359,18 +357,9 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 				buildHTTPListener(config, endpoint.Address, endpoint.Port, false))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
-			// Traffic sent to our service VIP is redirected by remote
-			// services' kubeproxy to our specific endpoint IP.
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address}, -1)},
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
 			}, endpoint.Address, endpoint.Port))
-
-			// Traffic sent to our service VIP by a container
-			// co-located in our same pod will be intercepted by envoy
-			// proxy before it is redirected to the endpoint IP.
-			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{service.Address}, -1)},
-			}, service.Address, servicePort.Port))
 
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %#v", protocol, servicePort)

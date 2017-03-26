@@ -259,6 +259,14 @@ func (routes HTTPRouteConfigs) clusters() Clusters {
 	return out
 }
 
+func (routes HTTPRouteConfigs) normalize() {
+	// sort HTTP routes by virtual hosts, rest should be deterministic
+	for _, routeConfig := range routes {
+		hosts := routeConfig.VirtualHosts
+		sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
+	}
+}
+
 // faults aggregates fault filters across virtual hosts in single http_conn_man
 func (rc *HTTPRouteConfig) faults() []*HTTPFilter {
 	out := make([]*HTTPFilter, 0)
@@ -368,20 +376,6 @@ type TCPRouteConfig struct {
 	Routes []*TCPRoute `json:"routes"`
 }
 
-// TCPRouteConfigs is a map from the port number to the route config
-type TCPRouteConfigs map[int]*TCPRouteConfig
-
-// EnsurePort creates a route config if necessary
-func (hosts TCPRouteConfigs) EnsurePort(port int) *TCPRouteConfig {
-	config, ok := hosts[port]
-	if !ok {
-		config = &TCPRouteConfig{}
-		hosts[port] = config
-	}
-	return config
-}
-
-// filterClusters aggregates clusters across TCP routes
 func (rc *TCPRouteConfig) clusters() Clusters {
 	out := make(Clusters, 0)
 	for _, route := range rc.Routes {
@@ -409,10 +403,8 @@ type Listener struct {
 // Listeners is a collection of listeners
 type Listeners []*Listener
 
-// normalize outputs the canonical form (modifies the slice)
-func (listeners Listeners) normalize() Listeners {
+func (listeners Listeners) normalize() {
 	sort.Slice(listeners, func(i, j int) bool { return listeners[i].Address < listeners[j].Address })
-	return listeners
 }
 
 // SSLContext definition

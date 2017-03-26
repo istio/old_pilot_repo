@@ -140,7 +140,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	addrs := map[string]bool{ip: true}
 	instances := ds.services.HostInstances(addrs)
 	services := ds.services.Services()
-	httpRouteConfigs, _ := buildOutboundRoutes(instances, services, &ProxyContext{
+	httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
 		Discovery:  ds.services,
 		Config:     ds.config,
 		MeshConfig: ds.mesh,
@@ -150,6 +150,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	// de-duplicate and canonicalize clusters
 	clusters := httpRouteConfigs.clusters().normalize()
 
+	// apply custom policies for HTTP clusters
 	for _, cluster := range clusters {
 		insertDestinationPolicy(ds.config, cluster)
 	}
@@ -182,7 +183,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 	addrs := map[string]bool{ip: true}
 	instances := ds.services.HostInstances(addrs)
 	services := ds.services.Services()
-	httpRouteConfigs, _ := buildOutboundRoutes(instances, services, &ProxyContext{
+	httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
 		Discovery:  ds.services,
 		Config:     ds.config,
 		MeshConfig: ds.mesh,

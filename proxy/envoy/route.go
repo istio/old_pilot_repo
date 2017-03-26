@@ -20,7 +20,6 @@ package envoy
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -297,13 +296,12 @@ func sharedHost(parts ...[]string) []string {
 	}
 }
 
-func buildTCPRoute(cluster *Cluster, addresses []string, port int) *TCPRoute {
+func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
+	// destination port is unnecessary with use_original_dst since
+	// the listener address already contains the port
 	route := &TCPRoute{
 		Cluster:    cluster.Name,
 		clusterRef: cluster,
-	}
-	if port >= 0 {
-		route.DestinationPorts = strconv.Itoa(port)
 	}
 	sort.Sort(sort.StringSlice(addresses))
 	for _, addr := range addresses {
