@@ -376,14 +376,6 @@ type TCPRouteConfig struct {
 	Routes []*TCPRoute `json:"routes"`
 }
 
-func (rc *TCPRouteConfig) clusters() Clusters {
-	out := make(Clusters, 0)
-	for _, route := range rc.Routes {
-		out = append(out, route.clusterRef)
-	}
-	return out
-}
-
 // NetworkFilter definition
 type NetworkFilter struct {
 	Type   string      `json:"type"`
