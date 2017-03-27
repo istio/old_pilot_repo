@@ -20,7 +20,7 @@
                     {
                       "prefix": "/hello",
                       "host_rewrite": "world.default.svc.cluster.local:80",
-                      "cluster": "out:world.default.svc.cluster.local:http"
+                      "cluster": "out.world.default.svc.cluster.local|http"
                     }
                   ]
                 }
@@ -51,8 +51,8 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "out:world.default.svc.cluster.local:http",
-        "service_name": "world.default.svc.cluster.local:http",
+        "name": "out.world.default.svc.cluster.local|http",
+        "service_name": "world.default.svc.cluster.local|http",
         "connect_timeout_ms": 1000,
         "type": "sds",
         "lb_type": "round_robin"
