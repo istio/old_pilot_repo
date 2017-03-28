@@ -40,8 +40,8 @@ func TestIngressClass(t *testing.T) {
 	defer deleteNamespace(cl.client, ns)
 
 	cases := []struct {
-		ingressMode IngressSyncMode
-		ingressClass string
+		ingressMode   IngressSyncMode
+		ingressClass  string
 		shouldProcess bool
 	}{
 		{ingressMode: IngressDefault, ingressClass: "nginx", shouldProcess: false},
@@ -68,10 +68,10 @@ func TestIngressClass(t *testing.T) {
 		}
 
 		ctl := NewController(cl, ControllerConfig{
-			Namespace: ns,
-			ResyncPeriod: resync,
+			Namespace:       ns,
+			ResyncPeriod:    resync,
 			IngressSyncMode: c.ingressMode,
-			IngressClass: "istio",
+			IngressClass:    "istio",
 		})
 
 		if c.ingressClass != "" {
@@ -326,7 +326,10 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "pod4", "nsA", "acct3", t)
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "pod5", "nsB", "acct4", t)
 
-	controller := NewController(&Client{client: clientSet}, ControllerConfig{Namespace: "default", ResyncPeriod: 100 * time.Millisecond})
+	controller := NewController(&Client{client: clientSet}, ControllerConfig{
+		Namespace:    "default",
+		ResyncPeriod: 100 * time.Millisecond,
+	})
 
 	createService(controller, "svc1", "nsA", map[string]string{"app": "prod-app"}, t)
 	createService(controller, "svc2", "nsA", map[string]string{"app": "staging-app"}, t)
