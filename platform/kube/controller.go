@@ -42,6 +42,12 @@ const (
 	ingressClass           = "istio"
 )
 
+// ControllerConfig stores the configurable attributes of a Controller.
+type ControllerConfig struct {
+	Namespace                string
+	ResyncPeriod             time.Duration
+}
+
 // Controller is a collection of synchronized resource watchers
 // Caches are thread-safe
 type Controller struct {
@@ -62,11 +68,7 @@ type cacheHandler struct {
 }
 
 // NewController creates a new Kubernetes controller
-func NewController(
-	client *Client,
-	namespace string,
-	resyncPeriod time.Duration,
-) *Controller {
+func NewController(client *Client, config ControllerConfig) *Controller {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
 		client: client,
@@ -74,45 +76,45 @@ func NewController(
 		kinds:  make(map[string]cacheHandler),
 	}
 
-	out.services = out.createInformer(&v1.Service{}, resyncPeriod,
+	out.services = out.createInformer(&v1.Service{}, config.ResyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Services(namespace).List(opts)
+			return client.client.CoreV1().Services(config.Namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Services(namespace).Watch(opts)
+			return client.client.CoreV1().Services(config.Namespace).Watch(opts)
 		})
 
-	out.endpoints = out.createInformer(&v1.Endpoints{}, resyncPeriod,
+	out.endpoints = out.createInformer(&v1.Endpoints{}, config.ResyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Endpoints(namespace).List(opts)
+			return client.client.CoreV1().Endpoints(config.Namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Endpoints(namespace).Watch(opts)
+			return client.client.CoreV1().Endpoints(config.Namespace).Watch(opts)
 		})
 
-	out.pods = newPodCache(out.createInformer(&v1.Pod{}, resyncPeriod,
+	out.pods = newPodCache(out.createInformer(&v1.Pod{}, config.ResyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Pods(namespace).List(opts)
+			return client.client.CoreV1().Pods(config.Namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Pods(namespace).Watch(opts)
+			return client.client.CoreV1().Pods(config.Namespace).Watch(opts)
 		}))
 
-	out.ingresses = out.createInformer(&v1beta1.Ingress{}, resyncPeriod,
+	out.ingresses = out.createInformer(&v1beta1.Ingress{}, config.ResyncPeriod,
 		func(opts v1.ListOptions) (runtime.Object, error) {
-			return client.client.ExtensionsV1beta1().Ingresses(namespace).List(opts)
+			return client.client.ExtensionsV1beta1().Ingresses(config.Namespace).List(opts)
 		},
 		func(opts v1.ListOptions) (watch.Interface, error) {
-			return client.client.ExtensionsV1beta1().Ingresses(namespace).Watch(opts)
+			return client.client.ExtensionsV1beta1().Ingresses(config.Namespace).Watch(opts)
 		})
 
 	// add stores for TPR kinds
 	for _, kind := range []string{IstioKind} {
-		out.kinds[kind] = out.createInformer(&Config{}, resyncPeriod,
+		out.kinds[kind] = out.createInformer(&Config{}, config.ResyncPeriod,
 			func(opts v1.ListOptions) (result runtime.Object, err error) {
 				result = &ConfigList{}
 				err = client.dyn.Get().
-					Namespace(namespace).
+					Namespace(config.Namespace).
 					Resource(kind+"s").
 					VersionedParams(&opts, api.ParameterCodec).
 					Do().
@@ -122,7 +124,7 @@ func NewController(
 			func(opts v1.ListOptions) (watch.Interface, error) {
 				return client.dyn.Get().
 					Prefix("watch").
-					Namespace(namespace).
+					Namespace(config.Namespace).
 					Resource(kind+"s").
 					VersionedParams(&opts, api.ParameterCodec).
 					Watch()

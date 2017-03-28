@@ -79,7 +79,7 @@ func TestController(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	ctl := NewController(cl, ns, resync)
+	ctl := NewController(cl, ControllerConfig{Namespace: ns, ResyncPeriod: resync})
 	added, deleted := 0, 0
 	n := 5
 	err := ctl.AppendConfigHandler(mock.Kind, func(k model.Key, o proto.Message, ev model.Event) {
@@ -112,7 +112,7 @@ func TestControllerCacheFreshness(t *testing.T) {
 	ns := makeNamespace(cl.client, t)
 	defer deleteNamespace(cl.client, ns)
 	stop := make(chan struct{})
-	ctl := NewController(cl, ns, resync)
+	ctl := NewController(cl, ControllerConfig{Namespace: ns, ResyncPeriod: resync})
 
 	// test interface implementation
 	var _ model.Controller = ctl
@@ -182,7 +182,7 @@ func TestControllerClientSync(t *testing.T) {
 	}
 
 	// check in the controller cache
-	ctl := NewController(cl, ns, resync)
+	ctl := NewController(cl, ControllerConfig{Namespace: ns, ResyncPeriod: resync})
 	go ctl.Run(stop)
 	eventually(func() bool { return ctl.HasSynced() }, t)
 	os, _ := ctl.List(mock.Kind, ns)
@@ -254,7 +254,7 @@ func TestServices(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	ctl := NewController(cl, ns, resync)
+	ctl := NewController(cl, ControllerConfig{Namespace: ns, ResyncPeriod: resync})
 	go ctl.Run(stop)
 
 	hostname := fmt.Sprintf("%s.%s.%s", testService, ns, ServiceSuffix)
@@ -312,7 +312,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "pod4", "nsA", "acct3", t)
 	createPod(clientSet, map[string]string{"app": "prod-app"}, "pod5", "nsB", "acct4", t)
 
-	controller := NewController(&Client{client: clientSet}, "default", 100*time.Millisecond)
+	controller := NewController(&Client{client: clientSet}, ControllerConfig{Namespace: "default", ResyncPeriod: 100 * time.Millisecond})
 
 	createService(controller, "svc1", "nsA", map[string]string{"app": "prod-app"}, t)
 	createService(controller, "svc2", "nsA", map[string]string{"app": "staging-app"}, t)
