@@ -12,14 +12,23 @@ import (
 )
 
 const (
-	ingressEnvoyV0Config = "testdata/ingress-envoy-v0.json"
+	ingressEnvoyConfig = "testdata/ingress-envoy.json"
+	ingressEnvoySSLConfig = "testdata/ingress-envoy-ssl.json"
 	ingressRouteRule     = "testdata/ingress-route.yaml.golden"
+	ingressCertFile = "testdata/tls.crt"
+	ingressKeyFile = "testdata/tls.key"
+	ingressSecret = "secret"
+)
+
+var (
+	ingressCert = []byte("abcdefghijklmnop")
+	ingressKey = []byte("qrstuvwxyz123456")
 )
 
 func compareFile(filename string, expect []byte, t *testing.T) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		t.Fatalf("Error loading %s", filename)
+		t.Fatalf("Error loading %s: %s", filename, err.Error())
 	}
 	if !reflect.DeepEqual(data, expect) {
 		diff := difflib.UnifiedDiff{
@@ -64,32 +73,29 @@ func TestIngressRoutes(t *testing.T) {
 	testIngressConfig(&IngressContext{
 		Registry: r,
 		Mesh: DefaultMeshConfig,
-	}, ingressEnvoyV0Config, t)
+	}, ingressEnvoyConfig, t)
 }
 
 func TestIngressRoutesSSL(t *testing.T) {
-	crt := []byte("abcdefghijklmnop")
-	key := []byte("qrstuvwxyz123456")
-
 	r := mock.MakeRegistry()
 	s := mock.SecretRegistry{
 		Secrets: map[string]map[string][]byte {
-			"secret": {
-				"tls.crt": crt,
-				"tls.key": key,
+			ingressSecret + ".default": {
+				"tls.crt": ingressCert,
+				"tls.key": ingressKey,
 			},
 		},
 	}
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressContext{
-		CertFilename: "testdata/tls.crt",
-		KeyFilename: "testdata/tls.key",
+		CertFile: ingressCertFile,
+		KeyFile: ingressKeyFile,
 		Namespace: "",
-		Secret: "secret",
+		Secret: ingressSecret,
 		Secrets: &s,
 		Registry: r,
 		Mesh: DefaultMeshConfig,
-	}, ingressEnvoyV0Config, t)
-	compareFile("testdata/tls.crt", crt, t)
-	compareFile("testdata/tls.key", key, t)
+	}, ingressEnvoySSLConfig, t)
+	compareFile(ingressCertFile, ingressCert, t)
+	compareFile(ingressKeyFile, ingressKey, t)
 }

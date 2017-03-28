@@ -84,13 +84,13 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 
 type IngressContext struct {
 	// TODO: cert/key filenames will need to be dynamic for multiple key/cert pairs
-	CertFilename string
-	KeyFilename  string
-	Namespace    string
-	Secret       string
-	Secrets      model.SecretRegistry
-	Registry     *model.IstioRegistry
-	Mesh         *MeshConfig
+	CertFile  string
+	KeyFile   string
+	Namespace string
+	Secret    string
+	Secrets   model.SecretRegistry
+	Registry  *model.IstioRegistry
+	Mesh      *MeshConfig
 }
 
 func generateIngress(context *IngressContext) *Config {
@@ -167,11 +167,11 @@ func generateIngress(context *IngressContext) *Config {
 		// configure Envoy
 		listener.Address = "tcp://0.0.0.0:443"
 		listener.SSLContext = &SSLContext{
-			CertChainFile:  context.CertFilename,
-			PrivateKeyFile: context.KeyFilename,
+			CertChainFile:  context.CertFile,
+			PrivateKeyFile: context.KeyFile,
 		}
 
-		if err := writeTLS(context.CertFilename, context.KeyFilename, context.Namespace,
+		if err := writeTLS(context.CertFile, context.KeyFile, context.Namespace,
 			context.Secret, context.Secrets); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
