@@ -34,15 +34,22 @@ import (
 	"istio.io/manager/test/mock"
 )
 
-func TestIngressIgnored(t *testing.T) {
+func TestIngressClass(t *testing.T) {
+	cl := makeClient(t)
+	ns := makeNamespace(cl.client, t)
+	defer deleteNamespace(cl.client, ns)
+
 	cases := []struct {
+		ingressMode IngressSyncMode
 		ingressClass string
-		shouldIgnore bool
+		shouldProcess bool
 	}{
-		{ingressClass: "nginx", shouldIgnore: true},
-		{ingressClass: "istio", shouldIgnore: false},
-		{ingressClass: "Istio", shouldIgnore: false},
-		{ingressClass: "", shouldIgnore: false},
+		{ingressMode: IngressDefault, ingressClass: "nginx", shouldProcess: false},
+		{ingressMode: IngressStrict, ingressClass: "nginx", shouldProcess: false},
+		{ingressMode: IngressDefault, ingressClass: "istio", shouldProcess: true},
+		{ingressMode: IngressStrict, ingressClass: "istio", shouldProcess: true},
+		{ingressMode: IngressDefault, ingressClass: "", shouldProcess: true},
+		{ingressMode: IngressStrict, ingressClass: "", shouldProcess: false},
 	}
 
 	for _, c := range cases {
@@ -60,13 +67,20 @@ func TestIngressIgnored(t *testing.T) {
 			},
 		}
 
+		ctl := NewController(cl, ControllerConfig{
+			Namespace: ns,
+			ResyncPeriod: resync,
+			IngressSyncMode: c.ingressMode,
+			IngressClass: "istio",
+		})
+
 		if c.ingressClass != "" {
 			ingress.Annotations["kubernetes.io/ingress.class"] = c.ingressClass
 		}
 
-		if c.shouldIgnore != ingressIgnored(&ingress) {
-			t.Errorf("ingressIgnored(<ingress of class '%s'>) => %v, want %v",
-				c.ingressClass, !c.shouldIgnore, c.shouldIgnore)
+		if c.shouldProcess != ctl.shouldProcessIngress(&ingress) {
+			t.Errorf("shouldProcessIngress(<ingress of class '%s'>) => %v, want %v",
+				c.ingressClass, !c.shouldProcess, c.shouldProcess)
 		}
 	}
 }
