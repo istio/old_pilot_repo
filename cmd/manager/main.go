@@ -92,9 +92,16 @@ var (
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			w, err := envoy.NewIngressWatcher(controller, controller,
-				&model.IstioRegistry{ConfigRegistry: controller},
-				cmd.Client, &flags.proxy, flags.ingressSecret, cmd.RootFlags.Namespace)
+			context := &envoy.IngressContext{
+				CertFilename: "/etc/tls.crt",
+				KeyFilename: "/etc/tls.key",
+				Namespace: cmd.RootFlags.Namespace,
+				Secret: flags.ingressSecret,
+				Secrets: cmd.Client,
+				Registry: &model.IstioRegistry{ConfigRegistry: controller},
+				Mesh: &flags.proxy,
+			}
+			w, err := envoy.NewIngressWatcher(controller, context)
 			if err != nil {
 				return err
 			}
