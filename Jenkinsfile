@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-afad32f')
+@Library('testutils@stable-3e4d089')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -16,13 +16,17 @@ mainFlow(utils) {
     gitUtils.initialize()
     bazel.setVars()
   }
-
   if (utils.runStage('PRESUBMIT')) {
     presubmit(gitUtils, bazel, utils)
   }
-
   if (utils.runStage('POSTSUBMIT')) {
     postsubmit(gitUtils, bazel, utils)
+  }
+  if (utils.runStage('STABLE_PRESUBMIT')) {
+    stablePresubmit(gitUtils, bazel, utils)
+  }
+  if (utils.runStage('STABLE_POSTSUBMIT')) {
+    stablePostsubmit(gitUtils, bazel, utils)
   }
 }
 
@@ -37,10 +41,8 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
-    stage('Go Build') {
-      sh('bin/init.sh')
-    }
     stage('Code Check') {
+      sh('bin/init.sh')
       sh('bin/check.sh')
     }
     stage('Bazel Tests') {
@@ -52,8 +54,41 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh('bin/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh("bin/e2e.sh -tag alpha${gitUtils.GIT_SHA} -v 2")
       }
+    }
+    stage('Build istioctl') {
+      def remotePath = gitUtils.artifactsPath('istioctl')
+      sh("bin/cross-compile-istioctl -p ${remotePath}")
+    }
+  }
+}
+
+def stablePresubmit(gitUtils, bazel, utils) {
+  goBuildNode(gitUtils, 'istio.io/manager') {
+    bazel.updateBazelRc()
+    utils.initTestingCluster()
+    sh('ln -s ~/.kube/config platform/kube/')
+    stage('Integration Tests') {
+      timeout(30) {
+        sh("bin/e2e.sh -count 10 -debug -tag debug${gitUtils.GIT_SHA} -v 2")
+      }
+    }
+  }
+}
+
+def stablePostsubmit(gitUtils, bazel, utils) {
+  goBuildNode(gitUtils, 'istio.io/manager') {
+    bazel.updateBazelRc()
+    stage('Docker Push') {
+      def images = 'init,init_debug,app,app_debug,proxy,proxy_debug,manager,manager_debug'
+      def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
+      utils.publishDockerImagesToDockerHub(images, tags)
+      utils.publishDockerImagesToContainerRegistry(images, tags, '', 'gcr.io/istio-io')
+    }
+    stage('Build istioctl') {
+      def remotePath = gitUtils.artifactsPath('istioctl')
+      sh("bin/cross-compile-istioctl -p ${remotePath}")
     }
   }
 }
@@ -69,16 +104,6 @@ def postsubmit(gitUtils, bazel, utils) {
       sh('bin/init.sh')
       sh('bin/codecov.sh')
       utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
-    }
-    stage('Docker Push') {
-      def images = 'init,init_debug,app,app_debug,proxy,proxy_debug,manager,manager_debug'
-      def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
-      utils.publishDockerImages(images, tags)
-    }
-    stage('Integration Tests') {
-      timeout(30) {
-        sh('bin/e2e.sh -count 10 -debug -tag debug' + gitUtils.GIT_SHA + ' -v 2')
-      }
     }
   }
 }
