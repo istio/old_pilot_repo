@@ -36,8 +36,7 @@ const (
 	OutboundClusterPrefix = "out."
 )
 
-// buildListenerSSLContext returns an SSLContext struct when auth is enabled.
-// Otherwise, it returns nil. This is used in listener SSLContext.
+// buildListenerSSLContext returns an SSLContext struct.
 func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
 	return &SSLContext{
 		CertChainFile:  mesh.AuthConfigPath + "/cert-chain.pem",
@@ -46,8 +45,7 @@ func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
 	}
 }
 
-// buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.
-// Otherwise, it returns nil. This is used in cluster SSLContext
+// buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName.
 func buildClusterSSLContext(hostname string, context *ProxyContext) *SSLContextWithSAN {
 	mesh := context.MeshConfig
 	serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
