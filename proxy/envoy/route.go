@@ -46,7 +46,7 @@ func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
 			CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
 		}
 	}
-	return nil
+	return &SSLContext{}
 }
 
 // buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.
@@ -62,7 +62,7 @@ func buildClusterSSLContext(hostname string, context *ProxyContext) *SSLContextW
 			VerifySubjectAltName: serviceAccounts,
 		}
 	}
-	return nil
+	return &SSLContextWithSAN{}
 }
 
 func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
