@@ -228,7 +228,6 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 	// map for each service port to define filters
 	for _, service := range services {
 		var sslContext *SSLContextWithSAN
-		// Build the sslContext for http inbound listener (only inbound listener does not use rds)
 		if context.MeshConfig.EnableAuth {
 			sslContext = buildClusterSSLContext(service.Hostname, context)
 		}
