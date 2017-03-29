@@ -39,30 +39,24 @@ const (
 // buildListenerSSLContext returns an SSLContext struct when auth is enabled.
 // Otherwise, it returns nil. This is used in listener SSLContext.
 func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
-	if mesh.EnableAuth {
-		return &SSLContext{
-			CertChainFile:  mesh.AuthConfigPath + "/cert-chain.pem",
-			PrivateKeyFile: mesh.AuthConfigPath + "/key.pem",
-			CaCertFile:     mesh.AuthConfigPath + "/root-cert.pem",
-		}
+	return &SSLContext{
+		CertChainFile:  mesh.AuthConfigPath + "/cert-chain.pem",
+		PrivateKeyFile: mesh.AuthConfigPath + "/key.pem",
+		CaCertFile:     mesh.AuthConfigPath + "/root-cert.pem",
 	}
-	return nil
 }
 
 // buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.
 // Otherwise, it returns nil. This is used in cluster SSLContext
 func buildClusterSSLContext(hostname string, context *ProxyContext) *SSLContextWithSAN {
 	mesh := context.MeshConfig
-	if mesh.EnableAuth {
-		serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
-		return &SSLContextWithSAN{
-			CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
-			PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
-			CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
-			VerifySubjectAltName: serviceAccounts,
-		}
+	serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
+	return &SSLContextWithSAN{
+		CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
+		PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
+		CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
+		VerifySubjectAltName: serviceAccounts,
 	}
-	return nil
 }
 
 func buildDefaultRoute(cluster *Cluster) *HTTPRoute {

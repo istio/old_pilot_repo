@@ -227,7 +227,11 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
-		sslContext := buildClusterSSLContext(service.Hostname, context)
+		var sslContext *SSLContextWithSAN
+		// Build the sslContext for http inbound listener (only inbound listener does not use rds)
+		if context.MeshConfig.EnableAuth {
+			sslContext = buildClusterSSLContext(service.Hostname, context)
+		}
 		for _, servicePort := range service.Ports {
 			protocol := servicePort.Protocol
 			switch protocol {
