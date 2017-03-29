@@ -34,6 +34,151 @@ import (
 	"istio.io/manager/test/mock"
 )
 
+func TestIngressController(t *testing.T) {
+	cl := makeClient(t)
+	ns := makeNamespace(cl.client, t)
+	defer deleteNamespace(cl.client, ns)
+
+	ctl := NewController(cl, ControllerConfig{
+		Namespace:       ns,
+		ResyncPeriod:    resync,
+		IngressSyncMode: IngressDefault,
+		IngressClass:    "istio",
+	})
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go ctl.Run(stop)
+
+	// Append an ingress notification handler that just counts number of notifications
+	notificationCount := 0
+	_ = ctl.AppendConfigHandler(model.IngressRule, func(key model.Key, msg proto.Message, ev model.Event) {
+		notificationCount++
+	})
+
+	// Create an ingress resource of a different class,
+	// So that we can later verify it doesn't generate a notification,
+	// nor returned with List(), Get() etc.
+	nginxIngress := v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "nginx-ingress",
+			Namespace: ns,
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class": "nginx",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Backend: &v1beta1.IngressBackend{
+				ServiceName: "service1",
+				ServicePort: intstr.FromInt(80),
+			},
+		},
+	}
+	createIngress(&nginxIngress, cl.client, t)
+
+	// Create a "real" ingress resource, with 4 host/path rules and an additional "default" rule.
+	const expectedRuleCount = 5
+	ingress := v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test-ingress",
+			Namespace: ns,
+		},
+		Spec: v1beta1.IngressSpec{
+			Backend: &v1beta1.IngressBackend{
+				ServiceName: "default-service",
+				ServicePort: intstr.FromInt(80),
+			},
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "host1.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/path1",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "service1",
+										ServicePort: intstr.FromInt(80),
+									},
+								},
+								{
+									Path: "/path2",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "service2",
+										ServicePort: intstr.FromInt(80),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Host: "host2.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/path3",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "service3",
+										ServicePort: intstr.FromInt(80),
+									},
+								},
+								{
+									Path: "/path4",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "service4",
+										ServicePort: intstr.FromInt(80),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	createIngress(&ingress, cl.client, t)
+
+	eventually(func() bool {
+		return notificationCount == expectedRuleCount
+	}, t)
+	if notificationCount != expectedRuleCount {
+		t.Errorf("expected %d IngressRule events to be notified, found %d", expectedRuleCount, notificationCount)
+	}
+
+	eventually(func() bool {
+		rules, _ := ctl.List(model.IngressRule, ns)
+		return len(rules) == expectedRuleCount
+	}, t)
+	rules, err := ctl.List(model.IngressRule, ns)
+	if err != nil {
+		t.Errorf("ctl.List(model.IngressRule, %s) => error: %v", ns, err)
+	}
+	if len(rules) != expectedRuleCount {
+		t.Errorf("expected %d IngressRule objects to be created, found %d", expectedRuleCount, len(rules))
+	}
+
+	for key, listMsg := range rules {
+		getMsg, exists := ctl.Get(key)
+		if !exists {
+			t.Errorf("expected IngressRule with key %v to exist", key)
+
+			listRule := listMsg.(*proxyconfig.RouteRule)
+			getRule := getMsg.(*proxyconfig.RouteRule)
+
+			// TODO:  Compare listRule and getRule objects
+			if listRule == nil {
+				t.Errorf("expected listRule to be of type *proxyconfig.RouteRule")
+			}
+			if getRule == nil {
+				t.Errorf("expected getRule to be of type *proxyconfig.RouteRule")
+			}
+		}
+	}
+
+}
+
 func TestIngressClass(t *testing.T) {
 	cl := makeClient(t)
 	ns := makeNamespace(cl.client, t)
@@ -393,6 +538,12 @@ func createPod(client kubernetes.Interface, labels map[string]string, name strin
 	}
 	if _, err := client.CoreV1().Pods(namespace).Create(pod); err != nil {
 		t.Errorf("Cannot create pod in namespace %s (error: %v)", namespace, err)
+	}
+}
+
+func createIngress(ingress *v1beta1.Ingress, client kubernetes.Interface, t *testing.T) {
+	if _, err := client.ExtensionsV1beta1().Ingresses(ingress.Namespace).Create(ingress); err != nil {
+		t.Errorf("Cannot create ingress in namespace %s (error: %v)", ingress.Namespace, err)
 	}
 }
 
