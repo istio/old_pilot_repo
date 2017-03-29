@@ -99,3 +99,68 @@ func TestBogusExplicitKubeConfig(t *testing.T) {
 		t.Fatalf("Did not fail setting up client with bogus kubeconfig: %v", err)
 	}
 }
+
+func TestGet(t *testing.T) {
+	rootSetup(t)
+	file = "testdata/dest-policy.yaml"
+	if err := postCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not create destination policy: %v", err)
+	}
+
+	if err := getCmd.RunE(getCmd, []string{"destination-policy", "world-cb"}); err != nil {
+		t.Fatalf("Did not find world-cb %v", err)
+	}
+
+	if err := deleteCmd.RunE(deleteCmd, []string{"destination-policy", "world-cb"}); err != nil {
+		t.Fatalf("Could not delete world-cb: %v", err)
+	}
+
+	if err := getCmd.RunE(getCmd, []string{"destination-policy", "world-cb"}); err == nil {
+		t.Fatalf("Found world-cb after deletion ")
+	}
+}
+
+func TestNewGet(t *testing.T) {
+	rootSetup(t)
+
+	file = "testdata/dest-policy.yaml"
+	if err := postCmd.RunE(postCmd, []string{}); err != nil {
+		t.Fatalf("Could not create destination policy: %v", err)
+	}
+
+	if err := getCmd.RunE(getCmd, []string{"route-rule"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	// Plural form
+	if err := getCmd.RunE(getCmd, []string{"route-rules"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	// Short output
+	outputFormat = "short"
+	if err := getCmd.RunE(getCmd, []string{"route-rules"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	// YAML output
+	outputFormat = "yaml"
+	if err := getCmd.RunE(getCmd, []string{"route-rules"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	// Singular form
+	if err := getCmd.RunE(getCmd, []string{"destination-policy"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	// Plural form
+	if err := getCmd.RunE(getCmd, []string{"destination-policies"}); err != nil {
+		t.Fatalf("Could not list routes: %v", err)
+	}
+
+	if err := deleteCmd.RunE(deleteCmd, []string{"destination-policy", "world-cb"}); err != nil {
+		t.Fatalf("Could not delete world-cb: %v", err)
+	}
+
+}
