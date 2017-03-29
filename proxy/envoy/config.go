@@ -169,10 +169,8 @@ func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string
 
 	var sslContext *SSLContext
 	// Build the sslContext for http inbound listener (only inbound listener does not use rds)
-	if !rds {
+	if !rds && mesh.EnableAuth {
 		sslContext = buildListenerSSLContext(mesh)
-	} else {
-		sslContext = nil
 	}
 
 	return &Listener{
