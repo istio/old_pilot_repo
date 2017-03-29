@@ -41,12 +41,12 @@ const (
 func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
 	if mesh.EnableAuth {
 		return &SSLContext{
-			CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
-			PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
-			CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
+			CertChainFile:  mesh.AuthConfigPath + "/cert-chain.pem",
+			PrivateKeyFile: mesh.AuthConfigPath + "/key.pem",
+			CaCertFile:     mesh.AuthConfigPath + "/root-cert.pem",
 		}
 	}
-	return nil 
+	return nil
 }
 
 // buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName when auth is enabled.

@@ -257,10 +257,10 @@ func compareJSON(jsonFile string, t *testing.T) {
 
 func testConfig(r *model.IstioRegistry, instance, envoyConfig string, t *testing.T, enableAuth bool) {
 	meshConfig := *DefaultMeshConfig
- 	if (enableAuth) {
- 		meshConfig.EnableAuth = true
- 		meshConfig.AuthConfigPath = "/etc/certs"
- 	}
+	if enableAuth {
+		meshConfig.EnableAuth = true
+		meshConfig.AuthConfigPath = "/etc/certs"
+	}
 
 	config := Generate(&ProxyContext{
 		Discovery:  mock.Discovery,

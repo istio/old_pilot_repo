@@ -174,7 +174,7 @@ func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string
 	}
 
 	return &Listener{
-		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+		Address:    fmt.Sprintf("tcp://%s:%d", ip, port),
 		SSLContext: sslContext,
 		Filters: []*NetworkFilter{{
 			Type:   "read",
