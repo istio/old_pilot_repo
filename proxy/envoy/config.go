@@ -139,7 +139,7 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 // buildHTTPListener constructs a listener for the network interface address and port
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
-func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int, rds bool) *Listener {
+func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int, rds bool, isInbound bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -169,7 +169,7 @@ func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string
 
 	var sslContext *SSLContext
 	// Build the sslContext for http inbound listener (only inbound listener does not use rds)
-	if !rds && mesh.EnableAuth {
+	if isInbound && mesh.EnableAuth {
 		sslContext = buildListenerSSLContext(mesh)
 	}
 
@@ -206,7 +206,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 	listeners, clusters := buildOutboundTCPListeners(services)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true))
+		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
 	}
 
 	return listeners, clusters
@@ -365,7 +365,7 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false))
+				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, true))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
