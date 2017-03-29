@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-afad32f')
+@Library('testutils@stable-2015adc')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -52,7 +52,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh('bin/e2e.sh -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh("bin/e2e.sh -tag alpha${gitUtils.GIT_SHA} -v 2")
       }
     }
   }
@@ -77,7 +77,7 @@ def postsubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(30) {
-        sh('bin/e2e.sh -count 10 -debug -tag alpha' + gitUtils.GIT_SHA + ' -v 2')
+        sh("bin/e2e.sh -count 10 -debug -tag alpha${gitUtils.GIT_SHA} -v 2")
       }
     }
   }
