@@ -36,6 +36,7 @@ var (
 	sidecarProxyPort int
 	runtimeVerbosity int
 	versionStr       string // override build version
+	enableCoreDump   bool
 
 	inFilename  string
 	outFilename string
@@ -99,6 +100,7 @@ Example usage:
 				SidecarProxyUID:  sidecarProxyUID,
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
+				EnableCoreDump:   enableCoreDump,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
 		},
@@ -126,5 +128,7 @@ func init() {
 		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
+	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
+		true, "Enable/Disable core dumps in injected proxy")
 	cmd.RootCmd.AddCommand(injectCmd)
 }
