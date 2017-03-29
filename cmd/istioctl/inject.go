@@ -128,7 +128,14 @@ func init() {
 		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
+
+	// Default --coreDump=true for pre-alpha development. Core dump
+	// settings (i.e. sysctl kernel.*) affect all pods in a node and
+	// require privileges. This option should only be used by the cluster
+	// admin (see https://kubernetes.io/docs/concepts/cluster-administration/sysctl-cluster/)
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
-		true, "Enable/Disable core dumps in injected proxy")
+		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
+			"all pods in a node and should only be used the cluster admin)")
+
 	cmd.RootCmd.AddCommand(injectCmd)
 }
