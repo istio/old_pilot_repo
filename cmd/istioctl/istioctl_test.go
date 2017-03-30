@@ -107,6 +107,7 @@ func TestGet(t *testing.T) {
 		t.Fatalf("Could not create destination policy: %v", err)
 	}
 
+	file = ""
 	if err := getCmd.RunE(getCmd, []string{"destination-policy", "world-cb"}); err != nil {
 		t.Fatalf("Did not find world-cb %v", err)
 	}
@@ -128,6 +129,7 @@ func TestNewGet(t *testing.T) {
 		t.Fatalf("Could not create destination policy: %v", err)
 	}
 
+	file = ""
 	if err := getCmd.RunE(getCmd, []string{"route-rule"}); err != nil {
 		t.Fatalf("Could not list routes: %v", err)
 	}

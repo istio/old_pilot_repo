@@ -149,7 +149,9 @@ var (
 					"short": printShortOutput,
 				}
 				if outputFunc, ok := outputters[outputFormat]; ok {
-					outputFunc(list)
+					if err := outputFunc(list); err != nil {
+						return err
+					}
 				} else {
 					return fmt.Errorf("Unknown output format %v. Types are yaml|short", outputFormat)
 				}
@@ -225,7 +227,10 @@ var (
 				return fmt.Errorf("error listing %s: %v", key.Kind, err)
 			}
 
-			printYamlOutput(list)
+			if err := printYamlOutput(list); err != nil {
+				return err
+			}
+
 			return nil
 		},
 	}
@@ -328,15 +333,15 @@ func readInputs() ([]inputDoc, error) {
 			return nil, fmt.Errorf("could not encode Spec: %v", err)
 		}
 
-		schema, ok := model.IstioConfig[v.Type]
+		ischema, ok := model.IstioConfig[v.Type]
 		if !ok {
 			return nil, fmt.Errorf("unknown spec type %s", v.Type)
 		}
-		rr, err := schema.FromJSON(string(byteRule))
+		rr, err := ischema.FromJSON(string(byteRule))
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
-		glog.V(2).Info(fmt.Sprintf("Parsed %v %v into %v %v", v.Type, v.Name, schema.MessageName, rr))
+		glog.V(2).Info(fmt.Sprintf("Parsed %v %v into %v %v", v.Type, v.Name, ischema.MessageName, rr))
 
 		v.ParsedSpec = rr
 
@@ -348,7 +353,7 @@ func readInputs() ([]inputDoc, error) {
 
 // Print a simple list of names
 func printShortOutput(list map[model.Key]proto.Message) error {
-	for key, _ := range list {
+	for key := range list {
 		fmt.Printf("%v\n", key.Name)
 	}
 
