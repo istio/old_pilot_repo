@@ -179,7 +179,7 @@ func generateIngress(context *IngressContext) *Config {
 	}
 
 	listeners := []*Listener{listener}
-	clusters := Clusters(rConfig.filterClusters(func(cl *Cluster) bool { return true })).Normalize()
+	clusters := rConfig.clusters().normalize()
 
 	return &Config{
 		Listeners: listeners,
