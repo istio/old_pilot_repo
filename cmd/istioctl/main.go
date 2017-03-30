@@ -117,7 +117,7 @@ var (
 		Short: "Retrieve a policy or rule",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return fmt.Errorf("You must specify the type of resource to get. Types are %v",
+				return fmt.Errorf("specify the type of resource to get. Types are %v",
 					strings.Join(model.IstioConfig.Kinds(), ", "))
 			}
 
@@ -127,7 +127,7 @@ var (
 				}
 				item, exists := cmd.Client.Get(key)
 				if !exists {
-					return fmt.Errorf("\"%v\" does not exist", key)
+					return fmt.Errorf("%q does not exist", key)
 				}
 				out, err := schema.ToYAML(item)
 				if err != nil {
@@ -153,7 +153,7 @@ var (
 						return err
 					}
 				} else {
-					return fmt.Errorf("Unknown output format %v. Types are yaml|short", outputFormat)
+					return fmt.Errorf("unknown output format %v. Types are yaml|short", outputFormat)
 				}
 
 			}
@@ -314,7 +314,7 @@ func readInputs() ([]inputDoc, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
-		glog.V(2).Info(fmt.Sprintf("Parsed %v %v into %v %v", v.Type, v.Name, ischema.MessageName, rr))
+		glog.V(2).Infof("Parsed %v %v into %v %v", v.Type, v.Name, ischema.MessageName, rr)
 
 		v.ParsedSpec = rr
 
@@ -335,9 +335,12 @@ func printShortOutput(list map[model.Key]proto.Message) error {
 
 // Print as YAML
 func printYamlOutput(list map[model.Key]proto.Message) error {
+	var retVal error = nil
+
 	for key, item := range list {
 		out, err := schema.ToYAML(item)
 		if err != nil {
+			retVal = err // Save the error, but keep going, so we can print the valid rules that follow
 			fmt.Println(err)
 		} else {
 			fmt.Printf("kind: %s\n", key.Kind)
@@ -354,5 +357,5 @@ func printYamlOutput(list map[model.Key]proto.Message) error {
 		fmt.Println("---")
 	}
 
-	return nil
+	return retVal
 }
