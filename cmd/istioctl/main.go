@@ -213,7 +213,9 @@ var (
 		Use:   "list <type>",
 		Short: "List policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
-			fmt.Fprintln(os.Stderr, "Warning: 'istioctl list' subcommand is deprecated")
+			if _, err := fmt.Fprintln(os.Stderr, "Warning: 'istioctl list' subcommand is deprecated"); err != nil {
+				return err
+			}
 
 			if len(args) != 1 {
 				return fmt.Errorf("please specify configuration type (one of %v)", model.IstioConfig.Kinds())
