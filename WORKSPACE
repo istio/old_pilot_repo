@@ -6,13 +6,14 @@ git_repository(
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_repositories", "new_go_repository")
 
 git_repository(
-    name = "ToolBox",
+    name = "istio_toolbox",
     remote = "https://github.com/istio/toolbox.git",
     commit = "55ee1cfbb22863051a45f084404fdf9a77046fc4"
 )
+
+load("@io_bazel_rules_go//go:def.bzl", "go_repositories", "new_go_repository")
 
 go_repositories()
 

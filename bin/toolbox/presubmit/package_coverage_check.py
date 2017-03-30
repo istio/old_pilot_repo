@@ -1,9 +1,9 @@
-from ToolBox.pkgCheck.pkg_cc_check import *
+from istio_toolbox.pkgCheck import pkg_cc_check
 import argparse
 import sys
 
 def packageCodeCoverageCheck(report, requirement):
-    pkgcheck = PkgChecker(report, requirement)
+    pkgcheck = pkg_cc_check.PkgChecker(report, requirement)
     return pkgcheck.check()
 
 if __name__ == "__main__":
