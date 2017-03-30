@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/pkg/api"
 
@@ -340,8 +341,7 @@ func printYamlOutput(list map[model.Key]proto.Message) error {
 	for key, item := range list {
 		out, err := schema.ToYAML(item)
 		if err != nil {
-			retVal = err // Save the error, but keep going, so we can print the valid rules that follow
-			fmt.Println(err)
+			retVal = multierror.Append(retVal, err)
 		} else {
 			fmt.Printf("kind: %s\n", key.Kind)
 			fmt.Printf("name: %s\n", key.Name)
