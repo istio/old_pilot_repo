@@ -335,7 +335,7 @@ func printShortOutput(list map[model.Key]proto.Message) error {
 
 // Print as YAML
 func printYamlOutput(list map[model.Key]proto.Message) error {
-	var retVal error = nil
+	var retVal error
 
 	for key, item := range list {
 		out, err := schema.ToYAML(item)
