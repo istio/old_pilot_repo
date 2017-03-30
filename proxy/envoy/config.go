@@ -139,7 +139,8 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 // buildHTTPListener constructs a listener for the network interface address and port
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
-func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int, rds bool, isInbound bool) *Listener {
+func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int,
+	rds bool, isInbound bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
