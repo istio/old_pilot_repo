@@ -34,9 +34,9 @@ import (
 )
 
 type ingressWatcher struct {
-	agent     proxy.Agent
-	ctl       model.Controller
-	context   *IngressContext
+	agent   proxy.Agent
+	ctl     model.Controller
+	context *IngressContext
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
@@ -82,6 +82,7 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	w.ctl.Run(stop)
 }
 
+// IngressContext defines information for ingress
 type IngressContext struct {
 	// TODO: cert/key filenames will need to be dynamic for multiple key/cert pairs
 	CertFile  string

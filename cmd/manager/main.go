@@ -93,13 +93,13 @@ var (
 		RunE: func(c *cobra.Command, args []string) error {
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
 			context := &envoy.IngressContext{
-				CertFile: "/etc/tls.crt",
-				KeyFile: "/etc/tls.key",
+				CertFile:  "/etc/tls.crt",
+				KeyFile:   "/etc/tls.key",
 				Namespace: cmd.RootFlags.Namespace,
-				Secret: flags.ingressSecret,
-				Secrets: cmd.Client,
-				Registry: &model.IstioRegistry{ConfigRegistry: controller},
-				Mesh: &flags.proxy,
+				Secret:    flags.ingressSecret,
+				Secrets:   cmd.Client,
+				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
+				Mesh:      &flags.proxy,
 			}
 			w, err := envoy.NewIngressWatcher(controller, context)
 			if err != nil {

@@ -3,26 +3,27 @@ package envoy
 import (
 	"testing"
 
+	"fmt"
+	"io/ioutil"
+	"reflect"
+
+	"github.com/pmezard/go-difflib/difflib"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
-	"io/ioutil"
-	"github.com/pmezard/go-difflib/difflib"
-	"fmt"
-	"reflect"
 )
 
 const (
-	ingressEnvoyConfig = "testdata/ingress-envoy.json"
+	ingressEnvoyConfig    = "testdata/ingress-envoy.json"
 	ingressEnvoySSLConfig = "testdata/ingress-envoy-ssl.json"
-	ingressRouteRule     = "testdata/ingress-route.yaml.golden"
-	ingressCertFile = "testdata/tls.crt"
-	ingressKeyFile = "testdata/tls.key"
-	ingressSecret = "secret"
+	ingressRouteRule      = "testdata/ingress-route.yaml.golden"
+	ingressCertFile       = "testdata/tls.crt"
+	ingressKeyFile        = "testdata/tls.key"
+	ingressSecret         = "secret"
 )
 
 var (
 	ingressCert = []byte("abcdefghijklmnop")
-	ingressKey = []byte("qrstuvwxyz123456")
+	ingressKey  = []byte("qrstuvwxyz123456")
 )
 
 func compareFile(filename string, expect []byte, t *testing.T) {
@@ -40,7 +41,7 @@ func compareFile(filename string, expect []byte, t *testing.T) {
 		}
 		text, _ := difflib.GetUnifiedDiffString(diff)
 		fmt.Println(text)
-		t.Fatal("Failed validating file %s", filename)
+		t.Fatalf("Failed validating file %s", filename)
 	}
 }
 
@@ -72,14 +73,14 @@ func TestIngressRoutes(t *testing.T) {
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressContext{
 		Registry: r,
-		Mesh: DefaultMeshConfig,
+		Mesh:     DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
 }
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
 	s := mock.SecretRegistry{
-		Secrets: map[string]map[string][]byte {
+		Secrets: map[string]map[string][]byte{
 			ingressSecret + ".default": {
 				"tls.crt": ingressCert,
 				"tls.key": ingressKey,
@@ -88,13 +89,13 @@ func TestIngressRoutesSSL(t *testing.T) {
 	}
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressContext{
-		CertFile: ingressCertFile,
-		KeyFile: ingressKeyFile,
+		CertFile:  ingressCertFile,
+		KeyFile:   ingressKeyFile,
 		Namespace: "",
-		Secret: ingressSecret,
-		Secrets: &s,
-		Registry: r,
-		Mesh: DefaultMeshConfig,
+		Secret:    ingressSecret,
+		Secrets:   &s,
+		Registry:  r,
+		Mesh:      DefaultMeshConfig,
 	}, ingressEnvoySSLConfig, t)
 	compareFile(ingressCertFile, ingressCert, t)
 	compareFile(ingressKeyFile, ingressKey, t)
