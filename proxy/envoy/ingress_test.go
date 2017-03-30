@@ -45,8 +45,8 @@ func compareFile(filename string, expect []byte, t *testing.T) {
 	}
 }
 
-func testIngressConfig(context *IngressContext, envoyConfig string, t *testing.T) {
-	config := generateIngress(context)
+func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
+	config := generateIngress(c)
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}
@@ -71,7 +71,7 @@ func addIngressRoute(r *model.IstioRegistry, t *testing.T) {
 func TestIngressRoutes(t *testing.T) {
 	r := mock.MakeRegistry()
 	addIngressRoute(r, t)
-	testIngressConfig(&IngressContext{
+	testIngressConfig(&IngressConfig{
 		Registry: r,
 		Mesh:     DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
@@ -88,7 +88,7 @@ func TestIngressRoutesSSL(t *testing.T) {
 		},
 	}
 	addIngressRoute(r, t)
-	testIngressConfig(&IngressContext{
+	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
 		KeyFile:   ingressKeyFile,
 		Namespace: "",

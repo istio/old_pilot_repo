@@ -108,7 +108,7 @@ var (
 				IngressClass:    flags.ingressClass,
 			}
 			controller := kube.NewController(cmd.Client, controllerConfig)
-			context := &envoy.IngressContext{
+			config := &envoy.IngressConfig{
 				CertFile:  "/etc/tls.crt",
 				KeyFile:   "/etc/tls.key",
 				Namespace: cmd.RootFlags.Namespace,
@@ -117,7 +117,7 @@ var (
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
 				Mesh:      &flags.proxy,
 			}
-			w, err := envoy.NewIngressWatcher(controller, context)
+			w, err := envoy.NewIngressWatcher(controller, config)
 			if err != nil {
 				return err
 			}

@@ -36,11 +36,11 @@ import (
 type ingressWatcher struct {
 	agent   proxy.Agent
 	ctl     model.Controller
-	context *IngressContext
+	context *IngressConfig
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
-func NewIngressWatcher(ctl model.Controller, context *IngressContext) (Watcher, error) {
+func NewIngressWatcher(ctl model.Controller, context *IngressConfig) (Watcher, error) {
 	agent := proxy.NewAgent(runEnvoy(context.Mesh, "ingress"), cleanupEnvoy(context.Mesh), 10, 100*time.Millisecond)
 
 	out := &ingressWatcher{
@@ -82,8 +82,8 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	w.ctl.Run(stop)
 }
 
-// IngressContext defines information for ingress
-type IngressContext struct {
+// IngressConfig defines information for ingress
+type IngressConfig struct {
 	// TODO: cert/key filenames will need to be dynamic for multiple key/cert pairs
 	CertFile  string
 	KeyFile   string
@@ -94,8 +94,8 @@ type IngressContext struct {
 	Mesh      *MeshConfig
 }
 
-func generateIngress(context *IngressContext) *Config {
-	rules := context.Registry.IngressRules(context.Namespace)
+func generateIngress(config *IngressConfig) *Config {
+	rules := config.Registry.IngressRules(config.Namespace)
 
 	// Phase 1: group rules by host
 	rulesByHost := make(map[string][]*config.RouteRule, len(rules))
@@ -140,7 +140,7 @@ func generateIngress(context *IngressContext) *Config {
 	rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
 
 	listener := &Listener{
-		Address:    "tcp://0.0.0.0:80",
+		Address:    fmt.Sprintf("tcp://%s:80", WildcardAddress),
 		BindToPort: true,
 		Filters: []*NetworkFilter{
 			{
@@ -164,16 +164,16 @@ func generateIngress(context *IngressContext) *Config {
 	}
 
 	// configure for HTTPS if provided with a secret name
-	if context.Secret != "" {
+	if config.Secret != "" {
 		// configure Envoy
-		listener.Address = "tcp://0.0.0.0:443"
+		listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
 		listener.SSLContext = &SSLContext{
-			CertChainFile:  context.CertFile,
-			PrivateKeyFile: context.KeyFile,
+			CertChainFile:  config.CertFile,
+			PrivateKeyFile: config.KeyFile,
 		}
 
-		if err := writeTLS(context.CertFile, context.KeyFile, context.Namespace,
-			context.Secret, context.Secrets); err != nil {
+		if err := writeTLS(config.CertFile, config.KeyFile, config.Namespace,
+			config.Secret, config.Secrets); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
 	}
@@ -185,12 +185,12 @@ func generateIngress(context *IngressContext) *Config {
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://0.0.0.0:%d", context.Mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, config.Mesh.AdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(context.Mesh.DiscoveryAddress, "sds"),
+				Cluster:        buildDiscoveryCluster(config.Mesh.DiscoveryAddress, "sds"),
 				RefreshDelayMs: 1000,
 			},
 		},
