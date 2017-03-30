@@ -94,8 +94,8 @@ type IngressConfig struct {
 	Mesh      *MeshConfig
 }
 
-func generateIngress(config *IngressConfig) *Config {
-	rules := config.Registry.IngressRules(config.Namespace)
+func generateIngress(conf *IngressConfig) *Config {
+	rules := conf.Registry.IngressRules(conf.Namespace)
 
 	// Phase 1: group rules by host
 	rulesByHost := make(map[string][]*config.RouteRule, len(rules))
@@ -164,16 +164,16 @@ func generateIngress(config *IngressConfig) *Config {
 	}
 
 	// configure for HTTPS if provided with a secret name
-	if config.Secret != "" {
+	if conf.Secret != "" {
 		// configure Envoy
 		listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
 		listener.SSLContext = &SSLContext{
-			CertChainFile:  config.CertFile,
-			PrivateKeyFile: config.KeyFile,
+			CertChainFile:  conf.CertFile,
+			PrivateKeyFile: conf.KeyFile,
 		}
 
-		if err := writeTLS(config.CertFile, config.KeyFile, config.Namespace,
-			config.Secret, config.Secrets); err != nil {
+		if err := writeTLS(conf.CertFile, conf.KeyFile, conf.Namespace,
+			conf.Secret, conf.Secrets); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
 	}
@@ -185,12 +185,12 @@ func generateIngress(config *IngressConfig) *Config {
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, config.Mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.AdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(config.Mesh.DiscoveryAddress, "sds"),
+				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds"),
 				RefreshDelayMs: 1000,
 			},
 		},
