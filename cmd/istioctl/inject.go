@@ -28,14 +28,15 @@ import (
 )
 
 var (
-	initImage        string
-	runtimeImage     string
-	discoveryPort    int
-	mixerPort        int
+	hub              string
+	tag              string
+	managerAddr      string
+	mixerAddr        string
 	sidecarProxyUID  int64
 	sidecarProxyPort int
 	runtimeVerbosity int
 	versionStr       string // override build version
+	enableCoreDump   bool
 
 	inFilename  string
 	outFilename string
@@ -44,7 +45,19 @@ var (
 var (
 	injectCmd = &cobra.Command{
 		Use:   "kube-inject",
-		Short: "Inject istio runtime into kubernete resources",
+		Short: "Inject istio sidecar proxy into kubernetes resources",
+		Long: `
+Use kube-inject to manually inject istio sidecar proxy into kubernetes
+resource files. Unsupported resources are left unmodified so it is
+safe to run kube-inject over a single file that contains multiple
+Service, ConfigMap, Deployment, etc. definitions for a complex
+application. Its best to do this when the resource is initially
+created.
+
+Example usage:
+
+	kubectl apply -f <(istioctl kube-inject -f <resource.yaml>)
+`,
 		RunE: func(_ *cobra.Command, _ []string) (err error) {
 			if inFilename == "" {
 				return errors.New("filename not specified (see --filename or -f)")
@@ -79,14 +92,15 @@ var (
 					version.Info.GitRevision)
 			}
 			params := &inject.Params{
-				InitImage:        initImage,
-				RuntimeImage:     runtimeImage,
+				InitImage:        inject.InitImageName(hub, tag),
+				RuntimeImage:     inject.RuntimeImageName(hub, tag),
 				RuntimeVerbosity: runtimeVerbosity,
-				DiscoveryPort:    discoveryPort,
-				MixerPort:        mixerPort,
+				ManagerAddr:      managerAddr,
+				MixerAddr:        mixerAddr,
 				SidecarProxyUID:  sidecarProxyUID,
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
+				EnableCoreDump:   enableCoreDump,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
 		},
@@ -94,18 +108,18 @@ var (
 )
 
 func init() {
-	injectCmd.PersistentFlags().StringVar(&initImage, "initImage",
-		inject.DefaultInitImage, "Istio init image")
-	injectCmd.PersistentFlags().StringVar(&runtimeImage, "runtimeImage",
-		inject.DefaultRuntimeImage, "Istio runtime image")
+	injectCmd.PersistentFlags().StringVar(&hub, "hub",
+		inject.DefaultHub, "Docker hub")
+	injectCmd.PersistentFlags().StringVar(&tag, "tag",
+		inject.DefaultTag, "Docker tag")
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
 		"", "Input kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
 		"", "Modified output kubernetes resource filename")
-	injectCmd.PersistentFlags().IntVar(&discoveryPort, "discoveryPort",
-		inject.DefaultManagerDiscoveryPort, "Manager discovery port")
-	injectCmd.PersistentFlags().IntVar(&mixerPort, "mixerPort",
-		inject.DefaultMixerPort, "Mixer port")
+	injectCmd.PersistentFlags().StringVar(&managerAddr, "managerAddr",
+		inject.DefaultManagerAddr, "Manager service DNS address")
+	injectCmd.PersistentFlags().StringVar(&mixerAddr, "mixerAddr",
+		inject.DefaultMixerAddr, "Mixer DNS address")
 	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity",
 		inject.DefaultRuntimeVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
@@ -114,5 +128,14 @@ func init() {
 		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
+
+	// Default --coreDump=true for pre-alpha development. Core dump
+	// settings (i.e. sysctl kernel.*) affect all pods in a node and
+	// require privileges. This option should only be used by the cluster
+	// admin (see https://kubernetes.io/docs/concepts/cluster-administration/sysctl-cluster/)
+	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
+		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
+			"all pods in a node and should only be used the cluster admin)")
+
 	cmd.RootCmd.AddCommand(injectCmd)
 }

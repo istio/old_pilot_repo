@@ -271,6 +271,12 @@ new_go_repository(
 )
 
 new_go_repository(
+    name = "io_k8s_apimachinery",
+    commit = "d3c1641d0c440b4c1bef7e1fc105f19f713477e0",
+    importpath = "k8s.io/apimachinery",
+)
+
+new_go_repository(
     name = "io_k8s_client_go",
     commit = "243d8a9cb66a51ad8676157f79e71033b4014a2a",
     importpath = "k8s.io/client-go",
@@ -286,7 +292,7 @@ new_go_repository(
 ## Proxy build rules
 ##
 
-PROXY = "95535f5fb6631adcb453b8f84a2e76d13ea23886"  # Mar 16 2017
+PROXY = "5e601ca3646135d3027568a2c8927e8f291628fc"  # Mar 23, 2017
 
 http_file(
     name = "istio_proxy",

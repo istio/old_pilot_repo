@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -33,21 +34,23 @@ import (
 
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
+	"istio.io/manager/platform/kube/inject"
 )
 
 const (
-	managerDiscovery     = "manager-discovery"
-	mixer                = "mixer"
-	egressProxy          = "egress-proxy"
-	ingressProxy         = "ingress-proxy"
-	app                  = "app"
-	appProxyManagerAgent = "app-proxy-manager-agent"
+	managerDiscovery = "manager-discovery"
+	mixer            = "mixer"
+	egressProxy      = "egress-proxy"
+	ingressProxy     = "ingress-proxy"
+	app              = "app"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
 
 	// Mixer image tag is the short SHA *update manually*
 	mixerTag = "6655a67"
+
+	ingressServiceName = "istio-ingress-controller"
 )
 
 type parameters struct {
@@ -60,12 +63,14 @@ type parameters struct {
 	debug      bool
 	parallel   bool
 	logs       bool
+
+	verbosity int
 }
 
 var (
 	params parameters
 
-	client      *kubernetes.Clientset
+	client      kubernetes.Interface
 	istioClient *kube.Client
 
 	// pods is a mapping from app name to a pod name (write once, read only)
@@ -93,11 +98,13 @@ func init() {
 func main() {
 	flag.Parse()
 	setup()
+
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
 		check((&reachability{}).run())
 		check(testRouting())
 	}
+
 	teardown()
 	glog.Infof("All tests passed %d time(s)!", params.count)
 }
@@ -110,6 +117,12 @@ func setup() {
 		glog.Fatal("No mixer image specified")
 	}
 	glog.Infof("params %#v", params)
+
+	if params.debug {
+		params.verbosity = 3
+	} else {
+		params.verbosity = 2
+	}
 
 	check(setupClient())
 
@@ -126,28 +139,27 @@ func setup() {
 	pods = make(map[string]string)
 
 	// setup ingress resources
-	_, err = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
+	_, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/cert.key "+
 		"--from-file=tls.crt=test/integration/cert.crt",
 		params.namespace))
-	check(err)
 
 	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/ingress.yaml", params.namespace))
 	check(err)
 
 	// deploy istio-infra
-	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("mixer", "mixer", mixer, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("istio-ingress", "istio-ingress", ingressProxy, "8080", "80", "9090", "90", "unversioned"))
+	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("mixer", "mixer", mixer, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("istio-ingress", "istio-ingress", ingressProxy, "8080", "80", "9090", "90", "unversioned", false))
 
 	// deploy a healthy mix of apps, with and without proxy
-	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("a", "a", appProxyManagerAgent, "8080", "80", "9090", "90", "unversioned"))
-	check(deploy("b", "b", appProxyManagerAgent, "80", "8080", "90", "9090", "unversioned"))
-	check(deploy("hello", "hello", appProxyManagerAgent, "8080", "80", "9090", "90", "v1"))
-	check(deploy("world-v1", "world", appProxyManagerAgent, "80", "8000", "90", "9090", "v1"))
-	check(deploy("world-v2", "world", appProxyManagerAgent, "80", "8000", "90", "9090", "v2"))
+	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned", false))
+	check(deploy("a", "a", app, "8080", "80", "9090", "90", "unversioned", true))
+	check(deploy("b", "b", app, "80", "8080", "90", "9090", "unversioned", true))
+	check(deploy("hello", "hello", app, "8080", "80", "9090", "90", "v1", true))
+	check(deploy("world-v1", "world", app, "80", "8000", "90", "9090", "v1", true))
+	check(deploy("world-v2", "world", app, "80", "8000", "90", "9090", "v2", true))
 	check(setPods())
 }
 
@@ -167,16 +179,21 @@ func check(err error) {
 
 // teardown removes resources
 func teardown() {
+	glog.Info("Cleaning up ingress secret.")
+	if err := run("kubectl delete secret ingress -n " + params.namespace); err != nil {
+		glog.Warning(err)
+	}
+
 	if nameSpaceCreated {
 		deleteNamespace(client, params.namespace)
 		params.namespace = ""
 	}
 }
 
-func deploy(name, svcName, dType, port1, port2, port3, port4, version string) error {
+func deploy(name, svcName, dType, port1, port2, port3, port4, version string, injectProxy bool) error {
 	// write template
 	configFile := name + "-" + dType + ".yaml"
-	var w *bufio.Writer
+
 	f, err := os.Create(configFile)
 	if err != nil {
 		return err
@@ -187,8 +204,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string) er
 		}
 	}()
 
-	w = bufio.NewWriter(f)
-
+	w := &bytes.Buffer{}
 	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
 		"service": svcName,
 		"name":    name,
@@ -201,7 +217,27 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string) er
 		return err
 	}
 
-	if err := w.Flush(); err != nil {
+	writer := bufio.NewWriter(f)
+	if injectProxy {
+		p := &inject.Params{
+			InitImage:        fmt.Sprintf("%s/init:%s", params.hub, params.tag),
+			RuntimeImage:     fmt.Sprintf("%s/runtime:%s", params.hub, params.tag),
+			RuntimeVerbosity: params.verbosity,
+			ManagerAddr:      inject.DefaultManagerAddr,
+			MixerAddr:        inject.DefaultMixerAddr,
+			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
+			SidecarProxyPort: inject.DefaultSidecarProxyPort,
+			Version:          "manager-integration-test",
+		}
+		if err := inject.IntoResourceFile(p, w, writer); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.Copy(writer, w); err != nil {
+			return err
+		}
+	}
+	if err := writer.Flush(); err != nil {
 		return err
 	}
 
@@ -283,11 +319,8 @@ func write(in string, data map[string]string, out io.Writer) error {
 	values["tag"] = params.tag
 	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
-	if params.debug {
-		values["verbosity"] = "3"
-	} else {
-		values["verbosity"] = "2"
-	}
+	values["verbosity"] = strconv.Itoa(params.verbosity)
+
 	for k, v := range data {
 		values[k] = v
 	}
@@ -354,7 +387,7 @@ func setPods() error {
 	var items []v1.Pod
 	for n := 0; ; n++ {
 		glog.Info("Checking all pods are running...")
-		list, err := client.Pods(params.namespace).List(v1.ListOptions{})
+		list, err := client.CoreV1().Pods(params.namespace).List(v1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -395,7 +428,7 @@ func setPods() error {
 // podLogs gets pod logs by container
 func podLogs(name string, container string) string {
 	glog.Infof("Pod proxy logs %q", name)
-	raw, err := client.Pods(params.namespace).
+	raw, err := client.CoreV1().Pods(params.namespace).
 		GetLogs(name, &v1.PodLogOptions{Container: container}).
 		Do().Raw()
 	if err != nil {
@@ -406,7 +439,7 @@ func podLogs(name string, container string) string {
 	return string(raw)
 }
 
-func generateNamespace(cl *kubernetes.Clientset) (string, error) {
+func generateNamespace(cl kubernetes.Interface) (string, error) {
 	ns, err := cl.Core().Namespaces().Create(&v1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "istio-integration-",
@@ -420,7 +453,7 @@ func generateNamespace(cl *kubernetes.Clientset) (string, error) {
 	return ns.Name, nil
 }
 
-func deleteNamespace(cl *kubernetes.Clientset, ns string) {
+func deleteNamespace(cl kubernetes.Interface, ns string) {
 	if cl != nil && ns != "" && ns != "default" {
 		if err := cl.Core().Namespaces().Delete(ns, &v1.DeleteOptions{}); err != nil {
 			glog.Infof("Error deleting namespace: %v\n", err)

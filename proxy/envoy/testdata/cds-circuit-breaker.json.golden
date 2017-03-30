@@ -1,15 +1,22 @@
 {
   "clusters": [
    {
-    "name": "out:hello.default.svc.cluster.local:http-status",
-    "service_name": "hello.default.svc.cluster.local:http-status",
+    "name": "out.hello.default.svc.cluster.local|http",
+    "service_name": "hello.default.svc.cluster.local|http",
     "connect_timeout_ms": 1000,
     "type": "sds",
     "lb_type": "round_robin"
    },
    {
-    "name": "out:world.default.svc.cluster.local:custom",
-    "service_name": "world.default.svc.cluster.local:custom",
+    "name": "out.hello.default.svc.cluster.local|http-status",
+    "service_name": "hello.default.svc.cluster.local|http-status",
+    "connect_timeout_ms": 1000,
+    "type": "sds",
+    "lb_type": "round_robin"
+   },
+   {
+    "name": "out.world.default.svc.cluster.local|http",
+    "service_name": "world.default.svc.cluster.local|http",
     "connect_timeout_ms": 1000,
     "type": "sds",
     "lb_type": "round_robin",
@@ -29,29 +36,8 @@
     }
    },
    {
-    "name": "out:world.default.svc.cluster.local:http",
-    "service_name": "world.default.svc.cluster.local:http",
-    "connect_timeout_ms": 1000,
-    "type": "sds",
-    "lb_type": "round_robin",
-    "max_requests_per_connection": 100,
-    "circuit_breakers": {
-     "default": {
-      "max_connections": 100,
-      "max_pending_requests": 100,
-      "max_requests": 100
-     }
-    },
-    "outlier_detection": {
-     "consecutive_5xx": 10,
-     "interval_ms": 30000,
-     "base_ejection_time_ms": 15500,
-     "max_ejection_percent": 100
-    }
-   },
-   {
-    "name": "out:world.default.svc.cluster.local:http-status",
-    "service_name": "world.default.svc.cluster.local:http-status",
+    "name": "out.world.default.svc.cluster.local|http-status",
+    "service_name": "world.default.svc.cluster.local|http-status",
     "connect_timeout_ms": 1000,
     "type": "sds",
     "lb_type": "round_robin",

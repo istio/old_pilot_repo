@@ -20,7 +20,6 @@ package envoy
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -31,11 +30,32 @@ import (
 
 const (
 	// InboundClusterPrefix is the prefix for service clusters co-hosted on the proxy instance
-	InboundClusterPrefix = "in:"
+	InboundClusterPrefix = "in."
 
 	// OutboundClusterPrefix is the prefix for service clusters external to the proxy instance
-	OutboundClusterPrefix = "out:"
+	OutboundClusterPrefix = "out."
 )
+
+// buildListenerSSLContext returns an SSLContext struct.
+func buildListenerSSLContext(mesh *MeshConfig) *SSLContext {
+	return &SSLContext{
+		CertChainFile:  mesh.AuthConfigPath + "/cert-chain.pem",
+		PrivateKeyFile: mesh.AuthConfigPath + "/key.pem",
+		CaCertFile:     mesh.AuthConfigPath + "/root-cert.pem",
+	}
+}
+
+// buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName.
+func buildClusterSSLContext(hostname string, context *ProxyContext) *SSLContextWithSAN {
+	mesh := context.MeshConfig
+	serviceAccounts, _ := context.Discovery.GetIstioServiceAccounts(hostname)
+	return &SSLContextWithSAN{
+		CertChainFile:        mesh.AuthConfigPath + "/cert-chain.pem",
+		PrivateKeyFile:       mesh.AuthConfigPath + "/key.pem",
+		CaCertFile:           mesh.AuthConfigPath + "/root-cert.pem",
+		VerifySubjectAltName: serviceAccounts,
+	}
+}
 
 func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 	return &HTTPRoute{
@@ -53,7 +73,6 @@ func buildInboundCluster(hostname string, port int, protocol model.Protocol) *Cl
 		LbType:           DefaultLbType,
 		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
 		hostname:         hostname,
-		outbound:         false,
 	}
 	if protocol == model.ProtocolGRPC || protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -61,7 +80,7 @@ func buildInboundCluster(hostname string, port int, protocol model.Protocol) *Cl
 	return cluster
 }
 
-func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, ssl *SSLContextWithSAN, tags model.Tags) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tags)
 	cluster := &Cluster{
@@ -70,10 +89,10 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		Type:             "sds",
 		LbType:           DefaultLbType,
 		ConnectTimeoutMs: DefaultTimeoutMs,
+		SSLContext:       ssl,
 		hostname:         hostname,
 		port:             port,
 		tags:             tags,
-		outbound:         true,
 	}
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
@@ -82,7 +101,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 }
 
 // buildHTTPRoute translates a route rule to an Envoy route
-func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, bool) {
+func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port, ssl *SSLContextWithSAN) (*HTTPRoute, bool) {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",
@@ -140,7 +159,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 				destination = rule.Destination
 			}
 
-			cluster := buildOutboundCluster(destination, port, dst.Tags)
+			cluster := buildOutboundCluster(destination, port, ssl, dst.Tags)
 			clusters = append(clusters, &WeightedClusterEntry{
 				Name:   cluster.Name,
 				Weight: int(dst.Weight),
@@ -157,7 +176,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	} else {
 		route.WeightedClusters = nil
 		// default route for the destination
-		cluster := buildOutboundCluster(rule.Destination, port, nil)
+		cluster := buildOutboundCluster(rule.Destination, port, ssl, nil)
 		route.Cluster = cluster.Name
 		route.clusters = make([]*Cluster, 0)
 		route.clusters = append(route.clusters, cluster)
@@ -282,13 +301,12 @@ func sharedHost(parts ...[]string) []string {
 	}
 }
 
-func buildTCPRoute(cluster *Cluster, addresses []string, port int) TCPRoute {
-	route := TCPRoute{
+func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
+	// destination port is unnecessary with use_original_dst since
+	// the listener address already contains the port
+	route := &TCPRoute{
 		Cluster:    cluster.Name,
 		clusterRef: cluster,
-	}
-	if port >= 0 {
-		route.DestinationPorts = strconv.Itoa(port)
 	}
 	sort.Sort(sort.StringSlice(addresses))
 	for _, addr := range addresses {

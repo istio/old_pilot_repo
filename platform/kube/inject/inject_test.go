@@ -23,21 +23,26 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-func TestIntoResourceFile(t *testing.T) {
-	params := Params{
-		InitImage:        DefaultInitImage,
-		RuntimeImage:     DefaultRuntimeImage,
-		RuntimeVerbosity: DefaultRuntimeVerbosity,
-		DiscoveryPort:    DefaultManagerDiscoveryPort,
-		MixerPort:        DefaultMixerPort,
-		SidecarProxyUID:  DefaultSidecarProxyUID,
-		SidecarProxyPort: DefaultSidecarProxyPort,
-		Version:          "12345678",
+func TestImageName(t *testing.T) {
+	want := "docker.io/istio/init:latest"
+	if got := InitImageName("docker.io/istio", "latest"); got != want {
+		t.Errorf("InitImage() failed: got %q want %q", got, want)
 	}
+	want = "docker.io/istio/runtime:latest"
+	if got := RuntimeImageName("docker.io/istio", "latest"); got != want {
+		t.Errorf("InitImage() failed: got %q want %q", got, want)
+	}
+}
+
+// Tag name should be kept in sync with value in platform/kube/inject/refresh.sh
+const unitTestTag = "unittest"
+
+func TestIntoResourceFile(t *testing.T) {
 
 	cases := []struct {
-		in   string
-		want string
+		in             string
+		want           string
+		enableCoreDump bool
 	}{
 		{
 			in:   "testdata/hello.yaml",
@@ -67,9 +72,25 @@ func TestIntoResourceFile(t *testing.T) {
 			in:   "testdata/multi-init.yaml",
 			want: "testdata/multi-init.yaml.injected",
 		},
+		{
+			in:             "testdata/enable-core-dump.yaml",
+			want:           "testdata/enable-core-dump.yaml.injected",
+			enableCoreDump: true,
+		},
 	}
 
 	for _, c := range cases {
+		params := Params{
+			InitImage:        InitImageName(DefaultHub, unitTestTag),
+			RuntimeImage:     RuntimeImageName(DefaultHub, unitTestTag),
+			RuntimeVerbosity: DefaultRuntimeVerbosity,
+			ManagerAddr:      DefaultManagerAddr,
+			MixerAddr:        DefaultMixerAddr,
+			SidecarProxyUID:  DefaultSidecarProxyUID,
+			SidecarProxyPort: DefaultSidecarProxyPort,
+			Version:          "12345678",
+			EnableCoreDump:   c.enableCoreDump,
+		}
 		in, err := os.Open(c.in)
 		if err != nil {
 			t.Fatalf("Failed to open %q: %v", c.in, err)

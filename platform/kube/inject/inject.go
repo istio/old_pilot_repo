@@ -37,13 +37,13 @@ import (
 // Defaults values for injecting istio proxy into kubernetes
 // resources.
 const (
-	DefaultInitImage            = "docker.io/istio/init:latest"
-	DefaultRuntimeImage         = "docker.io/istio/runtime:latest"
-	DefaultManagerDiscoveryPort = 8080
-	DefaultMixerPort            = 9091
-	DefaultSidecarProxyUID      = int64(1337)
-	DefaultSidecarProxyPort     = 15001
-	DefaultRuntimeVerbosity     = 2
+	DefaultHub              = "docker.io/istio"
+	DefaultTag              = "2017-03-22-17.30.06"
+	DefaultManagerAddr      = "istio-manager:8080"
+	DefaultMixerAddr        = "istio-mixer:9091"
+	DefaultSidecarProxyUID  = int64(1337)
+	DefaultSidecarProxyPort = 15001
+	DefaultRuntimeVerbosity = 2
 )
 
 const (
@@ -52,7 +52,17 @@ const (
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
 	initContainerName                  = "init"
 	runtimeContainerName               = "proxy"
+	enableCoreDumpContainerName        = "enable-core-dump"
+	enableCoreDumpImage                = "alpine"
 )
+
+// InitImageName returns the fully qualified image name for the istio
+// init image given a docker hub and tag.
+func InitImageName(hub, tag string) string { return hub + "/init:" + tag }
+
+// RuntimeImageName returns the fully qualified image name for the istio
+// runtime image given a docker hub and tag.
+func RuntimeImageName(hub, tag string) string { return hub + "/runtime:" + tag }
 
 // Params describes configurable parameters for injecting istio proxy
 // into kubernetes resource.
@@ -60,11 +70,26 @@ type Params struct {
 	InitImage        string
 	RuntimeImage     string
 	RuntimeVerbosity int
-	DiscoveryPort    int
-	MixerPort        int
+	ManagerAddr      string
+	MixerAddr        string
 	SidecarProxyUID  int64
 	SidecarProxyPort int
 	Version          string
+	EnableCoreDump   bool
+}
+
+var enableCoreDumpContainer = map[string]interface{}{
+	"name":    enableCoreDumpContainerName,
+	"image":   enableCoreDumpImage,
+	"command": []string{"/bin/sh"},
+	"args": []string{
+		"-c",
+		"sysctl -w kernel.core_pattern=/tmp/core.%e.%p.%t",
+	},
+	"imagePullPolicy": "Always",
+	"securityContext": map[string]interface{}{
+		"privileged": true,
+	},
 }
 
 func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
@@ -84,24 +109,27 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			return err
 		}
 	}
-	annotations = append(annotations,
-		map[string]interface{}{
-			"name":  initContainerName,
-			"image": p.InitImage,
-			"args": []string{
-				"-p", strconv.Itoa(p.SidecarProxyPort),
-				"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
-			},
-			"imagePullPolicy": "Always",
-			"securityContext": map[string]interface{}{
-				"capabilities": map[string]interface{}{
-					"add": []string{
-						"NET_ADMIN",
-					},
+	annotations = append(annotations, map[string]interface{}{
+		"name":  initContainerName,
+		"image": p.InitImage,
+		"args": []string{
+			"-p", strconv.Itoa(p.SidecarProxyPort),
+			"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
+		},
+		"imagePullPolicy": "Always",
+		"securityContext": map[string]interface{}{
+			"capabilities": map[string]interface{}{
+				"add": []string{
+					"NET_ADMIN",
 				},
 			},
 		},
-	)
+	})
+
+	if p.EnableCoreDump {
+		annotations = append(annotations, enableCoreDumpContainer)
+	}
+
 	initAnnotationValue, err := json.Marshal(&annotations)
 	if err != nil {
 		return err
@@ -116,8 +144,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			Args: []string{
 				"proxy",
 				"sidecar",
-				"-s", "manager:" + strconv.Itoa(p.DiscoveryPort),
-				"-m", "mixer:" + strconv.Itoa(p.MixerPort),
+				"-s", p.ManagerAddr,
+				"-m", p.MixerAddr,
 				"-n", "$(POD_NAMESPACE)",
 				"-v", strconv.Itoa(p.RuntimeVerbosity),
 			},

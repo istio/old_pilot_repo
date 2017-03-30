@@ -71,9 +71,6 @@ func (r *reachability) run() error {
 			return err
 		}
 	}
-	glog.Info("Cleaning up ingress secret.")
-	check(run("kubectl delete secret ingress -n " + params.namespace))
-
 	glog.Info("Success!")
 	return nil
 }
@@ -272,7 +269,7 @@ func (r *reachability) verifyTCPRouting() error {
 // retry loop
 func (r *reachability) makeIngressRequest(src, dst string, done func() bool) func() error {
 	return func() error {
-		url := fmt.Sprintf("https://ingress:443/%s", dst)
+		url := fmt.Sprintf("https://%s:443/%s", ingressServiceName, dst)
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
