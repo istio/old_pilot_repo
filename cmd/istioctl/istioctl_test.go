@@ -57,7 +57,7 @@ func TestCreateReplaceDeleteRoutes(t *testing.T) {
 	if err := postCmd.RunE(postCmd, []string{}); err != nil {
 		t.Fatalf("Could not create routes: %v", err)
 	}
-	if err := listCmd.RunE(listCmd, []string{"route-rule"}); err != nil {
+	if err := getCmd.RunE(getCmd, []string{"route-rules"}); err != nil {
 		t.Fatalf("Could not list destination policies: %v", err)
 	}
 	if err := putCmd.RunE(putCmd, []string{}); err != nil {
@@ -78,7 +78,7 @@ func TestCreateReplaceDeletePolicy(t *testing.T) {
 	if err := postCmd.RunE(postCmd, []string{}); err != nil {
 		t.Fatalf("Could not create destination policy: %v", err)
 	}
-	if err := listCmd.RunE(listCmd, []string{"destination-policy"}); err != nil {
+	if err := getCmd.RunE(getCmd, []string{"destination-policy"}); err != nil {
 		t.Fatalf("Could not list destination policies: %v", err)
 	}
 	if err := putCmd.RunE(putCmd, []string{}); err != nil {

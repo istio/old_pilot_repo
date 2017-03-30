@@ -209,33 +209,6 @@ var (
 		},
 	}
 
-	listCmd = &cobra.Command{
-		Use:   "list <type>",
-		Short: "List policies and rules",
-		RunE: func(c *cobra.Command, args []string) error {
-			if _, err := fmt.Fprintln(os.Stderr, "Warning: 'istioctl list' subcommand is deprecated"); err != nil {
-				return err
-			}
-
-			if len(args) != 1 {
-				return fmt.Errorf("please specify configuration type (one of %v)", model.IstioConfig.Kinds())
-			}
-			if err := setup(args[0], ""); err != nil {
-				return err
-			}
-
-			list, err := cmd.Client.List(key.Kind, key.Namespace)
-			if err != nil {
-				return fmt.Errorf("error listing %s: %v", key.Kind, err)
-			}
-
-			if err := printYamlOutput(list); err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}
 )
 
 func init() {
@@ -253,7 +226,6 @@ func init() {
 	cmd.RootCmd.AddCommand(postCmd)
 	cmd.RootCmd.AddCommand(putCmd)
 	cmd.RootCmd.AddCommand(getCmd)
-	cmd.RootCmd.AddCommand(listCmd)
 	cmd.RootCmd.AddCommand(deleteCmd)
 }
 
