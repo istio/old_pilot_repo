@@ -16,15 +16,19 @@ mainFlow(utils) {
     gitUtils.initialize()
     bazel.setVars()
   }
+  // PR on master branch
   if (utils.runStage('PRESUBMIT')) {
     presubmit(gitUtils, bazel, utils)
   }
+  // Postsubmit from master branch
   if (utils.runStage('POSTSUBMIT')) {
     postsubmit(gitUtils, bazel, utils)
   }
+  // PR from master to stable branch for qualification
   if (utils.runStage('STABLE_PRESUBMIT')) {
     stablePresubmit(gitUtils, bazel, utils)
   }
+  // Postsubmit form stable branch, post qualification
   if (utils.runStage('STABLE_POSTSUBMIT')) {
     stablePostsubmit(gitUtils, bazel, utils)
   }
@@ -41,8 +45,10 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
-    stage('Code Check') {
+    stage('Go Build') {
       sh('bin/init.sh')
+    }
+    stage('Code Check') {
       sh('bin/check.sh')
     }
     stage('Bazel Tests') {
