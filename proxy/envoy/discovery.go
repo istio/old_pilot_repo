@@ -17,6 +17,7 @@ package envoy
 import (
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"strconv"
 
 	restful "github.com/emicklei/go-restful"
@@ -62,6 +63,12 @@ func NewDiscoveryService(services model.ServiceDiscovery, config *model.IstioReg
 		mesh:     mesh,
 	}
 	container := restful.NewContainer()
+
+	container.ServeMux.HandleFunc("/debug/pprof/", pprof.Index)
+	container.ServeMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	container.ServeMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	container.ServeMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	container.ServeMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	out.Register(container)
 	out.server = &http.Server{Addr: ":" + strconv.Itoa(port), Handler: container}
 	return out
