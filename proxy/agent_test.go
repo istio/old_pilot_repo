@@ -247,6 +247,6 @@ func TestRecovery(t *testing.T) {
 	a.ScheduleConfigUpdate(desired)
 
 	// make sure we don't try to reconcile twice
-	<-time.After(10 * time.Millisecond)
+	<-time.After(100 * time.Millisecond)
 	close(stop)
 }
