@@ -139,11 +139,10 @@ func setup() {
 	pods = make(map[string]string)
 
 	// setup ingress resources
-	_, err = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
+	_, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/cert.key "+
 		"--from-file=tls.crt=test/integration/cert.crt",
 		params.namespace))
-	check(err)
 
 	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/ingress.yaml", params.namespace))
 	check(err)
@@ -221,9 +220,9 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 	writer := bufio.NewWriter(f)
 	if injectProxy {
 		p := &inject.Params{
-			InitImage:        fmt.Sprintf("%s/init:%s", params.hub, params.tag),
-			RuntimeImage:     fmt.Sprintf("%s/runtime:%s", params.hub, params.tag),
-			RuntimeVerbosity: params.verbosity,
+			InitImage:        inject.InitImageName(params.hub, params.tag),
+			ProxyImage:       inject.ProxyImageName(params.hub, params.tag),
+			Verbosity:        params.verbosity,
 			ManagerAddr:      inject.DefaultManagerAddr,
 			MixerAddr:        inject.DefaultMixerAddr,
 			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
