@@ -16,12 +16,17 @@ to update all `BUILD` files:
 
     gazelle -go_prefix "istio.io/manager" -mode fix -repo_root .
 
-[Gazelle tool](https://github.com/bazelbuild/rules_go/tree/master/go/tools/gazelle) to automatically generate `BUILD` files ships with Bazel and is located in Bazel workspace cache:
+Install [Gazelle tool](https://github.com/bazelbuild/rules_go/tree/master/go/tools/gazelle) that automatically generates Bazel `BUILD` files as follows:
 
-    $HOME/.cache/bazel/_bazel_<username>/<somelongfoldername>/external/io_bazel_rules_go_repository_tools/bin/gazelle
+    go install github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle
 
-_Note_: If you cannot find the gazelle binary in the path mentioned above,
-try to update the mlocate database and run `locate gazelle`.
+_Note_: Gazelle incorrectly rewrites Istio API dependency. You need to manually replace:
+
+    @io_istio_api//proxy/v1/config:go_default_library
+
+with:
+
+    @io_istio_api//:go_default_library
 
 ## Go tooling compatibility
 

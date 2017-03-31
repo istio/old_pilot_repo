@@ -349,10 +349,11 @@ http_file(
 ##
 
 load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_repositories")
+
 go_proto_repositories()
 
 new_git_repository(
-    name = "com_github_istio_api",
+    name = "io_istio_api",
     build_file_content = """
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
 load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
@@ -368,7 +369,6 @@ go_proto_library(
     ],
 )
     """,
-    commit = "38243f4aa912b38f63aba12e695afa669c34a0bf", # Mar 31 2017
+    commit = "38243f4aa912b38f63aba12e695afa669c34a0bf",  # Mar 31 2017
     remote = "https://github.com/istio/api.git",
 )
-
