@@ -22,11 +22,11 @@
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "10.1.1.0"
                   },
                   "forward_attributes": {
                     "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.uid": "10.1.1.0"
                   }
                 }
               },
@@ -68,11 +68,11 @@
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "10.1.1.0"
                   },
                   "forward_attributes": {
                     "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.uid": "10.1.1.0"
                   }
                 }
               },
@@ -116,7 +116,7 @@
       "bind_to_port": false
     },
     {
-      "address": "tcp://10.1.1.1:1081",
+      "address": "tcp://10.1.1.0:1081",
       "filters": [
         {
           "type": "read",
@@ -135,7 +135,7 @@
                     "hello.default.svc.cluster:81",
                     "hello.default.svc.cluster.local:81",
                     "10.1.0.0:81",
-                    "10.1.1.1:1081"
+                    "10.1.1.0:1081"
                   ],
                   "routes": [
                     {
@@ -158,11 +158,11 @@
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "10.1.1.0"
                   },
                   "forward_attributes": {
                     "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.uid": "10.1.1.0"
                   }
                 }
               },
@@ -180,10 +180,15 @@
           }
         }
       ],
+      "ssl_context": {
+        "cert_chain_file": "/etc/certs/cert-chain.pem",
+        "private_key_file": "/etc/certs/key.pem",
+        "ca_cert_file": "/etc/certs/root-cert.pem"
+      },
       "bind_to_port": false
     },
     {
-      "address": "tcp://10.1.1.1:1090",
+      "address": "tcp://10.1.1.0:1090",
       "filters": [
         {
           "type": "read",
@@ -195,7 +200,7 @@
                 {
                   "cluster": "in.1090",
                   "destination_ip_list": [
-                    "10.1.1.1/32"
+                    "10.1.1.0/32"
                   ]
                 }
               ]
@@ -206,7 +211,7 @@
       "bind_to_port": false
     },
     {
-      "address": "tcp://10.1.1.1:80",
+      "address": "tcp://10.1.1.0:80",
       "filters": [
         {
           "type": "read",
@@ -231,8 +236,8 @@
                     "hello.default.svc.cluster.local",
                     "10.1.0.0:80",
                     "10.1.0.0",
-                    "10.1.1.1:80",
-                    "10.1.1.1"
+                    "10.1.1.0:80",
+                    "10.1.1.0"
                   ],
                   "routes": [
                     {
@@ -255,11 +260,11 @@
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "10.1.1.0"
                   },
                   "forward_attributes": {
                     "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.uid": "10.1.1.0"
                   }
                 }
               },
@@ -277,6 +282,11 @@
           }
         }
       ],
+      "ssl_context": {
+        "cert_chain_file": "/etc/certs/cert-chain.pem",
+        "private_key_file": "/etc/certs/key.pem",
+        "ca_cert_file": "/etc/certs/root-cert.pem"
+      },
       "bind_to_port": false
     },
     {
