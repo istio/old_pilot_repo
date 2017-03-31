@@ -76,9 +76,8 @@ func (cr *ConfigRegistry) Delete(key model.Key) error {
 	if _, ok := cr.data[key]; ok {
 		delete(cr.data, key)
 		return nil
-	} else {
-		return fmt.Errorf("Item is missing")
 	}
+	return fmt.Errorf("Item is missing")
 }
 
 // Post implements config registry method
