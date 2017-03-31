@@ -185,7 +185,7 @@ func generateIngress(namespace, secret string, secrets model.SecretRegistry,
 			Clusters: clusters,
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay.Nanoseconds() / 1e6),
 			},
 		},
 	}

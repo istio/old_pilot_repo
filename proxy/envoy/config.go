@@ -106,11 +106,11 @@ func Generate(context *ProxyContext) *Config {
 			Clusters: clusters,
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay.Nanoseconds() / 1e6),
 			},
 			CDS: &CDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay.Nanoseconds() / 1e6),
 			},
 		},
 	}
