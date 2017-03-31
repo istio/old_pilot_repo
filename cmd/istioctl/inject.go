@@ -34,8 +34,9 @@ var (
 	mixerAddr        string
 	sidecarProxyUID  int64
 	sidecarProxyPort int
-	runtimeVerbosity int
+	verbosity        int
 	versionStr       string // override build version
+	enableCoreDump   bool
 
 	inFilename  string
 	outFilename string
@@ -92,13 +93,14 @@ Example usage:
 			}
 			params := &inject.Params{
 				InitImage:        inject.InitImageName(hub, tag),
-				RuntimeImage:     inject.RuntimeImageName(hub, tag),
-				RuntimeVerbosity: runtimeVerbosity,
+				ProxyImage:       inject.ProxyImageName(hub, tag),
+				Verbosity:        verbosity,
 				ManagerAddr:      managerAddr,
 				MixerAddr:        mixerAddr,
 				SidecarProxyUID:  sidecarProxyUID,
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
+				EnableCoreDump:   enableCoreDump,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
 		},
@@ -118,13 +120,22 @@ func init() {
 		inject.DefaultManagerAddr, "Manager service DNS address")
 	injectCmd.PersistentFlags().StringVar(&mixerAddr, "mixerAddr",
 		inject.DefaultMixerAddr, "Mixer DNS address")
-	injectCmd.PersistentFlags().IntVar(&runtimeVerbosity, "verbosity",
-		inject.DefaultRuntimeVerbosity, "Runtime verbosity")
+	injectCmd.PersistentFlags().IntVar(&verbosity, "verbosity",
+		inject.DefaultVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
 		inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
 	injectCmd.PersistentFlags().IntVar(&sidecarProxyPort, "sidecarProxyPort",
 		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
+
+	// Default --coreDump=true for pre-alpha development. Core dump
+	// settings (i.e. sysctl kernel.*) affect all pods in a node and
+	// require privileges. This option should only be used by the cluster
+	// admin (see https://kubernetes.io/docs/concepts/cluster-administration/sysctl-cluster/)
+	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
+		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
+			"all pods in a node and should only be used the cluster admin)")
+
 	cmd.RootCmd.AddCommand(injectCmd)
 }
