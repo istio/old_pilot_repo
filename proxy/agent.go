@@ -75,11 +75,11 @@ const (
 func NewAgent(run func(interface{}, int) error, cleanup func(int),
 	maxRetries int, initialInterval time.Duration) Agent {
 	return &agent{
-		run:     run,
-		cleanup: cleanup,
-		epochs:  make(map[int]interface{}),
-		config:  make(chan interface{}),
-		status:  make(chan exitStatus),
+		run:      run,
+		cleanup:  cleanup,
+		epochs:   make(map[int]interface{}),
+		configCh: make(chan interface{}),
+		statusCh: make(chan exitStatus),
 		retry: &retry{
 			delay:           defaultDelay,
 			defaultDelay:    defaultDelay,
@@ -120,19 +120,19 @@ type agent struct {
 	retry *retry
 
 	// desired configuration state
-	desired interface{}
+	desiredConfig interface{}
 
 	// active epochs and their configurations
 	epochs map[int]interface{}
 
 	// current configuration is the highest epoch configuration
-	current interface{}
+	currentConfig interface{}
 
 	// channel for posting desired configurations
-	config chan interface{}
+	configCh chan interface{}
 
 	// channel for proxy exit notifications
-	status chan exitStatus
+	statusCh chan exitStatus
 }
 
 type exitStatus struct {
@@ -141,7 +141,7 @@ type exitStatus struct {
 }
 
 func (a *agent) ScheduleConfigUpdate(config interface{}) {
-	a.config <- config
+	a.configCh <- config
 }
 
 func (a *agent) Run(stop <-chan struct{}) {
@@ -155,9 +155,9 @@ func (a *agent) Run(stop <-chan struct{}) {
 		rateLimiter.Accept()
 
 		select {
-		case config := <-a.config:
-			if !reflect.DeepEqual(a.desired, config) {
-				a.desired = config
+		case config := <-a.configCh:
+			if !reflect.DeepEqual(a.desiredConfig, config) {
+				a.desiredConfig = config
 
 				// reset retry budget if and only if the desired config changes
 				a.retry.budget = a.retry.maxRetries
@@ -166,7 +166,7 @@ func (a *agent) Run(stop <-chan struct{}) {
 				a.reconcile()
 			}
 
-		case status := <-a.status:
+		case status := <-a.statusCh:
 			if status.err != nil {
 				glog.V(2).Infof("Epoch %d terminated with an error: %v", status.epoch, status.err)
 			} else {
@@ -178,10 +178,10 @@ func (a *agent) Run(stop <-chan struct{}) {
 
 			// delete epoch record and update current config
 			delete(a.epochs, status.epoch)
-			a.current = a.epochs[a.latestEpoch()]
+			a.currentConfig = a.epochs[a.latestEpoch()]
 
 			// schedule a retry for a transient error
-			if status.err != nil && !reflect.DeepEqual(a.desired, a.current) {
+			if status.err != nil && !reflect.DeepEqual(a.desiredConfig, a.currentConfig) {
 				if a.retry.budget > 0 {
 					a.retry.delay = a.retry.initialInterval * (1 << uint(a.retry.maxRetries-a.retry.budget))
 					a.retry.budget = a.retry.budget - 1
@@ -208,7 +208,7 @@ func (a *agent) Run(stop <-chan struct{}) {
 
 func (a *agent) reconcile() {
 	// check that the config is current
-	if reflect.DeepEqual(a.desired, a.current) {
+	if reflect.DeepEqual(a.desiredConfig, a.currentConfig) {
 		glog.V(2).Info("Desired configuration is already applied, resetting delay")
 		a.retry.delay = a.retry.defaultDelay
 		return
@@ -216,15 +216,15 @@ func (a *agent) reconcile() {
 
 	// discover and increment the latest running epoch
 	epoch := a.latestEpoch() + 1
-	a.epochs[epoch] = a.desired
-	a.current = a.desired
-	go a.waitForExit(a.desired, epoch)
+	a.epochs[epoch] = a.desiredConfig
+	a.currentConfig = a.desiredConfig
+	go a.waitForExit(a.desiredConfig, epoch)
 }
 
 // waitForExit runs the start-up command and waits for it to finish
 func (a *agent) waitForExit(config interface{}, epoch int) {
 	err := a.run(config, epoch)
-	a.status <- exitStatus{epoch: epoch, err: err}
+	a.statusCh <- exitStatus{epoch: epoch, err: err}
 }
 
 // latestEpoch returns the latest epoch, or -1 if no epoch is running
