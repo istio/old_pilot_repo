@@ -12,7 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//model:go_default_library",
-        "//model/proxy/alphav1/config:go_default_library",
+        "@com_github_istio_api//:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
@@ -55,7 +55,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//model:go_default_library",
-        "//model/proxy/alphav1/config:go_default_library",
+        "@com_github_istio_api//:go_default_library",
         "//test/mock:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",

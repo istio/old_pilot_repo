@@ -27,7 +27,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/golang/protobuf/proto"
 
-	proxyconfig "istio.io/manager/model/proxy/alphav1/config"
+	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 var (
