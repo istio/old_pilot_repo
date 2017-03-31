@@ -276,12 +276,6 @@ new_go_repository(
     importpath = "k8s.io/client-go",
 )
 
-new_go_repository(
-    name = "com_github_golang_mock",
-    commit = "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
-    importpath = "github.com/golang/mock",
-)
-
 ##
 ## Proxy build rules
 ##
@@ -371,4 +365,14 @@ go_proto_library(
     """,
     commit = "38243f4aa912b38f63aba12e695afa669c34a0bf",  # Mar 31 2017
     remote = "https://github.com/istio/api.git",
+)
+
+##
+## Mock codegen rules
+##
+
+new_go_repository(
+    name = "com_github_golang_mock",
+    commit = "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
+    importpath = "github.com/golang/mock",
 )
