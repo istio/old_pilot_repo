@@ -30,8 +30,7 @@ func AddFlags(rootCmd *cobra.Command) {
 	flag.CommandLine.VisitAll(func(gf *flag.Flag) {
 		switch gf.Name {
 		case "logtostderr":
-			err := gf.Value.Set("true")
-			if err != nil {
+			if err := gf.Value.Set("true"); err != nil {
 				fmt.Printf("missing logtostderr flag: %v", err)
 			}
 		case "alsologtostderr", "log_dir", "stderrthreshold":

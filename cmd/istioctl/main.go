@@ -68,14 +68,13 @@ var (
 			model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
 			if kubeconfig == "" {
-				if os.Getenv("KUBECONFIG") != "" {
+				if v := os.Getenv("KUBECONFIG"); v != "" {
 					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
-					kubeconfig = os.Getenv("KUBECONFIG")
+					kubeconfig = v
 				}
 			}
 
-			var client *kube.Client
-			client, err = kube.NewClient(kubeconfig, model.IstioConfig)
+			client, err := kube.NewClient(kubeconfig, model.IstioConfig)
 			if err != nil && kubeconfig == "" {
 				// If no configuration was specified, and the platform client failed, try again using ~/.kube/config
 				client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
