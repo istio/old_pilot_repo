@@ -29,10 +29,11 @@ import (
 )
 
 type args struct {
-	proxy         envoy.MeshConfig
-	identity      envoy.ProxyNode
-	sdsPort       int
-	ingressSecret string
+	proxy           envoy.MeshConfig
+	identity        envoy.ProxyNode
+	sdsPort         int
+	ingressSecret   string
+	enableProfiling bool
 }
 
 const (
@@ -49,10 +50,16 @@ var (
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			sds := envoy.NewDiscoveryService(controller,
-				&model.IstioRegistry{ConfigRegistry: controller},
-				&flags.proxy,
-				flags.sdsPort)
+			options := envoy.DiscoveryServiceOptions{
+				Services: controller,
+				Config: &model.IstioRegistry{
+					ConfigRegistry: controller,
+				},
+				Mesh:            &flags.proxy,
+				Port:            flags.sdsPort,
+				EnableProfiling: flags.enableProfiling,
+			}
+			sds := envoy.NewDiscoveryService(options)
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
@@ -123,6 +130,8 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
 		"",
 		"Mixer DNS address (or empty to disable Mixer)")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
+		"Enable profiling via web interface host:port/debug/pprof")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.identity.IP, "nodeIP", "",
 		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
