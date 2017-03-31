@@ -80,6 +80,10 @@ def stablePresubmit(gitUtils, bazel, utils) {
         sh("bin/e2e.sh -count 10 -debug -tag debug${gitUtils.GIT_SHA} -v 2")
       }
     }
+    stage('Build istioctl') {
+      def remotePath = gitUtils.artifactsPath('istioctl')
+      sh("bin/cross-compile-istioctl -p ${remotePath}")
+    }
   }
 }
 
