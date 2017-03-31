@@ -32,8 +32,8 @@ go_test(
     srcs = [
         "config_test.go",
         "discovery_test.go",
-        "route_test.go",
         "ingress_test.go",
+        "route_test.go",
     ],
     data = glob(["testdata/*.golden"]),
     library = ":go_default_library",

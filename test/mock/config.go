@@ -73,8 +73,12 @@ func (cr *ConfigRegistry) Get(key model.Key) (proto.Message, bool) {
 
 // Delete implements config registry method
 func (cr *ConfigRegistry) Delete(key model.Key) error {
-	delete(cr.data, key)
-	return nil
+	if _, ok := cr.data[key]; ok {
+		delete(cr.data, key)
+		return nil
+	} else {
+		return fmt.Errorf("Item is missing")
+	}
 }
 
 // Post implements config registry method
