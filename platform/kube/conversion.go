@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/pkg/util/intstr"
 
 	"istio.io/api/proxy/v1/config"
-
 	"istio.io/manager/model"
 )
 

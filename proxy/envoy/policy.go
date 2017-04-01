@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-
 	"istio.io/manager/model"
 )
 
