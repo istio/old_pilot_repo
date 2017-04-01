@@ -16,21 +16,19 @@ package envoy
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/go-multierror"
 
+	"istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
-	"istio.io/manager/model/proxy/alphav1/config"
 	"istio.io/manager/proxy"
-
-	"io/ioutil"
-
-	"github.com/hashicorp/errwrap"
 )
 
 type ingressWatcher struct {
@@ -191,7 +189,7 @@ func generateIngress(conf *IngressConfig) *Config {
 			Clusters: clusters,
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(conf.Mesh.DiscoveryRefreshDelay / time.Millisecond),
 			},
 		},
 	}

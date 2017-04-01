@@ -38,6 +38,7 @@ type args struct {
 	ingressSecret            string
 	ingressClass             string
 	defaultIngressController bool
+	enableProfiling          bool
 }
 
 const (
@@ -76,10 +77,16 @@ var (
 				ResyncPeriod:    resyncPeriod,
 				IngressSyncMode: kube.IngressOff,
 			})
-			sds := envoy.NewDiscoveryService(controller,
-				&model.IstioRegistry{ConfigRegistry: controller},
-				&flags.proxy,
-				flags.sdsPort)
+			options := envoy.DiscoveryServiceOptions{
+				Services: controller,
+				Config: &model.IstioRegistry{
+					ConfigRegistry: controller,
+				},
+				Mesh:            &flags.proxy,
+				Port:            flags.sdsPort,
+				EnableProfiling: flags.enableProfiling,
+			}
+			sds := envoy.NewDiscoveryService(options)
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
@@ -176,6 +183,8 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
 		envoy.DefaultMeshConfig.AuthConfigPath,
 		"The directory in which certificate and key files are stored")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
+		"Enable profiling via web interface host:port/debug/pprof")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.identity.IP, "nodeIP", "",
 		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
@@ -206,6 +215,9 @@ func init() {
 	proxyCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
 		envoy.DefaultMeshConfig.AuthConfigPath,
 		"The directory in which certificate and key files are stored")
+	proxyCmd.PersistentFlags().DurationVar(&flags.proxy.DiscoveryRefreshDelay, "discovery_refresh_delay",
+		envoy.DefaultMeshConfig.DiscoveryRefreshDelay,
+		"The average delay Envoy uses between fetches to the SDS/CDS/RDS APIs")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)
