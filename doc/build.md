@@ -7,22 +7,13 @@ We are using [Bazel 0.4.4](https://github.com/bazelbuild/bazel/releases) as the 
     bazel build //...
 
 Bazel uses `BUILD` files to keep track of dependencies between sources.  If you
-add a new source file, change the imports, or add a data dependency, please run the following command
-to update all `BUILD` files:
+add a new source file or change the imports  please run the following command
+in the repository root to update all `BUILD` files:
 
-    gazelle -go_prefix "istio.io/manager" -mode fix -repo_root .
+    bin/gazelle
 
-Install [Gazelle tool](https://github.com/bazelbuild/rules_go/tree/master/go/tools/gazelle) that automatically generates Bazel `BUILD` files as follows:
-
-    go install github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle
-
-_Note_: Gazelle incorrectly rewrites Istio API dependency. You need to manually replace:
-
-    @io_istio_api//proxy/v1/config:go_default_library
-
-with:
-
-    @io_istio_api//:go_default_library
+Data dependencies such as the ones used by tests require manual declaration in
+the `BUILD` files.
 
 ## Go tooling compatibility
 
