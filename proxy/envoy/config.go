@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -104,11 +105,11 @@ func Generate(context *ProxyContext) *Config {
 			Clusters: clusters,
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
 			},
 			CDS: &CDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds"),
-				RefreshDelayMs: 1000,
+				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
 			},
 		},
 	}
@@ -139,7 +140,8 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 // buildHTTPListener constructs a listener for the network interface address and port
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
-func buildHTTPListener(routeConfig *HTTPRouteConfig, ip string, port int, rds bool) *Listener {
+func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int,
+	rds bool, isInbound bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -161,14 +163,21 @@ func buildHTTPListener(routeConfig *HTTPRouteConfig, ip string, port int, rds bo
 		config.RDS = &RDS{
 			Cluster:         RDSName,
 			RouteConfigName: fmt.Sprintf("%d", port),
-			RefreshDelayMs:  1000,
+			RefreshDelayMs:  (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
 		}
 	} else {
 		config.RouteConfig = routeConfig
 	}
 
+	var sslContext *SSLContext
+	// Build the sslContext for http inbound listener when auth is enabled
+	if isInbound && mesh.EnableAuth {
+		sslContext = buildListenerSSLContext(mesh)
+	}
+
 	return &Listener{
-		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+		Address:    fmt.Sprintf("tcp://%s:%d", ip, port),
+		SSLContext: sslContext,
 		Filters: []*NetworkFilter{{
 			Type:   "read",
 			Name:   HTTPConnectionManager,
@@ -199,7 +208,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 	listeners, clusters := buildOutboundTCPListeners(services)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(routeConfig, WildcardAddress, port, true))
+		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
 	}
 
 	return listeners, clusters
@@ -220,7 +229,10 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
-		sslContext := buildSSLContextWithSAN(service.Hostname, context)
+		var sslContext *SSLContextWithSAN
+		if context.MeshConfig.EnableAuth {
+			sslContext = buildClusterSSLContext(service.Hostname, context)
+		}
 		for _, servicePort := range service.Ports {
 			protocol := servicePort.Protocol
 			switch protocol {
@@ -354,7 +366,7 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(config, endpoint.Address, endpoint.Port, false))
+				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, true))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
