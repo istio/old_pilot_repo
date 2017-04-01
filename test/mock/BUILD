@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "config.go",
         "mock_config.pb.go",
+        "secret.go",
         "service.go",
     ],
     visibility = ["//visibility:public"],

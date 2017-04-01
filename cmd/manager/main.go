@@ -29,10 +29,13 @@ import (
 )
 
 type args struct {
-	proxy         envoy.MeshConfig
-	identity      envoy.ProxyNode
-	sdsPort       int
-	ingressSecret string
+	proxy                    envoy.MeshConfig
+	identity                 envoy.ProxyNode
+	sdsPort                  int
+	ingressSecret            string
+	ingressClass             string
+	defaultIngressController bool
+	enableProfiling          bool
 }
 
 const (
@@ -48,11 +51,21 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			sds := envoy.NewDiscoveryService(controller,
-				&model.IstioRegistry{ConfigRegistry: controller},
-				&flags.proxy,
-				flags.sdsPort)
+			controller := kube.NewController(cmd.Client, kube.ControllerConfig{
+				Namespace:       cmd.RootFlags.Namespace,
+				ResyncPeriod:    resyncPeriod,
+				IngressSyncMode: kube.IngressOff,
+			})
+			options := envoy.DiscoveryServiceOptions{
+				Services: controller,
+				Config: &model.IstioRegistry{
+					ConfigRegistry: controller,
+				},
+				Mesh:            &flags.proxy,
+				Port:            flags.sdsPort,
+				EnableProfiling: flags.enableProfiling,
+			}
+			sds := envoy.NewDiscoveryService(options)
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
@@ -71,7 +84,11 @@ var (
 		Short: "Istio Proxy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			setFlagsFromEnv()
-			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
+			controller := kube.NewController(cmd.Client, kube.ControllerConfig{
+				Namespace:       cmd.RootFlags.Namespace,
+				ResyncPeriod:    resyncPeriod,
+				IngressSyncMode: kube.IngressOff,
+			})
 			w, err := envoy.NewWatcher(controller,
 				controller,
 				&model.IstioRegistry{ConfigRegistry: controller},
@@ -91,10 +108,23 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			controller := kube.NewController(cmd.Client, cmd.RootFlags.Namespace, resyncPeriod)
-			w, err := envoy.NewIngressWatcher(controller, controller,
-				&model.IstioRegistry{ConfigRegistry: controller},
-				cmd.Client, &flags.proxy, flags.ingressSecret, cmd.RootFlags.Namespace)
+			controllerConfig := kube.ControllerConfig{
+				Namespace:       cmd.RootFlags.Namespace,
+				ResyncPeriod:    resyncPeriod,
+				IngressSyncMode: kube.IngressStrict,
+				IngressClass:    flags.ingressClass,
+			}
+			controller := kube.NewController(cmd.Client, controllerConfig)
+			config := &envoy.IngressConfig{
+				CertFile:  "/etc/tls.crt",
+				KeyFile:   "/etc/tls.key",
+				Namespace: cmd.RootFlags.Namespace,
+				Secret:    flags.ingressSecret,
+				Secrets:   cmd.Client,
+				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
+				Mesh:      &flags.proxy,
+			}
+			w, err := envoy.NewIngressWatcher(controller, config)
 			if err != nil {
 				return err
 			}
@@ -123,6 +153,14 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
 		"",
 		"Mixer DNS address (or empty to disable Mixer)")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
+		envoy.DefaultMeshConfig.EnableAuth,
+		"Enable mutual TLS for proxy-to-proxy traffic")
+	discoveryCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
+		envoy.DefaultMeshConfig.AuthConfigPath,
+		"The directory in which certificate and key files are stored")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
+		"Enable profiling via web interface host:port/debug/pprof")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.identity.IP, "nodeIP", "",
 		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
@@ -149,10 +187,13 @@ func init() {
 		"Mixer DNS address (or empty to disable Mixer)")
 	proxyCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
 		envoy.DefaultMeshConfig.EnableAuth,
-		"The Envoy enforces auth for proxy-proxy traffic")
+		"Enable mutual TLS for proxy-to-proxy traffic")
 	proxyCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
 		envoy.DefaultMeshConfig.AuthConfigPath,
-		"The path Envoy uses to find files: cert_chain, private_key, ca_cert")
+		"The directory in which certificate and key files are stored")
+	proxyCmd.PersistentFlags().DurationVar(&flags.proxy.DiscoveryRefreshDelay, "discovery_refresh_delay",
+		envoy.DefaultMeshConfig.DiscoveryRefreshDelay,
+		"The average delay Envoy uses between fetches to the SDS/CDS/RDS APIs")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)
@@ -162,6 +203,13 @@ func init() {
 	ingressCmd.PersistentFlags().StringVar(&flags.ingressSecret, "secret",
 		"",
 		"Kubernetes secret name for ingress SSL termination")
+	ingressCmd.PersistentFlags().StringVar(&flags.ingressClass, "ingress_class",
+		"istio",
+		"The class of ingress resources to be processed by this ingress controller")
+	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller",
+		true,
+		"Specifies whether running as the cluster's default ingress controller, "+
+			"thereby processing unclassified ingress resources")
 
 	cmd.RootCmd.Use = "manager"
 	cmd.RootCmd.Long = `
