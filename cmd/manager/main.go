@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"istio.io/manager/cmd"
+	"istio.io/manager/cmd/manager/api"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/proxy/envoy"
@@ -69,6 +70,10 @@ var (
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
+			a := api.NewAPI("v1alpha1")
+			if err := a.ListenAndServe(); err != nil {
+				return err
+			}
 			cmd.WaitSignal(stop)
 			return
 		},
