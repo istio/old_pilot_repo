@@ -25,6 +25,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pmezard/go-difflib/difflib"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
 )
@@ -255,19 +256,14 @@ func compareJSON(jsonFile string, t *testing.T) {
 	}
 }
 
-func testConfig(r *model.IstioRegistry, instance, envoyConfig string, t *testing.T, enableAuth bool) {
-	meshConfig := *DefaultMeshConfig
-	if enableAuth {
-		meshConfig.EnableAuth = true
-		meshConfig.AuthConfigPath = "/etc/certs"
-	}
-
+func testConfig(r *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
 	config := Generate(&ProxyContext{
 		Discovery:  mock.Discovery,
 		Config:     r,
-		MeshConfig: &meshConfig,
+		MeshConfig: mesh,
 		Addrs:      map[string]bool{instance: true},
 	})
+
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}
@@ -337,41 +333,47 @@ func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
 
 func TestMockConfig(t *testing.T) {
 	r := mock.MakeRegistry()
-	testConfig(r, mock.HostInstanceV0, envoyV0Config, t, false)
-	testConfig(r, mock.HostInstanceV1, envoyV1Config, t, false)
+	testConfig(r, DefaultMeshConfig, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, DefaultMeshConfig, mock.HostInstanceV1, envoyV1Config, t)
 }
 
 func TestMockConfigWithAuth(t *testing.T) {
 	r := mock.MakeRegistry()
-	testConfig(r, mock.HostInstanceV0, envoyV0ConfigAuth, t, true)
-	testConfig(r, mock.HostInstanceV1, envoyV1ConfigAuth, t, true)
+	mesh := *DefaultMeshConfig
+	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0ConfigAuth, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1ConfigAuth, t)
 }
 
 func TestMockConfigTimeout(t *testing.T) {
 	r := mock.MakeRegistry()
+	mesh := *DefaultMeshConfig
 	addTimeout(r, t)
-	testConfig(r, mock.HostInstanceV0, envoyV0Config, t, false)
-	testConfig(r, mock.HostInstanceV1, envoyV1Config, t, false)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
 
 func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := mock.MakeRegistry()
+	mesh := *DefaultMeshConfig
 	addCircuitBreaker(r, t)
-	testConfig(r, mock.HostInstanceV0, envoyV0Config, t, false)
-	testConfig(r, mock.HostInstanceV1, envoyV1Config, t, false)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
 
 func TestMockConfigWeighted(t *testing.T) {
 	r := mock.MakeRegistry()
+	mesh := *DefaultMeshConfig
 	addWeightedRoute(r, t)
-	testConfig(r, mock.HostInstanceV0, envoyV0Config, t, false)
-	testConfig(r, mock.HostInstanceV1, envoyV1Config, t, false)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
 
 func TestMockConfigFault(t *testing.T) {
 	r := mock.MakeRegistry()
+	mesh := *DefaultMeshConfig
 	addFaultRoute(r, t)
 	// Fault rule uses source condition, hence the different golden artifacts
-	testConfig(r, mock.HostInstanceV0, envoyFaultConfig, t, false)
-	testConfig(r, mock.HostInstanceV1, envoyV1Config, t, false)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyFaultConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }

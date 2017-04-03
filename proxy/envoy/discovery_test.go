@@ -23,6 +23,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
 )
@@ -36,13 +37,12 @@ func makeDiscoveryService(r *model.IstioRegistry) *DiscoveryService {
 }
 
 func makeDiscoveryServiceWithSSLContext(r *model.IstioRegistry) *DiscoveryService {
-	meshConfigWithSSLContext := *DefaultMeshConfig
-	meshConfigWithSSLContext.EnableAuth = true
-	meshConfigWithSSLContext.AuthConfigPath = "/etc/certs"
+	mesh := *DefaultMeshConfig
+	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	return &DiscoveryService{
 		services: mock.Discovery,
 		config:   r,
-		mesh:     &meshConfigWithSSLContext,
+		mesh:     &mesh,
 	}
 }
 
