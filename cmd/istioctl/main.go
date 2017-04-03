@@ -111,6 +111,9 @@ var (
 				if err = setup(v.Type, v.Name); err != nil {
 					return err
 				}
+				if err := model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
+					return err
+				}
 				err = config.Post(key, v.ParsedSpec)
 				if err != nil {
 					return err
@@ -139,6 +142,9 @@ var (
 			}
 			for _, v := range varr {
 				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				if err := model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
 					return err
 				}
 				err = config.Put(key, v.ParsedSpec)

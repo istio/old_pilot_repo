@@ -83,9 +83,6 @@ func (cr *ConfigRegistry) Delete(key model.Key) error {
 
 // Post implements config registry method
 func (cr *ConfigRegistry) Post(key model.Key, v proto.Message) error {
-	if err := model.IstioConfig.ValidateConfig(&key, v); err != nil {
-		return err
-	}
 	_, ok := cr.data[key]
 	if !ok {
 		cr.data[key] = v
@@ -96,9 +93,6 @@ func (cr *ConfigRegistry) Post(key model.Key, v proto.Message) error {
 
 // Put implements config registry method
 func (cr *ConfigRegistry) Put(key model.Key, v proto.Message) error {
-	if err := model.IstioConfig.ValidateConfig(&key, v); err != nil {
-		return err
-	}
 	_, ok := cr.data[key]
 	if !ok {
 		return errors.New("item is missing")
