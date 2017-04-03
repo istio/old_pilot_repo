@@ -204,16 +204,341 @@ func (t Tags) Validate() error {
 	return errs
 }
 
+func validateFQDN(fqdn string) error {
+	if len(fqdn) > 255 {
+		return fmt.Errorf("Domain name too long (max 255)")
+	}
+
+	for _, label := range strings.Split(fqdn, ".") {
+		if !IsDNS1123Label(label) {
+			return fmt.Errorf("Domain name %q invalid", fqdn)
+		}
+	}
+
+	return nil
+}
+
+func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
+	var retVal error
+
+	if mc.Source != "" {
+		if err := validateFQDN(mc.Source); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	// We do not validate source_tags because they have no explicit rules
+
+	if mc.GetTcp() != nil {
+		if err := ValidateL4MatchAttributes(mc.GetTcp()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if mc.GetUdp() != nil {
+		if err := ValidateL4MatchAttributes(mc.GetUdp()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	// We do not (yet) validate http_headers.
+
+	return retVal
+}
+
+func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) error {
+	var retVal error
+
+	if ma.SourceSubnet != nil {
+		for _, subnet := range ma.SourceSubnet{
+			if err := validateSubnet(subnet); err != nil {
+				retVal = multierror.Append(retVal, err)
+			}
+		}
+	}
+
+	if ma.DestinationSubnet != nil {
+		for _, subnet := range ma.DestinationSubnet {
+			if err := validateSubnet(subnet); err != nil {
+				retVal = multierror.Append(retVal, err)
+			}
+		}
+	}
+
+	return retVal
+}
+
+func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
+	var retVal error
+
+	if dw.Destination != "" {
+		if err := validateFQDN(dw.Destination); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	// We do not validate tags because they have no explicit rules
+
+	if dw.Weight > 100 {
+		retVal = multierror.Append(retVal, fmt.Errorf("weight must not exceed 100"))
+	}
+	if dw.Weight < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("weight must be in range 0..100"))
+	}
+
+	return retVal
+}
+
+func ValidateHttpTimeout(timeout *proxyconfig.HTTPTimeout) error {
+	var retVal error
+
+	if simple := timeout.GetSimpleTimeout(); simple != nil {
+		if simple.TimeoutSeconds < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("timeout_seconds must be in range 0.."))
+		}
+
+		// We ignore override_header_name
+	}
+
+	return retVal
+}
+
+func ValidateHttpRetries(retry *proxyconfig.HTTPRetry) error {
+	var retVal error
+
+	if simple := retry.GetSimpleRetry(); simple != nil {
+		if simple.Attempts < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("attempts must be in range 0.."))
+		}
+
+		// We ignore override_header_name
+	}
+
+	return retVal
+}
+
+func ValidateHttpFault(fault *proxyconfig.HTTPFaultInjection) error {
+	var retVal error
+
+	if fault.GetDelay() != nil {
+		if err := validateDelay(fault.GetDelay()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if fault.GetAbort() != nil {
+		if err := validateAbort(fault.GetAbort()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	return retVal
+}
+
+func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) error {
+	var retVal error
+
+	if fault.GetTerminate() != nil {
+		if err := validateTerminate(fault.GetTerminate()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if fault.GetThrottle() != nil {
+		if err := validateThrottle(fault.GetThrottle()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	return retVal
+}
+
+func validateSubnet(subnet string) error {
+	var retVal error
+
+	// TODO verify subnet is "IPv4 or IPv6 ip address with optional subnet. E.g., a.b.c.d/xx form or just a.b.c.d
+
+	return retVal
+}
+
+func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
+	var retVal error
+
+	if delay.Percent > 100 {
+		retVal = multierror.Append(retVal, fmt.Errorf("delay percent must not exceed 100"))
+	}
+	if delay.Percent < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("delay percent must be in range 0..100"))
+	}
+
+	if delay.GetFixedDelaySeconds() < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("delay fixed_seconds invalid"))
+	}
+
+	if delay.GetExponentialDelaySeconds() < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("delay exponential_seconds invalid"))
+	}
+
+	return retVal
+}
+
+func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) error {
+	var retVal error
+
+	if abort.Percent > 100 {
+		retVal = multierror.Append(retVal, fmt.Errorf("abort percent must not exceed 100"))
+	}
+	if abort.Percent < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("abort percent must be in range 0..100"))
+	}
+
+	// No validation yet for grpc_status / http2_error / http_status
+	// No validation yet for override_header_name
+
+	return retVal
+}
+
+func validateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) error {
+	var retVal error
+
+	if terminate.Percent > 100 {
+		retVal = multierror.Append(retVal, fmt.Errorf("terminate percent must not exceed 100"))
+	}
+	if terminate.Percent < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("terminate percent must be in range 0..100"))
+	}
+
+	return retVal
+}
+
+func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) error {
+	var retVal error
+
+	if throttle.Percent > 100 {
+		retVal = multierror.Append(retVal, fmt.Errorf("throttle percent must not exceed 100"))
+	}
+	if throttle.Percent < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("throttle percent must be in range 0..100"))
+	}
+
+	if throttle.DownstreamLimitBps < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("downstream_limit_bps invalid"))
+	}
+
+	if throttle.UpstreamLimitBps < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("upstream_limit_bps invalid"))
+	}
+
+	if throttle.GetThrottleAfterSeconds() < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("throttle_after_seconds invalid"))
+	}
+
+	if throttle.GetThrottleAfterBytes() < 0 {
+		retVal = multierror.Append(retVal, fmt.Errorf("throttle_after_bytes invalid"))
+	}
+
+	// TODO Check DoubleValue throttle.GetThrottleForSeconds()
+
+	return retVal
+}
+
+func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) error {
+	var retVal error
+
+	// Currently the policy is just a name, and we don't validate it
+
+	return retVal
+}
+
+func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) error {
+	var retVal error
+
+	if simple := cb.GetSimpleCb(); simple != nil {
+		if simple.MaxConnections < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_connections must be in range 0.."))
+		}
+		if simple.HttpMaxPendingRequests < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_pending_requests must be in range 0.."))
+		}
+		if simple.HttpMaxRequests < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_requests must be in range 0.."))
+		}
+		if simple.SleepWindowSeconds < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range 0.."))
+		}
+		if simple.HttpConsecutiveErrors < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range 0.."))
+		}
+		if simple.HttpDetectionIntervalSeconds < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_detection_interval_seconds must be in range 0.."))
+		}
+		if simple.HttpMaxRequestsPerConnection < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range 0.."))
+		}
+		if simple.HttpMaxEjectionPercent < 0 || simple.HttpMaxEjectionPercent > 100 {
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_max_ejection_percent must be in range 0..100"))
+		}
+	}
+
+	return retVal
+}
+
 // ValidateRouteRule checks routing rules
 func ValidateRouteRule(msg proto.Message) error {
+
 	value, ok := msg.(*proxyconfig.RouteRule)
 	if !ok {
-		return fmt.Errorf("Cannot cast to routing rule")
+		return fmt.Errorf("cannot cast to routing rule")
 	}
+	var retVal error
 	if value.Destination == "" {
-		return fmt.Errorf("RouteRule must have a destination service")
+		retVal = multierror.Append(retVal, fmt.Errorf("routeRule must have a destination service"))
 	}
-	return nil
+	if err := validateFQDN(value.Destination); err != nil {
+		retVal = multierror.Append(retVal, err)
+	}
+
+	// We don't validate precedence because any int32 is legal
+
+	if value.GetMatch() != nil {
+		if err := ValidateMatchCondition(value.GetMatch()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if value.GetRoute() != nil {
+		for _, destWeight := range value.GetRoute() {
+			if err := ValidateDestinationWeight(destWeight); err != nil {
+				retVal = multierror.Append(retVal, err)
+			}
+		}
+	}
+
+	if value.GetHttpReqTimeout() != nil {
+		if err := ValidateHttpTimeout(value.GetHttpReqTimeout()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if value.GetHttpReqRetries() != nil {
+		if err := ValidateHttpRetries(value.GetHttpReqRetries()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if value.GetHttpFault() != nil {
+		if err := ValidateHttpFault(value.GetHttpFault()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if value.GetL4Fault() != nil {
+		if err := ValidateL4Fault(value.GetL4Fault()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	return retVal
 }
 
 // ValidateIngressRule checks ingress rules
@@ -228,8 +553,30 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 	if !ok {
 		return fmt.Errorf("Cannot cast to destination policy")
 	}
+
+	var retVal error
+
 	if value.Destination == "" {
-		return fmt.Errorf("DestinationPolicy should have a valid service name in its destination field")
+		retVal = multierror.Append(retVal, fmt.Errorf("DestinationPolicy should have a valid service name in its destination field"))
+	} else {
+		if err := validateFQDN(value.Destination); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
 	}
-	return nil
+
+	// We do not validate tags because they have no explicit rules
+
+	if value.GetLoadBalancing() != nil {
+		if err := ValidateLoadBalancing(value.GetLoadBalancing()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if value.GetCircuitBreaker() != nil {
+		if err := ValidateCircuitBreaker(value.GetCircuitBreaker()); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	return retVal
 }

@@ -62,6 +62,7 @@ var (
 			if len(args) != 0 {
 				return fmt.Errorf("create takes no arguments")
 			}
+			c.SilenceUsage = true
 			varr, err := readInputs()
 			if err != nil {
 				return err
@@ -91,6 +92,7 @@ var (
 			if len(args) != 0 {
 				return fmt.Errorf("replace takes no arguments")
 			}
+			c.SilenceUsage = true
 			varr, err := readInputs()
 			if err != nil {
 				return err
@@ -126,6 +128,7 @@ var (
 				if err := setup(args[0], args[1]); err != nil {
 					return err
 				}
+				c.SilenceUsage = true
 				item, exists := cmd.Client.Get(key)
 				if !exists {
 					return fmt.Errorf("%q does not exist", key)
@@ -140,6 +143,7 @@ var (
 					return err
 				}
 
+				c.SilenceUsage = true
 				list, err := cmd.Client.List(key.Kind, key.Namespace)
 				if err != nil {
 					return fmt.Errorf("error listing %s: %v", key.Kind, err)
@@ -172,6 +176,7 @@ var (
 				if len(args) < 2 {
 					return fmt.Errorf("provide configuration type and name or -f option")
 				}
+				c.SilenceUsage = true
 				for i := 1; i < len(args); i++ {
 					if err := setup(args[0], args[i]); err != nil {
 						return err
@@ -188,6 +193,7 @@ var (
 			if len(args) != 0 {
 				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
+			c.SilenceUsage = true
 			varr, err := readInputs()
 			if err != nil {
 				return err
@@ -231,7 +237,6 @@ func init() {
 
 func main() {
 	if err := cmd.RootCmd.Execute(); err != nil {
-		glog.Error(err)
 		os.Exit(-1)
 	}
 }
