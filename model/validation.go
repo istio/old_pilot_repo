@@ -206,12 +206,12 @@ func (t Tags) Validate() error {
 
 func validateFQDN(fqdn string) error {
 	if len(fqdn) > 255 {
-		return fmt.Errorf("Domain name too long (max 255)")
+		return fmt.Errorf("domain name %q too long (max 255)", fqdn)
 	}
 
 	for _, label := range strings.Split(fqdn, ".") {
 		if !IsDNS1123Label(label) {
-			return fmt.Errorf("Domain name %q invalid", fqdn)
+			return fmt.Errorf("domain name %q invalid", fqdn)
 		}
 	}
 
@@ -512,40 +512,40 @@ func ValidateRouteRule(msg proto.Message) error {
 
 	// We don't validate precedence because any int32 is legal
 
-	if value.GetMatch() != nil {
-		if err := ValidateMatchCondition(value.GetMatch()); err != nil {
+	if value.Match != nil {
+		if err := ValidateMatchCondition(value.Match); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
-	if value.GetRoute() != nil {
-		for _, destWeight := range value.GetRoute() {
+	if value.Route != nil {
+		for _, destWeight := range value.Route {
 			if err := ValidateDestinationWeight(destWeight); err != nil {
 				retVal = multierror.Append(retVal, err)
 			}
 		}
 	}
 
-	if value.GetHttpReqTimeout() != nil {
-		if err := ValidateHTTPTimeout(value.GetHttpReqTimeout()); err != nil {
+	if value.HttpReqTimeout != nil {
+		if err := ValidateHTTPTimeout(value.HttpReqTimeout); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
-	if value.GetHttpReqRetries() != nil {
-		if err := ValidateHTTPRetries(value.GetHttpReqRetries()); err != nil {
+	if value.HttpReqRetries != nil {
+		if err := ValidateHTTPRetries(value.HttpReqRetries); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
-	if value.GetHttpFault() != nil {
-		if err := ValidateHTTPFault(value.GetHttpFault()); err != nil {
+	if value.HttpFault != nil {
+		if err := ValidateHTTPFault(value.HttpFault); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
-	if value.GetL4Fault() != nil {
-		if err := ValidateL4Fault(value.GetL4Fault()); err != nil {
+	if value.L4Fault != nil {
+		if err := ValidateL4Fault(value.L4Fault); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
