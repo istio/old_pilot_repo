@@ -56,7 +56,6 @@ var (
 	// DefaultMeshConfig configuration
 	DefaultMeshConfig = &proxyconfig.ProxyMeshConfig{
 		DiscoveryAddress: "manager:8080",
-		MixerAddress:     "mixer:9091",
 
 		ProxyListenPort:        15001,
 		ProxyAdminPort:         15000,

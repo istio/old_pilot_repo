@@ -32,7 +32,7 @@ import (
 
 type args struct {
 	namespace                string
-	proxy                    envoy.MeshConfig
+	resyncPeriod             time.Duration
 	identity                 envoy.ProxyNode
 	sdsPort                  int
 	ingressSecret            string
@@ -41,14 +41,8 @@ type args struct {
 	enableProfiling          bool
 }
 
-const (
-	resyncPeriod = 100 * time.Millisecond
-)
-
 var (
-	flags = &args{
-		proxy: *envoy.DefaultMeshConfig,
-	}
+	flags = &args{}
 
 	client *kube.Client
 
@@ -74,7 +68,7 @@ var (
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(client, kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressOff,
 			})
 			options := envoy.DiscoveryServiceOptions{
@@ -107,7 +101,7 @@ var (
 			setFlagsFromEnv()
 			controller := kube.NewController(client, kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressOff,
 			})
 			w, err := envoy.NewWatcher(controller,
@@ -131,7 +125,7 @@ var (
 		RunE: func(c *cobra.Command, args []string) error {
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressStrict,
 				IngressClass:    flags.ingressClass,
 			}
@@ -171,18 +165,11 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flags.namespace, "namespace", "n", "",
 		"Select a Kubernetes namespace ('' means all namespaces)")
+	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 100*time.Millisecond,
+		"Controller resync interval")
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
 		"Discovery service port")
-	discoveryCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
-		"",
-		"Mixer DNS address (or empty to disable Mixer)")
-	discoveryCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
-		envoy.DefaultMeshConfig.EnableAuth,
-		"Enable mutual TLS for proxy-to-proxy traffic")
-	discoveryCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
-		envoy.DefaultMeshConfig.AuthConfigPath,
-		"The directory in which certificate and key files are stored")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
 
@@ -190,34 +177,6 @@ func init() {
 		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.identity.Name, "nodeName", "",
 		"Proxy node name. If not provided uses ${POD_NAME}.${POD_NAMESPACE}")
-
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.DiscoveryAddress, "sds", "s",
-		envoy.DefaultMeshConfig.DiscoveryAddress,
-		"Discovery service DNS address")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.ProxyPort, "port", "p",
-		envoy.DefaultMeshConfig.ProxyPort,
-		"Envoy proxy port")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.AdminPort, "admin_port", "a",
-		envoy.DefaultMeshConfig.AdminPort,
-		"Envoy admin port")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.BinaryPath, "envoy_path", "b",
-		envoy.DefaultMeshConfig.BinaryPath,
-		"Envoy binary location")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.ConfigPath, "config_path", "e",
-		envoy.DefaultMeshConfig.ConfigPath,
-		"Envoy config root location")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
-		"",
-		"Mixer DNS address (or empty to disable Mixer)")
-	proxyCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
-		envoy.DefaultMeshConfig.EnableAuth,
-		"Enable mutual TLS for proxy-to-proxy traffic")
-	proxyCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
-		envoy.DefaultMeshConfig.AuthConfigPath,
-		"The directory in which certificate and key files are stored")
-	proxyCmd.PersistentFlags().DurationVar(&flags.proxy.DiscoveryRefreshDelay, "discovery_refresh_delay",
-		envoy.DefaultMeshConfig.DiscoveryRefreshDelay,
-		"The average delay Envoy uses between fetches to the SDS/CDS/RDS APIs")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)

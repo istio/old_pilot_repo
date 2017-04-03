@@ -333,13 +333,16 @@ func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
 
 func TestMockConfig(t *testing.T) {
 	r := mock.MakeRegistry()
-	testConfig(r, DefaultMeshConfig, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, DefaultMeshConfig, mock.HostInstanceV1, envoyV1Config, t)
+	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
 
 func TestMockConfigWithAuth(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0ConfigAuth, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1ConfigAuth, t)
@@ -348,6 +351,7 @@ func TestMockConfigWithAuth(t *testing.T) {
 func TestMockConfigTimeout(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
 	addTimeout(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -356,6 +360,7 @@ func TestMockConfigTimeout(t *testing.T) {
 func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
 	addCircuitBreaker(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -364,6 +369,7 @@ func TestMockConfigCircuitBreaker(t *testing.T) {
 func TestMockConfigWeighted(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
 	addWeightedRoute(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -372,6 +378,7 @@ func TestMockConfigWeighted(t *testing.T) {
 func TestMockConfigFault(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := *DefaultMeshConfig
+	mesh.MixerAddress = "mixer:9091"
 	addFaultRoute(r, t)
 	// Fault rule uses source condition, hence the different golden artifacts
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyFaultConfig, t)
