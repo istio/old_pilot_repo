@@ -204,14 +204,31 @@ func (t Tags) Validate() error {
 	return errs
 }
 
+// Validate ensures tags are well-formed, but does not insist that tags exist
+func Validate(t map[string]string) error {
+	var errs error
+	for k, v := range t {
+		if !tagRegexp.MatchString(k) {
+			errs = multierror.Append(errs, fmt.Errorf("Invalid tag key: %q", k))
+		}
+		if !tagRegexp.MatchString(v) {
+			errs = multierror.Append(errs, fmt.Errorf("Invalid tag value: %q", v))
+		}
+	}
+	return errs
+}
+
 func validateFQDN(fqdn string) error {
 	if len(fqdn) > 255 {
 		return fmt.Errorf("domain name %q too long (max 255)", fqdn)
 	}
+	if len(fqdn) == 0 {
+		return fmt.Errorf("empty domain name not allowed")
+	}
 
 	for _, label := range strings.Split(fqdn, ".") {
 		if !IsDNS1123Label(label) {
-			return fmt.Errorf("domain name %q invalid", fqdn)
+			return fmt.Errorf("domain name %q invalid (label %q invalid)", fqdn, label)
 		}
 	}
 
@@ -228,7 +245,9 @@ func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
 		}
 	}
 
-	// We do not validate source_tags because they have no explicit rules
+	if err := Validate(mc.SourceTags); err != nil {
+		retVal = multierror.Append(retVal, err)
+	}
 
 	if mc.GetTcp() != nil {
 		if err := ValidateL4MatchAttributes(mc.GetTcp()); err != nil {
@@ -270,6 +289,26 @@ func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) error {
 	return retVal
 }
 
+func validatePercent(err error, val int32, label string) error {
+	if val > 100 {
+		err = multierror.Append(err, fmt.Errorf("%v must not exceed 100", label))
+	}
+	if val < 0 {
+		err = multierror.Append(err, fmt.Errorf("%v must be in range 0..100", label))
+	}
+	return err
+}
+
+func validateFloatPercent(err error, val float32, label string) error {
+	if val > 100.0 {
+		err = multierror.Append(err, fmt.Errorf("%v must not exceed 100", label))
+	}
+	if val < 0.0 {
+		err = multierror.Append(err, fmt.Errorf("%v must be in range 0..100", label))
+	}
+	return err
+}
+
 // ValidateDestinationWeight validates DestinationWeight
 func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
 	var retVal error
@@ -281,13 +320,11 @@ func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
 	}
 
 	// We do not validate tags because they have no explicit rules
+	if err := Validate(dw.Tags); err != nil {
+		retVal = multierror.Append(retVal, err)
+	}
 
-	if dw.Weight > 100 {
-		retVal = multierror.Append(retVal, fmt.Errorf("weight must not exceed 100"))
-	}
-	if dw.Weight < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("weight must be in range 0..100"))
-	}
+	retVal = validatePercent(retVal, dw.Weight, "weight")
 
 	return retVal
 }
@@ -371,12 +408,7 @@ func validateSubnet(subnet string) error {
 func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
 	var retVal error
 
-	if delay.Percent > 100 {
-		retVal = multierror.Append(retVal, fmt.Errorf("delay percent must not exceed 100"))
-	}
-	if delay.Percent < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("delay percent must be in range 0..100"))
-	}
+	retVal = validateFloatPercent(retVal, delay.Percent, "delay")
 
 	if delay.GetFixedDelaySeconds() < 0 {
 		retVal = multierror.Append(retVal, fmt.Errorf("delay fixed_seconds invalid"))
@@ -392,12 +424,7 @@ func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
 func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) error {
 	var retVal error
 
-	if abort.Percent > 100 {
-		retVal = multierror.Append(retVal, fmt.Errorf("abort percent must not exceed 100"))
-	}
-	if abort.Percent < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("abort percent must be in range 0..100"))
-	}
+	retVal = validateFloatPercent(retVal, abort.Percent, "abort")
 
 	// No validation yet for grpc_status / http2_error / http_status
 	// No validation yet for override_header_name
@@ -408,12 +435,7 @@ func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) error {
 func validateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) error {
 	var retVal error
 
-	if terminate.Percent > 100 {
-		retVal = multierror.Append(retVal, fmt.Errorf("terminate percent must not exceed 100"))
-	}
-	if terminate.Percent < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("terminate percent must be in range 0..100"))
-	}
+	retVal = validateFloatPercent(retVal, terminate.Percent, "terminate")
 
 	return retVal
 }
@@ -421,12 +443,7 @@ func validateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) error 
 func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) error {
 	var retVal error
 
-	if throttle.Percent > 100 {
-		retVal = multierror.Append(retVal, fmt.Errorf("throttle percent must not exceed 100"))
-	}
-	if throttle.Percent < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("throttle percent must be in range 0..100"))
-	}
+	retVal = validateFloatPercent(retVal, throttle.Percent, "throttle")
 
 	if throttle.DownstreamLimitBps < 0 {
 		retVal = multierror.Append(retVal, fmt.Errorf("downstream_limit_bps invalid"))
@@ -486,10 +503,7 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) error {
 			retVal = multierror.Append(retVal,
 				fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range [0..]"))
 		}
-		if simple.HttpMaxEjectionPercent < 0 || simple.HttpMaxEjectionPercent > 100 {
-			retVal = multierror.Append(retVal,
-				fmt.Errorf("circuit_breaker http_max_ejection_percent must be in range [0..100]"))
-		}
+		retVal = validatePercent(retVal, simple.HttpMaxEjectionPercent, "circuit_breaker http_max_ejection_percent")
 	}
 
 	return retVal
@@ -504,7 +518,7 @@ func ValidateRouteRule(msg proto.Message) error {
 	}
 	var retVal error
 	if value.Destination == "" {
-		retVal = multierror.Append(retVal, fmt.Errorf("routeRule must have a destination service"))
+		retVal = multierror.Append(retVal, fmt.Errorf("route rule must have a destination service"))
 	}
 	if err := validateFQDN(value.Destination); err != nil {
 		retVal = multierror.Append(retVal, err)
@@ -570,14 +584,16 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 
 	if value.Destination == "" {
 		retVal = multierror.Append(retVal,
-			fmt.Errorf("destinationPolicy should have a valid service name in its destination field"))
+			fmt.Errorf("destination policy should have a valid service name in its destination field"))
 	} else {
 		if err := validateFQDN(value.Destination); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
-	// We do not validate tags because they have no explicit rules
+	if err := Validate(value.Tags); err != nil {
+		retVal = multierror.Append(retVal, err)
+	}
 
 	if value.GetLoadBalancing() != nil {
 		if err := ValidateLoadBalancing(value.GetLoadBalancing()); err != nil {

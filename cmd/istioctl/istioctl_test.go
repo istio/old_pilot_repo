@@ -160,7 +160,7 @@ func TestInvalidRouteRule(t *testing.T) {
 	rootSetup(t)
 	file = "testdata/invalid-route-rule.yaml"
 	if err := postCmd.RunE(postCmd, []string{}); err == nil {
-		t.Fatalf("Did not fail when presented with invalid rule")
+		t.Fatalf("Did not fail when presented with invalid route rule")
 	}
 }
 
@@ -168,6 +168,6 @@ func TestInvalidDestinationPolicy(t *testing.T) {
 	rootSetup(t)
 	file = "testdata/invalid-destination-policy2.yaml"
 	if err := postCmd.RunE(postCmd, []string{}); err == nil {
-		t.Fatalf("Did not fail when presented with invalid rule")
+		t.Fatalf("Did not fail when presented with invalid destination policy")
 	}
 }
