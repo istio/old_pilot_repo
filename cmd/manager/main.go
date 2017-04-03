@@ -32,7 +32,6 @@ type args struct {
 	proxy                    envoy.MeshConfig
 	identity                 envoy.ProxyNode
 	sdsPort                  int
-	ingressSecret            string
 	ingressClass             string
 	defaultIngressController bool
 	enableProfiling          bool
@@ -108,19 +107,20 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
+			secrets := kube.NewSecret(cmd.RootFlags.Namespace, cmd.Client.GetKubernetesClient())
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       cmd.RootFlags.Namespace,
 				ResyncPeriod:    resyncPeriod,
 				IngressSyncMode: kube.IngressStrict,
 				IngressClass:    flags.ingressClass,
+				Secrets:         secrets,
 			}
 			controller := kube.NewController(cmd.Client, controllerConfig)
 			config := &envoy.IngressConfig{
 				CertFile:  "/etc/tls.crt",
 				KeyFile:   "/etc/tls.key",
 				Namespace: cmd.RootFlags.Namespace,
-				Secret:    flags.ingressSecret,
-				Secrets:   cmd.Client,
+				Secrets:   secrets,
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
 				Mesh:      &flags.proxy,
 			}
@@ -199,10 +199,6 @@ func init() {
 	proxyCmd.AddCommand(ingressCmd)
 	proxyCmd.AddCommand(egressCmd)
 
-	// TODO: remove this once we write the logic to obtain secrets dynamically
-	ingressCmd.PersistentFlags().StringVar(&flags.ingressSecret, "secret",
-		"",
-		"Kubernetes secret name for ingress SSL termination")
 	ingressCmd.PersistentFlags().StringVar(&flags.ingressClass, "ingress_class",
 		"istio",
 		"The class of ingress resources to be processed by this ingress controller")

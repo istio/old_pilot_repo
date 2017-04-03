@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
-	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/go-multierror"
 
 	"istio.io/api/proxy/v1/config"
@@ -86,7 +85,6 @@ type IngressConfig struct {
 	CertFile  string
 	KeyFile   string
 	Namespace string
-	Secret    string
 	Secrets   model.SecretRegistry
 	Registry  *model.IstioRegistry
 	Mesh      *MeshConfig
@@ -161,17 +159,19 @@ func generateIngress(conf *IngressConfig) *Config {
 		},
 	}
 
-	// configure for HTTPS if provided with a secret name
-	if conf.Secret != "" {
-		// configure Envoy
+	// configure for HTTPS if there is a secret
+	if secret, err := conf.Secrets.GetSecret("*"); err != nil {
+		glog.Warningf("Error retrieving ingress secret: %v", err)
+	} else if secret != nil {
+		// configure Envoy for HTTPS
 		listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  conf.CertFile,
 			PrivateKeyFile: conf.KeyFile,
 		}
 
-		if err := writeTLS(conf.CertFile, conf.KeyFile, conf.Namespace,
-			conf.Secret, conf.Secrets); err != nil {
+		// write key/cert
+		if err := writeTLS(conf.CertFile, conf.KeyFile, secret); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
 	}
@@ -195,34 +195,21 @@ func generateIngress(conf *IngressConfig) *Config {
 	}
 }
 
-func writeTLS(certFilename, keyFilename, namespace, secret string, secrets model.SecretRegistry) error {
-	var uri string
-	if namespace == "" {
-		uri = secret + ".default"
-	} else {
-		uri = fmt.Sprintf("%s.%s", secret, namespace)
-	}
-
-	s, err := secrets.GetSecret(uri)
-	if err != nil {
-		return errwrap.Wrap(fmt.Errorf("could not get secret %q", uri), err)
-	}
-
-	cert, exists := s["tls.crt"]
+func writeTLS(certFilename, keyFilename string, secret map[string][]byte) error {
+	cert, exists := secret["tls.crt"]
 	if !exists {
-		return fmt.Errorf("could not find tls.crt in secret %q", uri)
+		return fmt.Errorf("could not find tls.crt in secret")
 	}
-
-	key, exists := s["tls.key"]
+	key, exists := secret["tls.key"]
 	if !exists {
-		return fmt.Errorf("could not find tls.key in secret %q", uri)
+		return fmt.Errorf("could not find tls.key in secret")
 	}
 
 	// write files
-	if err = ioutil.WriteFile(certFilename, cert, 0755); err != nil {
+	if err := ioutil.WriteFile(certFilename, cert, 0755); err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(keyFilename, key, 0755); err != nil {
+	if err := ioutil.WriteFile(keyFilename, key, 0755); err != nil {
 		return err
 	}
 

@@ -18,7 +18,6 @@ const (
 	ingressRouteRule      = "testdata/ingress-route.yaml.golden"
 	ingressCertFile       = "testdata/tls.crt"
 	ingressKeyFile        = "testdata/tls.key"
-	ingressSecret         = "secret"
 )
 
 var (
@@ -70,18 +69,20 @@ func addIngressRoute(r *model.IstioRegistry, t *testing.T) {
 
 func TestIngressRoutes(t *testing.T) {
 	r := mock.MakeRegistry()
+	s := &mock.SecretRegistry{Secrets: map[string]map[string][]byte{}}
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressConfig{
 		Registry: r,
+		Secrets:  s,
 		Mesh:     DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
 }
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := mock.SecretRegistry{
+	s := &mock.SecretRegistry{
 		Secrets: map[string]map[string][]byte{
-			ingressSecret + ".default": {
+			"*": {
 				"tls.crt": ingressCert,
 				"tls.key": ingressKey,
 			},
@@ -92,8 +93,7 @@ func TestIngressRoutesSSL(t *testing.T) {
 		CertFile:  ingressCertFile,
 		KeyFile:   ingressKeyFile,
 		Namespace: "",
-		Secret:    ingressSecret,
-		Secrets:   &s,
+		Secrets:   s,
 		Registry:  r,
 		Mesh:      DefaultMeshConfig,
 	}, ingressEnvoySSLConfig, t)

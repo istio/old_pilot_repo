@@ -66,6 +66,7 @@ type ControllerConfig struct {
 	ResyncPeriod    time.Duration
 	IngressSyncMode IngressSyncMode
 	IngressClass    string
+	Secrets         *Secret
 }
 
 // Controller is a collection of synchronized resource watchers
@@ -249,6 +250,21 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 		ingress := obj.(*v1beta1.Ingress)
 		if !c.shouldProcessIngress(ingress) {
 			return nil
+		}
+
+		// TODO: priority?
+		for _, tls := range ingress.Spec.TLS {
+			if tls.SecretName == "" {
+				continue
+			}
+
+			if len(tls.Hosts) == 0 {
+				c.config.Secrets.put("*", tls.SecretName)
+			} else {
+				for _, host := range tls.Hosts {
+					c.config.Secrets.put(host, tls.SecretName)
+				}
+			}
 		}
 
 		// Convert the ingress into a map[Key]Message, and invoke handler for each
