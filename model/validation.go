@@ -218,6 +218,7 @@ func validateFQDN(fqdn string) error {
 	return nil
 }
 
+// ValidateMatchCondition validates a Match Condition
 func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
 	var retVal error
 
@@ -246,11 +247,12 @@ func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
 	return retVal
 }
 
+// ValidateL4MatchAttributes validates L4 Match Attributes
 func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) error {
 	var retVal error
 
 	if ma.SourceSubnet != nil {
-		for _, subnet := range ma.SourceSubnet{
+		for _, subnet := range ma.SourceSubnet {
 			if err := validateSubnet(subnet); err != nil {
 				retVal = multierror.Append(retVal, err)
 			}
@@ -268,6 +270,7 @@ func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) error {
 	return retVal
 }
 
+// ValidateDestinationWeight validates DestinationWeight
 func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
 	var retVal error
 
@@ -289,12 +292,13 @@ func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
 	return retVal
 }
 
-func ValidateHttpTimeout(timeout *proxyconfig.HTTPTimeout) error {
+// ValidateHTTPTimeout validates HTTP Timeout
+func ValidateHTTPTimeout(timeout *proxyconfig.HTTPTimeout) error {
 	var retVal error
 
 	if simple := timeout.GetSimpleTimeout(); simple != nil {
 		if simple.TimeoutSeconds < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("timeout_seconds must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("timeout_seconds must be in range [0..]"))
 		}
 
 		// We ignore override_header_name
@@ -303,12 +307,13 @@ func ValidateHttpTimeout(timeout *proxyconfig.HTTPTimeout) error {
 	return retVal
 }
 
-func ValidateHttpRetries(retry *proxyconfig.HTTPRetry) error {
+// ValidateHTTPRetries validates HTTP Retries
+func ValidateHTTPRetries(retry *proxyconfig.HTTPRetry) error {
 	var retVal error
 
 	if simple := retry.GetSimpleRetry(); simple != nil {
 		if simple.Attempts < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("attempts must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("attempts must be in range [0..]"))
 		}
 
 		// We ignore override_header_name
@@ -317,7 +322,8 @@ func ValidateHttpRetries(retry *proxyconfig.HTTPRetry) error {
 	return retVal
 }
 
-func ValidateHttpFault(fault *proxyconfig.HTTPFaultInjection) error {
+// ValidateHTTPFault validates HTTP Fault
+func ValidateHTTPFault(fault *proxyconfig.HTTPFaultInjection) error {
 	var retVal error
 
 	if fault.GetDelay() != nil {
@@ -335,6 +341,7 @@ func ValidateHttpFault(fault *proxyconfig.HTTPFaultInjection) error {
 	return retVal
 }
 
+// ValidateL4Fault validates L4 Fault
 func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) error {
 	var retVal error
 
@@ -442,6 +449,7 @@ func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) error {
 	return retVal
 }
 
+// ValidateLoadBalancing validates Load Balancing
 func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) error {
 	var retVal error
 
@@ -450,33 +458,37 @@ func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) error {
 	return retVal
 }
 
+// ValidateCircuitBreaker validates Circuit Breaker
 func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) error {
 	var retVal error
 
 	if simple := cb.GetSimpleCb(); simple != nil {
 		if simple.MaxConnections < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_connections must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_connections must be in range [0..]"))
 		}
 		if simple.HttpMaxPendingRequests < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_pending_requests must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_pending_requests must be in range [0..]"))
 		}
 		if simple.HttpMaxRequests < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_requests must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_requests must be in range [0..]"))
 		}
 		if simple.SleepWindowSeconds < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range [0..]"))
 		}
 		if simple.HttpConsecutiveErrors < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range 0.."))
+			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range [0..]"))
 		}
 		if simple.HttpDetectionIntervalSeconds < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_detection_interval_seconds must be in range 0.."))
+			retVal = multierror.Append(retVal,
+				fmt.Errorf("circuit_breaker http_detection_interval_seconds must be in range [0..]"))
 		}
 		if simple.HttpMaxRequestsPerConnection < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range 0.."))
+			retVal = multierror.Append(retVal,
+				fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range [0..]"))
 		}
 		if simple.HttpMaxEjectionPercent < 0 || simple.HttpMaxEjectionPercent > 100 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_max_ejection_percent must be in range 0..100"))
+			retVal = multierror.Append(retVal,
+				fmt.Errorf("circuit_breaker http_max_ejection_percent must be in range [0..100]"))
 		}
 	}
 
@@ -515,19 +527,19 @@ func ValidateRouteRule(msg proto.Message) error {
 	}
 
 	if value.GetHttpReqTimeout() != nil {
-		if err := ValidateHttpTimeout(value.GetHttpReqTimeout()); err != nil {
+		if err := ValidateHTTPTimeout(value.GetHttpReqTimeout()); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
 	if value.GetHttpReqRetries() != nil {
-		if err := ValidateHttpRetries(value.GetHttpReqRetries()); err != nil {
+		if err := ValidateHTTPRetries(value.GetHttpReqRetries()); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
 
 	if value.GetHttpFault() != nil {
-		if err := ValidateHttpFault(value.GetHttpFault()); err != nil {
+		if err := ValidateHTTPFault(value.GetHttpFault()); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
 	}
@@ -557,7 +569,8 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 	var retVal error
 
 	if value.Destination == "" {
-		retVal = multierror.Append(retVal, fmt.Errorf("destinationPolicy should have a valid service name in its destination field"))
+		retVal = multierror.Append(retVal,
+			fmt.Errorf("destinationPolicy should have a valid service name in its destination field"))
 	} else {
 		if err := validateFQDN(value.Destination); err != nil {
 			retVal = multierror.Append(retVal, err)
