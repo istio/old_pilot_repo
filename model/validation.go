@@ -557,7 +557,7 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 	var retVal error
 
 	if value.Destination == "" {
-		retVal = multierror.Append(retVal, fmt.Errorf("DestinationPolicy should have a valid service name in its destination field"))
+		retVal = multierror.Append(retVal, fmt.Errorf("destinationPolicy should have a valid service name in its destination field"))
 	} else {
 		if err := validateFQDN(value.Destination); err != nil {
 			retVal = multierror.Append(retVal, err)
