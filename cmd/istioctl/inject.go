@@ -64,8 +64,7 @@ Example usage:
 			if inFilename == "-" {
 				reader = os.Stdin
 			} else {
-				reader, err = os.Open(inFilename)
-				if err != nil {
+				if reader, err = os.Open(inFilename); err != nil {
 					return err
 				}
 			}
@@ -74,8 +73,8 @@ Example usage:
 			if outFilename == "" {
 				writer = os.Stdout
 			} else {
-				file, err := os.Create(outFilename)
-				if err != nil {
+				var file *os.File
+				if file, err = os.Create(outFilename); err != nil {
 					return err
 				}
 				writer = file
@@ -83,10 +82,13 @@ Example usage:
 			}
 
 			if versionStr == "" {
-				versionStr = version.VersionString()
+				versionStr = version.Line()
 			}
 
 			mesh, err := cmd.GetMeshConfig(client.GetKubernetesClient(), namespace, meshConfig)
+			if err != nil {
+				return err
+			}
 			params := &inject.Params{
 				InitImage:       inject.InitImageName(hub, tag),
 				ProxyImage:      inject.ProxyImageName(hub, tag),

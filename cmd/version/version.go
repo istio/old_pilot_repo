@@ -71,8 +71,8 @@ func init() {
 	Info.GolangVersion = runtime.Version()
 }
 
-// VersionString combines version information into a single line
-func VersionString() string {
+// Line combines version information into a single line
+func Line() string {
 	return fmt.Sprintf("%v@%v-%v-%v",
 		Info.User,
 		Info.Host,
