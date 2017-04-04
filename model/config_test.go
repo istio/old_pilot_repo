@@ -878,6 +878,14 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
+			Route: []*proxyconfig.DestinationWeight{
+				{Tags: map[string]string{"@": "~"}},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
 			HttpReqTimeout: &proxyconfig.HTTPTimeout{
 				TimeoutPolicy: &proxyconfig.HTTPTimeout_SimpleTimeout{
 					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{TimeoutSeconds: -1},
@@ -900,6 +908,16 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent:       -1,
 					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: -1},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpFault: &proxyconfig.HTTPFaultInjection{
+				Abort: &proxyconfig.HTTPFaultInjection_Abort{
+					Percent:   -1,
+					ErrorType: &proxyconfig.HTTPFaultInjection_Abort_HttpStatus{HttpStatus: -1},
 				},
 			},
 		},
@@ -942,6 +960,30 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			},
 		},
 			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{SourceTags: map[string]string{"@": "0"}},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{SourceTags: map[string]string{"a": "~"}},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match: &proxyconfig.MatchCondition{
+				Tcp: &proxyconfig.L4MatchAttributes{
+					SourceSubnet:      []string{"1.2.3.4"},
+					DestinationSubnet: []string{"1.2.3.4"},
+				},
+				Udp: &proxyconfig.L4MatchAttributes{
+					SourceSubnet:      []string{"1.2.3.4"},
+					DestinationSubnet: []string{"1.2.3.4"},
+				},
+			},
+		},
+			valid: true},
 	}
 	for _, c := range cases {
 		if got := ValidateRouteRule(c.in); (got == nil) != c.valid {
@@ -977,6 +1019,31 @@ func TestValidateDestinationPolicy(t *testing.T) {
 					},
 				},
 			},
+		},
+			valid: false},
+		{in: &proxyconfig.DestinationPolicy{
+			Destination: "ratings!.default.svc.cluster.local",
+			CircuitBreaker: &proxyconfig.CircuitBreaker{
+				CbPolicy: &proxyconfig.CircuitBreaker_SimpleCb{
+					SimpleCb: &proxyconfig.CircuitBreaker_SimpleCircuitBreakerPolicy{
+						HttpMaxEjectionPercent: 101,
+					},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.DestinationPolicy{
+			Destination: "foobar",
+			LoadBalancing: &proxyconfig.LoadBalancing{
+				LbPolicy: &proxyconfig.LoadBalancing_Name{
+					Name: 0,
+				},
+			},
+		},
+			valid: true},
+		{in: &proxyconfig.DestinationPolicy{
+			Destination: "foobar",
+			Tags:        map[string]string{"@": "~"},
 		},
 			valid: false},
 	}
