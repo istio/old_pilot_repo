@@ -39,20 +39,21 @@ const (
 )
 
 // buildListenerSSLContext returns an SSLContext struct.
-func buildListenerSSLContext(certs string) *SSLContext {
+func buildListenerSSLContext(certsDir string) *SSLContext {
 	return &SSLContext{
-		CertChainFile:  certs + "/cert-chain.pem",
-		PrivateKeyFile: certs + "/key.pem",
-		CaCertFile:     certs + "/root-cert.pem",
+		CertChainFile:  certsDir + "/cert-chain.pem",
+		PrivateKeyFile: certsDir + "/key.pem",
+		CaCertFile:     certsDir + "/root-cert.pem",
 	}
 }
 
 // buildClusterSSLContext returns an SSLContextWithSAN struct with VerifySubjectAltName.
-func buildClusterSSLContext(certs string, serviceAccounts []string) *SSLContextWithSAN {
+// The list of service accounts may be empty but not nil.
+func buildClusterSSLContext(certsDir string, serviceAccounts []string) *SSLContextWithSAN {
 	return &SSLContextWithSAN{
-		CertChainFile:        certs + "/cert-chain.pem",
-		PrivateKeyFile:       certs + "/key.pem",
-		CaCertFile:           certs + "/root-cert.pem",
+		CertChainFile:        certsDir + "/cert-chain.pem",
+		PrivateKeyFile:       certsDir + "/key.pem",
+		CaCertFile:           certsDir + "/root-cert.pem",
 		VerifySubjectAltName: serviceAccounts,
 	}
 }
