@@ -18,5 +18,5 @@ go_test(
     srcs = ["inject_test.go"],
     data = glob(["testdata/*.yaml*"]),
     library = ":go_default_library",
-    deps = ["@com_github_pmezard_go_difflib//difflib:go_default_library"],
+    deps = ["//test/util:go_default_library"],
 )

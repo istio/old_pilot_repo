@@ -26,6 +26,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
+	"istio.io/manager/test/util"
 )
 
 func makeDiscoveryService(r *model.IstioRegistry) *DiscoveryService {
@@ -67,7 +68,7 @@ func compareResponse(body []byte, file string, t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	compareJSON(file, t)
+	util.CompareYAML(file, t)
 }
 
 func TestServiceDiscovery(t *testing.T) {

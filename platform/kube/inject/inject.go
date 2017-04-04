@@ -141,8 +141,6 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	args := []string{
 		"proxy",
 		"sidecar",
-		"-s", p.ManagerAddr,
-		"-m", p.MixerAddr,
 		"-n", "$(POD_NAMESPACE)",
 		"-v", strconv.Itoa(p.Verbosity),
 	}
