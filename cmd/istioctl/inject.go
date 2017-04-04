@@ -29,8 +29,6 @@ import (
 var (
 	hub              string
 	tag              string
-	managerAddr      string
-	mixerAddr        string
 	sidecarProxyUID  int64
 	sidecarProxyPort int
 	verbosity        int
@@ -97,8 +95,6 @@ Example usage:
 				InitImage:        inject.InitImageName(hub, tag),
 				ProxyImage:       inject.ProxyImageName(hub, tag),
 				Verbosity:        verbosity,
-				ManagerAddr:      managerAddr,
-				MixerAddr:        mixerAddr,
 				SidecarProxyUID:  sidecarProxyUID,
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
@@ -120,10 +116,6 @@ func init() {
 		"", "Input kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
 		"", "Modified output kubernetes resource filename")
-	injectCmd.PersistentFlags().StringVar(&managerAddr, "managerAddr",
-		inject.DefaultManagerAddr, "Manager service DNS address")
-	injectCmd.PersistentFlags().StringVar(&mixerAddr, "mixerAddr",
-		inject.DefaultMixerAddr, "Mixer DNS address")
 	injectCmd.PersistentFlags().IntVar(&verbosity, "verbosity",
 		inject.DefaultVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",

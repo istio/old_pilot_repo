@@ -39,8 +39,6 @@ import (
 const (
 	DefaultHub              = "docker.io/istio"
 	DefaultTag              = "2017-03-22-17.30.06"
-	DefaultManagerAddr      = "istio-manager:8080"
-	DefaultMixerAddr        = "istio-mixer:9091"
 	DefaultSidecarProxyUID  = int64(1337)
 	DefaultSidecarProxyPort = 15001
 	DefaultVerbosity        = 2
@@ -73,8 +71,6 @@ type Params struct {
 	InitImage        string
 	ProxyImage       string
 	Verbosity        int
-	ManagerAddr      string
-	MixerAddr        string
 	SidecarProxyUID  int64
 	SidecarProxyPort int
 	Version          string

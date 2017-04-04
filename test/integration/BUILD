@@ -25,6 +25,7 @@ go_binary(
         "app.yaml.tmpl",
         "cert.crt",
         "cert.key",
+        "config.yaml",
         "egress-proxy.yaml.tmpl",
         "ingress.yaml",
         "ingress-proxy.yaml.tmpl",
