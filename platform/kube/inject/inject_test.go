@@ -104,8 +104,6 @@ func TestIntoResourceFile(t *testing.T) {
 			InitImage:        InitImageName(DefaultHub, unitTestTag),
 			ProxyImage:       ProxyImageName(DefaultHub, unitTestTag),
 			Verbosity:        DefaultVerbosity,
-			ManagerAddr:      "istio-manager:8080",
-			MixerAddr:        "istio-mixer:9091",
 			SidecarProxyUID:  DefaultSidecarProxyUID,
 			SidecarProxyPort: DefaultSidecarProxyPort,
 			Version:          "12345678",
