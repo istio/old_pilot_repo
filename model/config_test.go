@@ -846,6 +846,102 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 		{in: &proxyconfig.DestinationPolicy{}, valid: false},
 		{in: &proxyconfig.RouteRule{}, valid: false},
 		{in: &proxyconfig.RouteRule{Destination: "foobar"}, valid: true},
+		{in: &proxyconfig.RouteRule{
+			Destination: "badhost@.default.svc.cluster.local",
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost!.default.svc.cluster.local"},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
+			Route: []*proxyconfig.DestinationWeight{
+				{Destination: "123456789012345678901234567890123456789012345678901234567890." +
+					"123456789012345678901234567890123456789012345678901234567890." +
+					"d123456789012345678901234567890123456789012345678901234567890." +
+					"123456789012345678901234567890123456789012345678901234567890." +
+					"123456789012345678901234567890123456789012345678901234567890." +
+					"123456789012345678901234567890123456789012345678901234567890"},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
+			Route: []*proxyconfig.DestinationWeight{
+				{Weight: -1},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpReqTimeout: &proxyconfig.HTTPTimeout{
+				TimeoutPolicy: &proxyconfig.HTTPTimeout_SimpleTimeout{
+					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{TimeoutSeconds: -1},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpReqRetries: &proxyconfig.HTTPRetry{
+				RetryPolicy: &proxyconfig.HTTPRetry_SimpleRetry{
+					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{Attempts: -1},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpFault: &proxyconfig.HTTPFaultInjection{
+				Delay: &proxyconfig.HTTPFaultInjection_Delay{
+					Percent:       -1,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: -1},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpFault: &proxyconfig.HTTPFaultInjection{
+				Delay: &proxyconfig.HTTPFaultInjection_Delay{
+					Percent:       101,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_ExponentialDelaySeconds{ExponentialDelaySeconds: -1},
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			L4Fault: &proxyconfig.L4FaultInjection{
+				Throttle: &proxyconfig.L4FaultInjection_Throttle{
+					Percent:            101,
+					DownstreamLimitBps: -1,
+					UpstreamLimitBps:   -1,
+					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterSeconds{ThrottleAfterSeconds: -1},
+				},
+				Terminate: &proxyconfig.L4FaultInjection_Terminate{
+					Percent:               101,
+					TerminateAfterSeconds: -1,
+				},
+			},
+		},
+			valid: false},
+		{in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			L4Fault: &proxyconfig.L4FaultInjection{
+				Throttle: &proxyconfig.L4FaultInjection_Throttle{
+					Percent:            101,
+					DownstreamLimitBps: -1,
+					UpstreamLimitBps:   -1,
+					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterBytes{ThrottleAfterBytes: -1},
+				},
+			},
+		},
+			valid: false},
 	}
 	for _, c := range cases {
 		if got := ValidateRouteRule(c.in); (got == nil) != c.valid {
@@ -865,6 +961,24 @@ func TestValidateDestinationPolicy(t *testing.T) {
 		{in: &proxyconfig.RouteRule{}, valid: false},
 		{in: &proxyconfig.DestinationPolicy{}, valid: false},
 		{in: &proxyconfig.DestinationPolicy{Destination: "foobar"}, valid: true},
+		{in: &proxyconfig.DestinationPolicy{
+			Destination: "ratings!.default.svc.cluster.local",
+			CircuitBreaker: &proxyconfig.CircuitBreaker{
+				CbPolicy: &proxyconfig.CircuitBreaker_SimpleCb{
+					SimpleCb: &proxyconfig.CircuitBreaker_SimpleCircuitBreakerPolicy{
+						MaxConnections:               -1,
+						HttpMaxPendingRequests:       -1,
+						HttpMaxRequests:              -1,
+						SleepWindowSeconds:           -1,
+						HttpConsecutiveErrors:        -1,
+						HttpDetectionIntervalSeconds: -1,
+						HttpMaxRequestsPerConnection: -1,
+						HttpMaxEjectionPercent:       -1,
+					},
+				},
+			},
+		},
+			valid: false},
 	}
 	for _, c := range cases {
 		if got := ValidateDestinationPolicy(c.in); (got == nil) != c.valid {
