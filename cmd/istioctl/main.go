@@ -211,6 +211,12 @@ var (
 		},
 	}
 
+	listCmd = &cobra.Command{
+ 		Use:   "list <type>",
+ 		Short: "List policies and rules",
+ 		RunE: getCmd.RunE,
+ 	}
+
 	deleteCmd = &cobra.Command{
 		Use:   "delete <type> <name> [<name2> ... <nameN>]",
 		Short: "Delete policies or rules",
@@ -280,6 +286,7 @@ func init() {
 	rootCmd.AddCommand(postCmd)
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
+	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(injectCmd)
 	rootCmd.AddCommand(version.VersionCmd)

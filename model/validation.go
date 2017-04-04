@@ -564,6 +564,31 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) error {
 	return retVal
 }
 
+func validateWeighs(routes []*proxyconfig.DestinationWeight, defaultDestination string) error {
+	var retVal error
+
+	// Sum weights by destination
+	weights := map[string]int32{}
+	for _, destWeight := range routes {
+		destination := destWeight.Destination
+		if destination == "" {
+			destination = defaultDestination
+		}
+
+		oldWeight := weights[destination]
+		weights[destination] = oldWeight + destWeight.Weight
+	}
+
+	for destination, weightSum := range weights {
+		if weightSum != 100 {
+			retVal = multierror.Append(retVal,
+				fmt.Errorf("Route %q weights total %v (must total 100)", destination, weightSum))
+		}
+	}
+
+	return retVal
+}
+
 // ValidateRouteRule checks routing rules
 func ValidateRouteRule(msg proto.Message) error {
 
@@ -592,6 +617,9 @@ func ValidateRouteRule(msg proto.Message) error {
 			if err := ValidateDestinationWeight(destWeight); err != nil {
 				retVal = multierror.Append(retVal, err)
 			}
+		}
+		if err := validateWeighs(value.Route, value.Destination); err != nil {
+			retVal = multierror.Append(retVal, err)
 		}
 	}
 

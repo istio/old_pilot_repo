@@ -176,7 +176,7 @@ func TestKindMapValidateConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "ProtoSchema validation",
+			name: "ProtoSchema validation1",
 			key: &Key{
 				Kind:      RouteRule,
 				Name:      "foo",
@@ -186,7 +186,7 @@ func TestKindMapValidateConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "ProtoSchema validation",
+			name: "ProtoSchema validation2",
 			key: &Key{
 				Kind:      RouteRule,
 				Name:      "foo",
