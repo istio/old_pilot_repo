@@ -22,12 +22,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/apis/meta/v1"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/bazel-manager/external/com_github_davecgh_go_spew/spew"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
@@ -183,7 +183,7 @@ func init() {
 	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 100*time.Millisecond,
 		"Controller resync interval")
 	rootCmd.PersistentFlags().StringVar(&flags.config, "config", "istio",
-		"ConfigMap name for Istio mesh configuration")
+		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", ConfigMapKey))
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
 		"Discovery service port")
@@ -194,10 +194,6 @@ func init() {
 		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.identity.Name, "nodeName", "",
 		"Proxy node name. If not provided uses ${POD_NAME}.${POD_NAMESPACE}")
-
-	proxyCmd.AddCommand(sidecarCmd)
-	proxyCmd.AddCommand(ingressCmd)
-	proxyCmd.AddCommand(egressCmd)
 
 	// TODO: remove this once we write the logic to obtain secrets dynamically
 	ingressCmd.PersistentFlags().StringVar(&flags.ingressSecret, "secret",
@@ -210,6 +206,10 @@ func init() {
 		true,
 		"Specifies whether running as the cluster's default ingress controller, "+
 			"thereby processing unclassified ingress resources")
+
+	proxyCmd.AddCommand(sidecarCmd)
+	proxyCmd.AddCommand(ingressCmd)
+	proxyCmd.AddCommand(egressCmd)
 
 	cmd.AddFlags(rootCmd)
 
