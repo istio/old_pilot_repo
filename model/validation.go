@@ -17,6 +17,7 @@ package model
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -190,23 +191,6 @@ func (instance *ServiceInstance) Validate() error {
 // Validate ensures tag is well-formed
 func (t Tags) Validate() error {
 	var errs error
-	if len(t) == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("Tag must have at least one key-value pair"))
-	}
-	for k, v := range t {
-		if !tagRegexp.MatchString(k) {
-			errs = multierror.Append(errs, fmt.Errorf("Invalid tag key: %q", k))
-		}
-		if !tagRegexp.MatchString(v) {
-			errs = multierror.Append(errs, fmt.Errorf("Invalid tag value: %q", v))
-		}
-	}
-	return errs
-}
-
-// Validate ensures tags are well-formed, but does not insist that tags exist
-func Validate(t map[string]string) error {
-	var errs error
 	for k, v := range t {
 		if !tagRegexp.MatchString(k) {
 			errs = multierror.Append(errs, fmt.Errorf("Invalid tag key: %q", k))
@@ -245,7 +229,7 @@ func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
 		}
 	}
 
-	if err := Validate(mc.SourceTags); err != nil {
+	if err := Tags(mc.SourceTags).Validate(); err != nil {
 		retVal = multierror.Append(retVal, err)
 	}
 
@@ -259,6 +243,7 @@ func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
 		if err := ValidateL4MatchAttributes(mc.GetUdp()); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
+		retVal = multierror.Append(retVal, fmt.Errorf("UDP protocol not implemented"))
 	}
 
 	// We do not (yet) validate http_headers.
@@ -319,8 +304,7 @@ func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
 		}
 	}
 
-	// We do not validate tags because they have no explicit rules
-	if err := Validate(dw.Tags); err != nil {
+	if err := Tags(dw.Tags).Validate(); err != nil {
 		retVal = multierror.Append(retVal, err)
 	}
 
@@ -386,6 +370,7 @@ func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) error {
 		if err := validateTerminate(fault.GetTerminate()); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
+		retVal = multierror.Append(retVal, fmt.Errorf("terminate not implemented"))
 	}
 
 	if fault.GetThrottle() != nil {
@@ -398,11 +383,58 @@ func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) error {
 }
 
 func validateSubnet(subnet string) error {
+	// The current implementation only supports IP v4 addresses
+	return validateIPv4Subnet(subnet)
+}
+
+// validateIPv4Subnet validates that a string in "CIDR notation" or "Dot-decimal notation"
+func validateIPv4Subnet(subnet string) error {
+
+	// We expect a string in "CIDR notation" or "Dot-decimal notation"
+	// E.g., a.b.c.d/xx form or just a.b.c.d
+	parts := strings.Split(subnet, "/")
+	if len(parts) > 2 {
+		return fmt.Errorf("%q is not valid CIDR notation", subnet)
+	}
+
 	var retVal error
 
-	// TODO verify subnet is "IPv4 or IPv6 ip address with optional subnet. E.g., a.b.c.d/xx form or just a.b.c.d
+	if len(parts) == 2 {
+		if err := validateCIDRBlock(parts[1]); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
+	if err := validateIPv4Address(parts[0]); err != nil {
+		retVal = multierror.Append(retVal, err)
+	}
 
 	return retVal
+}
+
+// validateCIDRBlock validates that a string in "CIDR notation" or "Dot-decimal notation"
+func validateCIDRBlock(cidr string) error {
+	if bits, err := strconv.Atoi(cidr); err != nil || bits <= 0 || bits > 32 {
+		return fmt.Errorf("/%v is not a valid CIDR block", cidr)
+	}
+
+	return nil
+}
+
+// validateIPv4Address validates that a string in "CIDR notation" or "Dot-decimal notation"
+func validateIPv4Address(addr string) error {
+	octets := strings.Split(addr, ".")
+	if len(octets) != 4 {
+		return fmt.Errorf("%q is not a valid IP address", addr)
+	}
+
+	for _, octet := range octets {
+		if n, err := strconv.Atoi(octet); err != nil || n < 0 || n > 255 {
+			return fmt.Errorf("%q is not a valid IP address", addr)
+		}
+	}
+
+	return nil
 }
 
 func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
@@ -414,8 +446,21 @@ func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
 		retVal = multierror.Append(retVal, fmt.Errorf("delay fixed_seconds invalid"))
 	}
 
-	if delay.GetExponentialDelaySeconds() < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("delay exponential_seconds invalid"))
+	if delay.GetExponentialDelaySeconds() != 0 {
+		if delay.GetExponentialDelaySeconds() < 0 {
+			retVal = multierror.Append(retVal, fmt.Errorf("delay exponential_seconds invalid"))
+		}
+		retVal = multierror.Append(retVal, fmt.Errorf("exponential_seconds not implemented"))
+	}
+
+	return retVal
+}
+
+func validateAbortHTTPStatus(httpStatus *proxyconfig.HTTPFaultInjection_Abort_HttpStatus) error {
+	var retVal error
+
+	if httpStatus.HttpStatus < 0 || httpStatus.HttpStatus > 600 {
+		retVal = multierror.Append(retVal, fmt.Errorf("invalid abort http status %v", httpStatus.HttpStatus))
 	}
 
 	return retVal
@@ -426,7 +471,17 @@ func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) error {
 
 	retVal = validateFloatPercent(retVal, abort.Percent, "abort")
 
-	// No validation yet for grpc_status / http2_error / http_status
+	switch abort.ErrorType.(type) {
+	case *proxyconfig.HTTPFaultInjection_Abort_GrpcStatus:
+		// No validation yet for grpc_status / http2_error / http_status
+	case *proxyconfig.HTTPFaultInjection_Abort_Http2Error:
+		// No validation yet for grpc_status / http2_error / http_status
+	case *proxyconfig.HTTPFaultInjection_Abort_HttpStatus:
+		if err := validateAbortHTTPStatus(abort.ErrorType.(*proxyconfig.HTTPFaultInjection_Abort_HttpStatus)); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+	}
+
 	// No validation yet for override_header_name
 
 	return retVal
@@ -562,6 +617,7 @@ func ValidateRouteRule(msg proto.Message) error {
 		if err := ValidateL4Fault(value.L4Fault); err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
+		retVal = multierror.Append(retVal, fmt.Errorf("L4 faults are not implemented"))
 	}
 
 	return retVal
@@ -591,7 +647,7 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 		}
 	}
 
-	if err := Validate(value.Tags); err != nil {
+	if err := Tags(value.Tags).Validate(); err != nil {
 		retVal = multierror.Append(retVal, err)
 	}
 
