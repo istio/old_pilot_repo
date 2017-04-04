@@ -73,7 +73,7 @@ func TestIngressRoutes(t *testing.T) {
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressConfig{
 		Registry: r,
-		Mesh:     DefaultMeshConfig,
+		Mesh:     &DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
 }
 
@@ -95,7 +95,7 @@ func TestIngressRoutesSSL(t *testing.T) {
 		Secret:    ingressSecret,
 		Secrets:   &s,
 		Registry:  r,
-		Mesh:      DefaultMeshConfig,
+		Mesh:      &DefaultMeshConfig,
 	}, ingressEnvoySSLConfig, t)
 	compareFile(ingressCertFile, ingressCert, t)
 	compareFile(ingressKeyFile, ingressKey, t)

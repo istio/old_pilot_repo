@@ -30,8 +30,7 @@ func (ps *ProtoSchema) Make() (proto.Message, error) {
 	if pbt == nil {
 		return nil, fmt.Errorf("unknown type %q", ps.MessageName)
 	}
-	pb := reflect.New(pbt.Elem()).Interface().(proto.Message)
-	return pb, nil
+	return reflect.New(pbt.Elem()).Interface().(proto.Message), nil
 }
 
 // ToJSON marshals a proto to canonical JSON

@@ -333,7 +333,7 @@ func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
 
 func TestMockConfig(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -341,7 +341,7 @@ func TestMockConfig(t *testing.T) {
 
 func TestMockConfigWithAuth(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0ConfigAuth, t)
@@ -350,7 +350,7 @@ func TestMockConfigWithAuth(t *testing.T) {
 
 func TestMockConfigTimeout(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	addTimeout(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
@@ -359,7 +359,7 @@ func TestMockConfigTimeout(t *testing.T) {
 
 func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	addCircuitBreaker(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
@@ -368,7 +368,7 @@ func TestMockConfigCircuitBreaker(t *testing.T) {
 
 func TestMockConfigWeighted(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	addWeightedRoute(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
@@ -377,7 +377,7 @@ func TestMockConfigWeighted(t *testing.T) {
 
 func TestMockConfigFault(t *testing.T) {
 	r := mock.MakeRegistry()
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
 	addFaultRoute(r, t)
 	// Fault rule uses source condition, hence the different golden artifacts

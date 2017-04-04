@@ -32,12 +32,12 @@ func makeDiscoveryService(r *model.IstioRegistry) *DiscoveryService {
 	return &DiscoveryService{
 		services: mock.Discovery,
 		config:   r,
-		mesh:     DefaultMeshConfig,
+		mesh:     &DefaultMeshConfig,
 	}
 }
 
 func makeDiscoveryServiceWithSSLContext(r *model.IstioRegistry) *DiscoveryService {
-	mesh := *DefaultMeshConfig
+	mesh := DefaultMeshConfig
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	return &DiscoveryService{
 		services: mock.Discovery,

@@ -27,12 +27,13 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/util/yaml"
+
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
-
-	"k8s.io/client-go/pkg/util/yaml"
 )
 
 // Each entry in the multi-doc YAML file used by `istioctl create -f` MUST have this format
@@ -250,7 +251,7 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "default",
+	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",

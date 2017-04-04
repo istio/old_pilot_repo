@@ -54,7 +54,7 @@ const (
 
 var (
 	// DefaultMeshConfig configuration
-	DefaultMeshConfig = &proxyconfig.ProxyMeshConfig{
+	DefaultMeshConfig = proxyconfig.ProxyMeshConfig{
 		DiscoveryAddress: "manager:8080",
 
 		ProxyListenPort:        15001,
@@ -467,8 +467,9 @@ func (clusters Clusters) normalize() Clusters {
 }
 
 func (clusters Clusters) setTimeout(timeout *duration.Duration) {
+	duration := int(convertDuration(timeout) / time.Millisecond)
 	for _, cluster := range clusters {
-		cluster.ConnectTimeoutMs = int(convertDuration(timeout) / time.Millisecond)
+		cluster.ConnectTimeoutMs = duration
 	}
 }
 

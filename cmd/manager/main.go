@@ -254,7 +254,7 @@ func getMeshConfig(kube kubernetes.Interface) (*proxyconfig.ProxyMeshConfig, err
 		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
 	}
 
-	mesh := *envoy.DefaultMeshConfig
+	mesh := envoy.DefaultMeshConfig
 	if err = model.ApplyYAML(yaml, &mesh); err != nil {
 		return nil, multierror.Prefix(err, "failed to convert to proto.")
 	}
