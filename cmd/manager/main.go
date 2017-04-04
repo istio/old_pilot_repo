@@ -19,20 +19,28 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/apis/meta/v1"
+
+	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/spf13/cobra"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/bazel-manager/external/com_github_davecgh_go_spew/spew"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/proxy/envoy"
-
-	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
-	"github.com/spf13/cobra"
 )
 
 type args struct {
-	namespace                string
-	resyncPeriod             time.Duration
+	kubeconfig   string
+	namespace    string
+	resyncPeriod time.Duration
+	config       string
+
 	identity                 envoy.ProxyNode
 	sdsPort                  int
 	ingressSecret            string
@@ -42,22 +50,27 @@ type args struct {
 }
 
 var (
-	flags = &args{}
-
+	flags  = &args{}
 	client *kube.Client
+	mesh   *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
 		Use:   "manager",
 		Short: "Istio Manager",
 		Long:  "Istio Manager provides management plane functionality to the Istio proxy mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			client, err = kube.NewClient("", model.IstioConfig)
+			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 			}
 			if err = client.RegisterResources(); err != nil {
 				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
+			mesh, err = getMeshConfig(client.GetKubernetesClient())
+			if err != nil {
+				return multierror.Prefix(err, "failed to set mesh configuration.")
+			}
+			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			return
 		},
 	}
@@ -76,7 +89,7 @@ var (
 				Config: &model.IstioRegistry{
 					ConfigRegistry: controller,
 				},
-				Mesh:            &flags.proxy,
+				Mesh:            mesh,
 				Port:            flags.sdsPort,
 				EnableProfiling: flags.enableProfiling,
 			}
@@ -107,7 +120,7 @@ var (
 			w, err := envoy.NewWatcher(controller,
 				controller,
 				&model.IstioRegistry{ConfigRegistry: controller},
-				&flags.proxy,
+				mesh,
 				&flags.identity)
 			if err != nil {
 				return
@@ -137,7 +150,7 @@ var (
 				Secret:    flags.ingressSecret,
 				Secrets:   client,
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
-				Mesh:      &flags.proxy,
+				Mesh:      mesh,
 			}
 			w, err := envoy.NewIngressWatcher(controller, config)
 			if err != nil {
@@ -163,10 +176,14 @@ var (
 )
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
+		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&flags.namespace, "namespace", "n", "",
-		"Select a Kubernetes namespace ('' means all namespaces)")
+		"Select a Kubernetes namespace for the controller loop ('' means all namespaces)")
 	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 100*time.Millisecond,
 		"Controller resync interval")
+	rootCmd.PersistentFlags().StringVar(&flags.config, "config", "istio",
+		"ConfigMap name for Istio mesh configuration")
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
 		"Discovery service port")
@@ -216,5 +233,31 @@ func setFlagsFromEnv() {
 	if flags.identity.Name == "" {
 		flags.identity.Name = fmt.Sprintf("%s.%s", os.Getenv("POD_NAME"), os.Getenv("POD_NAMESPACE"))
 	}
+}
 
+const (
+	// ConfigMapKey is the key for mesh configuration data in the config map
+	ConfigMapKey = "mesh"
+)
+
+// fetch configuration from a config map
+func getMeshConfig(kube kubernetes.Interface) (*proxyconfig.ProxyMeshConfig, error) {
+	config, err := kube.CoreV1().ConfigMaps(flags.namespace).Get(flags.config, v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// values in the data are strings, while proto might use a different data type.
+	// therefore, we have to get a value by a key
+	yaml, exists := config.Data[ConfigMapKey]
+	if !exists {
+		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
+	}
+
+	mesh := *envoy.DefaultMeshConfig
+	if err = model.ApplyYAML(yaml, &mesh); err != nil {
+		return nil, multierror.Prefix(err, "failed to convert to proto.")
+	}
+
+	return &mesh, nil
 }

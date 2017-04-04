@@ -26,7 +26,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/pkg/api"
 
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
@@ -251,7 +250,7 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "",
+	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "default",
 		"Select a Kubernetes namespace")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
@@ -297,11 +296,6 @@ func setup(kind, name string) error {
 	if !ok {
 		return fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
 			kind, strings.Join(model.IstioConfig.Kinds(), ", "))
-	}
-
-	// use default namespace by default
-	if namespace == "" {
-		namespace = api.NamespaceDefault
 	}
 
 	// set the config key

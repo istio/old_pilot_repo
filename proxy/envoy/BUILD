@@ -45,5 +45,6 @@ go_test(
         "@com_github_emicklei_go_restful//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_pmezard_go_difflib//difflib:go_default_library",
+        "@io_istio_api//:go_default_library",
     ],
 )

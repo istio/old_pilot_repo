@@ -340,7 +340,8 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 // configuration for co-located service instances. The function also returns
 // all inbound clusters since they are statically declared in the proxy
 // configuration and do no utilize CDS.
-func buildInboundListeners(instances []*model.ServiceInstance, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
+func buildInboundListeners(instances []*model.ServiceInstance,
+	mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	listeners := make(Listeners, 0)
