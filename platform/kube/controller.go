@@ -252,7 +252,6 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 			return nil
 		}
 
-		// TODO: priority?
 		for _, tls := range ingress.Spec.TLS {
 			if tls.SecretName == "" {
 				continue
