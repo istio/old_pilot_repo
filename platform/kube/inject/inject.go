@@ -50,11 +50,13 @@ const (
 	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationSidecarValue = "injected"
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
-	istioCertVolumeName                = "istio-cert"
 	initContainerName                  = "init"
 	proxyContainerName                 = "proxy"
 	enableCoreDumpContainerName        = "enable-core-dump"
 	enableCoreDumpImage                = "alpine"
+
+	istioCertVolumeName   = "istio-cert"
+	istioCertSecretPrefix = "istio."
 )
 
 // InitImageName returns the fully qualified image name for the istio
@@ -165,7 +167,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			Name: istioCertVolumeName,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName: "istio." + sa,
+					SecretName: istioCertSecretPrefix + sa,
 				},
 			},
 		})
