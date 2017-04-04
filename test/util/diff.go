@@ -41,7 +41,10 @@ func compare(content, golden []byte) error {
 			B:       difflib.SplitLines(data),
 			Context: 2,
 		}
-		text, _ := difflib.GetUnifiedDiffString(diff)
+		text, err := difflib.GetUnifiedDiffString(diff)
+		if err != nil {
+			return err
+		}
 		return errors.New(text)
 	}
 
@@ -57,7 +60,9 @@ func CompareYAML(filename string, t *testing.T) {
 	goldenFile := filename + ".golden"
 	if Refresh() {
 		t.Logf("Refreshing golden file for %s", filename)
-		_ = ioutil.WriteFile(goldenFile, content, 0644)
+		if err = ioutil.WriteFile(goldenFile, content, 0644); err != nil {
+			t.Errorf(err.Error())
+		}
 	}
 
 	golden, err := ioutil.ReadFile(goldenFile)
@@ -65,7 +70,7 @@ func CompareYAML(filename string, t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	if err = compare(content, golden); err != nil {
-		t.Errorf("Failed validating artifact %s: %v", filename, err)
+		t.Errorf("Failed validating artifact %s:\n%v", filename, err)
 	}
 }
 
@@ -76,7 +81,7 @@ func CompareFile(filename string, golden []byte, t *testing.T) {
 		t.Fatalf("Error loading %s: %s", filename, err.Error())
 	}
 	if err = compare(content, golden); err != nil {
-		t.Fatalf("Failed validating file %s: %v", filename, err)
+		t.Fatalf("Failed validating file %s:\n%v", filename, err)
 	}
 }
 
@@ -84,7 +89,9 @@ func CompareFile(filename string, golden []byte, t *testing.T) {
 func CompareContent(content []byte, goldenFile string, t *testing.T) {
 	if Refresh() {
 		t.Logf("Refreshing golden file %s", goldenFile)
-		_ = ioutil.WriteFile(goldenFile, content, 0644)
+		if err := ioutil.WriteFile(goldenFile, content, 0644); err != nil {
+			t.Errorf(err.Error())
+		}
 	}
 
 	golden, err := ioutil.ReadFile(goldenFile)
@@ -92,6 +99,6 @@ func CompareContent(content []byte, goldenFile string, t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	if err = compare(content, golden); err != nil {
-		t.Fatalf("Failed validating golden file %s: %v", goldenFile, err)
+		t.Fatalf("Failed validating golden file %s:\n%v", goldenFile, err)
 	}
 }

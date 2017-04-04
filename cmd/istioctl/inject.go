@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 
+	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/platform/kube/inject"
 
@@ -27,19 +28,16 @@ import (
 )
 
 var (
-	hub              string
-	tag              string
-	sidecarProxyUID  int64
-	sidecarProxyPort int
-	verbosity        int
-	versionStr       string // override build version
-	enableCoreDump   bool
+	hub             string
+	tag             string
+	sidecarProxyUID int64
+	verbosity       int
+	versionStr      string // override build version
+	enableCoreDump  bool
+	meshConfig      string
 
 	inFilename  string
 	outFilename string
-
-	authConfigPath string
-	enableAuth     bool
 )
 
 var (
@@ -85,22 +83,18 @@ Example usage:
 			}
 
 			if versionStr == "" {
-				versionStr = fmt.Sprintf("%v@%v-%v-%v",
-					version.Info.User,
-					version.Info.Host,
-					version.Info.Version,
-					version.Info.GitRevision)
+				versionStr = version.VersionString()
 			}
+
+			mesh, err := cmd.GetMeshConfig(client.GetKubernetesClient(), namespace, meshConfig)
 			params := &inject.Params{
-				InitImage:        inject.InitImageName(hub, tag),
-				ProxyImage:       inject.ProxyImageName(hub, tag),
-				Verbosity:        verbosity,
-				SidecarProxyUID:  sidecarProxyUID,
-				SidecarProxyPort: sidecarProxyPort,
-				Version:          versionStr,
-				EnableCoreDump:   enableCoreDump,
-				EnableAuth:       enableAuth,
-				AuthConfigPath:   authConfigPath,
+				InitImage:       inject.InitImageName(hub, tag),
+				ProxyImage:      inject.ProxyImageName(hub, tag),
+				Verbosity:       verbosity,
+				SidecarProxyUID: sidecarProxyUID,
+				Version:         versionStr,
+				EnableCoreDump:  enableCoreDump,
+				Mesh:            mesh,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
 		},
@@ -120,10 +114,10 @@ func init() {
 		inject.DefaultVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
 		inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
-	injectCmd.PersistentFlags().IntVar(&sidecarProxyPort, "sidecarProxyPort",
-		inject.DefaultSidecarProxyPort, "Sidecar proxy Port")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
+	injectCmd.PersistentFlags().StringVar(&meshConfig, "meshConfig", "istio",
+		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", cmd.ConfigMapKey))
 
 	// Default --coreDump=true for pre-alpha development. Core dump
 	// settings (i.e. sysctl kernel.*) affect all pods in a node and
@@ -132,9 +126,4 @@ func init() {
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
 		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
-
-	injectCmd.PersistentFlags().BoolVar(&enableAuth, "enable_auth", false,
-		"Enable/Disable mutual TLS authentication for proxy-to-proxy traffic")
-	injectCmd.PersistentFlags().StringVar(&authConfigPath, "auth_config_path", "/etc/certs/",
-		"The directory in which certificate and key files are stored")
 }

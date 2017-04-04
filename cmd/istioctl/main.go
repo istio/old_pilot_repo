@@ -50,7 +50,9 @@ type inputDoc struct {
 var (
 	kubeconfig string
 	namespace  string
-	config     model.ConfigRegistry
+	client     *kube.Client
+
+	config model.ConfigRegistry
 
 	// input file name
 	file string

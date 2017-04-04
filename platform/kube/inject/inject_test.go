@@ -19,6 +19,8 @@ import (
 	"os"
 	"testing"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/proxy/envoy"
 	"istio.io/manager/test/util"
 )
 
@@ -98,16 +100,20 @@ func TestIntoResourceFile(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		mesh := envoy.DefaultMeshConfig
+		if c.enableAuth {
+			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+			mesh.AuthCertsPath = c.authConfigPath
+		}
+
 		params := Params{
-			InitImage:        InitImageName(DefaultHub, unitTestTag),
-			ProxyImage:       ProxyImageName(DefaultHub, unitTestTag),
-			Verbosity:        DefaultVerbosity,
-			SidecarProxyUID:  DefaultSidecarProxyUID,
-			SidecarProxyPort: DefaultSidecarProxyPort,
-			Version:          "12345678",
-			EnableCoreDump:   c.enableCoreDump,
-			EnableAuth:       c.enableAuth,
-			AuthConfigPath:   c.authConfigPath,
+			InitImage:       InitImageName(DefaultHub, unitTestTag),
+			ProxyImage:      ProxyImageName(DefaultHub, unitTestTag),
+			Verbosity:       DefaultVerbosity,
+			SidecarProxyUID: DefaultSidecarProxyUID,
+			Version:         "12345678",
+			EnableCoreDump:  c.enableCoreDump,
+			Mesh:            &mesh,
 		}
 		in, err := os.Open(c.in)
 		if err != nil {

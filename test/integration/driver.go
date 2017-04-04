@@ -35,6 +35,7 @@ import (
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
+	"istio.io/manager/proxy/envoy"
 )
 
 const (
@@ -222,13 +223,16 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 
 	writer := bufio.NewWriter(f)
 	if injectProxy {
+		mesh := envoy.DefaultMeshConfig
+		mesh.MixerAddress = "istio-mixer:9091"
+		mesh.DiscoveryAddress = "istio-manager:8080"
 		p := &inject.Params{
-			InitImage:        inject.InitImageName(params.hub, params.tag),
-			ProxyImage:       inject.ProxyImageName(params.hub, params.tag),
-			Verbosity:        params.verbosity,
-			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
-			SidecarProxyPort: inject.DefaultSidecarProxyPort,
-			Version:          "manager-integration-test",
+			InitImage:       inject.InitImageName(params.hub, params.tag),
+			ProxyImage:      inject.ProxyImageName(params.hub, params.tag),
+			Verbosity:       params.verbosity,
+			SidecarProxyUID: inject.DefaultSidecarProxyUID,
+			Version:         "manager-integration-test",
+			Mesh:            &mesh,
 		}
 		if err := inject.IntoResourceFile(p, w, writer); err != nil {
 			return err

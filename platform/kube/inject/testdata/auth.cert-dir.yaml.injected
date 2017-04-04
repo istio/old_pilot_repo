@@ -32,9 +32,6 @@ spec:
         - $(POD_NAMESPACE)
         - -v
         - "2"
-        - --enable_auth
-        - --auth_config_path
-        - /etc/non-default-dir/
         env:
         - name: POD_NAME
           valueFrom:
@@ -56,10 +53,10 @@ spec:
           runAsUser: 1337
         volumeMounts:
         - mountPath: /etc/non-default-dir/
-          name: istio-cert
+          name: istio-certs
           readOnly: true
       volumes:
-      - name: istio-cert
+      - name: istio-certs
         secret:
           secretName: istio.default
 status: {}

@@ -19,9 +19,6 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/apis/meta/v1"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -66,7 +63,7 @@ var (
 			if err = client.RegisterResources(); err != nil {
 				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
-			mesh, err = getMeshConfig(client.GetKubernetesClient())
+			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.namespace, flags.config)
 			if err != nil {
 				return multierror.Prefix(err, "failed to set mesh configuration.")
 			}
@@ -183,7 +180,7 @@ func init() {
 	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 100*time.Millisecond,
 		"Controller resync interval")
 	rootCmd.PersistentFlags().StringVar(&flags.config, "config", "istio",
-		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", ConfigMapKey))
+		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", cmd.ConfigMapKey))
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
 		"Discovery service port")
@@ -233,31 +230,4 @@ func setFlagsFromEnv() {
 	if flags.identity.Name == "" {
 		flags.identity.Name = fmt.Sprintf("%s.%s", os.Getenv("POD_NAME"), os.Getenv("POD_NAMESPACE"))
 	}
-}
-
-const (
-	// ConfigMapKey is the key for mesh configuration data in the config map
-	ConfigMapKey = "mesh"
-)
-
-// fetch configuration from a config map
-func getMeshConfig(kube kubernetes.Interface) (*proxyconfig.ProxyMeshConfig, error) {
-	config, err := kube.CoreV1().ConfigMaps(flags.namespace).Get(flags.config, v1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// values in the data are strings, while proto might use a different data type.
-	// therefore, we have to get a value by a key
-	yaml, exists := config.Data[ConfigMapKey]
-	if !exists {
-		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
-	}
-
-	mesh := envoy.DefaultMeshConfig
-	if err = model.ApplyYAML(yaml, &mesh); err != nil {
-		return nil, multierror.Prefix(err, "failed to convert to proto.")
-	}
-
-	return &mesh, nil
 }
