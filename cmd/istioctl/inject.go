@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 
-	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/platform/kube/inject"
 
@@ -40,6 +39,9 @@ var (
 
 	inFilename  string
 	outFilename string
+
+	authConfigPath string
+	enableAuth     bool
 )
 
 var (
@@ -101,6 +103,8 @@ Example usage:
 				SidecarProxyPort: sidecarProxyPort,
 				Version:          versionStr,
 				EnableCoreDump:   enableCoreDump,
+				EnableAuth:       enableAuth,
+				AuthConfigPath:   authConfigPath,
 			}
 			return inject.IntoResourceFile(params, reader, writer)
 		},
@@ -137,5 +141,8 @@ func init() {
 		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
 
-	cmd.RootCmd.AddCommand(injectCmd)
+	injectCmd.PersistentFlags().BoolVar(&enableAuth, "enable_auth", false,
+		"Enable/Disable mutual TLS authentication for proxy-to-proxy traffic")
+	injectCmd.PersistentFlags().StringVar(&authConfigPath, "auth_config_path", "/etc/certs/",
+		"The directory in which certificate and key files are stored")
 }

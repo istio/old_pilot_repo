@@ -11,7 +11,7 @@ spec:
       annotations:
         alpha.istio.io/sidecar: injected
         alpha.istio.io/version: "12345678"
-        pod.beta.kubernetes.io/init-containers: '[{"command":["sh","-c","true"],"image":"busybox","name":"init-one"},{"command":["sh","-c","true"],"image":"busybox","name":"init-two"},{"args":["-p","15001","-u","1337"],"image":"docker.io/istio/init:unittest","imagePullPolicy":"Always","name":"init","securityContext":{"capabilities":{"add":["NET_ADMIN"]}}}]'
+        pod.beta.kubernetes.io/init-containers: '[{"args":["-p","15001","-u","1337"],"image":"docker.io/istio/init:unittest","imagePullPolicy":"Always","name":"init","securityContext":{"capabilities":{"add":["NET_ADMIN"]}}}]'
       creationTimestamp: null
       labels:
         app: hello
@@ -36,6 +36,9 @@ spec:
         - $(POD_NAMESPACE)
         - -v
         - "2"
+        - --enable_auth
+        - --auth_config_path
+        - /etc/certs/
         env:
         - name: POD_NAME
           valueFrom:
@@ -55,5 +58,13 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/certs/
+          name: istio-cert
+          readOnly: true
+      volumes:
+      - name: istio-cert
+        secret:
+          secretName: istio.default
 status: {}
 ---
