@@ -555,10 +555,13 @@ func validateWeights(routes []*proxyconfig.DestinationWeight, defaultDestination
 		weights[destination] = oldWeight + destWeight.Weight
 	}
 
-	for destination, weightSum := range weights {
-		if weightSum != 100 {
-			errs = multierror.Append(errs,
-				fmt.Errorf("Route %q weights total %v (must total 100)", destination, weightSum))
+	// From cfg.proto "If there is only [one] destination in a rule, the weight value is assumed to be 100.
+	if len(weights) != 1 {
+		for destination, weightSum := range weights {
+			if weightSum != 100 {
+				errs = multierror.Append(errs,
+					fmt.Errorf("Route %q weights total %v (must total 100)", destination, weightSum))
+			}
 		}
 	}
 
