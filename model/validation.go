@@ -220,166 +220,149 @@ func validateFQDN(fqdn string) error {
 }
 
 // ValidateMatchCondition validates a Match Condition
-func ValidateMatchCondition(mc *proxyconfig.MatchCondition) error {
-	var retVal error
+func ValidateMatchCondition(mc *proxyconfig.MatchCondition) (errs error) {
 
 	if mc.Source != "" {
 		if err := validateFQDN(mc.Source); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if err := Tags(mc.SourceTags).Validate(); err != nil {
-		retVal = multierror.Append(retVal, err)
+		errs = multierror.Append(errs, err)
 	}
 
 	if mc.GetTcp() != nil {
 		if err := ValidateL4MatchAttributes(mc.GetTcp()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if mc.GetUdp() != nil {
 		if err := ValidateL4MatchAttributes(mc.GetUdp()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
-		retVal = multierror.Append(retVal, fmt.Errorf("UDP protocol not implemented"))
+		errs = multierror.Append(errs, fmt.Errorf("Istio does not support UDP protocol yet"))
 	}
 
-	// We do not (yet) validate http_headers.
+	// TODO We do not (yet) validate http_headers.
 
-	return retVal
+	return
 }
 
 // ValidateL4MatchAttributes validates L4 Match Attributes
-func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) error {
-	var retVal error
+func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) (errs error) {
 
-	if ma.SourceSubnet != nil {
-		for _, subnet := range ma.SourceSubnet {
-			if err := validateSubnet(subnet); err != nil {
-				retVal = multierror.Append(retVal, err)
-			}
+	for _, subnet := range ma.SourceSubnet {
+		if err := validateSubnet(subnet); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	if ma.DestinationSubnet != nil {
-		for _, subnet := range ma.DestinationSubnet {
-			if err := validateSubnet(subnet); err != nil {
-				retVal = multierror.Append(retVal, err)
-			}
+	for _, subnet := range ma.DestinationSubnet {
+		if err := validateSubnet(subnet); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return retVal
+	return
 }
 
 func validatePercent(err error, val int32, label string) error {
-	if val > 100 {
-		err = multierror.Append(err, fmt.Errorf("%v must not exceed 100", label))
-	}
-	if val < 0 {
+	if val < 0 || val > 100 {
 		err = multierror.Append(err, fmt.Errorf("%v must be in range 0..100", label))
 	}
 	return err
 }
 
 func validateFloatPercent(err error, val float32, label string) error {
-	if val > 100.0 {
-		err = multierror.Append(err, fmt.Errorf("%v must not exceed 100", label))
-	}
-	if val < 0.0 {
+	if val < 0.0 || val > 100.0 {
 		err = multierror.Append(err, fmt.Errorf("%v must be in range 0..100", label))
 	}
 	return err
 }
 
 // ValidateDestinationWeight validates DestinationWeight
-func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) error {
-	var retVal error
+func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) (errs error) {
 
 	if dw.Destination != "" {
 		if err := validateFQDN(dw.Destination); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if err := Tags(dw.Tags).Validate(); err != nil {
-		retVal = multierror.Append(retVal, err)
+		errs = multierror.Append(errs, err)
 	}
 
-	retVal = validatePercent(retVal, dw.Weight, "weight")
+	errs = validatePercent(errs, dw.Weight, "weight")
 
-	return retVal
+	return
 }
 
 // ValidateHTTPTimeout validates HTTP Timeout
 func ValidateHTTPTimeout(timeout *proxyconfig.HTTPTimeout) error {
-	var retVal error
 
 	if simple := timeout.GetSimpleTimeout(); simple != nil {
 		if simple.TimeoutSeconds < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("timeout_seconds must be in range [0..]"))
+			return fmt.Errorf("timeout_seconds must be in range [0..]")
 		}
 
-		// We ignore override_header_name
+		// TODO validate override_header_name?
 	}
 
-	return retVal
+	return nil
 }
 
 // ValidateHTTPRetries validates HTTP Retries
-func ValidateHTTPRetries(retry *proxyconfig.HTTPRetry) error {
-	var retVal error
+func ValidateHTTPRetries(retry *proxyconfig.HTTPRetry) (errs error) {
 
 	if simple := retry.GetSimpleRetry(); simple != nil {
 		if simple.Attempts < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("attempts must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("attempts must be in range [0..]"))
 		}
 
 		// We ignore override_header_name
 	}
 
-	return retVal
+	return
 }
 
 // ValidateHTTPFault validates HTTP Fault
-func ValidateHTTPFault(fault *proxyconfig.HTTPFaultInjection) error {
-	var retVal error
+func ValidateHTTPFault(fault *proxyconfig.HTTPFaultInjection) (errs error) {
 
 	if fault.GetDelay() != nil {
 		if err := validateDelay(fault.GetDelay()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if fault.GetAbort() != nil {
 		if err := validateAbort(fault.GetAbort()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return retVal
+	return
 }
 
 // ValidateL4Fault validates L4 Fault
-func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) error {
-	var retVal error
+func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) (errs error) {
 
 	if fault.GetTerminate() != nil {
 		if err := validateTerminate(fault.GetTerminate()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
-		retVal = multierror.Append(retVal, fmt.Errorf("terminate not implemented"))
+		errs = multierror.Append(errs, fmt.Errorf("Istio does not support the terminate fault yet"))
 	}
 
 	if fault.GetThrottle() != nil {
 		if err := validateThrottle(fault.GetThrottle()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return retVal
+	return
 }
 
 func validateSubnet(subnet string) error {
@@ -397,19 +380,19 @@ func validateIPv4Subnet(subnet string) error {
 		return fmt.Errorf("%q is not valid CIDR notation", subnet)
 	}
 
-	var retVal error
+	var errs error
 
 	if len(parts) == 2 {
 		if err := validateCIDRBlock(parts[1]); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if err := validateIPv4Address(parts[0]); err != nil {
-		retVal = multierror.Append(retVal, err)
+		errs = multierror.Append(errs, err)
 	}
 
-	return retVal
+	return errs
 }
 
 // validateCIDRBlock validates that a string in "CIDR notation" or "Dot-decimal notation"
@@ -437,135 +420,128 @@ func validateIPv4Address(addr string) error {
 	return nil
 }
 
-func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) error {
-	var retVal error
+func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) (errs error) {
 
-	retVal = validateFloatPercent(retVal, delay.Percent, "delay")
+	errs = validateFloatPercent(errs, delay.Percent, "delay")
 
 	if delay.GetFixedDelaySeconds() < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("delay fixed_seconds invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("delay fixed_seconds invalid"))
 	}
 
 	if delay.GetExponentialDelaySeconds() != 0 {
 		if delay.GetExponentialDelaySeconds() < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("delay exponential_seconds invalid"))
+			errs = multierror.Append(errs, fmt.Errorf("delay exponential_seconds invalid"))
 		}
-		retVal = multierror.Append(retVal, fmt.Errorf("exponential_seconds not implemented"))
+		errs = multierror.Append(errs, fmt.Errorf("Istio does not support exponential_seconds yet"))
 	}
 
-	return retVal
+	return
 }
 
-func validateAbortHTTPStatus(httpStatus *proxyconfig.HTTPFaultInjection_Abort_HttpStatus) error {
-	var retVal error
+func validateAbortHTTPStatus(httpStatus *proxyconfig.HTTPFaultInjection_Abort_HttpStatus) (errs error) {
 
 	if httpStatus.HttpStatus < 0 || httpStatus.HttpStatus > 600 {
-		retVal = multierror.Append(retVal, fmt.Errorf("invalid abort http status %v", httpStatus.HttpStatus))
+		errs = multierror.Append(errs, fmt.Errorf("invalid abort http status %v", httpStatus.HttpStatus))
 	}
 
-	return retVal
+	return
 }
 
-func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) error {
-	var retVal error
+func validateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) (errs error) {
 
-	retVal = validateFloatPercent(retVal, abort.Percent, "abort")
+	errs = validateFloatPercent(errs, abort.Percent, "abort")
 
 	switch abort.ErrorType.(type) {
 	case *proxyconfig.HTTPFaultInjection_Abort_GrpcStatus:
-		// No validation yet for grpc_status / http2_error / http_status
+		// TODO No validation yet for grpc_status / http2_error / http_status
+		errs = multierror.Append(errs, fmt.Errorf("Istio does not support gRPC fault injection yet"))
 	case *proxyconfig.HTTPFaultInjection_Abort_Http2Error:
-		// No validation yet for grpc_status / http2_error / http_status
+		// TODO No validation yet for grpc_status / http2_error / http_status
 	case *proxyconfig.HTTPFaultInjection_Abort_HttpStatus:
 		if err := validateAbortHTTPStatus(abort.ErrorType.(*proxyconfig.HTTPFaultInjection_Abort_HttpStatus)); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	// No validation yet for override_header_name
 
-	return retVal
+	return
 }
 
-func validateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) error {
-	var retVal error
+func validateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) (errs error) {
 
-	retVal = validateFloatPercent(retVal, terminate.Percent, "terminate")
+	errs = validateFloatPercent(errs, terminate.Percent, "terminate")
 
-	return retVal
+	return
 }
 
-func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) error {
-	var retVal error
+func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) (errs error) {
 
-	retVal = validateFloatPercent(retVal, throttle.Percent, "throttle")
+	errs = validateFloatPercent(errs, throttle.Percent, "throttle")
 
 	if throttle.DownstreamLimitBps < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("downstream_limit_bps invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("downstream_limit_bps invalid"))
 	}
 
 	if throttle.UpstreamLimitBps < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("upstream_limit_bps invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("upstream_limit_bps invalid"))
 	}
 
 	if throttle.GetThrottleAfterSeconds() < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("throttle_after_seconds invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("throttle_after_seconds invalid"))
 	}
 
 	if throttle.GetThrottleAfterBytes() < 0 {
-		retVal = multierror.Append(retVal, fmt.Errorf("throttle_after_bytes invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("throttle_after_bytes invalid"))
 	}
 
 	// TODO Check DoubleValue throttle.GetThrottleForSeconds()
 
-	return retVal
+	return
 }
 
 // ValidateLoadBalancing validates Load Balancing
-func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) error {
-	var retVal error
+func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) (errs error) {
 
 	// Currently the policy is just a name, and we don't validate it
 
-	return retVal
+	return
 }
 
 // ValidateCircuitBreaker validates Circuit Breaker
-func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) error {
-	var retVal error
+func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 
 	if simple := cb.GetSimpleCb(); simple != nil {
 		if simple.MaxConnections < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_connections must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker max_connections must be in range [0..]"))
 		}
 		if simple.HttpMaxPendingRequests < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_pending_requests must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker max_pending_requests must be in range [0..]"))
 		}
 		if simple.HttpMaxRequests < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker max_requests must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker max_requests must be in range [0..]"))
 		}
 		if simple.SleepWindowSeconds < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range [0..]"))
 		}
 		if simple.HttpConsecutiveErrors < 0 {
-			retVal = multierror.Append(retVal, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range [0..]"))
+			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range [0..]"))
 		}
 		if simple.HttpDetectionIntervalSeconds < 0 {
-			retVal = multierror.Append(retVal,
+			errs = multierror.Append(errs,
 				fmt.Errorf("circuit_breaker http_detection_interval_seconds must be in range [0..]"))
 		}
 		if simple.HttpMaxRequestsPerConnection < 0 {
-			retVal = multierror.Append(retVal,
+			errs = multierror.Append(errs,
 				fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range [0..]"))
 		}
-		retVal = validatePercent(retVal, simple.HttpMaxEjectionPercent, "circuit_breaker http_max_ejection_percent")
+		errs = validatePercent(errs, simple.HttpMaxEjectionPercent, "circuit_breaker http_max_ejection_percent")
 	}
 
-	return retVal
+	return
 }
 
-func validateWeighs(routes []*proxyconfig.DestinationWeight, defaultDestination string) error {
-	var retVal error
+func validateWeights(routes []*proxyconfig.DestinationWeight, defaultDestination string) (errs error) {
 
 	// Sum weights by destination
 	weights := map[string]int32{}
@@ -581,12 +557,12 @@ func validateWeighs(routes []*proxyconfig.DestinationWeight, defaultDestination 
 
 	for destination, weightSum := range weights {
 		if weightSum != 100 {
-			retVal = multierror.Append(retVal,
+			errs = multierror.Append(errs,
 				fmt.Errorf("Route %q weights total %v (must total 100)", destination, weightSum))
 		}
 	}
 
-	return retVal
+	return
 }
 
 // ValidateRouteRule checks routing rules
@@ -596,59 +572,60 @@ func ValidateRouteRule(msg proto.Message) error {
 	if !ok {
 		return fmt.Errorf("cannot cast to routing rule")
 	}
-	var retVal error
+
+	var errs error
 	if value.Destination == "" {
-		retVal = multierror.Append(retVal, fmt.Errorf("route rule must have a destination service"))
+		errs = multierror.Append(errs, fmt.Errorf("route rule must have a destination service"))
 	}
 	if err := validateFQDN(value.Destination); err != nil {
-		retVal = multierror.Append(retVal, err)
+		errs = multierror.Append(errs, err)
 	}
 
 	// We don't validate precedence because any int32 is legal
 
 	if value.Match != nil {
 		if err := ValidateMatchCondition(value.Match); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.Route != nil {
 		for _, destWeight := range value.Route {
 			if err := ValidateDestinationWeight(destWeight); err != nil {
-				retVal = multierror.Append(retVal, err)
+				errs = multierror.Append(errs, err)
 			}
 		}
-		if err := validateWeighs(value.Route, value.Destination); err != nil {
-			retVal = multierror.Append(retVal, err)
+		if err := validateWeights(value.Route, value.Destination); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.HttpReqTimeout != nil {
 		if err := ValidateHTTPTimeout(value.HttpReqTimeout); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.HttpReqRetries != nil {
 		if err := ValidateHTTPRetries(value.HttpReqRetries); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.HttpFault != nil {
 		if err := ValidateHTTPFault(value.HttpFault); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.L4Fault != nil {
 		if err := ValidateL4Fault(value.L4Fault); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
-		retVal = multierror.Append(retVal, fmt.Errorf("L4 faults are not implemented"))
+		errs = multierror.Append(errs, fmt.Errorf("L4 faults are not implemented"))
 	}
 
-	return retVal
+	return errs
 }
 
 // ValidateIngressRule checks ingress rules
@@ -664,32 +641,32 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 		return fmt.Errorf("Cannot cast to destination policy")
 	}
 
-	var retVal error
+	var errs error
 
 	if value.Destination == "" {
-		retVal = multierror.Append(retVal,
+		errs = multierror.Append(errs,
 			fmt.Errorf("destination policy should have a valid service name in its destination field"))
 	} else {
 		if err := validateFQDN(value.Destination); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if err := Tags(value.Tags).Validate(); err != nil {
-		retVal = multierror.Append(retVal, err)
+		errs = multierror.Append(errs, err)
 	}
 
 	if value.GetLoadBalancing() != nil {
 		if err := ValidateLoadBalancing(value.GetLoadBalancing()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
 	if value.GetCircuitBreaker() != nil {
 		if err := ValidateCircuitBreaker(value.GetCircuitBreaker()); err != nil {
-			retVal = multierror.Append(retVal, err)
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return retVal
+	return errs
 }

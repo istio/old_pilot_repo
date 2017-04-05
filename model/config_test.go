@@ -904,6 +904,16 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent:       -1,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: 3},
+				},
+			},
+		},
+			valid: false},
+		{name: "route rule bad delay fixed seconds", in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			HttpFault: &proxyconfig.HTTPFaultInjection{
+				Delay: &proxyconfig.HTTPFaultInjection_Delay{
+					Percent:       100,
 					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: -1},
 				},
 			},
