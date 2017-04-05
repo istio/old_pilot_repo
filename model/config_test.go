@@ -881,6 +881,24 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			},
 		},
 			valid: true},
+		{name: "route rule two destinationweights", in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
+			Route: []*proxyconfig.DestinationWeight{
+				{Destination: "host2.default.svc.cluster.local", Weight: 50},
+				{Destination: "host3.default.svc.cluster.local", Weight: 50},
+			},
+		},
+			valid: true},
+		{name: "route rule two destinationweights", in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
+			Route: []*proxyconfig.DestinationWeight{
+				{Destination: "host.default.svc.cluster.local", Weight: 75, Tags: map[string]string{"version": "v1"}},
+				{Destination: "host.default.svc.cluster.local", Weight: 25, Tags: map[string]string{"version": "v3"}},
+			},
+		},
+			valid: true},
 		{name: "route rule bad route tags", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},

@@ -543,26 +543,20 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 
 func validateWeights(routes []*proxyconfig.DestinationWeight, defaultDestination string) (errs error) {
 
-	// Sum weights by destination
-	weights := map[string]int32{}
+	// Sum weights
+	sum := 0
 	for _, destWeight := range routes {
-		destination := destWeight.Destination
-		if destination == "" {
-			destination = defaultDestination
-		}
-
-		oldWeight := weights[destination]
-		weights[destination] = oldWeight + destWeight.Weight
+		sum = sum + int(destWeight.Weight)
 	}
 
-	// From cfg.proto "If there is only [one] destination in a rule, the weight value is assumed to be 100.
-	if len(weights) != 1 {
-		for destination, weightSum := range weights {
-			if weightSum != 100 {
-				errs = multierror.Append(errs,
-					fmt.Errorf("Route %q weights total %v (must total 100)", destination, weightSum))
-			}
-		}
+	// From cfg.proto "If there is only [one] destination in a rule, the weight value is assumed to be 100."
+	if len(routes) == 1 && sum == 0 {
+		return
+	}
+
+	if sum != 100 {
+		errs = multierror.Append(errs,
+			fmt.Errorf("Route weights total %v (must total 100)", sum))
 	}
 
 	return
