@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -35,6 +35,9 @@ import (
 const (
 	// ConfigMapKey is the key for mesh configuration data in the config map
 	ConfigMapKey = "mesh"
+
+	// DefaultConfigMapName is the default config map name that holds the mesh configuration.
+	DefaultConfigMapName = "istio"
 )
 
 // GetMeshConfig fetches configuration from a config map
