@@ -90,10 +90,18 @@ var (
 				Port:            flags.sdsPort,
 				EnableProfiling: flags.enableProfiling,
 			}
+			apiserver := api.NewAPI(api.APIServiceOptions{
+				Version: "v1alpha1",
+				Port:    8081,
+				Registry: &model.IstioRegistry{
+					ConfigRegistry: controller,
+				},
+			})
 			sds := envoy.NewDiscoveryService(options)
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
+			go apiserver.Run()
 			cmd.WaitSignal(stop)
 			return
 		},
