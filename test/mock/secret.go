@@ -1,11 +1,11 @@
 package mock
 
+import "istio.io/manager/model"
+
 // SecretRegistry is a mock of the secret registry
-type SecretRegistry struct {
-	Secrets map[string]map[string][]byte
-}
+type SecretRegistry map[string]*model.TLSContext
 
 // GetSecret retrieves a secret for the given URI
-func (s *SecretRegistry) GetSecret(uri string) (map[string][]byte, error) {
-	return s.Secrets[uri], nil
+func (s SecretRegistry) GetSecret(uri string) (*model.TLSContext, error) {
+	return s[uri], nil
 }

@@ -160,9 +160,9 @@ func generateIngress(conf *IngressConfig) *Config {
 	}
 
 	// configure for HTTPS if there is a secret
-	if secret, err := conf.Secrets.GetSecret("*"); err != nil {
+	if tls, err := conf.Secrets.GetSecret("*"); err != nil {
 		glog.Warningf("Error retrieving ingress secret: %v", err)
-	} else if secret != nil {
+	} else if tls != nil {
 		// configure Envoy for HTTPS
 		listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
 		listener.SSLContext = &SSLContext{
@@ -171,7 +171,7 @@ func generateIngress(conf *IngressConfig) *Config {
 		}
 
 		// write key/cert
-		if err := writeTLS(conf.CertFile, conf.KeyFile, secret); err != nil {
+		if err := writeTLS(conf.CertFile, conf.KeyFile, tls); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
 	}
@@ -195,21 +195,11 @@ func generateIngress(conf *IngressConfig) *Config {
 	}
 }
 
-func writeTLS(certFilename, keyFilename string, secret map[string][]byte) error {
-	cert, exists := secret["tls.crt"]
-	if !exists {
-		return fmt.Errorf("could not find tls.crt in secret")
-	}
-	key, exists := secret["tls.key"]
-	if !exists {
-		return fmt.Errorf("could not find tls.key in secret")
-	}
-
-	// write files
-	if err := ioutil.WriteFile(certFilename, cert, 0755); err != nil {
+func writeTLS(certFile, keyFile string, tls *model.TLSContext) error {
+	if err := ioutil.WriteFile(certFile, tls.Certificate, 0755); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(keyFilename, key, 0755); err != nil {
+	if err := ioutil.WriteFile(keyFile, tls.PrivateKey, 0755); err != nil {
 		return err
 	}
 

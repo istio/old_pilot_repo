@@ -21,8 +21,9 @@ const (
 )
 
 var (
-	ingressCert = []byte("abcdefghijklmnop")
-	ingressKey  = []byte("qrstuvwxyz123456")
+	ingressCert       = []byte("abcdefghijklmnop")
+	ingressKey        = []byte("qrstuvwxyz123456")
+	ingressTLSContext = &model.TLSContext{ingressCert, ingressKey}
 )
 
 func compareFile(filename string, expect []byte, t *testing.T) {
@@ -69,7 +70,7 @@ func addIngressRoute(r *model.IstioRegistry, t *testing.T) {
 
 func TestIngressRoutes(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{Secrets: map[string]map[string][]byte{}}
+	s := &mock.SecretRegistry{}
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressConfig{
 		Registry: r,
@@ -80,14 +81,7 @@ func TestIngressRoutes(t *testing.T) {
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{
-		Secrets: map[string]map[string][]byte{
-			"*": {
-				"tls.crt": ingressCert,
-				"tls.key": ingressKey,
-			},
-		},
-	}
+	s := &mock.SecretRegistry{"*": ingressTLSContext}
 	addIngressRoute(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,

@@ -20,5 +20,10 @@ package model
 // TODO: add controller hooks for notification about changes to the secret
 type SecretRegistry interface {
 	// GetSecret retrieves the secret data by a platform specific URI
-	GetSecret(uri string) (map[string][]byte, error)
+	GetSecret(uri string) (*TLSContext, error)
+}
+
+type TLSContext struct {
+	Certificate []byte
+	PrivateKey []byte
 }

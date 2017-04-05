@@ -66,7 +66,7 @@ type ControllerConfig struct {
 	ResyncPeriod    time.Duration
 	IngressSyncMode IngressSyncMode
 	IngressClass    string
-	Secrets         *Secret
+	Secrets         *secret
 }
 
 // Controller is a collection of synchronized resource watchers
@@ -252,19 +252,7 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 			return nil
 		}
 
-		for _, tls := range ingress.Spec.TLS {
-			if tls.SecretName == "" {
-				continue
-			}
-
-			if len(tls.Hosts) == 0 {
-				c.config.Secrets.put("*", tls.SecretName)
-			} else {
-				for _, host := range tls.Hosts {
-					c.config.Secrets.put(host, tls.SecretName)
-				}
-			}
-		}
+		c.mapIngressSecrets(ingress.Spec.TLS)
 
 		// Convert the ingress into a map[Key]Message, and invoke handler for each
 		// TODO: This works well for Add and Delete events, but no so for Update:
@@ -769,5 +757,21 @@ func (c *Controller) shouldProcessIngress(ingress *v1beta1.Ingress) bool {
 	default:
 		glog.Warningf("Invalid ingress synchronization mode: %v", c.config.IngressSyncMode)
 		return false
+	}
+}
+
+func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS) {
+	for _, t := range tls {
+		if t.SecretName == "" {
+			continue
+		}
+
+		if len(t.Hosts) == 0 {
+			c.config.Secrets.put("*", t.SecretName)
+		} else {
+			for _, host := range t.Hosts {
+				c.config.Secrets.put(host, t.SecretName)
+			}
+		}
 	}
 }
