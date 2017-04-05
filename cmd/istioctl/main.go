@@ -77,7 +77,7 @@ var (
 				}
 			}
 
-			client, err := kube.NewClient(kubeconfig, model.IstioConfig)
+			client, err = kube.NewClient(kubeconfig, model.IstioConfig)
 			if err != nil && kubeconfig == "" {
 				// If no configuration was specified, and the platform client failed, try again using ~/.kube/config
 				client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
