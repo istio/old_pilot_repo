@@ -39,7 +39,7 @@ type DiscoveryService struct {
 	server     *http.Server
 
 	disableCache bool
-	cacheMu      sync.RWMutex
+	cacheMu      sync.Mutex
 	cache        map[string][]byte
 	cacheStats   discoveryCacheStats
 }
