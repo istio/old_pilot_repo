@@ -30,6 +30,8 @@ import (
 	"istio.io/manager/test/util"
 )
 
+// Implement minimal methods to satisfy model.Controller interface for
+// creating a new discovery service instance.
 type mockController struct{}
 
 func (mockController) AppendConfigHandler(_ string, _ func(model.Key, proto.Message, model.Event)) error {
@@ -41,7 +43,7 @@ func (mockController) AppendServiceHandler(_ func(*model.Service, model.Event)) 
 func (mockController) AppendInstanceHandler(_ func(*model.ServiceInstance, model.Event)) error {
 	return nil
 }
-func (mockController) Run(stop <-chan struct{}) { <-stop }
+func (mockController) Run(_ <-chan struct{}) {}
 
 func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryService {
 	out, err := NewDiscoveryService(DiscoveryServiceOptions{
