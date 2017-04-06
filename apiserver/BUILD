@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "apiserver.go",
         "config.go",
-        "handlers.go",
+        "handler.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
