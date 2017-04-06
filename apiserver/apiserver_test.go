@@ -65,6 +65,15 @@ func makeAPIRequest(api *API, method, url string, data []byte, t *testing.T) (in
 	return result.StatusCode, body
 }
 
+func TestNewAPIThenRun(t *testing.T) {
+	apiserver := NewAPI(APIServiceOptions{
+		Version:  "v1alpha1",
+		Port:     8081,
+		Registry: mock.MakeRegistry(),
+	})
+	go apiserver.Run()
+}
+
 func TestAddUpdateGetDeleteConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
