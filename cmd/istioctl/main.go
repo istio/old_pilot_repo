@@ -52,8 +52,9 @@ var (
 	schema model.ProtoSchema
 
 	rootCmd = &cobra.Command{
-		Use:   "istioctl",
-		Short: "Istio control interface",
+		Use:          "istioctl",
+		Short:        "Istio control interface",
+		SilenceUsage: true,
 		Long: fmt.Sprintf("Istio configuration command line utility. Available configuration types: %v",
 			model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
@@ -64,7 +65,7 @@ var (
 				}
 			}
 
-			client, err := kube.NewClient(kubeconfig, model.IstioConfig)
+			client, err = kube.NewClient(kubeconfig, model.IstioConfig)
 			if err != nil && kubeconfig == "" {
 				// If no configuration was specified, and the platform client failed, try again using ~/.kube/config
 				client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
@@ -87,6 +88,7 @@ var (
 		Short: "Create policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("create takes no arguments")
 			}
 			varr, err := readInputs()
@@ -98,6 +100,9 @@ var (
 			}
 			for _, v := range varr {
 				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
 					return err
 				}
 				err = config.Post(key, v.ParsedSpec)
@@ -116,6 +121,7 @@ var (
 		Short: "Replace policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("replace takes no arguments")
 			}
 			varr, err := readInputs()
@@ -127,6 +133,9 @@ var (
 			}
 			for _, v := range varr {
 				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
 					return err
 				}
 				err = config.Put(key, v.ParsedSpec)
@@ -151,6 +160,7 @@ var (
 
 			if len(args) > 1 {
 				if err := setup(args[0], args[1]); err != nil {
+					c.Println(c.UsageString())
 					return err
 				}
 				item, exists := config.Get(key)
@@ -164,6 +174,7 @@ var (
 				fmt.Print(out)
 			} else {
 				if err := setup(args[0], ""); err != nil {
+					c.Println(c.UsageString())
 					return err
 				}
 
@@ -197,6 +208,7 @@ var (
 			// If we did not receive a file option, get names of resources to delete from command line
 			if file == "" {
 				if len(args) < 2 {
+					c.Println(c.UsageString())
 					return fmt.Errorf("provide configuration type and name or -f option")
 				}
 				for i := 1; i < len(args); i++ {
@@ -213,6 +225,7 @@ var (
 
 			// As we did get a file option, make sure the command line did not include any resources to delete
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
 			varr, err := readInputs()
@@ -264,7 +277,6 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		glog.Error(err)
 		os.Exit(-1)
 	}
 }
