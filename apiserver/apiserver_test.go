@@ -3,7 +3,7 @@ package apiserver
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/pmezard/go-difflib/difflib"
 
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
+	test_util "istio.io/manager/test/util"
 )
 
 var (
@@ -24,9 +24,11 @@ var (
 	validUpdatedRouteRuleJSON       = []byte(`{"type":"route-rule","name":"name","spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,"route":[{"tags":{"version":"v2"},"weight":25}]}}`)
 	validDiffNamespaceRouteRuleJSON = []byte(`{"type":"route-rule","name":"name","spec":{"destination":"service.differentnamespace.svc.cluster.local","precedence":1,"route":[{"tags":{"version":"v3"},"weight":25}]}}`)
 
-	itemExistsResponse  = "item already exists"
-	invalidTypeResponse = "unknown configuration type not-a-route-rule; use one of [destination-policy ingress-rule route-rule]"
-	notFoundResponse    = "item not found"
+	errItemExists  = &model.ItemAlreadyExistsError{Key: routeRuleKey}
+	errNotFound    = &model.ItemNotFoundError{}
+	errInvalidBody = errors.New("invalid character 'J' looking for beginning of value")
+	errInvalidSpec = errors.New("cannot parse proto message: json: cannot unmarshal string into Go value of type map[string]json.RawMessage")
+	errInvalidType = errors.New("unknown configuration type not-a-route-rule; use one of [destination-policy ingress-rule route-rule]")
 )
 
 func makeAPIServer(r *model.IstioRegistry) *API {
@@ -62,19 +64,19 @@ func TestAddUpdateGetDeleteConfig(t *testing.T) {
 	// Add the route-rule
 	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
 	compareStatus(status, http.StatusCreated, t)
-	compareResponseJSON(body, "testdata/route-rule.json", t)
+	test_util.CompareContent(body, "testdata/route-rule.json", t)
 	compareStoredConfig(mockReg, routeRuleKey, true, t)
 
 	// Update the route-rule
 	status, body = makeAPIRequest(api, "PUT", url, validUpdatedRouteRuleJSON, t)
 	compareStatus(status, http.StatusOK, t)
-	compareResponseJSON(body, "testdata/route-rule-v2.json", t)
+	test_util.CompareContent(body, "testdata/route-rule-v2.json", t)
 	compareStoredConfig(mockReg, routeRuleKey, true, t)
 
 	// Get the route-rule
 	status, body = makeAPIRequest(api, "GET", url, nil, t)
 	compareStatus(status, http.StatusOK, t)
-	compareResponseJSON(body, "testdata/route-rule-v2.json", t)
+	test_util.CompareContent(body, "testdata/route-rule-v2.json", t)
 
 	// Delete the route-rule
 	status, body = makeAPIRequest(api, "DELETE", url, nil, t)
@@ -117,7 +119,7 @@ func TestNotFoundGetConfig(t *testing.T) {
 	url := "/test/config/route-rule/namespace/name"
 	status, body := makeAPIRequest(api, "GET", url, nil, t)
 	compareStatus(status, http.StatusNotFound, t)
-	compareResponseText(string(body), notFoundResponse, t)
+	compareResponseError(string(body), errNotFound, t)
 }
 
 func TestInvalidConfigTypeGetConfig(t *testing.T) {
@@ -127,7 +129,7 @@ func TestInvalidConfigTypeGetConfig(t *testing.T) {
 	status, body := makeAPIRequest(api, "GET", url, nil, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseText(string(body), invalidTypeResponse, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 ///////////////////////////////////////////////////////
@@ -142,34 +144,38 @@ func TestMultipleAddConfigsReturnConflict(t *testing.T) {
 	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusConflict, t)
-	compareResponseText(string(body), itemExistsResponse, t)
+	compareResponseError(string(body), errItemExists, t)
 }
 
 func TestInvalidConfigTypeAddConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/not-a-route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
+	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 func TestInvalidBodyAddConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "POST", url, []byte("JUSTASTRING"), t)
+	status, body := makeAPIRequest(api, "POST", url, []byte("JUSTASTRING"), t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidBody, t)
+
 }
 
 func TestInvalidSpecAddConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "POST", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
+	status, body := makeAPIRequest(api, "POST", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidSpec, t)
 }
 
 ///////////////////////////////////////////////////////
@@ -183,7 +189,7 @@ func TestNotFoundConfigUpdateConfig(t *testing.T) {
 	status, body := makeAPIRequest(api, "PUT", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusNotFound, t)
-	compareResponseText(string(body), notFoundResponse, t)
+	compareResponseError(string(body), errNotFound, t)
 
 }
 
@@ -191,27 +197,30 @@ func TestInvalidConfigTypeUpdateConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/not-a-route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "PUT", url, validRouteRuleJSON, t)
+	status, body := makeAPIRequest(api, "PUT", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 func TestInvalidBodyUpdateConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "PUT", url, []byte("JUSTASTRING"), t)
+	status, body := makeAPIRequest(api, "PUT", url, []byte("JUSTASTRING"), t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidBody, t)
 }
 
 func TestInvalidSpecUpdateConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "PUT", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
+	status, body := makeAPIRequest(api, "PUT", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidSpec, t)
 }
 
 ///////////////////////////////////////////////////////
@@ -225,7 +234,7 @@ func TestNotFoundDeleteConfig(t *testing.T) {
 	status, body := makeAPIRequest(api, "DELETE", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusNotFound, t)
-	compareResponseText(string(body), notFoundResponse, t)
+	compareResponseError(string(body), errNotFound, t)
 
 }
 
@@ -233,9 +242,10 @@ func TestInvalidConfigTypeDeleteConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/not-a-route-rule/namespace/name"
-	status, _ := makeAPIRequest(api, "DELETE", url, validRouteRuleJSON, t)
+	status, body := makeAPIRequest(api, "DELETE", url, validRouteRuleJSON, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 ///////////////////////////////////////////////////////
@@ -246,18 +256,20 @@ func TestInvalidConfigTypeWithNamespaceListConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/not-a-route-rule/namespace"
-	status, _ := makeAPIRequest(api, "GET", url, nil, t)
+	status, body := makeAPIRequest(api, "GET", url, nil, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 func TestInvalidConfigTypeWithoutNamespaceListConfig(t *testing.T) {
 	mockReg := mock.MakeRegistry()
 	api := makeAPIServer(mockReg)
 	url := "/test/config/not-a-route-rule"
-	status, _ := makeAPIRequest(api, "GET", url, nil, t)
+	status, body := makeAPIRequest(api, "GET", url, nil, t)
 
 	compareStatus(status, http.StatusBadRequest, t)
+	compareResponseError(string(body), errInvalidType, t)
 }
 
 ///////////////////////////////////////////////////////
@@ -280,18 +292,10 @@ func compareStatus(received, expected int, t *testing.T) {
 	}
 }
 
-func compareResponseText(received, expected string, t *testing.T) {
-	if strings.Compare(received, expected) != 0 {
-		t.Errorf("expected response body to be %v, but received: %v", expected, received)
+func compareResponseError(received string, expected error, t *testing.T) {
+	if strings.Compare(received, expected.Error()) != 0 {
+		t.Errorf("expected response body to be %v, but received: %v", expected.Error(), received)
 	}
-}
-
-func compareResponseJSON(body []byte, file string, t *testing.T) {
-	err := ioutil.WriteFile(file, body, 0644)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	compareJSON(file, t)
 }
 
 func compareStoredConfig(mockReg *model.IstioRegistry, key model.Key, present bool, t *testing.T) {
@@ -302,31 +306,4 @@ func compareStoredConfig(mockReg *model.IstioRegistry, key model.Key, present bo
 		t.Errorf("Unexpected config was present in the registry for key: %+v", key)
 	}
 	// To Do: compare protos
-}
-
-func compareJSON(jsonFile string, t *testing.T) {
-	file, err := ioutil.ReadFile(jsonFile)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	golden, err := ioutil.ReadFile(jsonFile + ".golden")
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	data := strings.TrimSpace(string(file))
-	expected := strings.TrimSpace(string(golden))
-
-	if data != expected {
-		diff := difflib.UnifiedDiff{
-			A:        difflib.SplitLines(expected),
-			B:        difflib.SplitLines(data),
-			FromFile: jsonFile + ".golden",
-			ToFile:   jsonFile,
-			Context:  2,
-		}
-		text, _ := difflib.GetUnifiedDiffString(diff)
-		fmt.Println(text)
-		t.Errorf("Failed validating golden artifact %s.golden", jsonFile)
-	}
 }

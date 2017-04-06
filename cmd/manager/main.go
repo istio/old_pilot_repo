@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/apiserver"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
@@ -90,9 +91,9 @@ var (
 				Port:            flags.sdsPort,
 				EnableProfiling: flags.enableProfiling,
 			}
-			apiserver := api.NewAPI(api.APIServiceOptions{
+			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version: "v1alpha1",
-				Port:    8081,
+				Port:    apiserverPort,
 				Registry: &model.IstioRegistry{
 					ConfigRegistry: controller,
 				},
@@ -192,6 +193,8 @@ func init() {
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
 		"Discovery service port")
+	discoveryCmd.PersistentFlags().IntVarP(&flags.apiserverPort, "port", "p", 8081,
+		"API service port")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
 

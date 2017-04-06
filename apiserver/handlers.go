@@ -10,6 +10,8 @@ import (
 	restful "github.com/emicklei/go-restful"
 )
 
+var schema model.ProtoSchema
+
 func (api *API) GetConfig(request *restful.Request, response *restful.Response) {
 
 	params := request.PathParameters()
@@ -57,6 +59,7 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 	if err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		return
 	}
 
 	config := &Config{}
@@ -67,7 +70,7 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	err = config.parseSpec()
+	err = config.ParseSpec()
 	if err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusBadRequest, err.Error())
@@ -109,7 +112,7 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 		return
 	}
 
-	err = config.parseSpec()
+	err = config.ParseSpec()
 	if err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusBadRequest, err.Error())

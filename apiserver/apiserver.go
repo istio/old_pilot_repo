@@ -12,13 +12,9 @@ import (
 )
 
 const (
-	Kind      = "kind"
-	Name      = "name"
-	Namespace = "namespace"
-)
-
-var (
-	schema model.ProtoSchema
+	kind      = "kind"
+	name      = "name"
+	namespace = "namespace"
 )
 
 type APIServiceOptions struct {
@@ -51,36 +47,36 @@ func (api *API) Register(container *restful.Container) {
 	ws.Path(fmt.Sprintf("/%s", api.version))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}/{%s}/{%s}", Kind, Namespace, Name)).
+		GET(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
 		To(api.GetConfig).
 		Doc("Get a config").
 		Writes(Config{}))
 
 	ws.Route(ws.
-		POST(fmt.Sprintf("/config/{%s}/{%s}/{%s}", Kind, Namespace, Name)).
+		POST(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
 		To(api.AddConfig).
 		Doc("Add a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		PUT(fmt.Sprintf("/config/{%s}/{%s}/{%s}", Kind, Namespace, Name)).
+		PUT(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
 		To(api.UpdateConfig).
 		Doc("Update a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		DELETE(fmt.Sprintf("/config/{%s}/{%s}/{%s}", Kind, Namespace, Name)).
+		DELETE(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
 		To(api.DeleteConfig).
 		Doc("Delete a config"))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}/{%s}", Kind, Namespace)).
+		GET(fmt.Sprintf("/config/{%s}/{%s}", kind, namespace)).
 		To(api.ListConfigs).
 		Doc("List all configs for kind in a given namespace").
 		Writes([]Config{}))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}", Kind)).
+		GET(fmt.Sprintf("/config/{%s}", kind)).
 		To(api.ListConfigs).
 		Doc("List all configs for kind in across all namespaces").
 		Writes([]Config{}))

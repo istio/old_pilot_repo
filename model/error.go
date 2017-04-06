@@ -1,11 +1,17 @@
 package model
 
+import "fmt"
+
 type ItemAlreadyExistsError struct {
+	Key Key
 	Msg string
 }
 
 func (e *ItemAlreadyExistsError) Error() string {
-	return e.Msg
+	if e.Msg != "" {
+		return e.Msg
+	}
+	return fmt.Sprintf("Item with key %+v already exists", e.Key)
 }
 
 type ItemNotFoundError struct {
@@ -13,5 +19,8 @@ type ItemNotFoundError struct {
 }
 
 func (e *ItemNotFoundError) Error() string {
-	return e.Msg
+	if e.Msg != "" {
+		return e.Msg
+	}
+	return "item not found"
 }

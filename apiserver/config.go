@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 
 	"istio.io/manager/model"
 )
@@ -21,7 +21,7 @@ type Config struct {
 	ParsedSpec proto.Message `json:"-"`
 }
 
-func (c *Config) parseSpec() error {
+func (c *Config) ParseSpec() error {
 
 	byteSpec, err := json.Marshal(c.Spec)
 	if err != nil {
