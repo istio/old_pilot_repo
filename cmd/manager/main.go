@@ -45,6 +45,7 @@ type args struct {
 	ingressClass             string
 	defaultIngressController bool
 	enableProfiling          bool
+	enableDiscoveryCaching   bool
 }
 
 var (
@@ -98,15 +99,20 @@ var (
 				IngressSyncMode: kube.IngressOff,
 			})
 			options := envoy.DiscoveryServiceOptions{
-				Services: controller,
+				Services:   controller,
+				Controller: controller,
 				Config: &model.IstioRegistry{
 					ConfigRegistry: controller,
 				},
 				Mesh:            mesh,
 				Port:            flags.sdsPort,
 				EnableProfiling: flags.enableProfiling,
+				EnableCaching:   flags.enableDiscoveryCaching,
 			}
-			sds := envoy.NewDiscoveryService(options)
+			sds, err := envoy.NewDiscoveryService(options)
+			if err != nil {
+				return fmt.Errorf("failed to create discovery service: %v", err)
+			}
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
@@ -201,6 +207,8 @@ func init() {
 		"Discovery service port")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.enableDiscoveryCaching, "discovery_cache", true,
+		"Enable caching discovery service responses")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
 		"IP address. If not provided uses ${POD_IP} environment variable.")
