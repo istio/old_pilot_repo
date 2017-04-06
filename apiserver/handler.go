@@ -13,6 +13,7 @@ import (
 
 var schema model.ProtoSchema
 
+// GetConfig retrieves the config object from the configuration registry
 func (api *API) GetConfig(request *restful.Request, response *restful.Response) {
 
 	params := request.PathParameters()
@@ -24,7 +25,8 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 
 	proto, ok := api.registry.Get(key)
 	if !ok {
-		api.writeError(http.StatusNotFound, "item not found", response)
+		errLocal := &model.ItemNotFoundError{Key: key}
+		api.writeError(http.StatusNotFound, errLocal.Error(), response)
 		return
 	}
 
@@ -49,6 +51,8 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 	}
 }
 
+// AddConfig creates and stores the passed config object in the configuration registry
+// It is equivalent to a restful PUT and is idempotent
 func (api *API) AddConfig(request *restful.Request, response *restful.Response) {
 
 	// ToDo: check url name matches body name
@@ -90,6 +94,7 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 	}
 }
 
+// UpdateConfig updates the passed config object in the configuration registry
 func (api *API) UpdateConfig(request *restful.Request, response *restful.Response) {
 
 	// ToDo: check url name matches body name
@@ -131,6 +136,7 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 	}
 }
 
+// DeleteConfig deletes the passed config object in the configuration registry
 func (api *API) DeleteConfig(request *restful.Request, response *restful.Response) {
 
 	params := request.PathParameters()
@@ -153,6 +159,10 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 	}
 	response.WriteHeader(http.StatusOK)
 }
+
+// ListConfigs lists the configuration objects in the the configuration registry
+// If kind and namespace are passed then it retrieves all rules of a kind in a namespace
+// If kind is passed and namespace is an empty string it retrieves all rules of a kind across all namespaces
 func (api *API) ListConfigs(request *restful.Request, response *restful.Response) {
 
 	params := request.PathParameters()

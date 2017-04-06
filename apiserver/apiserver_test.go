@@ -32,7 +32,7 @@ var (
 		`"route":[{"tags":{"version":"v3"},"weight":25}]}}`)
 
 	errItemExists  = &model.ItemAlreadyExistsError{Key: routeRuleKey}
-	errNotFound    = &model.ItemNotFoundError{}
+	errNotFound    = &model.ItemNotFoundError{Key: routeRuleKey}
 	errInvalidBody = errors.New("invalid character 'J' looking for beginning of value")
 	errInvalidSpec = errors.New("cannot parse proto message: json: " +
 		"cannot unmarshal string into Go value of type map[string]json.RawMessage")

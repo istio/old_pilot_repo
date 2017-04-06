@@ -192,9 +192,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flags.config, "meshConfig", cmd.DefaultConfigMapName,
 		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", cmd.ConfigMapKey))
 
-	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
+	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "sdsPort", "p", 8080,
 		"Discovery service port")
-	discoveryCmd.PersistentFlags().IntVarP(&flags.apiserverPort, "port", "p", 8081,
+	discoveryCmd.PersistentFlags().IntVarP(&flags.apiserverPort, "apiPort", "p", 8081,
 		"API service port")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")

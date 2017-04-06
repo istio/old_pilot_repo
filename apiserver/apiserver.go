@@ -17,18 +17,23 @@ const (
 	namespace = "namespace"
 )
 
+// APIServiceOptions are the options available for configuration on the API
+// Version is the API version e.g. v1 for /v1/config
 type APIServiceOptions struct {
 	Version  string
 	Port     int
 	Registry *model.IstioRegistry
 }
 
+// API is the server wrapper that listens for incoming requests to the manager and processes them
 type API struct {
 	server   *http.Server
 	version  string
 	registry *model.IstioRegistry
 }
 
+// NewAPI creates a new instance of the API using the options passed to it
+// It returns a pointer to the newly created API
 func NewAPI(o APIServiceOptions) *API {
 	out := &API{
 		version:  o.Version,
@@ -40,6 +45,7 @@ func NewAPI(o APIServiceOptions) *API {
 	return out
 }
 
+// Register adds the routes to the restful container
 func (api *API) Register(container *restful.Container) {
 	ws := &restful.WebService{}
 	ws.Consumes(restful.MIME_JSON)
@@ -84,6 +90,7 @@ func (api *API) Register(container *restful.Container) {
 	container.Add(ws)
 }
 
+// Run calls listen and serve on the API server
 func (api *API) Run() {
 	glog.Infof("Starting api at %v", api.server.Addr)
 	if err := api.server.ListenAndServe(); err != nil {

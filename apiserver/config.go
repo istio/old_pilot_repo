@@ -21,6 +21,8 @@ type Config struct {
 	ParsedSpec proto.Message `json:"-"`
 }
 
+// ParseSpec takes the field in the config object and parses into a protobuf message
+// Then assigns it to the ParseSpec field
 func (c *Config) ParseSpec() error {
 
 	byteSpec, err := json.Marshal(c.Spec)

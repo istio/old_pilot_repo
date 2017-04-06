@@ -19,6 +19,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["apiserver_test.go"],
+    data = glob(["testdata/*.golden"]),
     library = ":go_default_library",
     deps = [
         "//model:go_default_library",

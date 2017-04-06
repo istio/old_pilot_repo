@@ -77,7 +77,7 @@ func (cr *ConfigRegistry) Delete(key model.Key) error {
 		delete(cr.data, key)
 		return nil
 	}
-	return &model.ItemNotFoundError{}
+	return &model.ItemNotFoundError{Key: key}
 }
 
 // Post implements config registry method
@@ -94,7 +94,7 @@ func (cr *ConfigRegistry) Post(key model.Key, v proto.Message) error {
 func (cr *ConfigRegistry) Put(key model.Key, v proto.Message) error {
 	_, ok := cr.data[key]
 	if !ok {
-		return &model.ItemNotFoundError{}
+		return &model.ItemNotFoundError{Key: key}
 	}
 	cr.data[key] = v
 	return nil
