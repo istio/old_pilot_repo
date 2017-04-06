@@ -39,7 +39,7 @@ type DiscoveryService struct {
 	server     *http.Server
 
 	disableCache bool
-	cacheMu      sync.Mutex
+	cacheMu      sync.RWMutex
 	cache        map[string][]byte
 	cacheStats   discoveryCacheStats
 }
@@ -158,9 +158,15 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Writes(HTTPRouteConfig{}))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/cache_stats")).
+		GET("/cache_stats").
 		To(ds.GetCacheStats).
+		Doc("Get discovery service cache stats").
 		Writes(discoveryCacheStats{}))
+
+	ws.Route(ws.
+		GET("/cache_clear").
+		To(ds.ClearCacheStats).
+		Doc("Clear discovery service cache stats"))
 
 	container.Add(ws)
 }
@@ -182,6 +188,13 @@ func (ds *DiscoveryService) GetCacheStats(_ *restful.Request, response *restful.
 	}
 }
 
+// ClearCacheStats clear the statistics for cached discovery responses.
+func (ds *DiscoveryService) ClearCacheStats(_ *restful.Request, _ *restful.Response) {
+	ds.cacheMu.Lock()
+	defer ds.cacheMu.Unlock()
+	ds.cacheStats.Stats = make(map[string]*discoveryCacheStatEntry)
+}
+
 func (ds *DiscoveryService) clearCache() {
 	ds.cacheMu.Lock()
 	defer ds.cacheMu.Unlock()
@@ -189,31 +202,40 @@ func (ds *DiscoveryService) clearCache() {
 	ds.cache = make(map[string][]byte)
 }
 
-// caller must hold cache mutex lock
-func (ds *DiscoveryService) cacheHitMiss(key string, hit bool) {
+func (ds *DiscoveryService) cachedDiscoveryResponse(key string) ([]byte, bool) {
 	if ds.disableCache {
-		return
+		return nil, false
 	}
+
+	ds.cacheMu.Lock()
+	defer ds.cacheMu.Unlock()
+
 	s, ok := ds.cacheStats.Stats[key]
 	if !ok {
 		s = &discoveryCacheStatEntry{}
 		ds.cacheStats.Stats[key] = s
 	}
-	if hit {
+
+	out, cached := ds.cache[key]
+	if cached {
 		s.Hit++
 	} else {
 		s.Miss++
 	}
+	return out, cached
+}
+
+func (ds *DiscoveryService) updateCachedDiscoveryResponse(key string, data []byte) {
+	ds.cacheMu.Lock()
+	ds.cache[key] = data
+	ds.cacheMu.Unlock()
 }
 
 // ListEndpoints responds to SDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-
 	key := request.Request.URL.String()
-	out, cached := ds.cache[key]
-	if ds.disableCache || !cached {
+	out, cached := ds.cachedDiscoveryResponse(key)
+	if !cached {
 		hostname, ports, tags := model.ParseServiceKey(request.PathParameter(ServiceKey))
 		// envoy expects an empty array if no hosts are available
 		hostArray := make([]*host, 0)
@@ -228,20 +250,16 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.cache[key] = out
+		ds.updateCachedDiscoveryResponse(key, out)
 	}
-	ds.cacheHitMiss(key, cached)
 	writeResponse(response, out)
 }
 
 // ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-
 	key := request.Request.URL.String()
-	out, cached := ds.cache[key]
-	if ds.disableCache || !cached {
+	out, cached := ds.cachedDiscoveryResponse(key)
+	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.mesh.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
 				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
@@ -276,9 +294,8 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.cache[key] = out
+		ds.updateCachedDiscoveryResponse(key, out)
 	}
-	ds.cacheHitMiss(key, cached)
 	writeResponse(response, out)
 }
 
@@ -286,12 +303,9 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 // Routes correspond to HTTP routes and use the listener port as the route name
 // to identify HTTP filters in the config. Service node value holds the local proxy identity.
 func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restful.Response) {
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-
 	key := request.Request.URL.String()
-	out, cached := ds.cache[key]
-	if ds.disableCache || !cached {
+	out, cached := ds.cachedDiscoveryResponse(key)
+	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.mesh.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
 				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
@@ -328,9 +342,8 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.cache[key] = out
+		ds.updateCachedDiscoveryResponse(key, out)
 	}
-	ds.cacheHitMiss(key, cached)
 	writeResponse(response, out)
 }
 

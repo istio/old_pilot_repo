@@ -24,6 +24,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
 	"istio.io/manager/test/util"
@@ -60,6 +61,7 @@ func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryServic
 
 func makeDiscoveryServiceWithSSLContext(t *testing.T, r *model.IstioRegistry) *DiscoveryService {
 	mesh := DefaultMeshConfig
+	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	out, err := NewDiscoveryService(DiscoveryServiceOptions{
 		Services:      mock.Discovery,
 		Controller:    &mockController{},
@@ -201,9 +203,10 @@ func TestDiscoveryCache(t *testing.T) {
 	}
 
 	cases := []struct {
-		wantCache string
-		query     bool
-		clear     bool
+		wantCache  string
+		query      bool
+		clearCache bool
+		clearStats bool
 	}{
 		{
 			wantCache: "testdata/cache-empty.json",
@@ -221,19 +224,29 @@ func TestDiscoveryCache(t *testing.T) {
 			query:     true,
 		},
 		{
-			wantCache: "testdata/cache-cleared.json",
-			clear:     true,
+			wantCache:  "testdata/cache-cleared.json",
+			clearCache: true,
+			query:      true,
+		},
+		{
+			wantCache:  "testdata/cache-cold.json",
+			clearCache: true,
+			clearStats: true,
+			query:      true,
 		},
 	}
 	for _, c := range cases {
+		if c.clearCache {
+			ds.clearCache()
+		}
+		if c.clearStats {
+			_ = makeDiscoveryRequest(ds, "/cache_clear", t)
+		}
 		if c.query {
 			for path, want := range responseByPath {
 				got := makeDiscoveryRequest(ds, path, t)
 				compareResponse(got, want, t)
 			}
-		}
-		if c.clear {
-			ds.clearCache()
 		}
 		got := makeDiscoveryRequest(ds, "/cache_stats", t)
 		compareResponse(got, c.wantCache, t)
