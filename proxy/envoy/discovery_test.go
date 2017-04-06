@@ -41,7 +41,7 @@ func (mockController) AppendServiceHandler(_ func(*model.Service, model.Event)) 
 func (mockController) AppendInstanceHandler(_ func(*model.ServiceInstance, model.Event)) error {
 	return nil
 }
-func (mockController) Run(_ <-chan struct{}) {}
+func (mockController) Run(stop <-chan struct{}) { <-stop }
 
 func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryService {
 	out, err := NewDiscoveryService(DiscoveryServiceOptions{
@@ -54,7 +54,6 @@ func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryServic
 	})
 	if err != nil {
 		t.Fatalf("NewDiscoveryService failed: %v", err)
-
 	}
 	return out
 }

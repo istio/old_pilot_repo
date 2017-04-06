@@ -138,7 +138,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		To(ds.ListEndpoints).
 		Doc("SDS registration").
 		Param(ws.PathParameter(ServiceKey, "tuple of service name and tag name").DataType("string")).
-		Writes(hosts{}))
+		Produces(restful.MIME_JSON))
 
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/clusters/{%s}/{%s}", ServiceCluster, ServiceNode)).
@@ -146,7 +146,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Doc("CDS registration").
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")).
-		Writes(ClusterManager{}))
+		Produces(restful.MIME_JSON))
 
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/routes/{%s}/{%s}/{%s}", RouteConfigName, ServiceCluster, ServiceNode)).
@@ -155,7 +155,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Param(ws.PathParameter(RouteConfigName, "route configuration name").DataType("string")).
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")).
-		Writes(HTTPRouteConfig{}))
+		Produces(restful.MIME_JSON))
 
 	ws.Route(ws.
 		GET("/cache_stats").
@@ -226,6 +226,10 @@ func (ds *DiscoveryService) cachedDiscoveryResponse(key string) ([]byte, bool) {
 }
 
 func (ds *DiscoveryService) updateCachedDiscoveryResponse(key string, data []byte) {
+	if ds.disableCache {
+		return
+	}
+
 	ds.cacheMu.Lock()
 	ds.cache[key] = data
 	ds.cacheMu.Unlock()
@@ -356,7 +360,6 @@ func errorResponse(r *restful.Response, status int, msg string) {
 
 func writeResponse(r *restful.Response, data []byte) {
 	r.WriteHeader(http.StatusOK)
-	r.Header().Set("Content-Type", "application/json")
 	if _, err := r.Write(data); err != nil {
 		glog.Warning(err)
 	}
