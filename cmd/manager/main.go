@@ -160,8 +160,27 @@ var (
 		Use:   "egress",
 		Short: "Istio Proxy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			// TODO: implement this method
+			controller := kube.NewController(client, kube.ControllerConfig{
+				Namespace:       flags.namespace,
+				ResyncPeriod:    resyncPeriod,
+				IngressSyncMode: kube.IngressOff,
+			})
+			config := &envoy.EgressConfig{
+				//CertFile:  "/etc/tls.crt",
+				//KeyFile:   "/etc/tls.key",
+				Namespace: flags.namespace,
+				//Secret:    flags.ingressSecret, //TODO Egress secret?
+				//Secrets:   client,
+				Mesh:      &flags.proxy,
+				Services:  controller,
+			}
+			w, err := envoy.NewEgressWatcher(controller, config)
+			if err != nil {
+				return err
+			}
+
 			stop := make(chan struct{})
+			go w.Run(stop)
 			cmd.WaitSignal(stop)
 			return nil
 		},

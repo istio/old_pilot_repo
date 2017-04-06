@@ -205,7 +205,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
 	context *ProxyContext) (Listeners, Clusters) {
 	httpOutbound := buildOutboundHTTPRoutes(instances, services, context)
-	listeners, clusters := buildOutboundTCPListeners(services)
+	listeners, clusters := buildOutboundTCPListeners(services, context)
 
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
@@ -233,6 +233,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 		if context.MeshConfig.EnableAuth {
 			sslContext = buildClusterSSLContext(service.Hostname, context)
 		}
+
 		for _, servicePort := range service.Ports {
 			protocol := servicePort.Protocol
 			switch protocol {
@@ -267,6 +268,21 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
+				if service.External {
+					for _ , route := range routes {
+						for _ , cluster := range route.clusters {
+							cluster.ServiceName = ""
+							cluster.Type = "strict_dns"
+							cluster.Hosts = []Host{
+								{
+									URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressAddress),
+								},
+							}
+
+						}
+					}
+				}
+
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
@@ -296,7 +312,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-func buildOutboundTCPListeners(services []*model.Service) (Listeners, Clusters) {
+func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 	for _, service := range services {
@@ -305,6 +321,15 @@ func buildOutboundTCPListeners(services []*model.Service) (Listeners, Clusters) 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// TODO: Enable SSL context for TCP and HTTPS services.
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
+				if service.External {
+					cluster.ServiceName = ""
+					cluster.Type = "strict_dns"
+					cluster.Hosts = []Host{
+						{
+							URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressAddress),
+						},
+					}
+				}
 				route := buildTCPRoute(cluster, []string{service.Address})
 				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
 				listener := buildTCPListener(config, service.Address, servicePort.Port)

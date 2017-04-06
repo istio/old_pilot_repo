@@ -23,6 +23,9 @@ import (
 
 // MeshConfig defines proxy mesh variables
 type MeshConfig struct {
+	// EgressAddress for egress proxy service
+	EgressAddress string
+
 	// DiscoveryAddress is the DNS address for Envoy discovery service
 	DiscoveryAddress string
 
@@ -73,6 +76,7 @@ type MeshConfig struct {
 var (
 	// DefaultMeshConfig configuration
 	DefaultMeshConfig = &MeshConfig{
+		EgressAddress:             "istio-egress:80",
 		DiscoveryAddress:          "manager:8080",
 		MixerAddress:              "mixer:9091",
 		ProxyPort:                 15001,
@@ -210,6 +214,8 @@ type HTTPRoute struct {
 	// faults contains the set of referenced faults in the route; the field is special
 	// and used only to aggregate fault filter information after composing routes
 	faults []*HTTPFilter
+
+	AutoHostRewrite bool `json:"auto_host_rewrite,omitempty"`
 }
 
 // RetryPolicy definition

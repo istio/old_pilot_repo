@@ -26,10 +26,12 @@ import (
 var (
 	HelloService                        = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
 	WorldService                        = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	ExternalService                     = MakeExternalService("gc-hello.default.svc.cluster.local", "gc-hello.mybluemix.net", "9.9.9.9")
 	Discovery    model.ServiceDiscovery = &ServiceDiscovery{
 		services: map[string]*model.Service{
 			HelloService.Hostname: HelloService,
 			WorldService.Hostname: WorldService,
+			ExternalService.Hostname: ExternalService,
 		},
 		versions: 2,
 	}
@@ -58,6 +60,20 @@ func MakeService(hostname, address string) *model.Service {
 	}
 }
 
+// MakeExternalService creates mock external service
+func MakeExternalService(hostname, external, address string) *model.Service {
+	return &model.Service{
+		Hostname: hostname,
+		Address:  external,
+		External: true,
+		Ports: []*model.Port{{
+			Name:     "http",
+			Port:     80,
+			Protocol: model.ProtocolHTTP,
+		}},
+	}
+}
+
 // MakeInstance creates a mock instance, version enumerates endpoints
 func MakeInstance(service *model.Service, port *model.Port, version int) *model.ServiceInstance {
 	// we make port 80 same as endpoint port, otherwise, it's distinct
@@ -80,6 +96,9 @@ func MakeInstance(service *model.Service, port *model.Port, version int) *model.
 // MakeIP creates a fake IP address for a service and instance version
 func MakeIP(service *model.Service, version int) string {
 	ip := net.ParseIP(service.Address).To4()
+	if ip == nil {
+		return service.Address
+	}
 	ip[2] = byte(1)
 	ip[3] = byte(version)
 	return ip.String()

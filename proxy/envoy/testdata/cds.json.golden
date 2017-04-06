@@ -1,6 +1,17 @@
 {
   "clusters": [
    {
+    "name": "out.gc-hello.default.svc.cluster.local|http",
+    "connect_timeout_ms": 1000,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [
+     {
+      "url": "tcp://istio-egress:80"
+     }
+    ]
+   },
+   {
     "name": "out.hello.default.svc.cluster.local|http",
     "service_name": "hello.default.svc.cluster.local|http",
     "connect_timeout_ms": 1000,
