@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -20,15 +21,23 @@ import (
 var (
 	routeRuleKey = model.Key{Name: "name", Namespace: "namespace", Kind: "route-rule"}
 
-	validRouteRuleJSON              = []byte(`{"type":"route-rule","name":"name","spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,"route":[{"tags":{"version":"v1"},"weight":25}]}}`)
-	validUpdatedRouteRuleJSON       = []byte(`{"type":"route-rule","name":"name","spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,"route":[{"tags":{"version":"v2"},"weight":25}]}}`)
-	validDiffNamespaceRouteRuleJSON = []byte(`{"type":"route-rule","name":"name","spec":{"destination":"service.differentnamespace.svc.cluster.local","precedence":1,"route":[{"tags":{"version":"v3"},"weight":25}]}}`)
+	validRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
+		`"spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v1"},"weight":25}]}}`)
+	validUpdatedRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
+		`"spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v2"},"weight":25}]}}`)
+	validDiffNamespaceRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
+		`"spec":{"destination":"service.differentnamespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v3"},"weight":25}]}}`)
 
 	errItemExists  = &model.ItemAlreadyExistsError{Key: routeRuleKey}
 	errNotFound    = &model.ItemNotFoundError{}
 	errInvalidBody = errors.New("invalid character 'J' looking for beginning of value")
-	errInvalidSpec = errors.New("cannot parse proto message: json: cannot unmarshal string into Go value of type map[string]json.RawMessage")
-	errInvalidType = errors.New("unknown configuration type not-a-route-rule; use one of [destination-policy ingress-rule route-rule]")
+	errInvalidSpec = errors.New("cannot parse proto message: json: " +
+		"cannot unmarshal string into Go value of type map[string]json.RawMessage")
+	errInvalidType = fmt.Errorf("unknown configuration type not-a-route-rule; use one of %v",
+		model.IstioConfig.Kinds())
 )
 
 func makeAPIServer(r *model.IstioRegistry) *API {
@@ -64,22 +73,22 @@ func TestAddUpdateGetDeleteConfig(t *testing.T) {
 	// Add the route-rule
 	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
 	compareStatus(status, http.StatusCreated, t)
-	test_util.CompareContent(body, "testdata/route-rule.json", t)
+	test_util.CompareContent(body, "testdata/route-rule.json.golden", t)
 	compareStoredConfig(mockReg, routeRuleKey, true, t)
 
 	// Update the route-rule
 	status, body = makeAPIRequest(api, "PUT", url, validUpdatedRouteRuleJSON, t)
 	compareStatus(status, http.StatusOK, t)
-	test_util.CompareContent(body, "testdata/route-rule-v2.json", t)
+	test_util.CompareContent(body, "testdata/route-rule-v2.json.golden", t)
 	compareStoredConfig(mockReg, routeRuleKey, true, t)
 
 	// Get the route-rule
 	status, body = makeAPIRequest(api, "GET", url, nil, t)
 	compareStatus(status, http.StatusOK, t)
-	test_util.CompareContent(body, "testdata/route-rule-v2.json", t)
+	test_util.CompareContent(body, "testdata/route-rule-v2.json.golden", t)
 
 	// Delete the route-rule
-	status, body = makeAPIRequest(api, "DELETE", url, nil, t)
+	status, _ = makeAPIRequest(api, "DELETE", url, nil, t)
 	compareStatus(status, http.StatusOK, t)
 	compareStoredConfig(mockReg, routeRuleKey, false, t)
 }

@@ -8,6 +8,7 @@ import (
 	"istio.io/manager/model"
 
 	restful "github.com/emicklei/go-restful"
+	"github.com/golang/glog"
 )
 
 var schema model.ProtoSchema
@@ -17,29 +18,25 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 	params := request.PathParameters()
 	key, err := setup(params)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	proto, ok := api.registry.Get(key)
 	if !ok {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "item not found")
+		api.writeError(http.StatusNotFound, "item not found", response)
 		return
 	}
 
 	retrieved, err := schema.ToJSON(proto)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
 	var retJSON interface{}
 	err = json.Unmarshal([]byte(retrieved), &retJSON)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
 	config := Config{
@@ -47,7 +44,9 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 		Type: params["kind"],
 		Spec: retJSON,
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, config)
+	if err = response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
+	}
 }
 
 func (api *API) AddConfig(request *restful.Request, response *restful.Response) {
@@ -57,23 +56,20 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 	params := request.PathParameters()
 	key, err := setup(params)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	config := &Config{}
 	err = request.ReadEntity(config)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	err = config.ParseSpec()
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
@@ -82,14 +78,16 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 		response.AddHeader("Content-Type", "text/plain")
 		switch err.(type) {
 		case *model.ItemAlreadyExistsError:
-			response.WriteErrorString(http.StatusConflict, err.Error())
+			api.writeError(http.StatusConflict, err.Error(), response)
 			return
 		default:
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
+			api.writeError(http.StatusInternalServerError, err.Error(), response)
 			return
 		}
 	}
-	response.WriteHeaderAndEntity(http.StatusCreated, config)
+	if err = response.WriteHeaderAndEntity(http.StatusCreated, config); err != nil {
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
+	}
 }
 
 func (api *API) UpdateConfig(request *restful.Request, response *restful.Response) {
@@ -99,40 +97,38 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 	params := request.PathParameters()
 	key, err := setup(params)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	config := &Config{}
 	err = request.ReadEntity(config)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	err = config.ParseSpec()
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	err = api.registry.Put(key, config.ParsedSpec)
 
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
 		switch err.(type) {
 		case *model.ItemNotFoundError:
-			response.WriteErrorString(http.StatusNotFound, err.Error())
+			api.writeError(http.StatusNotFound, err.Error(), response)
 			return
 		default:
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
+			api.writeError(http.StatusInternalServerError, err.Error(), response)
 			return
 		}
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, config)
+	if err = response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
+	}
 }
 
 func (api *API) DeleteConfig(request *restful.Request, response *restful.Response) {
@@ -140,20 +136,18 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 	params := request.PathParameters()
 	key, err := setup(params)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusBadRequest, err.Error())
+		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
 	err = api.registry.Delete(key)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
 		switch err.(type) {
 		case *model.ItemNotFoundError:
-			response.WriteErrorString(http.StatusNotFound, err.Error())
+			api.writeError(http.StatusNotFound, err.Error(), response)
 			return
 		default:
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
+			api.writeError(http.StatusInternalServerError, err.Error(), response)
 			return
 		}
 	}
@@ -166,31 +160,29 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 
 	_, ok := model.IstioConfig[kind]
 	if !ok {
-		response.WriteErrorString(http.StatusBadRequest, fmt.Sprintf("unknown configuration type %s; use one of %v", kind, model.IstioConfig.Kinds()))
+		api.writeError(http.StatusBadRequest,
+			fmt.Sprintf("unknown configuration type %s; use one of %v", kind, model.IstioConfig.Kinds()), response)
 		return
 	}
 
 	result, err := api.registry.List(kind, namespace)
 	if err != nil {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
 
 	// Parse back to config
 	out := []Config{}
 	for k, v := range result {
-		retrieved, err := schema.ToJSON(v)
-		if err != nil {
-			response.AddHeader("Content-Type", "text/plain")
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		retrieved, errLocal := schema.ToJSON(v)
+		if errLocal != nil {
+			api.writeError(http.StatusInternalServerError, errLocal.Error(), response)
 			return
 		}
 		var retJSON interface{}
-		err = json.Unmarshal([]byte(retrieved), &retJSON)
-		if err != nil {
-			response.AddHeader("Content-Type", "text/plain")
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		errLocal = json.Unmarshal([]byte(retrieved), &retJSON)
+		if errLocal != nil {
+			api.writeError(http.StatusInternalServerError, errLocal.Error(), response)
 			return
 		}
 		config := Config{
@@ -200,7 +192,17 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 		}
 		out = append(out, config)
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, out)
+	if err = response.WriteHeaderAndEntity(http.StatusOK, out); err != nil {
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
+	}
+}
+
+func (api *API) writeError(status int, msg string, response *restful.Response) {
+	glog.Warning(msg)
+	response.AddHeader("Content-Type", "text/plain")
+	if err := response.WriteErrorString(status, msg); err != nil {
+		glog.Warning(err)
+	}
 }
 
 func setup(params map[string]string) (model.Key, error) {

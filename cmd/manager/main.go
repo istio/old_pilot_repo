@@ -41,6 +41,7 @@ type args struct {
 
 	identity                 envoy.ProxyNode
 	sdsPort                  int
+	apiserverPort            int
 	ingressSecret            string
 	ingressClass             string
 	defaultIngressController bool
@@ -93,7 +94,7 @@ var (
 			}
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version: "v1alpha1",
-				Port:    apiserverPort,
+				Port:    flags.apiserverPort,
 				Registry: &model.IstioRegistry{
 					ConfigRegistry: controller,
 				},
