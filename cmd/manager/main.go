@@ -194,7 +194,7 @@ func init() {
 
 	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "sdsPort", "p", 8080,
 		"Discovery service port")
-	discoveryCmd.PersistentFlags().IntVarP(&flags.apiserverPort, "apiPort", "p", 8081,
+	discoveryCmd.PersistentFlags().IntVar(&flags.apiserverPort, "apiPort", 8081,
 		"API service port")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
