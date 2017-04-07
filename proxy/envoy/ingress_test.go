@@ -10,12 +10,15 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
+	"encoding/json"
 )
 
 const (
 	ingressEnvoyConfig    = "testdata/ingress-envoy.json"
 	ingressEnvoySSLConfig = "testdata/ingress-envoy-ssl.json"
-	ingressRouteRule      = "testdata/ingress-route.yaml.golden"
+	ingressEnvoyPartialSSLConfig = "testdata/ingress-envoy-partial-ssl.json"
+	ingressRouteRule1      = "testdata/ingress-route-1.yaml.golden"
+	ingressRouteRule2      = "testdata/ingress-route-2.yaml.golden"
 	ingressCertFile       = "testdata/tls.crt"
 	ingressKeyFile        = "testdata/tls.key"
 )
@@ -51,27 +54,32 @@ func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
 		t.Fatal("Failed to generate config")
 	}
 
+	data, _ := json.MarshalIndent(config, "", "  ")
+	fmt.Println(string(data))
+
 	if err := config.WriteFile(envoyConfig); err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 	compareJSON(envoyConfig, t)
 }
 
-func addIngressRoute(r *model.IstioRegistry, t *testing.T) {
-	msg, err := configObjectFromYAML(model.IngressRule, ingressRouteRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = r.Post(model.Key{Kind: model.IngressRule, Name: "route"}, msg); err != nil {
-		t.Fatal(err)
+func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
+	for i, file := range []string{ ingressRouteRule1, ingressRouteRule2 } {
+		msg, err := configObjectFromYAML(model.IngressRule, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = r.Post(model.Key{Kind: model.IngressRule, Name: fmt.Sprintf("route_%d", i)}, msg); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestIngressRoutes(t *testing.T) {
 	r := mock.MakeRegistry()
 	s := &mock.SecretRegistry{}
-	addIngressRoute(r, t)
+	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		Registry: r,
 		Secrets:  s,
@@ -82,7 +90,7 @@ func TestIngressRoutes(t *testing.T) {
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
 	s := &mock.SecretRegistry{"*": ingressTLSContext}
-	addIngressRoute(r, t)
+	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
 		KeyFile:   ingressKeyFile,
@@ -91,6 +99,22 @@ func TestIngressRoutesSSL(t *testing.T) {
 		Registry:  r,
 		Mesh:      DefaultMeshConfig,
 	}, ingressEnvoySSLConfig, t)
+	compareFile(ingressCertFile, ingressCert, t)
+	compareFile(ingressKeyFile, ingressKey, t)
+}
+
+func TestIngressRoutesPartialSSL(t *testing.T) {
+	r := mock.MakeRegistry()
+	s := &mock.SecretRegistry{"world.default.svc.cluster.local": ingressTLSContext}
+	addIngressRoutes(r, t)
+	testIngressConfig(&IngressConfig{
+		CertFile:  ingressCertFile,
+		KeyFile:   ingressKeyFile,
+		Namespace: "",
+		Secrets:   s,
+		Registry:  r,
+		Mesh:      DefaultMeshConfig,
+	}, ingressEnvoyPartialSSLConfig, t)
 	compareFile(ingressCertFile, ingressCert, t)
 	compareFile(ingressKeyFile, ingressKey, t)
 }

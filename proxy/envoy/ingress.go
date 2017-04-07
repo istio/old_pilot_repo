@@ -91,9 +91,28 @@ type IngressConfig struct {
 }
 
 func generateIngress(conf *IngressConfig) *Config {
+	vhosts, vhostsTLS, tls := buildIngressVhosts(conf)
+	listeners, clusters := buildIngressListeners(vhosts, vhostsTLS, tls, conf)
+
+	return &Config{
+		Listeners: listeners,
+		Admin: Admin{
+			AccessLogPath: DefaultAccessLog,
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.AdminPort),
+		},
+		ClusterManager: ClusterManager{
+			Clusters: clusters,
+			SDS: &SDS{
+				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds"),
+				RefreshDelayMs: (int)(conf.Mesh.DiscoveryRefreshDelay / time.Millisecond),
+			},
+		},
+	}
+}
+
+func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *model.TLSContext) {
 	rules := conf.Registry.IngressRules(conf.Namespace)
 
-	// Phase 1: group rules by host
 	rulesByHost := make(map[string][]*config.RouteRule, len(rules))
 	for _, rule := range rules {
 		host := "*"
@@ -111,8 +130,38 @@ func generateIngress(conf *IngressConfig) *Config {
 		rulesByHost[host] = append(rulesByHost[host], rule)
 	}
 
-	// Phase 2: create a VirtualHost for each host
+	// figure out which hosts are configured to terminate TLS
+	// ensure that only one TLS config is used
+	// TODO: extensive tests
+	tlsValid := true
+	tls, err := conf.Secrets.GetSecret("*")
+	if err != nil {
+		glog.Warningf("Error retrieving TLS context for wildcard: %v", err)
+		tlsValid = false
+	}
+	wildcardTLS := tls != nil
+
+	tlsHosts := make(map[string]bool)
+	for host := range rulesByHost {
+		if t, err := conf.Secrets.GetSecret(host); err != nil {
+			glog.Warningf("Error retrieving TLS context for %q: %v", host, err)
+			tlsHosts[host] = true
+		} else if t != nil {
+			if tls == nil {
+				tls = t
+			} else if string(tls.PrivateKey) != string(t.PrivateKey) || string(tls.Certificate) != string(t.Certificate) {
+				glog.Warningf("Invalid ingress configuration for %q: multiple TLS configs", host)
+				tlsValid = false
+			}
+			tlsHosts[host] = true
+		} else if wildcardTLS {
+			tlsHosts[host] = true
+		}
+	}
+
+	// build vhosts
 	vhosts := make([]*VirtualHost, 0, len(rulesByHost))
+	vhostsTLS := make([]*VirtualHost, 0, len(rulesByHost))
 	for host, hostRules := range rulesByHost {
 		routes := make([]*HTTPRoute, 0, len(hostRules))
 		for _, rule := range hostRules {
@@ -129,70 +178,100 @@ func generateIngress(conf *IngressConfig) *Config {
 			Domains: []string{host},
 			Routes:  routes,
 		}
-		vhosts = append(vhosts, vhost)
+
+		// sort into TLS and non-TLS
+		if tlsHosts[host] {
+			if tlsValid { // only add TLS vhosts when the TLS config is valid
+				vhostsTLS = append(vhostsTLS, vhost)
+			}
+		} else {
+			vhosts = append(vhosts, vhost)
+		}
 	}
-	sort.Slice(vhosts, func(i, j int) bool { return vhosts[i].Name < vhosts[j].Name })
 
-	rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
+	return vhosts, vhostsTLS, tls
+}
 
-	listener := &Listener{
-		Address:    fmt.Sprintf("tcp://%s:80", WildcardAddress),
-		BindToPort: true,
-		Filters: []*NetworkFilter{
-			{
-				Type: "read",
-				Name: HTTPConnectionManager,
-				Config: HTTPFilterConfig{
-					CodecType:   "auto",
-					StatPrefix:  "http",
-					AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
-					RouteConfig: rConfig,
-					Filters: []HTTPFilter{
-						{
-							Type:   "decoder",
-							Name:   "router",
-							Config: FilterRouterConfig{},
+func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSContext, conf *IngressConfig) (Listeners, Clusters) {
+	clusters := make(Clusters, 0)
+	listeners := make([]*Listener, 0)
+
+	if len(vhosts) > 0 {
+		sort.Slice(vhosts, func(i, j int) bool { return vhosts[i].Name < vhosts[j].Name })
+
+		rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
+		listener := &Listener{
+			Address:    fmt.Sprintf("tcp://%s:80", WildcardAddress),
+			BindToPort: true,
+			Filters: []*NetworkFilter{
+				{
+					Type: "read",
+					Name: HTTPConnectionManager,
+					Config: HTTPFilterConfig{
+						CodecType:   "auto",
+						StatPrefix:  "http",
+						AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
+						RouteConfig: rConfig,
+						Filters: []HTTPFilter{
+							{
+								Type:   "decoder",
+								Name:   "router",
+								Config: FilterRouterConfig{},
+							},
 						},
 					},
 				},
 			},
-		},
-	}
-
-	// configure for HTTPS if there is a secret
-	if tls, err := conf.Secrets.GetSecret("*"); err != nil {
-		glog.Warningf("Error retrieving ingress secret: %v", err)
-	} else if tls != nil {
-		// configure Envoy for HTTPS
-		listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
-		listener.SSLContext = &SSLContext{
-			CertChainFile:  conf.CertFile,
-			PrivateKeyFile: conf.KeyFile,
 		}
 
+		listeners = append(listeners, listener)
+		clusters = append(clusters, rConfig.clusters()...)
+	}
+
+	if len(vhostsTLS) > 0 {
 		// write key/cert
 		if err := writeTLS(conf.CertFile, conf.KeyFile, tls); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
-	}
 
-	listeners := []*Listener{listener}
-	clusters := rConfig.clusters().normalize()
+		sort.Slice(vhostsTLS, func(i, j int) bool { return vhostsTLS[i].Name < vhostsTLS[j].Name })
 
-	return &Config{
-		Listeners: listeners,
-		Admin: Admin{
-			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.AdminPort),
-		},
-		ClusterManager: ClusterManager{
-			Clusters: clusters,
-			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: (int)(conf.Mesh.DiscoveryRefreshDelay / time.Millisecond),
+		rConfig := &HTTPRouteConfig{VirtualHosts: vhostsTLS}
+		listener := &Listener{
+			Address:    fmt.Sprintf("tcp://%s:443", WildcardAddress),
+			SSLContext: &SSLContext{
+				CertChainFile:  conf.CertFile,
+				PrivateKeyFile: conf.KeyFile,
 			},
-		},
+			BindToPort: true,
+			Filters: []*NetworkFilter{
+				{
+					Type: "read",
+					Name: HTTPConnectionManager,
+					Config: HTTPFilterConfig{
+						CodecType:   "auto",
+						StatPrefix:  "https",
+						AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
+						RouteConfig: rConfig,
+						Filters: []HTTPFilter{
+							{
+								Type:   "decoder",
+								Name:   "router",
+								Config: FilterRouterConfig{},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		listeners = append(listeners, listener)
+		clusters = append(clusters, rConfig.clusters()...)
 	}
+
+	clusters = clusters.normalize()
+
+	return listeners, clusters
 }
 
 func writeTLS(certFile, keyFile string, tls *model.TLSContext) error {
