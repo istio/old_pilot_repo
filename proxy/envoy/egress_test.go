@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"istio.io/manager/test/mock"
+	"istio.io/manager/test/util"
 )
 
 const (
@@ -20,13 +21,13 @@ func testEgressConfig(c *EgressConfig, envoyConfig string, t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	compareJSON(envoyConfig, t)
+	util.CompareYAML(envoyConfig, t)
 }
 
 func TestEgressRoutes(t *testing.T) {
 	r := mock.Discovery
 	testEgressConfig(&EgressConfig{
 		Services: r,
-		Mesh:     DefaultMeshConfig,
+		Mesh:     &DefaultMeshConfig,
 	}, egressEnvoyConfig, t)
 }

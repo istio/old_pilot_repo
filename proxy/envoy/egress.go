@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/proxy"
 )
@@ -72,7 +73,7 @@ func (w *egressWatcher) Run(stop <-chan struct{}) {
 type EgressConfig struct {
 	Namespace string
 	Services  model.ServiceDiscovery
-	Mesh      *MeshConfig
+	Mesh      *config.ProxyMeshConfig
 }
 
 func generateEgress(conf *EgressConfig) *Config {
@@ -114,6 +115,7 @@ func generateEgress(conf *EgressConfig) *Config {
 		},
 	}
 
+	//TODO
 	//// configure for HTTPS if provided with a secret name
 	//if conf.Secret != "" {
 	//	// configure Envoy
@@ -132,11 +134,13 @@ func generateEgress(conf *EgressConfig) *Config {
 	listeners := []*Listener{listener}
 	clusters := rConfig.clusters().normalize()
 
+	clusters.setTimeout(conf.Mesh.ConnectTimeout)
+
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
@@ -159,12 +163,12 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 				Cluster:         svc.Address,
 				AutoHostRewrite: true,
 			}
-			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil, nil)
+			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil)
 
 			// configure cluster for strict_dns
 			cluster.Name = svc.Address
 			cluster.ServiceName = ""
-			cluster.Type = StrictDNSType
+			cluster.Type = ClusterTypeStrictDNS
 			cluster.Hosts = []Host{
 				{
 					URL: fmt.Sprintf("tcp://%s:%d", svc.Address, servicePort.Port),

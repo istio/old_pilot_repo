@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 )
 
@@ -88,28 +89,28 @@ func Generate(context *ProxyContext) *Config {
 
 	// add an extra listener that binds to a port
 	listeners = append(listeners, &Listener{
-		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyPort),
+		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyListenPort),
 		BindToPort:     true,
 		UseOriginalDst: true,
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName))
+	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout))
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
+				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds", mesh.ConnectTimeout),
+				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
 			},
 			CDS: &CDS{
-				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds"),
-				RefreshDelayMs: (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
+				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds", mesh.ConnectTimeout),
+				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
 			},
 		},
 	}
@@ -120,7 +121,7 @@ func Generate(context *ProxyContext) *Config {
 // must be present)
 func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 	// query the services model
-	instances := context.Discovery.HostInstances(context.Addrs)
+	instances := context.Discovery.HostInstances(map[string]bool{context.IPAddress: true})
 	services := context.Discovery.Services()
 
 	inbound, inClusters := buildInboundListeners(instances, context.MeshConfig)
@@ -140,8 +141,8 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 // buildHTTPListener constructs a listener for the network interface address and port
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
-func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string, port int,
-	rds bool, isInbound bool) *Listener {
+func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRouteConfig,
+	ip string, port int, rds bool, inbound bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -163,27 +164,32 @@ func buildHTTPListener(mesh *MeshConfig, routeConfig *HTTPRouteConfig, ip string
 		config.RDS = &RDS{
 			Cluster:         RDSName,
 			RouteConfigName: fmt.Sprintf("%d", port),
-			RefreshDelayMs:  (int)(mesh.DiscoveryRefreshDelay / time.Millisecond),
+			RefreshDelayMs:  (int)(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
 		}
 	} else {
 		config.RouteConfig = routeConfig
 	}
 
-	var sslContext *SSLContext
-	// Build the sslContext for http inbound listener when auth is enabled
-	if isInbound && mesh.EnableAuth {
-		sslContext = buildListenerSSLContext(mesh)
-	}
-
-	return &Listener{
-		Address:    fmt.Sprintf("tcp://%s:%d", ip, port),
-		SSLContext: sslContext,
+	listener := &Listener{
+		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
 		Filters: []*NetworkFilter{{
 			Type:   "read",
 			Name:   HTTPConnectionManager,
 			Config: config,
 		}},
 	}
+
+	if inbound {
+		switch mesh.AuthPolicy {
+		case proxyconfig.ProxyMeshConfig_NONE:
+		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+			listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
+		default:
+			glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
+		}
+	}
+
+	return listener
 }
 
 // buildTCPListener constructs a listener for the TCP proxy
@@ -205,12 +211,11 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
 	context *ProxyContext) (Listeners, Clusters) {
 	httpOutbound := buildOutboundHTTPRoutes(instances, services, context)
-	listeners, clusters := buildOutboundTCPListeners(services, context)
+	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
 	}
-
 	return listeners, clusters
 }
 
@@ -229,11 +234,8 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
-		var sslContext *SSLContextWithSAN
-		if context.MeshConfig.EnableAuth {
-			sslContext = buildClusterSSLContext(service.Hostname, context)
-		}
-
+		// clusters aggregate clusters across ports
+		clusters := make(Clusters, 0)
 		for _, servicePort := range service.Ports {
 			protocol := servicePort.Protocol
 			switch protocol {
@@ -254,7 +256,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 				// collect route rules
 				for _, rule := range rules {
 					if rule.Destination == service.Hostname {
-						httpRoute, catchAll = buildHTTPRoute(rule, servicePort, sslContext)
+						httpRoute, catchAll = buildHTTPRoute(rule, servicePort)
 						routes = append(routes, httpRoute)
 						if catchAll {
 							break
@@ -264,7 +266,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 
 				if !catchAll {
 					// default route for the destination
-					cluster := buildOutboundCluster(service.Hostname, servicePort, sslContext, nil)
+					cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
@@ -273,7 +275,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 						route.HostRewrite = service.Address
 						for _, cluster := range route.clusters {
 							cluster.ServiceName = ""
-							cluster.Type = StrictDNSType
+							cluster.Type = ClusterTypeStrictDNS
 							cluster.Hosts = []Host{
 								{
 									URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressProxyAddress),
@@ -287,6 +289,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
 				http.VirtualHosts = append(http.VirtualHosts, host)
+				clusters = append(clusters, host.clusters()...)
 
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// handled by buildOutboundTCPListeners
@@ -294,6 +297,21 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 			default:
 				glog.Warningf("Unsupported outbound protocol %v for port %#v", protocol, servicePort)
 			}
+		}
+
+		clusters.setTimeout(context.MeshConfig.ConnectTimeout)
+
+		// apply SSL context to outbound clusters for authentication policy
+		switch context.MeshConfig.AuthPolicy {
+		case proxyconfig.ProxyMeshConfig_NONE:
+		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+			serviceAccounts := context.Discovery.GetIstioServiceAccounts(service.Hostname, service.Ports.GetNames())
+			sslContext := buildClusterSSLContext(context.MeshConfig.AuthCertsPath, serviceAccounts)
+			for _, cluster := range clusters {
+				cluster.SSLContext = sslContext
+			}
+		default:
+			glog.Warningf("Unknown auth policy: %v", context.MeshConfig.AuthPolicy)
 		}
 	}
 
@@ -313,7 +331,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext) (Listeners, Clusters) {
+func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*model.Service) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 	for _, service := range services {
@@ -321,13 +339,13 @@ func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext)
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// TODO: Enable SSL context for TCP and HTTPS services.
-				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
+				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 				if service.External {
 					cluster.ServiceName = ""
-					cluster.Type = StrictDNSType
+					cluster.Type = ClusterTypeStrictDNS
 					cluster.Hosts = []Host{
 						{
-							URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressProxyAddress),
+							URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
 						},
 					}
 				}
@@ -339,6 +357,7 @@ func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext)
 			}
 		}
 	}
+	tcpClusters.setTimeout(mesh.ConnectTimeout)
 	return tcpListeners, tcpClusters
 }
 
@@ -346,7 +365,8 @@ func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext)
 // configuration for co-located service instances. The function also returns
 // all inbound clusters since they are statically declared in the proxy
 // configuration and do no utilize CDS.
-func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig) (Listeners, Clusters) {
+func buildInboundListeners(instances []*model.ServiceInstance,
+	mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
 	// used for shortcut domain names for hostnames
 	suffix := sharedInstanceHost(instances)
 	listeners := make(Listeners, 0)
@@ -404,5 +424,6 @@ func buildInboundListeners(instances []*model.ServiceInstance, mesh *MeshConfig)
 		}
 	}
 
+	clusters.setTimeout(mesh.ConnectTimeout)
 	return listeners, clusters
 }
