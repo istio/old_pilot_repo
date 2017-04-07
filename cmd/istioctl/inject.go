@@ -107,10 +107,20 @@ Example usage:
 )
 
 func init() {
+	defaultHub := os.Getenv(inject.DefaultHubEnvVar)
+	if defaultHub == "" {
+		defaultHub = inject.DefaultHub
+	}
 	injectCmd.PersistentFlags().StringVar(&hub, "hub",
-		inject.DefaultHub, "Docker hub")
+		defaultHub, "Docker hub")
+
+	defaultTag := os.Getenv(inject.DefaultTagEnvVar)
+	if defaultTag == "" {
+		defaultTag = inject.DefaultTag
+	}
 	injectCmd.PersistentFlags().StringVar(&tag, "tag",
-		inject.DefaultTag, "Docker tag")
+		defaultTag, "Docker tag")
+
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
 		"", "Input kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
