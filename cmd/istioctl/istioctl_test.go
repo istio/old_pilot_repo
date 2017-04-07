@@ -171,12 +171,3 @@ func TestInvalidDestinationPolicy(t *testing.T) {
 		t.Fatalf("Did not fail when presented with invalid destination policy")
 	}
 }
-
-func TestCreateInvalidNamespace(t *testing.T) {
-	rootSetup(t)
-	file = "testdata/four-route-rules.yaml"
-	namespace = "invalid"
-	if err := postCmd.RunE(postCmd, []string{}); err == nil {
-		t.Fatalf("Did not fail creating rules under invalid namespace %q", namespace)
-	}
-}

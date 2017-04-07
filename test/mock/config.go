@@ -83,9 +83,6 @@ func (cr *ConfigRegistry) Delete(key model.Key) error {
 
 // Post implements config registry method
 func (cr *ConfigRegistry) Post(key model.Key, v proto.Message) error {
-	if key.Namespace == "invalid" {
-		return fmt.Errorf("namespace %q not present", key.Namespace)
-	}
 	_, ok := cr.data[key]
 	if !ok {
 		cr.data[key] = v
