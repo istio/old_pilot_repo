@@ -164,7 +164,7 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			secrets := kube.NewSecret(flags.namespace, client.GetKubernetesClient())
+			secrets := kube.NewSecretStore(flags.namespace, client.GetKubernetesClient())
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       flags.namespace,
 				ResyncPeriod:    flags.resyncPeriod,

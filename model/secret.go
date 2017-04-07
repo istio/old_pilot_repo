@@ -23,6 +23,7 @@ type SecretRegistry interface {
 	GetSecret(uri string) (*TLSContext, error)
 }
 
+// TLSContext defines a TLS configuration.
 type TLSContext struct {
 	Certificate []byte
 	PrivateKey []byte

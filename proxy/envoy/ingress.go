@@ -132,7 +132,7 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 
 	// figure out which hosts are configured to terminate TLS
 	// ensure that only one TLS config is used
-	// TODO: extensive tests
+	// TODO: extensive tests for the TLS logic
 	tlsValid := true
 	tls, err := conf.Secrets.GetSecret("*")
 	if err != nil {

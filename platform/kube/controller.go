@@ -66,7 +66,7 @@ type ControllerConfig struct {
 	ResyncPeriod    time.Duration
 	IngressSyncMode IngressSyncMode
 	IngressClass    string
-	Secrets         *secret
+	Secrets         *secretStore
 }
 
 // Controller is a collection of synchronized resource watchers
