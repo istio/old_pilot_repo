@@ -63,20 +63,17 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 	}
 
 	config := &Config{}
-	err = request.ReadEntity(config)
-	if err != nil {
+	if err = request.ReadEntity(config); err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	err = config.ParseSpec()
-	if err != nil {
+	if err = config.ParseSpec(); err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	err = api.registry.Post(key, config.ParsedSpec)
-	if err != nil {
+	if err = api.registry.Post(key, config.ParsedSpec); err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		switch err.(type) {
 		case *model.ItemAlreadyExistsError:
@@ -104,21 +101,17 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 	}
 
 	config := &Config{}
-	err = request.ReadEntity(config)
-	if err != nil {
+	if err = request.ReadEntity(config); err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	err = config.ParseSpec()
-	if err != nil {
+	if err = config.ParseSpec(); err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	err = api.registry.Put(key, config.ParsedSpec)
-
-	if err != nil {
+	if err = api.registry.Put(key, config.ParsedSpec); err != nil {
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
@@ -142,8 +135,7 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 		return
 	}
 
-	err = api.registry.Delete(key)
-	if err != nil {
+	if err = api.registry.Delete(key); err != nil {
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
@@ -163,8 +155,7 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 	params := request.PathParameters()
 	namespace, kind := params["namespace"], params["kind"]
 
-	_, ok := model.IstioConfig[kind]
-	if !ok {
+	if _, ok := model.IstioConfig[kind]; !ok {
 		api.writeError(http.StatusBadRequest,
 			fmt.Sprintf("unknown configuration type %s; use one of %v", kind, model.IstioConfig.Kinds()), response)
 		return
@@ -186,8 +177,7 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 			return
 		}
 		var retJSON interface{}
-		errLocal = json.Unmarshal([]byte(retrieved), &retJSON)
-		if errLocal != nil {
+		if errLocal = json.Unmarshal([]byte(retrieved), &retJSON); errLocal != nil {
 			api.writeError(http.StatusInternalServerError, errLocal.Error(), response)
 			return
 		}
@@ -213,8 +203,7 @@ func (api *API) writeError(status int, msg string, response *restful.Response) {
 
 func setup(params map[string]string) (model.Key, error) {
 	name, namespace, kind := params["name"], params["namespace"], params["kind"]
-	_, ok := model.IstioConfig[kind]
-	if !ok {
+	if _, ok := model.IstioConfig[kind]; !ok {
 		return model.Key{}, fmt.Errorf("unknown configuration type %s; use one of %v", kind, model.IstioConfig.Kinds())
 	}
 
