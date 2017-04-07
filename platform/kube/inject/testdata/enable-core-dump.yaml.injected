@@ -20,7 +20,7 @@ spec:
         track: stable
     spec:
       containers:
-      - image: gcr.io/google-samples/hello-go-gke:1.0
+      - image: fake.docker.io/google-samples/hello-go-gke:1.0
         name: hello
         ports:
         - containerPort: 80
@@ -29,12 +29,6 @@ spec:
       - args:
         - proxy
         - sidecar
-        - -s
-        - istio-manager:8080
-        - -m
-        - istio-mixer:9091
-        - -n
-        - $(POD_NAMESPACE)
         - -v
         - "2"
         env:
