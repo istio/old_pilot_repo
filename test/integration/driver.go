@@ -28,13 +28,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
+	"istio.io/manager/proxy/envoy"
 )
 
 const (
@@ -138,6 +139,9 @@ func setup() {
 
 	pods = make(map[string]string)
 
+	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
+	check(err)
+
 	// setup ingress resources
 	_, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/cert.key "+
@@ -219,15 +223,16 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 
 	writer := bufio.NewWriter(f)
 	if injectProxy {
+		mesh := envoy.DefaultMeshConfig
+		mesh.MixerAddress = "istio-mixer:9091"
+		mesh.DiscoveryAddress = "istio-manager:8080"
 		p := &inject.Params{
-			InitImage:        inject.InitImageName(params.hub, params.tag),
-			ProxyImage:       inject.ProxyImageName(params.hub, params.tag),
-			Verbosity:        params.verbosity,
-			ManagerAddr:      inject.DefaultManagerAddr,
-			MixerAddr:        inject.DefaultMixerAddr,
-			SidecarProxyUID:  inject.DefaultSidecarProxyUID,
-			SidecarProxyPort: inject.DefaultSidecarProxyPort,
-			Version:          "manager-integration-test",
+			InitImage:       inject.InitImageName(params.hub, params.tag),
+			ProxyImage:      inject.ProxyImageName(params.hub, params.tag),
+			Verbosity:       params.verbosity,
+			SidecarProxyUID: inject.DefaultSidecarProxyUID,
+			Version:         "manager-integration-test",
+			Mesh:            &mesh,
 		}
 		if err := inject.IntoResourceFile(p, w, writer); err != nil {
 			return err
@@ -387,7 +392,7 @@ func setPods() error {
 	var items []v1.Pod
 	for n := 0; ; n++ {
 		glog.Info("Checking all pods are running...")
-		list, err := client.CoreV1().Pods(params.namespace).List(v1.ListOptions{})
+		list, err := client.CoreV1().Pods(params.namespace).List(meta_v1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -441,7 +446,7 @@ func podLogs(name string, container string) string {
 
 func generateNamespace(cl kubernetes.Interface) (string, error) {
 	ns, err := cl.Core().Namespaces().Create(&v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			GenerateName: "istio-integration-",
 		},
 	})
@@ -455,7 +460,7 @@ func generateNamespace(cl kubernetes.Interface) (string, error) {
 
 func deleteNamespace(cl kubernetes.Interface, ns string) {
 	if cl != nil && ns != "" && ns != "default" {
-		if err := cl.Core().Namespaces().Delete(ns, &v1.DeleteOptions{}); err != nil {
+		if err := cl.Core().Namespaces().Delete(ns, &meta_v1.DeleteOptions{}); err != nil {
 			glog.Infof("Error deleting namespace: %v\n", err)
 		}
 		glog.Infof("Deleted namespace %s\n", ns)

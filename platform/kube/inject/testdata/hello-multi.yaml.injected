@@ -29,12 +29,6 @@ spec:
       - args:
         - proxy
         - sidecar
-        - -s
-        - istio-manager:8080
-        - -m
-        - istio-mixer:9091
-        - -n
-        - $(POD_NAMESPACE)
         - -v
         - "2"
         env:
@@ -89,12 +83,6 @@ spec:
       - args:
         - proxy
         - sidecar
-        - -s
-        - istio-manager:8080
-        - -m
-        - istio-mixer:9091
-        - -n
-        - $(POD_NAMESPACE)
         - -v
         - "2"
         env:

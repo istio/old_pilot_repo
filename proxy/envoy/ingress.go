@@ -87,7 +87,7 @@ type IngressConfig struct {
 	Namespace string
 	Secrets   model.SecretRegistry
 	Registry  *model.IstioRegistry
-	Mesh      *MeshConfig
+	Mesh      *config.ProxyMeshConfig
 }
 
 func generateIngress(conf *IngressConfig) *Config {
@@ -98,13 +98,13 @@ func generateIngress(conf *IngressConfig) *Config {
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.AdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
 			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds"),
-				RefreshDelayMs: (int)(conf.Mesh.DiscoveryRefreshDelay / time.Millisecond),
+				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds", conf.Mesh.ConnectTimeout),
+				RefreshDelayMs: (int)(convertDuration(conf.Mesh.DiscoveryRefreshDelay) / time.Millisecond),
 			},
 		},
 	}
@@ -238,7 +238,7 @@ func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSConte
 
 		rConfig := &HTTPRouteConfig{VirtualHosts: vhostsTLS}
 		listener := &Listener{
-			Address:    fmt.Sprintf("tcp://%s:443", WildcardAddress),
+			Address: fmt.Sprintf("tcp://%s:443", WildcardAddress),
 			SSLContext: &SSLContext{
 				CertChainFile:  conf.CertFile,
 				PrivateKeyFile: conf.KeyFile,
@@ -270,6 +270,7 @@ func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSConte
 	}
 
 	clusters = clusters.normalize()
+	clusters.setTimeout(conf.Mesh.ConnectTimeout)
 
 	return listeners, clusters
 }
@@ -320,7 +321,7 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 			return nil, multierror.Append(fmt.Errorf("failed to extract routing rule destination port"), err)
 		}
 
-		cluster := buildOutboundCluster(destination, port, nil, tags)
+		cluster := buildOutboundCluster(destination, port, tags)
 		clusters = append(clusters, &WeightedClusterEntry{
 			Name:   cluster.Name,
 			Weight: int(dst.Weight),

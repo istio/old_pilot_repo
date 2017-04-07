@@ -19,50 +19,74 @@ import (
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/spf13/cobra"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/apiserver"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/proxy/envoy"
-
-	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
-	"github.com/spf13/cobra"
 )
 
 type args struct {
-	namespace                string
-	proxy                    envoy.MeshConfig
-	identity                 envoy.ProxyNode
+	kubeconfig   string
+	namespace    string
+	resyncPeriod time.Duration
+	config       string
+
+	ipAddress                string
+	podName                  string
 	sdsPort                  int
+	apiserverPort            int
+	ingressSecret            string
 	ingressClass             string
 	defaultIngressController bool
 	enableProfiling          bool
+	enableDiscoveryCaching   bool
 }
 
-const (
-	resyncPeriod = 100 * time.Millisecond
-)
-
 var (
-	flags = &args{
-		proxy: *envoy.DefaultMeshConfig,
-	}
-
+	flags  args
 	client *kube.Client
+	mesh   *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
 		Use:   "manager",
 		Short: "Istio Manager",
 		Long:  "Istio Manager provides management plane functionality to the Istio proxy mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			client, err = kube.NewClient("", model.IstioConfig)
+			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 			}
 			if err = client.RegisterResources(); err != nil {
 				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
+
+			// set values from environment variables
+			if flags.ipAddress == "" {
+				flags.ipAddress = os.Getenv("POD_IP")
+			}
+			if flags.podName == "" {
+				flags.podName = os.Getenv("POD_NAME")
+			}
+			if flags.namespace == "" {
+				flags.namespace = os.Getenv("POD_NAMESPACE")
+			}
+			glog.V(2).Infof("flags %s", spew.Sdump(flags))
+
+			// receive mesh configuration
+			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.namespace, flags.config)
+			if err != nil {
+				return multierror.Prefix(err, "failed to retrieve mesh configuration.")
+			}
+
+			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			return
 		},
 	}
@@ -73,22 +97,35 @@ var (
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			controller := kube.NewController(client, kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressOff,
 			})
 			options := envoy.DiscoveryServiceOptions{
-				Services: controller,
+				Services:   controller,
+				Controller: controller,
 				Config: &model.IstioRegistry{
 					ConfigRegistry: controller,
 				},
-				Mesh:            &flags.proxy,
+				Mesh:            mesh,
 				Port:            flags.sdsPort,
 				EnableProfiling: flags.enableProfiling,
+				EnableCaching:   flags.enableDiscoveryCaching,
 			}
-			sds := envoy.NewDiscoveryService(options)
+			sds, err := envoy.NewDiscoveryService(options)
+			if err != nil {
+				return fmt.Errorf("failed to create discovery service: %v", err)
+			}
+			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
+				Version: "v1alpha1",
+				Port:    flags.apiserverPort,
+				Registry: &model.IstioRegistry{
+					ConfigRegistry: controller,
+				},
+			})
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go sds.Run()
+			go apiserver.Run()
 			cmd.WaitSignal(stop)
 			return
 		},
@@ -103,17 +140,16 @@ var (
 		Use:   "sidecar",
 		Short: "Istio Proxy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			setFlagsFromEnv()
 			controller := kube.NewController(client, kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressOff,
 			})
 			w, err := envoy.NewWatcher(controller,
 				controller,
 				&model.IstioRegistry{ConfigRegistry: controller},
-				&flags.proxy,
-				&flags.identity)
+				mesh,
+				flags.ipAddress)
 			if err != nil {
 				return
 			}
@@ -131,7 +167,7 @@ var (
 			secrets := kube.NewSecret(flags.namespace, client.GetKubernetesClient())
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       flags.namespace,
-				ResyncPeriod:    resyncPeriod,
+				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressStrict,
 				IngressClass:    flags.ingressClass,
 				Secrets:         secrets,
@@ -143,7 +179,7 @@ var (
 				Namespace: flags.namespace,
 				Secrets:   secrets,
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
-				Mesh:      &flags.proxy,
+				Mesh:      mesh,
 			}
 			w, err := envoy.NewIngressWatcher(controller, config)
 			if err != nil {
@@ -169,67 +205,38 @@ var (
 )
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
+		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&flags.namespace, "namespace", "n", "",
-		"Select a Kubernetes namespace ('' means all namespaces)")
+		"Select a namespace for the controller loop. If not set, uses ${POD_NAMESPACE} environment variable")
+	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", time.Second,
+		"Controller resync interval")
+	rootCmd.PersistentFlags().StringVar(&flags.config, "meshConfig", cmd.DefaultConfigMapName,
+		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", cmd.ConfigMapKey))
 
-	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "port", "p", 8080,
+	discoveryCmd.PersistentFlags().IntVarP(&flags.sdsPort, "sdsPort", "p", 8080,
 		"Discovery service port")
-	discoveryCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
-		"",
-		"Mixer DNS address (or empty to disable Mixer)")
-	discoveryCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
-		envoy.DefaultMeshConfig.EnableAuth,
-		"Enable mutual TLS for proxy-to-proxy traffic")
-	discoveryCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
-		envoy.DefaultMeshConfig.AuthConfigPath,
-		"The directory in which certificate and key files are stored")
+	discoveryCmd.PersistentFlags().IntVar(&flags.apiserverPort, "apiPort", 8081,
+		"API service port")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.enableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
+	discoveryCmd.PersistentFlags().BoolVar(&flags.enableDiscoveryCaching, "discovery_cache", true,
+		"Enable caching discovery service responses")
 
-	proxyCmd.PersistentFlags().StringVar(&flags.identity.IP, "nodeIP", "",
-		"Proxy node IP address. If not provided uses ${POD_IP} environment variable.")
-	proxyCmd.PersistentFlags().StringVar(&flags.identity.Name, "nodeName", "",
-		"Proxy node name. If not provided uses ${POD_NAME}.${POD_NAMESPACE}")
+	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
+		"IP address. If not provided uses ${POD_IP} environment variable.")
+	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
+		"Pod name. If not provided uses ${POD_NAME} environment variable")
 
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.DiscoveryAddress, "sds", "s",
-		envoy.DefaultMeshConfig.DiscoveryAddress,
-		"Discovery service DNS address")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.ProxyPort, "port", "p",
-		envoy.DefaultMeshConfig.ProxyPort,
-		"Envoy proxy port")
-	proxyCmd.PersistentFlags().IntVarP(&flags.proxy.AdminPort, "admin_port", "a",
-		envoy.DefaultMeshConfig.AdminPort,
-		"Envoy admin port")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.BinaryPath, "envoy_path", "b",
-		envoy.DefaultMeshConfig.BinaryPath,
-		"Envoy binary location")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.ConfigPath, "config_path", "e",
-		envoy.DefaultMeshConfig.ConfigPath,
-		"Envoy config root location")
-	proxyCmd.PersistentFlags().StringVarP(&flags.proxy.MixerAddress, "mixer", "m",
-		"",
-		"Mixer DNS address (or empty to disable Mixer)")
-	proxyCmd.PersistentFlags().BoolVar(&flags.proxy.EnableAuth, "enable_auth",
-		envoy.DefaultMeshConfig.EnableAuth,
-		"Enable mutual TLS for proxy-to-proxy traffic")
-	proxyCmd.PersistentFlags().StringVar(&flags.proxy.AuthConfigPath, "auth_config_path",
-		envoy.DefaultMeshConfig.AuthConfigPath,
-		"The directory in which certificate and key files are stored")
-	proxyCmd.PersistentFlags().DurationVar(&flags.proxy.DiscoveryRefreshDelay, "discovery_refresh_delay",
-		envoy.DefaultMeshConfig.DiscoveryRefreshDelay,
-		"The average delay Envoy uses between fetches to the SDS/CDS/RDS APIs")
+	ingressCmd.PersistentFlags().StringVar(&flags.ingressClass, "ingress_class", "istio",
+		"The class of ingress resources to be processed by this ingress controller")
+	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller", true,
+		"Specifies whether running as the cluster's default ingress controller, "+
+			"thereby processing unclassified ingress resources")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)
 	proxyCmd.AddCommand(egressCmd)
-
-	ingressCmd.PersistentFlags().StringVar(&flags.ingressClass, "ingress_class",
-		"istio",
-		"The class of ingress resources to be processed by this ingress controller")
-	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller",
-		true,
-		"Specifies whether running as the cluster's default ingress controller, "+
-			"thereby processing unclassified ingress resources")
 
 	cmd.AddFlags(rootCmd)
 
@@ -243,15 +250,4 @@ func main() {
 		glog.Error(err)
 		os.Exit(-1)
 	}
-}
-
-// setFlagsFromEnv sets default values for flags that are not specified
-func setFlagsFromEnv() {
-	if flags.identity.IP == "" {
-		flags.identity.IP = os.Getenv("POD_IP")
-	}
-	if flags.identity.Name == "" {
-		flags.identity.Name = fmt.Sprintf("%s.%s", os.Getenv("POD_NAME"), os.Getenv("POD_NAMESPACE"))
-	}
-
 }

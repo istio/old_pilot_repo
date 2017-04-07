@@ -15,7 +15,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,31 +25,22 @@ import (
 	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
+	"istio.io/manager/apiserver"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
-
-	"k8s.io/client-go/pkg/util/yaml"
 )
-
-// Each entry in the multi-doc YAML file used by `istioctl create -f` MUST have this format
-type inputDoc struct {
-	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, or destination-policy
-	Type string      `json:"type,omitempty"`
-	Name string      `json:"name,omitempty"`
-	Spec interface{} `json:"spec,omitempty"`
-	// ParsedSpec will be one of the messages in model.IstioConfig: for example an
-	// istio.proxy.v1alpha.config.RouteRule or DestinationPolicy
-	ParsedSpec proto.Message `json:"-"`
-}
 
 var (
 	kubeconfig string
 	namespace  string
-	config     model.ConfigRegistry
+	client     *kube.Client
+
+	config model.ConfigRegistry
 
 	// input file name
 	file string
@@ -62,8 +52,9 @@ var (
 	schema model.ProtoSchema
 
 	rootCmd = &cobra.Command{
-		Use:   "istioctl",
-		Short: "Istio control interface",
+		Use:          "istioctl",
+		Short:        "Istio control interface",
+		SilenceUsage: true,
 		Long: fmt.Sprintf("Istio configuration command line utility. Available configuration types: %v",
 			model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
@@ -74,7 +65,7 @@ var (
 				}
 			}
 
-			client, err := kube.NewClient(kubeconfig, model.IstioConfig)
+			client, err = kube.NewClient(kubeconfig, model.IstioConfig)
 			if err != nil && kubeconfig == "" {
 				// If no configuration was specified, and the platform client failed, try again using ~/.kube/config
 				client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
@@ -97,6 +88,7 @@ var (
 		Short: "Create policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("create takes no arguments")
 			}
 			varr, err := readInputs()
@@ -108,6 +100,9 @@ var (
 			}
 			for _, v := range varr {
 				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
 					return err
 				}
 				err = config.Post(key, v.ParsedSpec)
@@ -126,6 +121,7 @@ var (
 		Short: "Replace policies and rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("replace takes no arguments")
 			}
 			varr, err := readInputs()
@@ -137,6 +133,9 @@ var (
 			}
 			for _, v := range varr {
 				if err = setup(v.Type, v.Name); err != nil {
+					return err
+				}
+				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
 					return err
 				}
 				err = config.Put(key, v.ParsedSpec)
@@ -161,6 +160,7 @@ var (
 
 			if len(args) > 1 {
 				if err := setup(args[0], args[1]); err != nil {
+					c.Println(c.UsageString())
 					return err
 				}
 				item, exists := config.Get(key)
@@ -174,6 +174,7 @@ var (
 				fmt.Print(out)
 			} else {
 				if err := setup(args[0], ""); err != nil {
+					c.Println(c.UsageString())
 					return err
 				}
 
@@ -207,6 +208,7 @@ var (
 			// If we did not receive a file option, get names of resources to delete from command line
 			if file == "" {
 				if len(args) < 2 {
+					c.Println(c.UsageString())
 					return fmt.Errorf("provide configuration type and name or -f option")
 				}
 				for i := 1; i < len(args); i++ {
@@ -223,6 +225,7 @@ var (
 
 			// As we did get a file option, make sure the command line did not include any resources to delete
 			if len(args) != 0 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
 			varr, err := readInputs()
@@ -251,7 +254,7 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "",
+	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
@@ -274,7 +277,6 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		glog.Error(err)
 		os.Exit(-1)
 	}
 }
@@ -299,11 +301,6 @@ func setup(kind, name string) error {
 			kind, strings.Join(model.IstioConfig.Kinds(), ", "))
 	}
 
-	// use default namespace by default
-	if namespace == "" {
-		namespace = api.NamespaceDefault
-	}
-
 	// set the config key
 	key = model.Key{
 		Kind:      kind,
@@ -315,7 +312,7 @@ func setup(kind, name string) error {
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
-func readInputs() ([]inputDoc, error) {
+func readInputs() ([]apiserver.Config, error) {
 
 	var reader io.Reader
 	var err error
@@ -329,12 +326,12 @@ func readInputs() ([]inputDoc, error) {
 		}
 	}
 
-	var varr []inputDoc
+	var varr []apiserver.Config
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
-		v := inputDoc{}
+		v := apiserver.Config{}
 		err = yamlDecoder.Decode(&v)
 		if err == io.EOF {
 			break
@@ -342,25 +339,9 @@ func readInputs() ([]inputDoc, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
-
-		// Do a second decode pass, to get the data into structured format
-		byteRule, err := json.Marshal(v.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("could not encode Spec: %v", err)
+		if err = v.ParseSpec(); err != nil {
+			return nil, err
 		}
-
-		ischema, ok := model.IstioConfig[v.Type]
-		if !ok {
-			return nil, fmt.Errorf("unknown spec type %s", v.Type)
-		}
-		rr, err := ischema.FromJSON(string(byteRule))
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
-		}
-		glog.V(2).Infof("Parsed %v %v into %v %v", v.Type, v.Name, ischema.MessageName, rr)
-
-		v.ParsedSpec = rr
-
 		varr = append(varr, v)
 	}
 

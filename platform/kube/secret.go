@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"k8s.io/client-go/kubernetes"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"istio.io/manager/model"
 )
 

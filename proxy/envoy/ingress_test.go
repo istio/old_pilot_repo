@@ -4,23 +4,20 @@ import (
 	"testing"
 
 	"fmt"
-	"io/ioutil"
-	"reflect"
 
-	"github.com/pmezard/go-difflib/difflib"
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
-	"encoding/json"
+	"istio.io/manager/test/util"
 )
 
 const (
-	ingressEnvoyConfig    = "testdata/ingress-envoy.json"
-	ingressEnvoySSLConfig = "testdata/ingress-envoy-ssl.json"
+	ingressEnvoyConfig           = "testdata/ingress-envoy.json"
+	ingressEnvoySSLConfig        = "testdata/ingress-envoy-ssl.json"
 	ingressEnvoyPartialSSLConfig = "testdata/ingress-envoy-partial-ssl.json"
-	ingressRouteRule1      = "testdata/ingress-route-1.yaml.golden"
-	ingressRouteRule2      = "testdata/ingress-route-2.yaml.golden"
-	ingressCertFile       = "testdata/tls.crt"
-	ingressKeyFile        = "testdata/tls.key"
+	ingressRouteRule1            = "testdata/ingress-route-1.yaml.golden"
+	ingressRouteRule2            = "testdata/ingress-route-2.yaml.golden"
+	ingressCertFile              = "testdata/tls.crt"
+	ingressKeyFile               = "testdata/tls.key"
 )
 
 var (
@@ -29,43 +26,21 @@ var (
 	ingressTLSContext = &model.TLSContext{ingressCert, ingressKey}
 )
 
-func compareFile(filename string, expect []byte, t *testing.T) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("Error loading %s: %s", filename, err.Error())
-	}
-	if !reflect.DeepEqual(data, expect) {
-		diff := difflib.UnifiedDiff{
-			A:        difflib.SplitLines(string(expect)),
-			B:        difflib.SplitLines(string(data)),
-			FromFile: filename,
-			ToFile:   "",
-			Context:  2,
-		}
-		text, _ := difflib.GetUnifiedDiffString(diff)
-		fmt.Println(text)
-		t.Fatalf("Failed validating file %s", filename)
-	}
-}
-
 func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
 	config := generateIngress(c)
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}
 
-	data, _ := json.MarshalIndent(config, "", "  ")
-	fmt.Println(string(data))
-
 	if err := config.WriteFile(envoyConfig); err != nil {
 		t.Fatal(err)
 	}
 
-	compareJSON(envoyConfig, t)
+	util.CompareYAML(envoyConfig, t)
 }
 
 func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
-	for i, file := range []string{ ingressRouteRule1, ingressRouteRule2 } {
+	for i, file := range []string{ingressRouteRule1, ingressRouteRule2} {
 		msg, err := configObjectFromYAML(model.IngressRule, file)
 		if err != nil {
 			t.Fatal(err)
@@ -83,7 +58,7 @@ func TestIngressRoutes(t *testing.T) {
 	testIngressConfig(&IngressConfig{
 		Registry: r,
 		Secrets:  s,
-		Mesh:     DefaultMeshConfig,
+		Mesh:     &DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
 }
 
@@ -97,10 +72,10 @@ func TestIngressRoutesSSL(t *testing.T) {
 		Namespace: "",
 		Secrets:   s,
 		Registry:  r,
-		Mesh:      DefaultMeshConfig,
+		Mesh:      &DefaultMeshConfig,
 	}, ingressEnvoySSLConfig, t)
-	compareFile(ingressCertFile, ingressCert, t)
-	compareFile(ingressKeyFile, ingressKey, t)
+	util.CompareFile(ingressCertFile, ingressCert, t)
+	util.CompareFile(ingressKeyFile, ingressKey, t)
 }
 
 func TestIngressRoutesPartialSSL(t *testing.T) {
@@ -113,8 +88,8 @@ func TestIngressRoutesPartialSSL(t *testing.T) {
 		Namespace: "",
 		Secrets:   s,
 		Registry:  r,
-		Mesh:      DefaultMeshConfig,
+		Mesh:      &DefaultMeshConfig,
 	}, ingressEnvoyPartialSSLConfig, t)
-	compareFile(ingressCertFile, ingressCert, t)
-	compareFile(ingressKeyFile, ingressKey, t)
+	util.CompareFile(ingressCertFile, ingressCert, t)
+	util.CompareFile(ingressKeyFile, ingressKey, t)
 }
