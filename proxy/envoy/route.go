@@ -196,7 +196,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port, ssl *SSLConte
 func buildDiscoveryCluster(address, name string) *Cluster {
 	return &Cluster{
 		Name:             name,
-		Type:             "strict_dns",
+		Type:             StrictDNSType,
 		ConnectTimeoutMs: DefaultTimeoutMs,
 		LbType:           DefaultLbType,
 		Hosts: []Host{

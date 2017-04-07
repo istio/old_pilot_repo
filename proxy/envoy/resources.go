@@ -23,8 +23,8 @@ import (
 
 // MeshConfig defines proxy mesh variables
 type MeshConfig struct {
-	// EgressAddress for egress proxy service
-	EgressAddress string
+	// EgressProxyAddress for egress proxy service
+	EgressProxyAddress string
 
 	// DiscoveryAddress is the DNS address for Envoy discovery service
 	DiscoveryAddress string
@@ -76,7 +76,7 @@ type MeshConfig struct {
 var (
 	// DefaultMeshConfig configuration
 	DefaultMeshConfig = &MeshConfig{
-		EgressAddress:             "istio-egress:80",
+		EgressProxyAddress:        "istio-egress:80",
 		DiscoveryAddress:          "manager:8080",
 		MixerAddress:              "mixer:9091",
 		ProxyPort:                 15001,
@@ -99,6 +99,7 @@ const (
 	DefaultAccessLog = "/dev/stdout"
 	LbTypeRoundRobin = "round_robin"
 	RDSName          = "rds"
+	StrictDNSType    = "strict_dns"
 
 	// HTTPConnectionManager is the name of HTTP filter.
 	HTTPConnectionManager = "http_connection_manager"

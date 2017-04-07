@@ -273,10 +273,10 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 						route.HostRewrite = service.Address
 						for _, cluster := range route.clusters {
 							cluster.ServiceName = ""
-							cluster.Type = "strict_dns"
+							cluster.Type = StrictDNSType
 							cluster.Hosts = []Host{
 								{
-									URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressAddress),
+									URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressProxyAddress),
 								},
 							}
 
@@ -324,10 +324,10 @@ func buildOutboundTCPListeners(services []*model.Service, context *ProxyContext)
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil, nil)
 				if service.External {
 					cluster.ServiceName = ""
-					cluster.Type = "strict_dns"
+					cluster.Type = StrictDNSType
 					cluster.Hosts = []Host{
 						{
-							URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressAddress),
+							URL: fmt.Sprintf("tcp://%s", context.MeshConfig.EgressProxyAddress),
 						},
 					}
 				}

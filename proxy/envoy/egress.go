@@ -164,7 +164,7 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 			// configure cluster for strict_dns
 			cluster.Name = svc.Address
 			cluster.ServiceName = ""
-			cluster.Type = "strict_dns"
+			cluster.Type = StrictDNSType
 			cluster.Hosts = []Host{
 				{
 					URL: fmt.Sprintf("tcp://%s:%d", svc.Address, servicePort.Port),

@@ -285,9 +285,10 @@ func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func
 
 			if strings.Contains(resp, trace) {
 				return nil
-			} else {
-				glog.Errorf("Failed to find trace id in response from external service")
 			}
+
+			glog.Errorf("Failed to find trace id in response from external service")
+
 			if done() {
 				return nil
 			}
