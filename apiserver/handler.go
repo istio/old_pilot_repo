@@ -11,8 +11,6 @@ import (
 	"github.com/golang/glog"
 )
 
-var schema model.ProtoSchema
-
 // GetConfig retrieves the config object from the configuration registry
 func (api *API) GetConfig(request *restful.Request, response *restful.Response) {
 
@@ -30,14 +28,14 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 		return
 	}
 
+	var schema model.ProtoSchema
 	retrieved, err := schema.ToJSON(proto)
 	if err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
 	var retJSON interface{}
-	err = json.Unmarshal([]byte(retrieved), &retJSON)
-	if err != nil {
+	if err = json.Unmarshal([]byte(retrieved), &retJSON); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
@@ -83,11 +81,10 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 		switch err.(type) {
 		case *model.ItemAlreadyExistsError:
 			api.writeError(http.StatusConflict, err.Error(), response)
-			return
 		default:
 			api.writeError(http.StatusInternalServerError, err.Error(), response)
-			return
 		}
+		return
 	}
 	if err = response.WriteHeaderAndEntity(http.StatusCreated, config); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
@@ -125,11 +122,10 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
-			return
 		default:
 			api.writeError(http.StatusInternalServerError, err.Error(), response)
-			return
 		}
+		return
 	}
 	if err = response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
@@ -151,11 +147,10 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
-			return
 		default:
 			api.writeError(http.StatusInternalServerError, err.Error(), response)
-			return
 		}
+		return
 	}
 	response.WriteHeader(http.StatusOK)
 }
@@ -183,6 +178,7 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 
 	// Parse back to config
 	out := []Config{}
+	var schema model.ProtoSchema
 	for k, v := range result {
 		retrieved, errLocal := schema.ToJSON(v)
 		if errLocal != nil {

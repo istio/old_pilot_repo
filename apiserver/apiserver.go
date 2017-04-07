@@ -41,9 +41,7 @@ func NewAPI(o APIServiceOptions) *API {
 	}
 	container := restful.NewContainer()
 	out.Register(container)
-	if o.Port != 0 {
-		out.server = &http.Server{Addr: ":" + strconv.Itoa(o.Port), Handler: container}
-	}
+	out.server = &http.Server{Addr: ":" + strconv.Itoa(o.Port), Handler: container}
 	return out
 }
 

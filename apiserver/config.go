@@ -38,6 +38,6 @@ func (c *Config) ParseSpec() error {
 		return fmt.Errorf("cannot parse proto message: %v", err)
 	}
 	c.ParsedSpec = message
-	glog.V(2).Info(fmt.Sprintf("Parsed %v %v into %v %v", c.Type, c.Name, schema.MessageName, message))
+	glog.V(2).Infof("Parsed %v %v into %v %v", c.Type, c.Name, schema.MessageName, message)
 	return nil
 }

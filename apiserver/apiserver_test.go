@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	restful "github.com/emicklei/go-restful"
@@ -126,173 +125,139 @@ func TestListConfig(t *testing.T) {
 
 }
 
-///////////////////////////////////////////////////////
-////////////////// GET CONFIG ERRORS //////////////////
-///////////////////////////////////////////////////////
+func TestConfigErrors(t *testing.T) {
+	cases := []struct {
+		name       string
+		url        string
+		method     string
+		data       []byte
+		wantStatus int
+		wantBody   string
+		duplicate  bool
+	}{
+		{
+			name:       "TestNotFoundGetConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "GET",
+			wantStatus: http.StatusNotFound,
+			wantBody:   errNotFound.Error(),
+		},
+		{
+			name:       "TestInvalidConfigTypeGetConfig",
+			url:        "/test/config/not-a-route-rule/namespace/name",
+			method:     "GET",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+		{
+			name:       "TestMultipleAddConfigsReturnConflict",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "POST",
+			data:       validRouteRuleJSON,
+			wantStatus: http.StatusConflict,
+			wantBody:   errItemExists.Error(),
+			duplicate:  true,
+		},
+		{
+			name:       "TestInvalidConfigTypeAddConfig",
+			url:        "/test/config/not-a-route-rule/namespace/name",
+			method:     "POST",
+			data:       validRouteRuleJSON,
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+		{
+			name:       "TestInvalidBodyAddConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "POST",
+			data:       []byte("JUSTASTRING"),
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidBody.Error(),
+		},
+		{
+			name:       "TestInvalidSpecAddConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "POST",
+			data:       []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`),
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidSpec.Error(),
+		},
+		{
+			name:       "TestNotFoundConfigUpdateConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "PUT",
+			data:       validRouteRuleJSON,
+			wantStatus: http.StatusNotFound,
+			wantBody:   errNotFound.Error(),
+		},
+		{
+			name:       "TestInvalidConfigTypeUpdateConfig",
+			url:        "/test/config/not-a-route-rule/namespace/name",
+			method:     "PUT",
+			data:       validRouteRuleJSON,
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+		{
+			name:       "TestInvalidBodyUpdateConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "PUT",
+			data:       []byte("JUSTASTRING"),
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidBody.Error(),
+		},
+		{
+			name:       "TestInvalidSpecUpdateConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "PUT",
+			data:       []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`),
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidSpec.Error(),
+		},
+		{
+			name:       "TestNotFoundDeleteConfig",
+			url:        "/test/config/route-rule/namespace/name",
+			method:     "DELETE",
+			wantStatus: http.StatusNotFound,
+			wantBody:   errNotFound.Error(),
+		},
+		{
+			name:       "TestInvalidConfigTypeDeleteConfig",
+			url:        "/test/config/not-a-route-rule/namespace/name",
+			method:     "DELETE",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+		{
+			name:       "TestInvalidConfigTypeWithNamespaceListConfig",
+			url:        "/test/config/not-a-route-rule/namespace",
+			method:     "GET",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+		{
+			name:       "TestInvalidConfigTypeWithoutNamespaceListConfig",
+			url:        "/test/config/not-a-route-rule",
+			method:     "GET",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   errInvalidType.Error(),
+		},
+	}
 
-func TestNotFoundGetConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "GET", url, nil, t)
-	compareStatus(status, http.StatusNotFound, t)
-	compareResponseError(string(body), errNotFound, t)
+	for _, c := range cases {
+		api := makeAPIServer(mock.MakeRegistry())
+		if c.duplicate {
+			makeAPIRequest(api, c.method, c.url, c.data, t)
+		}
+		gotStatus, gotBody := makeAPIRequest(api, c.method, c.url, c.data, t)
+		if gotStatus != c.wantStatus {
+			t.Errorf("%s: got status code %v, want %v", c.name, gotStatus, c.wantStatus)
+		}
+		if string(gotBody) != c.wantBody {
+			t.Errorf("%s: got body %q, want %q", c.name, string(gotBody), c.wantBody)
+		}
+	}
 }
-
-func TestInvalidConfigTypeGetConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "GET", url, nil, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-///////////////////////////////////////////////////////
-////////////////// ADD CONFIG ERRORS //////////////////
-///////////////////////////////////////////////////////
-
-func TestMultipleAddConfigsReturnConflict(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
-	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusConflict, t)
-	compareResponseError(string(body), errItemExists, t)
-}
-
-func TestInvalidConfigTypeAddConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-func TestInvalidBodyAddConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "POST", url, []byte("JUSTASTRING"), t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidBody, t)
-
-}
-
-func TestInvalidSpecAddConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "POST", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidSpec, t)
-}
-
-///////////////////////////////////////////////////////
-//////////////// UPDATE CONFIG ERRORS /////////////////
-///////////////////////////////////////////////////////
-
-func TestNotFoundConfigUpdateConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "PUT", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusNotFound, t)
-	compareResponseError(string(body), errNotFound, t)
-
-}
-
-func TestInvalidConfigTypeUpdateConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "PUT", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-func TestInvalidBodyUpdateConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "PUT", url, []byte("JUSTASTRING"), t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidBody, t)
-}
-
-func TestInvalidSpecUpdateConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "PUT", url, []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`), t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidSpec, t)
-}
-
-///////////////////////////////////////////////////////
-//////////////// DELETE CONFIG ERRORS /////////////////
-///////////////////////////////////////////////////////
-
-func TestNotFoundDeleteConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "DELETE", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusNotFound, t)
-	compareResponseError(string(body), errNotFound, t)
-
-}
-
-func TestInvalidConfigTypeDeleteConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule/namespace/name"
-	status, body := makeAPIRequest(api, "DELETE", url, validRouteRuleJSON, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-///////////////////////////////////////////////////////
-///////////////// LIST CONFIG ERRORS //////////////////
-///////////////////////////////////////////////////////
-
-func TestInvalidConfigTypeWithNamespaceListConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule/namespace"
-	status, body := makeAPIRequest(api, "GET", url, nil, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-func TestInvalidConfigTypeWithoutNamespaceListConfig(t *testing.T) {
-	mockReg := mock.MakeRegistry()
-	api := makeAPIServer(mockReg)
-	url := "/test/config/not-a-route-rule"
-	status, body := makeAPIRequest(api, "GET", url, nil, t)
-
-	compareStatus(status, http.StatusBadRequest, t)
-	compareResponseError(string(body), errInvalidType, t)
-}
-
-///////////////////////////////////////////////////////
-////////////////// HELPER FUNCTIONS ///////////////////
-///////////////////////////////////////////////////////
 
 func compareListCount(body []byte, expected int, t *testing.T) {
 	configSlice := []Config{}
@@ -307,12 +272,6 @@ func compareListCount(body []byte, expected int, t *testing.T) {
 func compareStatus(received, expected int, t *testing.T) {
 	if received != expected {
 		t.Errorf("Expected status code: %d, received: %d", expected, received)
-	}
-}
-
-func compareResponseError(received string, expected error, t *testing.T) {
-	if strings.Compare(received, expected.Error()) != 0 {
-		t.Errorf("expected response body to be %v, but received: %v", expected.Error(), received)
 	}
 }
 
