@@ -70,12 +70,7 @@ func (w *egressWatcher) Run(stop <-chan struct{}) {
 
 // EgressConfig defines information for engress
 type EgressConfig struct {
-	// TODO: cert/key filenames will need to be dynamic for multiple key/cert pairs
-//	CertFile  string
-//	KeyFile   string
 	Namespace string
-//	Secret    string
-//	Secrets   model.SecretRegistry
 	Services  model.ServiceDiscovery
 	Mesh      *MeshConfig
 }
@@ -160,8 +155,8 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 
 			route := &HTTPRoute{
-				Prefix: "/",
-				Cluster: svc.Address,
+				Prefix:          "/",
+				Cluster:         svc.Address,
 				AutoHostRewrite: true,
 			}
 			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil, nil)

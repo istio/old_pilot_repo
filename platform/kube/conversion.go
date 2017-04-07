@@ -88,7 +88,7 @@ func convertService(svc v1.Service) *model.Service {
 		addr = svc.Spec.ClusterIP
 	}
 
-	if svc.Spec.ExternalName != "" {
+	if svc.Spec.Type == v1.ServiceTypeExternalName && svc.Spec.ExternalName != "" {
 		addr = svc.Spec.ExternalName
 		external = true
 	}

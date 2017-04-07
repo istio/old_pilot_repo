@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	egressEnvoyConfig    = "testdata/egress-envoy.json"
+	egressEnvoyConfig = "testdata/egress-envoy.json"
 )
 
 func testEgressConfig(c *EgressConfig, envoyConfig string, t *testing.T) {

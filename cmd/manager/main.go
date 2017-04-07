@@ -166,11 +166,7 @@ var (
 				IngressSyncMode: kube.IngressOff,
 			})
 			config := &envoy.EgressConfig{
-				//CertFile:  "/etc/tls.crt",
-				//KeyFile:   "/etc/tls.key",
 				Namespace: flags.namespace,
-				//Secret:    flags.ingressSecret, //TODO Egress secret?
-				//Secrets:   client,
 				Mesh:      &flags.proxy,
 				Services:  controller,
 			}

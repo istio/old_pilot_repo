@@ -207,6 +207,8 @@ type HTTPRoute struct {
 	RetryPolicy  *RetryPolicy      `json:"retry_policy,omitempty"`
 	OpaqueConfig map[string]string `json:"opaque_config,omitempty"`
 
+	AutoHostRewrite bool `json:"auto_host_rewrite,omitempty"`
+
 	// clusters contains the set of referenced clusters in the route; the field is special
 	// and used only to aggregate cluster information after composing routes
 	clusters []*Cluster
@@ -214,8 +216,6 @@ type HTTPRoute struct {
 	// faults contains the set of referenced faults in the route; the field is special
 	// and used only to aggregate fault filter information after composing routes
 	faults []*HTTPFilter
-
-	AutoHostRewrite bool `json:"auto_host_rewrite,omitempty"`
 }
 
 // RetryPolicy definition

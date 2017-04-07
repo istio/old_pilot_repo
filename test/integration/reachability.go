@@ -59,6 +59,10 @@ func (r *reachability) run() error {
 		return err
 	}
 
+	if err := r.verifyEgress(); err != nil {
+		return err
+	}
+
 	if glog.V(2) {
 		glog.Infof("requests: %#v", r.accessLogs)
 	}
@@ -254,6 +258,61 @@ func (r *reachability) verifyTCPRouting() error {
 						}
 					}
 				}
+			}
+		}
+	}
+	if params.parallel {
+		if err := g.Wait(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// makeEgressRequest creates a function to make egress requests; done should return true to quickly exit the
+// retry loop
+func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func() error {
+	return func() error {
+		url := fmt.Sprintf("http://%s:80/headers", dst)
+		for n := 0; n < budget; n++ {
+			trace := fmt.Sprint(time.Now().UnixNano())
+			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
+			resp, err := shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
+				pods[src], params.namespace, url, trace))
+			if err != nil {
+				return err
+			}
+
+			if strings.Contains(resp, trace) {
+				return nil
+			} else {
+				glog.Errorf("Failed to find trace id in response from external service")
+			}
+			if done() {
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
+	}
+}
+
+func (r *reachability) verifyEgress() error {
+	g, ctx := errgroup.WithContext(context.Background())
+	for _, src := range []string{"a", "b"} {
+		if params.parallel {
+			g.Go(r.makeEgressRequest(src, "httpbin", func() bool {
+				select {
+				case <-time.After(time.Second):
+				// try again
+				case <-ctx.Done():
+					return true
+				}
+				return false
+
+			}))
+		} else {
+			if err := r.makeEgressRequest(src, "httpbin", func() bool { return false })(); err != nil {
+				return err
 			}
 		}
 	}
