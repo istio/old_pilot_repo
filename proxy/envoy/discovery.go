@@ -39,16 +39,15 @@ type DiscoveryService struct {
 	mesh       *proxyconfig.ProxyMeshConfig
 	server     *http.Server
 
-	disableCache bool
-	cacheMu      sync.RWMutex
-	cache        map[string]*discoveryCacheEntry
-
 	// TODO Profile and optimize cache eviction policy to avoid
 	// flushing the entire cache when any route, service, or endpoint
 	// changes. An explicit cache expiration policy should be
 	// considered with this change to avoid memory exhaustion as the
 	// entire cache will no longer be periodically flushed and stale
 	// entries can linger in the cache indefinitely.
+	sdsCache *discoveryCache
+	cdsCache *discoveryCache
+	rdsCache *discoveryCache
 }
 
 type discoveryCacheStatEntry struct {
@@ -64,6 +63,86 @@ type discoveryCacheEntry struct {
 	data []byte
 	hit  uint64 // atomic
 	miss uint64 // atmoic
+}
+
+type discoveryCache struct {
+	disabled bool
+	mu       sync.RWMutex
+	cache    map[string]*discoveryCacheEntry
+}
+
+func newDiscoveryCache(enabled bool) *discoveryCache {
+	return &discoveryCache{
+		disabled: !enabled,
+		cache:    make(map[string]*discoveryCacheEntry),
+	}
+}
+func (c *discoveryCache) cachedDiscoveryResponse(key string) ([]byte, bool) {
+	if c.disabled {
+		return nil, false
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Miss - entry.miss is updated in updateCachedDiscoveryResponse
+	entry, ok := c.cache[key]
+	if !ok || entry.data == nil {
+		return nil, false
+	}
+
+	// Hit
+	atomic.AddUint64(&entry.hit, 1)
+	return entry.data, true
+}
+
+func (c *discoveryCache) updateCachedDiscoveryResponse(key string, data []byte) {
+	if c.disabled {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.cache[key]
+	if !ok {
+		entry = &discoveryCacheEntry{}
+		c.cache[key] = entry
+	} else if entry.data != nil {
+		glog.Warningf("Overriding cached data for entry %v", key)
+	}
+	entry.data = data
+	atomic.AddUint64(&entry.miss, 1)
+}
+
+func (c *discoveryCache) clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, v := range c.cache {
+		v.data = nil
+	}
+}
+
+func (c *discoveryCache) resetStats() {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, v := range c.cache {
+		atomic.StoreUint64(&v.hit, 0)
+		atomic.StoreUint64(&v.miss, 0)
+	}
+}
+
+func (c *discoveryCache) stats() map[string]*discoveryCacheStatEntry {
+	stats := make(map[string]*discoveryCacheStatEntry)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for k, v := range c.cache {
+		stats[k] = &discoveryCacheStatEntry{
+			Hit:  atomic.LoadUint64(&v.hit),
+			Miss: atomic.LoadUint64(&v.miss),
+		}
+	}
+	return stats
 }
 
 type hosts struct {
@@ -101,12 +180,13 @@ type DiscoveryServiceOptions struct {
 // NewDiscoveryService creates an Envoy discovery service on a given port
 func NewDiscoveryService(o DiscoveryServiceOptions) (*DiscoveryService, error) {
 	out := &DiscoveryService{
-		services:     o.Services,
-		controller:   o.Controller,
-		config:       o.Config,
-		mesh:         o.Mesh,
-		cache:        make(map[string]*discoveryCacheEntry),
-		disableCache: !o.EnableCaching,
+		services:   o.Services,
+		controller: o.Controller,
+		config:     o.Config,
+		mesh:       o.Mesh,
+		sdsCache:   newDiscoveryCache(o.EnableCaching),
+		cdsCache:   newDiscoveryCache(o.EnableCaching),
+		rdsCache:   newDiscoveryCache(o.EnableCaching),
 	}
 	container := restful.NewContainer()
 	if o.EnableProfiling {
@@ -193,84 +273,39 @@ func (ds *DiscoveryService) Run() {
 
 // GetCacheStats returns the statistics for cached discovery responses.
 func (ds *DiscoveryService) GetCacheStats(_ *restful.Request, response *restful.Response) {
-	out := discoveryCacheStats{make(map[string]*discoveryCacheStatEntry)}
-
-	ds.cacheMu.RLock()
-	for k, v := range ds.cache {
-		out.Stats[k] = &discoveryCacheStatEntry{
-			Hit:  atomic.LoadUint64(&v.hit),
-			Miss: atomic.LoadUint64(&v.miss),
-		}
+	stats := make(map[string]*discoveryCacheStatEntry)
+	for k, v := range ds.sdsCache.stats() {
+		stats[k] = v
 	}
-	ds.cacheMu.RUnlock()
-
-	if err := response.WriteEntity(out); err != nil {
+	for k, v := range ds.cdsCache.stats() {
+		stats[k] = v
+	}
+	for k, v := range ds.rdsCache.stats() {
+		stats[k] = v
+	}
+	if err := response.WriteEntity(discoveryCacheStats{stats}); err != nil {
 		glog.Warning(err)
 	}
 }
 
 // ClearCacheStats clear the statistics for cached discovery responses.
 func (ds *DiscoveryService) ClearCacheStats(_ *restful.Request, _ *restful.Response) {
-	ds.cacheMu.RLock()
-	defer ds.cacheMu.RUnlock()
-	for _, v := range ds.cache {
-		atomic.StoreUint64(&v.hit, 0)
-		atomic.StoreUint64(&v.miss, 0)
-	}
+	ds.sdsCache.resetStats()
+	ds.cdsCache.resetStats()
+	ds.rdsCache.resetStats()
 }
 
 func (ds *DiscoveryService) clearCache() {
 	glog.Infof("Cleared discovery service cache")
-
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-	for _, v := range ds.cache {
-		v.data = nil
-	}
-}
-
-func (ds *DiscoveryService) cachedDiscoveryResponse(key string) ([]byte, bool) {
-	if ds.disableCache {
-		return nil, false
-	}
-
-	ds.cacheMu.RLock()
-	defer ds.cacheMu.RUnlock()
-
-	// Miss - entry.miss is updated in updateCachedDiscoveryResponse
-	entry, ok := ds.cache[key]
-	if !ok || entry.data == nil {
-		return nil, false
-	}
-
-	// Hit
-	atomic.AddUint64(&entry.hit, 1)
-	return entry.data, true
-}
-
-func (ds *DiscoveryService) updateCachedDiscoveryResponse(key string, data []byte) {
-	if ds.disableCache {
-		return
-	}
-
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-
-	entry, ok := ds.cache[key]
-	if !ok {
-		entry = &discoveryCacheEntry{}
-		ds.cache[key] = entry
-	} else if entry.data != nil {
-		glog.Warningf("Overriding cached data for entry %v", key)
-	}
-	entry.data = data
-	atomic.AddUint64(&entry.miss, 1)
+	ds.sdsCache.clear()
+	ds.cdsCache.clear()
+	ds.rdsCache.clear()
 }
 
 // ListEndpoints responds to SDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
-	out, cached := ds.cachedDiscoveryResponse(key)
+	out, cached := ds.sdsCache.cachedDiscoveryResponse(key)
 	if !cached {
 		hostname, ports, tags := model.ParseServiceKey(request.PathParameter(ServiceKey))
 		// envoy expects an empty array if no hosts are available
@@ -286,7 +321,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.updateCachedDiscoveryResponse(key, out)
+		ds.sdsCache.updateCachedDiscoveryResponse(key, out)
 	}
 	writeResponse(response, out)
 }
@@ -294,7 +329,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 // ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
-	out, cached := ds.cachedDiscoveryResponse(key)
+	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
 	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.mesh.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
@@ -330,7 +365,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.updateCachedDiscoveryResponse(key, out)
+		ds.cdsCache.updateCachedDiscoveryResponse(key, out)
 	}
 	writeResponse(response, out)
 }
@@ -340,7 +375,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 // to identify HTTP filters in the config. Service node value holds the local proxy identity.
 func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
-	out, cached := ds.cachedDiscoveryResponse(key)
+	out, cached := ds.rdsCache.cachedDiscoveryResponse(key)
 	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.mesh.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
@@ -378,7 +413,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ds.updateCachedDiscoveryResponse(key, out)
+		ds.rdsCache.updateCachedDiscoveryResponse(key, out)
 	}
 	writeResponse(response, out)
 }
