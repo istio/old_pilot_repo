@@ -77,8 +77,8 @@ func makeDiscoveryServiceWithSSLContext(t *testing.T, r *model.IstioRegistry) *D
 	return out
 }
 
-func makeDiscoveryRequest(ds *DiscoveryService, url string, t *testing.T) []byte {
-	httpRequest, err := http.NewRequest("GET", url, nil)
+func makeDiscoveryRequest(ds *DiscoveryService, method, url string, t *testing.T) []byte {
+	httpRequest, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func compareResponse(body []byte, file string, t *testing.T) {
 func TestServiceDiscovery(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0], nil)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/sds.json", t)
 }
 
@@ -112,14 +112,14 @@ func TestServiceDiscoveryVersion(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0],
 		map[string]string{"version": "v1"})
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/sds-v1.json", t)
 }
 
 func TestServiceDiscoveryEmpty(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := "/v1/registration/nonexistent"
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/sds-empty.json", t)
 }
 
@@ -127,7 +127,7 @@ func TestClusterDiscovery(t *testing.T) {
 	registry := mock.MakeRegistry()
 	ds := makeDiscoveryService(t, registry)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/cds.json", t)
 }
 
@@ -136,7 +136,7 @@ func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
 	addCircuitBreaker(registry, t)
 	ds := makeDiscoveryService(t, registry)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/cds-circuit-breaker.json", t)
 }
 
@@ -144,17 +144,17 @@ func TestClusterDiscoveryWithSSLContext(t *testing.T) {
 	registry := mock.MakeRegistry()
 	ds := makeDiscoveryServiceWithSSLContext(t, registry)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/cds-ssl-context.json", t)
 }
 
 func TestRouteDiscovery(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-v0.json", t)
 	url = fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV1)
-	response = makeDiscoveryRequest(ds, url, t)
+	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-v1.json", t)
 }
 
@@ -163,7 +163,7 @@ func TestRouteDiscoveryTimeout(t *testing.T) {
 	addTimeout(registry, t)
 	ds := makeDiscoveryService(t, registry)
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-timeout.json", t)
 }
 
@@ -172,7 +172,7 @@ func TestRouteDiscoveryWeighted(t *testing.T) {
 	addWeightedRoute(registry, t)
 	ds := makeDiscoveryService(t, registry)
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-weighted.json", t)
 }
 
@@ -183,11 +183,11 @@ func TestRouteDiscoveryFault(t *testing.T) {
 
 	// fault rule is source based: we check that the rule only affect v0 and not v1
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV0)
-	response := makeDiscoveryRequest(ds, url, t)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-fault.json", t)
 
 	url = fmt.Sprintf("/v1/routes/80/%s/%s", ds.mesh.IstioServiceCluster, mock.HostInstanceV1)
-	response = makeDiscoveryRequest(ds, url, t)
+	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-v1.json", t)
 }
 
@@ -241,15 +241,15 @@ func TestDiscoveryCache(t *testing.T) {
 			ds.clearCache()
 		}
 		if c.clearStats {
-			_ = makeDiscoveryRequest(ds, "/cache_clear", t)
+			_ = makeDiscoveryRequest(ds, "POST", "/cache_clear", t)
 		}
 		if c.query {
 			for path, want := range responseByPath {
-				got := makeDiscoveryRequest(ds, path, t)
+				got := makeDiscoveryRequest(ds, "GET", path, t)
 				compareResponse(got, want, t)
 			}
 		}
-		got := makeDiscoveryRequest(ds, "/cache_stats", t)
+		got := makeDiscoveryRequest(ds, "GET", "/cache_stats", t)
 		compareResponse(got, c.wantCache, t)
 	}
 }

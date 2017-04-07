@@ -21,6 +21,7 @@ import (
 	"net/http/pprof"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -39,9 +40,8 @@ type DiscoveryService struct {
 	server     *http.Server
 
 	disableCache bool
-	cacheMu      sync.Mutex
-	cache        map[string][]byte
-	cacheStats   discoveryCacheStats
+	cacheMu      sync.RWMutex
+	cache        map[string]*discoveryCacheEntry
 }
 
 type discoveryCacheStatEntry struct {
@@ -51,6 +51,12 @@ type discoveryCacheStatEntry struct {
 
 type discoveryCacheStats struct {
 	Stats map[string]*discoveryCacheStatEntry `json:"cache_stats"`
+}
+
+type discoveryCacheEntry struct {
+	data []byte
+	hit  uint64 // atomic
+	miss uint64 // atmoic
 }
 
 type hosts struct {
@@ -92,8 +98,7 @@ func NewDiscoveryService(o DiscoveryServiceOptions) (*DiscoveryService, error) {
 		controller:   o.Controller,
 		config:       o.Config,
 		mesh:         o.Mesh,
-		cache:        make(map[string][]byte),
-		cacheStats:   discoveryCacheStats{make(map[string]*discoveryCacheStatEntry)},
+		cache:        make(map[string]*discoveryCacheEntry),
 		disableCache: !o.EnableCaching,
 	}
 	container := restful.NewContainer()
@@ -164,7 +169,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Writes(discoveryCacheStats{}))
 
 	ws.Route(ws.
-		GET("/cache_clear").
+		POST("/cache_clear").
 		To(ds.ClearCacheStats).
 		Doc("Clear discovery service cache stats"))
 
@@ -181,25 +186,40 @@ func (ds *DiscoveryService) Run() {
 
 // GetCacheStats returns the statistics for cached discovery responses.
 func (ds *DiscoveryService) GetCacheStats(_ *restful.Request, response *restful.Response) {
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-	if err := response.WriteEntity(ds.cacheStats); err != nil {
+	out := discoveryCacheStats{make(map[string]*discoveryCacheStatEntry)}
+
+	ds.cacheMu.RLock()
+	for k, v := range ds.cache {
+		out.Stats[k] = &discoveryCacheStatEntry{
+			Hit:  atomic.LoadUint64(&v.hit),
+			Miss: atomic.LoadUint64(&v.miss),
+		}
+	}
+	ds.cacheMu.RUnlock()
+
+	if err := response.WriteEntity(out); err != nil {
 		glog.Warning(err)
 	}
 }
 
 // ClearCacheStats clear the statistics for cached discovery responses.
 func (ds *DiscoveryService) ClearCacheStats(_ *restful.Request, _ *restful.Response) {
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
-	ds.cacheStats.Stats = make(map[string]*discoveryCacheStatEntry)
+	ds.cacheMu.RLock()
+	defer ds.cacheMu.RUnlock()
+	for _, v := range ds.cache {
+		atomic.StoreUint64(&v.hit, 0)
+		atomic.StoreUint64(&v.miss, 0)
+	}
 }
 
 func (ds *DiscoveryService) clearCache() {
+	glog.Infof("Cleared discovery service cache")
+
 	ds.cacheMu.Lock()
 	defer ds.cacheMu.Unlock()
-	glog.Infof("Cleared discovery service cache")
-	ds.cache = make(map[string][]byte)
+	for _, v := range ds.cache {
+		v.data = nil
+	}
 }
 
 func (ds *DiscoveryService) cachedDiscoveryResponse(key string) ([]byte, bool) {
@@ -207,22 +227,18 @@ func (ds *DiscoveryService) cachedDiscoveryResponse(key string) ([]byte, bool) {
 		return nil, false
 	}
 
-	ds.cacheMu.Lock()
-	defer ds.cacheMu.Unlock()
+	ds.cacheMu.RLock()
+	defer ds.cacheMu.RUnlock()
 
-	s, ok := ds.cacheStats.Stats[key]
-	if !ok {
-		s = &discoveryCacheStatEntry{}
-		ds.cacheStats.Stats[key] = s
+	// Miss - entry.miss is updated in updateCachedDiscoveryResponse
+	entry, ok := ds.cache[key]
+	if !ok || entry.data == nil {
+		return nil, false
 	}
 
-	out, cached := ds.cache[key]
-	if cached {
-		s.Hit++
-	} else {
-		s.Miss++
-	}
-	return out, cached
+	// Hit
+	atomic.AddUint64(&entry.hit, 1)
+	return entry.data, true
 }
 
 func (ds *DiscoveryService) updateCachedDiscoveryResponse(key string, data []byte) {
@@ -231,8 +247,17 @@ func (ds *DiscoveryService) updateCachedDiscoveryResponse(key string, data []byt
 	}
 
 	ds.cacheMu.Lock()
-	ds.cache[key] = data
-	ds.cacheMu.Unlock()
+	defer ds.cacheMu.Unlock()
+
+	entry, ok := ds.cache[key]
+	if !ok {
+		entry = &discoveryCacheEntry{}
+		ds.cache[key] = entry
+	} else if entry.data != nil {
+		glog.Warningf("Overriding cached data for entry %v", key)
+	}
+	entry.data = data
+	atomic.AddUint64(&entry.miss, 1)
 }
 
 // ListEndpoints responds to SDS requests
