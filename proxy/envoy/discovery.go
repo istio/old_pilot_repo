@@ -42,6 +42,13 @@ type DiscoveryService struct {
 	disableCache bool
 	cacheMu      sync.RWMutex
 	cache        map[string]*discoveryCacheEntry
+
+	// TODO Profile and optimize cache eviction policy to avoid
+	// flushing the entire cache when any route, service, or endpoint
+	// changes. An explicit cache expiration policy should be
+	// considered with this change to avoid memory exhaustion as the
+	// entire cache will no longer be periodically flushed and stale
+	// entries can linger in the cache indefinitely.
 }
 
 type discoveryCacheStatEntry struct {
@@ -169,7 +176,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Writes(discoveryCacheStats{}))
 
 	ws.Route(ws.
-		POST("/cache_clear").
+		POST("/cache_stats_delete").
 		To(ds.ClearCacheStats).
 		Doc("Clear discovery service cache stats"))
 

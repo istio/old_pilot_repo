@@ -241,7 +241,7 @@ func TestDiscoveryCache(t *testing.T) {
 			ds.clearCache()
 		}
 		if c.clearStats {
-			_ = makeDiscoveryRequest(ds, "POST", "/cache_clear", t)
+			_ = makeDiscoveryRequest(ds, "POST", "/cache_stats_delete", t)
 		}
 		if c.query {
 			for path, want := range responseByPath {
