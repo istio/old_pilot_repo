@@ -115,8 +115,6 @@ var (
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
-			sds := envoy.NewDiscoveryService(options)
-
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version: "v1alpha1",
 				Port:    flags.apiserverPort,
