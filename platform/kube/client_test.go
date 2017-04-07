@@ -28,6 +28,8 @@ import (
 
 	"istio.io/manager/model"
 	"istio.io/manager/test/mock"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 func TestThirdPartyResourcesClient(t *testing.T) {
@@ -119,5 +121,18 @@ func deleteNamespace(cl kubernetes.Interface, ns string) {
 			glog.Warningf("Error deleting namespace: %v", err)
 		}
 		glog.Infof("Deleted namespace %s", ns)
+	}
+}
+
+func TestPostFailsOnInvalidNamespace(t *testing.T) {
+	cl := makeClient(t)
+	key := model.Key{
+		Kind:      "route-rule",
+		Name:      "dummy",
+		Namespace: "invalid",
+	}
+	spec := &proxyconfig.RouteRule{Destination: "dummy"}
+	if err := cl.Post(key, spec); err == nil {
+		t.Fatalf("Did not fail on invalid namespace Post")
 	}
 }
