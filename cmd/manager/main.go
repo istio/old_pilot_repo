@@ -43,7 +43,6 @@ type args struct {
 	podName                  string
 	sdsPort                  int
 	apiserverPort            int
-	ingressSecret            string
 	ingressClass             string
 	defaultIngressController bool
 	enableProfiling          bool
@@ -164,7 +163,7 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			secrets := kube.NewSecretStore(flags.namespace, client.GetKubernetesClient())
+			secrets := kube.newSecretStore(flags.namespace, client.GetKubernetesClient())
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       flags.namespace,
 				ResyncPeriod:    flags.resyncPeriod,

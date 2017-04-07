@@ -22,8 +22,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// NewSecretStore creates a new ingress secret store
-func NewSecretStore(namespace string, client kubernetes.Interface) *secretStore {
+// newSecretStore creates a new ingress secret store
+func newSecretStore(namespace string, client kubernetes.Interface) *secretStore {
 	return &secretStore{
 		namespace: namespace,
 		client:    client,
@@ -65,7 +65,7 @@ func (s *secretStore) GetSecret(host string) (*model.TLSContext, error) {
 	}
 
 	return &model.TLSContext{
-		Certificate: []byte(secret.Data["tls.crt"]),
-		PrivateKey:  []byte(secret.Data["tls.key"]),
+		Certificate: secret.Data["tls.crt"],
+		PrivateKey:  secret.Data["tls.key"],
 	}, nil
 }

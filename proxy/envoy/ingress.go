@@ -192,7 +192,8 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 	return vhosts, vhostsTLS, tls
 }
 
-func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSContext, conf *IngressConfig) (Listeners, Clusters) {
+func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSContext, conf *IngressConfig) (
+	Listeners, Clusters) {
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 

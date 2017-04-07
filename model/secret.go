@@ -26,5 +26,5 @@ type SecretRegistry interface {
 // TLSContext defines a TLS configuration.
 type TLSContext struct {
 	Certificate []byte
-	PrivateKey []byte
+	PrivateKey  []byte
 }

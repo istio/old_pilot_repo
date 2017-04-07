@@ -23,7 +23,7 @@ const (
 var (
 	ingressCert       = []byte("abcdefghijklmnop")
 	ingressKey        = []byte("qrstuvwxyz123456")
-	ingressTLSContext = &model.TLSContext{ingressCert, ingressKey}
+	ingressTLSContext = &model.TLSContext{Certificate: ingressCert, PrivateKey: ingressKey}
 )
 
 func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
