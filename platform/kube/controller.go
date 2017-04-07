@@ -25,15 +25,15 @@ import (
 	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
 
-	"istio.io/manager/model"
-
-	"k8s.io/apimachinery/pkg/labels"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+
+	"istio.io/manager/model"
 )
 
 const (
@@ -99,35 +99,35 @@ func NewController(client *Client, config ControllerConfig) *Controller {
 	}
 
 	out.services = out.createInformer(&v1.Service{}, config.ResyncPeriod,
-		func(opts v1.ListOptions) (runtime.Object, error) {
+		func(opts meta_v1.ListOptions) (runtime.Object, error) {
 			return client.client.CoreV1().Services(config.Namespace).List(opts)
 		},
-		func(opts v1.ListOptions) (watch.Interface, error) {
+		func(opts meta_v1.ListOptions) (watch.Interface, error) {
 			return client.client.CoreV1().Services(config.Namespace).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, config.ResyncPeriod,
-		func(opts v1.ListOptions) (runtime.Object, error) {
+		func(opts meta_v1.ListOptions) (runtime.Object, error) {
 			return client.client.CoreV1().Endpoints(config.Namespace).List(opts)
 		},
-		func(opts v1.ListOptions) (watch.Interface, error) {
+		func(opts meta_v1.ListOptions) (watch.Interface, error) {
 			return client.client.CoreV1().Endpoints(config.Namespace).Watch(opts)
 		})
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, config.ResyncPeriod,
-		func(opts v1.ListOptions) (runtime.Object, error) {
+		func(opts meta_v1.ListOptions) (runtime.Object, error) {
 			return client.client.CoreV1().Pods(config.Namespace).List(opts)
 		},
-		func(opts v1.ListOptions) (watch.Interface, error) {
+		func(opts meta_v1.ListOptions) (watch.Interface, error) {
 			return client.client.CoreV1().Pods(config.Namespace).Watch(opts)
 		}))
 
 	if config.IngressSyncMode != IngressOff {
 		out.ingresses = out.createInformer(&v1beta1.Ingress{}, config.ResyncPeriod,
-			func(opts v1.ListOptions) (runtime.Object, error) {
+			func(opts meta_v1.ListOptions) (runtime.Object, error) {
 				return client.client.ExtensionsV1beta1().Ingresses(config.Namespace).List(opts)
 			},
-			func(opts v1.ListOptions) (watch.Interface, error) {
+			func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				return client.client.ExtensionsV1beta1().Ingresses(config.Namespace).Watch(opts)
 			})
 	}
@@ -135,7 +135,7 @@ func NewController(client *Client, config ControllerConfig) *Controller {
 	// add stores for TPR kinds
 	for _, kind := range []string{IstioKind} {
 		out.kinds[kind] = out.createInformer(&Config{}, config.ResyncPeriod,
-			func(opts v1.ListOptions) (result runtime.Object, err error) {
+			func(opts meta_v1.ListOptions) (result runtime.Object, err error) {
 				result = &ConfigList{}
 				err = client.dyn.Get().
 					Namespace(config.Namespace).
@@ -145,7 +145,7 @@ func NewController(client *Client, config ControllerConfig) *Controller {
 					Into(result)
 				return
 			},
-			func(opts v1.ListOptions) (watch.Interface, error) {
+			func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				return client.dyn.Get().
 					Prefix("watch").
 					Namespace(config.Namespace).
@@ -185,7 +185,7 @@ func (c *Controller) createInformer(
 		&cache.ListWatch{ListFunc: lf, WatchFunc: wf}, o,
 		resyncPeriod, cache.Indexers{})
 
-	err := informer.AddEventHandler(
+	informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// TODO: filtering functions to skip over un-referenced resources (perf)
 			AddFunc: func(obj interface{}) {
@@ -200,9 +200,6 @@ func (c *Controller) createInformer(
 				c.queue.Push(Task{handler: handler.apply, obj: obj, event: model.EventDelete})
 			},
 		})
-	if err != nil {
-		glog.Warning(err)
-	}
 
 	return cacheHandler{informer: informer, handler: handler}
 }
@@ -628,37 +625,33 @@ const (
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
 // An empty array is always returned if an error occurs.
-func (c *Controller) GetIstioServiceAccounts(hostname string) ([]string, error) {
-	name, namespace, err := parseHostname(hostname)
-	saArray := make([]string, 0)
-	if err != nil {
-		glog.Warningf("parseHostname(%s) => error %v", hostname, err)
-		return saArray, err
-	}
-	svc, exists := c.serviceByKey(name, namespace)
-	if !exists {
-		err := fmt.Sprintf("Failed to get service for hostname %s.", hostname)
-		glog.Warningf(err)
-		return saArray, errors.New(err)
-	}
-	lo := v1.ListOptions{
-		LabelSelector: labels.Set(svc.Spec.Selector).String(),
-	}
-	// TODO: This is fragile, improve it.
-	pods, err := c.client.client.CoreV1().Pods(svc.Namespace).List(lo)
-	if err != nil {
-		glog.Warningf("Failed to get pods for service %s.", hostname)
-		return saArray, err
-	}
+func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
 	saSet := make(map[string]bool)
-	for _, p := range pods.Items {
-		sa := makeIstioServiceAccount(p.Spec.ServiceAccountName, namespace, LocalDomain)
-		if _, exists := saSet[sa]; !exists {
-			saSet[sa] = true
-			saArray = append(saArray, sa)
+	for _, si := range c.Instances(hostname, ports, model.TagsList{}) {
+		key, exists := c.pods.keys[si.Endpoint.Address]
+		if !exists {
+			continue
 		}
+		item, exists, err := c.pods.informer.GetStore().GetByKey(key)
+		if !exists {
+			continue
+		}
+		if err != nil {
+			glog.V(2).Infof("Error retrieving pod by key: %v", err)
+			continue
+		}
+
+		pod, _ := item.(*v1.Pod)
+		sa := makeIstioServiceAccount(pod.Spec.ServiceAccountName, pod.GetNamespace(), LocalDomain)
+		saSet[sa] = true
 	}
-	return saArray, nil
+
+	saArray := make([]string, 0)
+	for sa := range saSet {
+		saArray = append(saArray, sa)
+	}
+
+	return saArray
 }
 
 func makeIstioServiceAccount(sa string, ns string, domain string) string {
