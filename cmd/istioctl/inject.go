@@ -27,6 +27,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	DefaultHubEnvVar       = "MANAGER_HUB"
+	DefaultTagEnvVar       = "MANAGER_TAG"
+)
+
 var (
 	hub             string
 	tag             string
@@ -59,6 +64,12 @@ Example usage:
 		RunE: func(_ *cobra.Command, _ []string) (err error) {
 			if inFilename == "" {
 				return errors.New("filename not specified (see --filename or -f)")
+			}
+			if hub == "" {
+				return fmt.Errorf("specify --hub or define %v", DefaultHubEnvVar)
+			}
+			if tag == "" {
+				return fmt.Errorf("specify --tag or define %v", DefaultTagEnvVar)
 			}
 			var reader io.Reader
 			if inFilename == "-" {
@@ -107,20 +118,10 @@ Example usage:
 )
 
 func init() {
-	defaultHub := os.Getenv(inject.DefaultHubEnvVar)
-	if defaultHub == "" {
-		defaultHub = inject.DefaultHub
-	}
 	injectCmd.PersistentFlags().StringVar(&hub, "hub",
-		defaultHub, "Docker hub")
-
-	defaultTag := os.Getenv(inject.DefaultTagEnvVar)
-	if defaultTag == "" {
-		defaultTag = inject.DefaultTag
-	}
+		os.Getenv(DefaultHubEnvVar), "Docker hub")
 	injectCmd.PersistentFlags().StringVar(&tag, "tag",
-		defaultTag, "Docker tag")
-
+		os.Getenv(DefaultTagEnvVar), "Docker tag")
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
 		"", "Input kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
