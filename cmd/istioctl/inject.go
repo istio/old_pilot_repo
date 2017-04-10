@@ -28,9 +28,9 @@ import (
 )
 
 const (
-	// The environment variable that defaults the value of the --hub flag to istioctl kube-inject
+	// DefaultHubEnvVar is the environment variable that defaults the value of the --hub flag to istioctl kube-inject
 	DefaultHubEnvVar = "MANAGER_HUB"
-	// The environment variable that defaults the value of the --tag flag to istioctl kube-inject
+	// DefaultTagEnvVar is the environment variable that defaults the value of the --tag flag to istioctl kube-inject
 	DefaultTagEnvVar = "MANAGER_TAG"
 )
 
