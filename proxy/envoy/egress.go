@@ -83,7 +83,9 @@ func generateEgress(conf *EgressConfig) *Config {
 	services := conf.Services.Services()
 	for _, service := range services {
 		if service.External {
-			vhosts = append(vhosts, buildEgressHTTPRoute(service))
+			if host := buildEgressHTTPRoute(service); host != nil {
+				vhosts = append(vhosts, host)
+			}
 		}
 	}
 
@@ -115,22 +117,6 @@ func generateEgress(conf *EgressConfig) *Config {
 		},
 	}
 
-	//TODO
-	//// configure for HTTPS if provided with a secret name
-	//if conf.Secret != "" {
-	//	// configure Envoy
-	//	listener.Address = fmt.Sprintf("tcp://%s:443", WildcardAddress)
-	//	listener.SSLContext = &SSLContext{
-	//		CertChainFile:  conf.CertFile,
-	//		PrivateKeyFile: conf.KeyFile,
-	//	}
-	//
-	//	if err := writeTLS(conf.CertFile, conf.KeyFile, conf.Namespace,
-	//		conf.Secret, conf.Secrets); err != nil {
-	//		glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
-	//	}
-	//}
-
 	listeners := []*Listener{listener}
 	clusters := rConfig.clusters().normalize()
 
@@ -160,13 +146,13 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 
 			route := &HTTPRoute{
 				Prefix:          "/",
-				Cluster:         svc.Address,
+				Cluster:         buildEgressClusterName(svc.Address, servicePort.Port),
 				AutoHostRewrite: true,
 			}
 			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil)
 
 			// configure cluster for strict_dns
-			cluster.Name = svc.Address
+			cluster.Name = buildEgressClusterName(svc.Address, servicePort.Port)
 			cluster.ServiceName = ""
 			cluster.Type = ClusterTypeStrictDNS
 			cluster.Hosts = []Host{
@@ -177,10 +163,8 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 
 			route.clusters = append(route.clusters, cluster)
 
-			// TODO do we need to match "myapp.whatever.google.com",
-			// "istio-egress.default.svc.cluster.local", and route.HostRewrite value from ingress
 			host = &VirtualHost{
-				Name:    svc.Address, // TODO myapp.whatever.google.com unique?
+				Name:    buildEgressClusterName(svc.Address, servicePort.Port),
 				Domains: []string{svc.Hostname, svc.Address},
 				Routes:  []*HTTPRoute{route},
 			}
@@ -194,4 +178,8 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 	}
 
 	return host
+}
+
+func buildEgressClusterName(address string, port int) string {
+	return fmt.Sprintf("%v|%d", address, port)
 }

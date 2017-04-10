@@ -12,15 +12,15 @@
             "route_config": {
               "virtual_hosts": [
                 {
-                  "name": "gc-hello.mybluemix.net",
+                  "name": "httpbin.org|80",
                   "domains": [
-                    "gc-hello.default.svc.cluster.local",
-                    "gc-hello.mybluemix.net"
+                    "httpbin.default.svc.cluster.local",
+                    "httpbin.org"
                   ],
                   "routes": [
                     {
                       "prefix": "/",
-                      "cluster": "gc-hello.mybluemix.net",
+                      "cluster": "httpbin.org|80",
                       "auto_host_rewrite": true
                     }
                   ]
@@ -52,13 +52,13 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "gc-hello.mybluemix.net",
+        "name": "httpbin.org|80",
         "connect_timeout_ms": 1000,
         "type": "strict_dns",
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://gc-hello.mybluemix.net:80"
+            "url": "tcp://httpbin.org:80"
           }
         ]
       }

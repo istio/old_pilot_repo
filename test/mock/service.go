@@ -23,15 +23,20 @@ import (
 
 // Mock values
 var (
-	HelloService    = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
-	WorldService    = MakeService("world.default.svc.cluster.local", "10.2.0.0")
-	ExternalService = MakeExternalService("gc-hello.default.svc.cluster.local",
-		"gc-hello.mybluemix.net", "9.9.9.9")
+	HelloService   = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
+	WorldService   = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	ExtHTTPService = MakeExternalHTTPService("httpbin.default.svc.cluster.local",
+		"httpbin.org", "10.3.0.0")
+	ExtHTTPSService = MakeExternalHTTPSService("httpsbin.default.svc.cluster.local",
+		"httpbin.org", "10.4.0.0")
 	Discovery model.ServiceDiscovery = &ServiceDiscovery{
 		services: map[string]*model.Service{
-			HelloService.Hostname:    HelloService,
-			WorldService.Hostname:    WorldService,
-			ExternalService.Hostname: ExternalService,
+			HelloService.Hostname:   HelloService,
+			WorldService.Hostname:   WorldService,
+			ExtHTTPService.Hostname: ExtHTTPService,
+			// TODO external https is not currently supported - this service
+			// should NOT be in any of the .golden json files
+			ExtHTTPSService.Hostname: ExtHTTPSService,
 		},
 		versions: 2,
 	}
@@ -60,8 +65,8 @@ func MakeService(hostname, address string) *model.Service {
 	}
 }
 
-// MakeExternalService creates mock external service
-func MakeExternalService(hostname, external, address string) *model.Service {
+// MakeExternalHTTPService creates mock external service
+func MakeExternalHTTPService(hostname, external string, address string) *model.Service {
 	return &model.Service{
 		Hostname: hostname,
 		Address:  external,
@@ -70,6 +75,20 @@ func MakeExternalService(hostname, external, address string) *model.Service {
 			Name:     "http",
 			Port:     80,
 			Protocol: model.ProtocolHTTP,
+		}},
+	}
+}
+
+// MakeExternalHTTPSService creates mock external service
+func MakeExternalHTTPSService(hostname, external string, address string) *model.Service {
+	return &model.Service{
+		Hostname: hostname,
+		Address:  external,
+		External: true,
+		Ports: []*model.Port{{
+			Name:     "https",
+			Port:     443,
+			Protocol: model.ProtocolHTTPS,
 		}},
 	}
 }

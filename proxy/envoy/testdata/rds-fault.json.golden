@@ -1,30 +1,6 @@
 {
   "virtual_hosts": [
    {
-    "name": "gc-hello.default.svc.cluster.local|http",
-    "domains": [
-     "gc-hello:80",
-     "gc-hello",
-     "gc-hello.default:80",
-     "gc-hello.default",
-     "gc-hello.default.svc:80",
-     "gc-hello.default.svc",
-     "gc-hello.default.svc.cluster:80",
-     "gc-hello.default.svc.cluster",
-     "gc-hello.default.svc.cluster.local:80",
-     "gc-hello.default.svc.cluster.local",
-     "gc-hello.mybluemix.net:80",
-     "gc-hello.mybluemix.net"
-    ],
-    "routes": [
-     {
-      "prefix": "/",
-      "host_rewrite": "gc-hello.mybluemix.net",
-      "cluster": "out.gc-hello.default.svc.cluster.local|http"
-     }
-    ]
-   },
-   {
     "name": "hello.default.svc.cluster.local|http",
     "domains": [
      "hello:80",
@@ -44,6 +20,30 @@
      {
       "prefix": "/",
       "cluster": "out.hello.default.svc.cluster.local|http"
+     }
+    ]
+   },
+   {
+    "name": "httpbin.default.svc.cluster.local|http",
+    "domains": [
+     "httpbin:80",
+     "httpbin",
+     "httpbin.default:80",
+     "httpbin.default",
+     "httpbin.default.svc:80",
+     "httpbin.default.svc",
+     "httpbin.default.svc.cluster:80",
+     "httpbin.default.svc.cluster",
+     "httpbin.default.svc.cluster.local:80",
+     "httpbin.default.svc.cluster.local",
+     "httpbin.org:80",
+     "httpbin.org"
+    ],
+    "routes": [
+     {
+      "prefix": "/",
+      "host_rewrite": "httpbin.org",
+      "cluster": "out.httpbin.default.svc.cluster.local|http"
      }
     ]
    },
