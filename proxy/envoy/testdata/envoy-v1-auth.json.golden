@@ -25,7 +25,7 @@
                     "target.uid": "10.1.1.1"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
+                    "source.name": "hello.default.svc.cluster.local",
                     "source.uid": "10.1.1.1"
                   }
                 }
@@ -71,7 +71,7 @@
                     "target.uid": "10.1.1.1"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
+                    "source.name": "hello.default.svc.cluster.local",
                     "source.uid": "10.1.1.1"
                   }
                 }
@@ -161,7 +161,7 @@
                     "target.uid": "10.1.1.1"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
+                    "source.name": "hello.default.svc.cluster.local",
                     "source.uid": "10.1.1.1"
                   }
                 }
@@ -263,7 +263,7 @@
                     "target.uid": "10.1.1.1"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
+                    "source.name": "hello.default.svc.cluster.local",
                     "source.uid": "10.1.1.1"
                   }
                 }
