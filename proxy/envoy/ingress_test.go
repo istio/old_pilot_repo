@@ -50,8 +50,6 @@ func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	res, err := r.List(model.IngressRule, "")
-	fmt.Println(res, err)
 }
 
 func TestIngressRoutes(t *testing.T) {

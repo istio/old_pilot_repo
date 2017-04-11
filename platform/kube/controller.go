@@ -80,7 +80,7 @@ type Controller struct {
 	endpoints cacheHandler
 	ingresses cacheHandler
 
-	pods *PodCache
+	pods    *PodCache
 	secrets *secretStore
 }
 
@@ -93,11 +93,11 @@ type cacheHandler struct {
 func NewController(client *Client, config ControllerConfig) *Controller {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
-		client: client,
-		config: config,
+		client:  client,
+		config:  config,
 		secrets: newSecretStore(client.GetKubernetesClient()),
-		queue:  NewQueue(1 * time.Second),
-		kinds:  make(map[string]cacheHandler),
+		queue:   NewQueue(1 * time.Second),
+		kinds:   make(map[string]cacheHandler),
 	}
 
 	out.services = out.createInformer(&v1.Service{}, config.ResyncPeriod,
