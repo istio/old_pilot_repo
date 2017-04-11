@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
@@ -44,6 +45,7 @@ const (
 	egressProxy      = "egress-proxy"
 	ingressProxy     = "ingress-proxy"
 	app              = "app"
+	SecretName       = "istio.default"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
@@ -52,6 +54,8 @@ const (
 	mixerTag = "6655a67"
 
 	ingressServiceName = "istio-ingress-controller"
+
+	DefaultAuthConfigPath = "/etc/certs"
 )
 
 type parameters struct {
@@ -61,6 +65,7 @@ type parameters struct {
 	namespace  string
 	kubeconfig string
 	count      int
+	auth       bool
 	debug      bool
 	parallel   bool
 	logs       bool
@@ -91,6 +96,7 @@ func init() {
 	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
+	flag.BoolVar(&params.auth, "auth", false, "Enable/disable auth.")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
@@ -102,7 +108,7 @@ func main() {
 
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
-		check((&reachability{}).run())
+		check((&reachability{}).run(params.auth))
 		check(testRouting())
 	}
 
@@ -139,7 +145,11 @@ func setup() {
 
 	pods = make(map[string]string)
 
-	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
+	if params.auth {
+		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config-auth.yaml", params.namespace))
+	} else {
+		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
+	}
 	check(err)
 
 	// setup ingress resources
@@ -150,6 +160,15 @@ func setup() {
 
 	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/ingress.yaml", params.namespace))
 	check(err)
+
+	if params.auth {
+		// setup auth resources
+                _, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic " + SecretName +
+                 " --from-file=cert-chain.pem=test/integration/default_certs/cert-chain.pem "+
+                 "--from-file=key.pem=test/integration/default_certs/key.pem "+
+                 "--from-file=root-cert.pem=test/integration/default_certs/root-cert.pem",
+                params.namespace))
+	}
 
 	// deploy istio-infra
 	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned", false))
@@ -187,6 +206,12 @@ func teardown() {
 	if err := run("kubectl delete secret ingress -n " + params.namespace); err != nil {
 		glog.Warning(err)
 	}
+
+	if params.auth {
+		if err := run("kubectl delete secret " + SecretName + " -n " + params.namespace); err != nil {
+			glog.Warning(err)
+                }
+        }
 
 	if nameSpaceCreated {
 		deleteNamespace(client, params.namespace)
@@ -226,6 +251,9 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		mesh := envoy.DefaultMeshConfig
 		mesh.MixerAddress = "istio-mixer:9091"
 		mesh.DiscoveryAddress = "istio-manager:8080"
+		if params.auth {
+			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+		}
 		p := &inject.Params{
 			InitImage:       inject.InitImageName(params.hub, params.tag),
 			ProxyImage:      inject.ProxyImageName(params.hub, params.tag),

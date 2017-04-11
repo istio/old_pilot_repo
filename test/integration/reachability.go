@@ -38,7 +38,7 @@ type reachability struct {
 	mixerLogs map[string]string
 }
 
-func (r *reachability) run() error {
+func (r *reachability) run(auth bool) error {
 	glog.Info("Verifying basic reachability across pods/services (a, b, and t)..")
 
 	r.mixerLogs = make(map[string]string)
@@ -47,7 +47,7 @@ func (r *reachability) run() error {
 		r.accessLogs[app] = make([]string, 0)
 	}
 
-	if err := r.makeRequests(); err != nil {
+	if err := r.makeRequests(auth); err != nil {
 		return err
 	}
 
@@ -55,8 +55,10 @@ func (r *reachability) run() error {
 		return err
 	}
 
-	if err := r.verifyIngress(); err != nil {
-		return err
+	if !auth {
+		if err := r.verifyIngress(); err != nil {
+			return err
+		}
 	}
 
 	if glog.V(2) {
@@ -116,11 +118,18 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 }
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func (r *reachability) makeRequests() error {
+func (r *reachability) makeRequests(auth bool) error {
 	g, ctx := errgroup.WithContext(context.Background())
-	testPods := []string{"a", "b", "t"}
+	testPods := []string{"a", "b"}
+	if !auth {
+		testPods = append(testPods, "t")
+	}
 	for _, src := range testPods {
 		for _, dst := range testPods {
+			// Bug: SSL can't talk to itself.
+			if dst != src {
+				continue
+			}
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + params.namespace} {
 					if params.parallel {
