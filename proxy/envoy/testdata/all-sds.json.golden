@@ -1,6 +1,19 @@
 {
   "services": [
    {
+    "key": "hello.default.svc.cluster.local|custom",
+    "hosts": [
+     {
+      "ip_address": "10.1.1.0",
+      "port": 1090
+     },
+     {
+      "ip_address": "10.1.1.1",
+      "port": 1090
+     }
+    ]
+   },
+   {
     "key": "hello.default.svc.cluster.local|http",
     "hosts": [
      {
@@ -10,22 +23,6 @@
      {
       "ip_address": "10.1.1.1",
       "port": 80
-     },
-     {
-      "ip_address": "10.1.1.0",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.1.1.0",
-      "port": 1090
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 1090
      }
     ]
    },
@@ -34,55 +31,23 @@
     "hosts": [
      {
       "ip_address": "10.1.1.0",
-      "port": 80
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 80
-     },
-     {
-      "ip_address": "10.1.1.0",
       "port": 1081
      },
      {
       "ip_address": "10.1.1.1",
       "port": 1081
-     },
-     {
-      "ip_address": "10.1.1.0",
-      "port": 1090
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 1090
      }
     ]
    },
    {
-    "key": "hello.default.svc.cluster.local|custom",
+    "key": "world.default.svc.cluster.local|custom",
     "hosts": [
      {
-      "ip_address": "10.1.1.0",
-      "port": 80
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 80
-     },
-     {
-      "ip_address": "10.1.1.0",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.1.1.1",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.1.1.0",
+      "ip_address": "10.2.1.0",
       "port": 1090
      },
      {
-      "ip_address": "10.1.1.1",
+      "ip_address": "10.2.1.1",
       "port": 1090
      }
     ]
@@ -97,22 +62,6 @@
      {
       "ip_address": "10.2.1.1",
       "port": 80
-     },
-     {
-      "ip_address": "10.2.1.0",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.2.1.0",
-      "port": 1090
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 1090
      }
     ]
    },
@@ -121,56 +70,11 @@
     "hosts": [
      {
       "ip_address": "10.2.1.0",
-      "port": 80
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 80
-     },
-     {
-      "ip_address": "10.2.1.0",
       "port": 1081
      },
      {
       "ip_address": "10.2.1.1",
       "port": 1081
-     },
-     {
-      "ip_address": "10.2.1.0",
-      "port": 1090
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 1090
-     }
-    ]
-   },
-   {
-    "key": "world.default.svc.cluster.local|custom",
-    "hosts": [
-     {
-      "ip_address": "10.2.1.0",
-      "port": 80
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 80
-     },
-     {
-      "ip_address": "10.2.1.0",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 1081
-     },
-     {
-      "ip_address": "10.2.1.0",
-      "port": 1090
-     },
-     {
-      "ip_address": "10.2.1.1",
-      "port": 1090
      }
     ]
    }

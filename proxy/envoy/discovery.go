@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -156,6 +157,8 @@ type host struct {
 	// Weight is an integer in the range [1, 100] or empty
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
+
+type serviceSorter []*service
 
 type services struct {
 	Services []*service `json:"services"`
@@ -320,7 +323,7 @@ func (ds *DiscoveryService) clearCache() {
 	ds.rdsCache.clear()
 }
 
-// ListAllEndpoints responds to SDS requests that are not limited by a key
+// ListAllEndpoints responds with all Services and is restricted to a single service key
 func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response *restful.Response) {
 
 	servicesArray := make([]*service, 0)
@@ -328,7 +331,7 @@ func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response 
 		for _, port := range svc.Ports {
 
 			hostArray := make([]*host, 0)
-			for _, ep := range ds.services.Instances(svc.Hostname, svc.Ports.GetNames(), []model.Tags{}) {
+			for _, ep := range ds.services.Instances(svc.Hostname, []string{port.Name}, []model.Tags{}) {
 				hostArray = append(hostArray, &host{
 					Address: ep.Endpoint.Address,
 					Port:    ep.Endpoint.Port,
@@ -341,6 +344,10 @@ func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response 
 			})
 		}
 	}
+
+	// Sort servicesArray.  This is not strictly necessary, but discovery_test.go will
+	// be comparing against a golden example using test/util/diff.go which does a textual comparison
+	sort.Sort(serviceSorter(servicesArray))
 
 	var err error
 	var out []byte
@@ -481,3 +488,7 @@ func writeResponse(r *restful.Response, data []byte) {
 		glog.Warning(err)
 	}
 }
+
+func (a serviceSorter) Len() int           { return len(a) }
+func (a serviceSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a serviceSorter) Less(i, j int) bool { return a[i].Key < a[j].Key }
