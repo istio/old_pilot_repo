@@ -44,9 +44,8 @@ const (
 	mixer            = "mixer"
 	egressProxy      = "egress-proxy"
 	ingressProxy     = "ingress-proxy"
-	CA               = "ca"
+	ca               = "ca"
 	app              = "app"
-	SecretName       = "istio.default"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
@@ -58,8 +57,6 @@ const (
 	mixerTag = "6655a67"
 
 	ingressServiceName = "istio-ingress-controller"
-
-	DefaultAuthConfigPath = "/etc/certs"
 )
 
 type parameters struct {
@@ -106,7 +103,7 @@ func init() {
 	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
-	flag.StringVar(&params.auth, "authmode", "both", "Enable / disable auth, or test both.")
+	flag.StringVar(&params.auth, "auth", "both", "Enable / disable auth, or test both.")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
@@ -147,7 +144,7 @@ func runTest() {
 	}
 
 	teardown()
-	glog.Infof("\n--------------- All tests passed %d time(s) with auth: %t! ---------------\n", params.count, enableAuth)
+	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", enableAuth, params.count)
 }
 
 func setup() {
@@ -180,7 +177,7 @@ func setup() {
 	pods = make(map[string]string)
 
 	if enableAuth {
-		check(deploy("ca", "ca", CA, "", "", "", "", "unversioned", false))
+		check(deploy("ca", "ca", ca, "", "", "", "", "unversioned", false))
 		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config-auth.yaml", params.namespace))
 	} else {
 		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
@@ -232,12 +229,6 @@ func teardown() {
 	if err := run("kubectl delete secret ingress -n " + params.namespace); err != nil {
 		glog.Warning(err)
 	}
-
-	if enableAuth {
-		if err := run("kubectl delete secret " + SecretName + " -n " + params.namespace); err != nil {
-			glog.Warning(err)
-                }
-        }
 
 	if nameSpaceCreated {
 		deleteNamespace(client, params.namespace)
