@@ -273,7 +273,7 @@ func (r *reachability) verifyTCPRouting() error {
 // retry loop
 func (r *reachability) makeEgressRequest(src, dst string, secure bool, done func() bool) func() error {
 	return func() error {
-		url := ""
+		var url string
 		if secure {
 			url = fmt.Sprintf("https://%s:443/headers", dst)
 		} else {
