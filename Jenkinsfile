@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-518be06')
+@Library('testutils@33a0a2b')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
