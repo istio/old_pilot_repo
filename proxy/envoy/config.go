@@ -336,22 +336,13 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	tcpClusters := make(Clusters, 0)
 	for _, service := range services {
 		if service.External {
-			continue // TODO TCP and HTTPS external not currently supported
+			continue // TODO TCP and HTTPS external services not currently supported
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS:
 				// TODO: Enable SSL context for TCP and HTTPS services.
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				if service.External {
-					cluster.ServiceName = ""
-					cluster.Type = ClusterTypeStrictDNS
-					cluster.Hosts = []Host{
-						{
-							URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
-						},
-					}
-				}
 				route := buildTCPRoute(cluster, []string{service.Address})
 				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
 				listener := buildTCPListener(config, service.Address, servicePort.Port)
