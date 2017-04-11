@@ -66,7 +66,6 @@ type ControllerConfig struct {
 	ResyncPeriod    time.Duration
 	IngressSyncMode IngressSyncMode
 	IngressClass    string
-	Secrets         *secretStore
 }
 
 // Controller is a collection of synchronized resource watchers
@@ -82,6 +81,7 @@ type Controller struct {
 	ingresses cacheHandler
 
 	pods *PodCache
+	secrets *secretStore
 }
 
 type cacheHandler struct {
@@ -95,6 +95,7 @@ func NewController(client *Client, config ControllerConfig) *Controller {
 	out := &Controller{
 		client: client,
 		config: config,
+		secrets: newSecretStore(client.GetKubernetesClient()),
 		queue:  NewQueue(1 * time.Second),
 		kinds:  make(map[string]cacheHandler),
 	}
@@ -619,6 +620,11 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 	return out
 }
 
+// GetTLSSecret implements secret registry operation.
+func (c *Controller) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
+	return c.secrets.GetTLSSecret(namespace, host)
+}
+
 const (
 	// IstioServiceAccountPrefix is always the prefix for Istio service accounts.
 	IstioServiceAccountPrefix = "istio:"
@@ -758,10 +764,10 @@ func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS) {
 		}
 
 		if len(t.Hosts) == 0 {
-			c.config.Secrets.put("*", t.SecretName)
+			c.secrets.put(c.config.Namespace, "*", t.SecretName)
 		} else {
 			for _, host := range t.Hosts {
-				c.config.Secrets.put(host, t.SecretName)
+				c.secrets.put(c.config.Namespace, host, t.SecretName)
 			}
 		}
 	}

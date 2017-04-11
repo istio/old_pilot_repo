@@ -19,12 +19,12 @@ package model
 // the data immediately to the client of this interface.
 // TODO: add controller hooks for notification about changes to the secret
 type SecretRegistry interface {
-	// GetSecret retrieves the secret data by a platform specific URI
-	GetSecret(uri string) (*TLSContext, error)
+	// GetTLSSecret retrieves a TLS secret by namespace and host
+	GetTLSSecret(namespace, host string) (*TLSSecret, error)
 }
 
-// TLSContext defines a TLS configuration.
-type TLSContext struct {
+// TLSSecret defines a TLS configuration.
+type TLSSecret struct {
 	Certificate []byte
 	PrivateKey  []byte
 }

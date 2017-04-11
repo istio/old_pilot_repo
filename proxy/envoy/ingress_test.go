@@ -18,12 +18,13 @@ const (
 	ingressRouteRule2            = "testdata/ingress-route-2.yaml.golden"
 	ingressCertFile              = "testdata/tls.crt"
 	ingressKeyFile               = "testdata/tls.key"
+	ingressNamespace             = "default"
 )
 
 var (
-	ingressCert       = []byte("abcdefghijklmnop")
-	ingressKey        = []byte("qrstuvwxyz123456")
-	ingressTLSContext = &model.TLSContext{Certificate: ingressCert, PrivateKey: ingressKey}
+	ingressCert      = []byte("abcdefghijklmnop")
+	ingressKey       = []byte("qrstuvwxyz123456")
+	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
 )
 
 func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
@@ -45,10 +46,12 @@ func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = r.Post(model.Key{Kind: model.IngressRule, Name: fmt.Sprintf("route_%d", i)}, msg); err != nil {
+		if err = r.Post(model.Key{Kind: model.IngressRule, Name: fmt.Sprintf("route_%d", i), Namespace: ingressNamespace}, msg); err != nil {
 			t.Fatal(err)
 		}
 	}
+	res, err := r.List(model.IngressRule, "")
+	fmt.Println(res, err)
 }
 
 func TestIngressRoutes(t *testing.T) {
@@ -56,20 +59,21 @@ func TestIngressRoutes(t *testing.T) {
 	s := &mock.SecretRegistry{}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
-		Registry: r,
-		Secrets:  s,
-		Mesh:     &DefaultMeshConfig,
+		Registry:  r,
+		Namespace: ingressNamespace,
+		Secrets:   s,
+		Mesh:      &DefaultMeshConfig,
 	}, ingressEnvoyConfig, t)
 }
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{"*": ingressTLSContext}
+	s := &mock.SecretRegistry{ingressNamespace: {"*": ingressTLSSecret}}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
 		KeyFile:   ingressKeyFile,
-		Namespace: "",
+		Namespace: ingressNamespace,
 		Secrets:   s,
 		Registry:  r,
 		Mesh:      &DefaultMeshConfig,
@@ -80,12 +84,12 @@ func TestIngressRoutesSSL(t *testing.T) {
 
 func TestIngressRoutesPartialSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{"world.default.svc.cluster.local": ingressTLSContext}
+	s := &mock.SecretRegistry{ingressNamespace: {"world.default.svc.cluster.local": ingressTLSSecret}}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
 		KeyFile:   ingressKeyFile,
-		Namespace: "",
+		Namespace: ingressNamespace,
 		Secrets:   s,
 		Registry:  r,
 		Mesh:      &DefaultMeshConfig,

@@ -91,8 +91,7 @@ type IngressConfig struct {
 }
 
 func generateIngress(conf *IngressConfig) *Config {
-	vhosts, vhostsTLS, tls := buildIngressVhosts(conf)
-	listeners, clusters := buildIngressListeners(vhosts, vhostsTLS, tls, conf)
+	listeners, clusters := buildIngressListeners(conf)
 
 	return &Config{
 		Listeners: listeners,
@@ -110,7 +109,7 @@ func generateIngress(conf *IngressConfig) *Config {
 	}
 }
 
-func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *model.TLSContext) {
+func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *model.TLSSecret) {
 	rules := conf.Registry.IngressRules(conf.Namespace)
 
 	rulesByHost := make(map[string][]*config.RouteRule, len(rules))
@@ -134,7 +133,7 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 	// ensure that only one TLS config is used
 	// TODO: extensive tests for the TLS logic
 	tlsValid := true
-	tls, err := conf.Secrets.GetSecret("*")
+	tls, err := conf.Secrets.GetTLSSecret(conf.Namespace, "*")
 	if err != nil {
 		glog.Warningf("Error retrieving TLS context for wildcard: %v", err)
 		tlsValid = false
@@ -143,14 +142,17 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 
 	tlsHosts := make(map[string]bool)
 	for host := range rulesByHost {
-		if t, err := conf.Secrets.GetSecret(host); err != nil {
+		t, err := conf.Secrets.GetTLSSecret(conf.Namespace, host)
+		if err != nil {
+			tlsValid = false
+			tlsHosts[host] = true // count this as a TLS host so that it is omitted from the config
+
 			glog.Warningf("Error retrieving TLS context for %q: %v", host, err)
-			tlsHosts[host] = true
 		} else if t != nil {
 			if tls == nil {
 				tls = t
 			} else if string(tls.PrivateKey) != string(t.PrivateKey) || string(tls.Certificate) != string(t.Certificate) {
-				glog.Warningf("Invalid ingress configuration for %q: multiple TLS configs", host)
+				glog.Warningf("Unsupported ingress configuration %q: multiple TLS configs", host)
 				tlsValid = false
 			}
 			tlsHosts[host] = true
@@ -192,8 +194,9 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 	return vhosts, vhostsTLS, tls
 }
 
-func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSContext, conf *IngressConfig) (
-	Listeners, Clusters) {
+func buildIngressListeners(conf *IngressConfig) (Listeners, Clusters) {
+	vhosts, vhostsTLS, tls := buildIngressVhosts(conf)
+
 	clusters := make(Clusters, 0)
 	listeners := make([]*Listener, 0)
 
@@ -230,7 +233,6 @@ func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSConte
 	}
 
 	if len(vhostsTLS) > 0 {
-		// write key/cert
 		if err := writeTLS(conf.CertFile, conf.KeyFile, tls); err != nil {
 			glog.Warning("Failed to get and save secrets. Envoy will crash and trigger a retry...")
 		}
@@ -276,7 +278,7 @@ func buildIngressListeners(vhosts, vhostsTLS []*VirtualHost, tls *model.TLSConte
 	return listeners, clusters
 }
 
-func writeTLS(certFile, keyFile string, tls *model.TLSContext) error {
+func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	if err := ioutil.WriteFile(certFile, tls.Certificate, 0755); err != nil {
 		return err
 	}

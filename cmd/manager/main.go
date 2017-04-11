@@ -163,20 +163,18 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			secrets := kube.newSecretStore(flags.namespace, client.GetKubernetesClient())
 			controllerConfig := kube.ControllerConfig{
 				Namespace:       flags.namespace,
 				ResyncPeriod:    flags.resyncPeriod,
 				IngressSyncMode: kube.IngressStrict,
 				IngressClass:    flags.ingressClass,
-				Secrets:         secrets,
 			}
 			controller := kube.NewController(client, controllerConfig)
 			config := &envoy.IngressConfig{
 				CertFile:  "/etc/tls.crt",
 				KeyFile:   "/etc/tls.key",
 				Namespace: flags.namespace,
-				Secrets:   secrets,
+				Secrets:   controller,
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
 				Mesh:      mesh,
 			}
