@@ -108,6 +108,15 @@ func TestServiceDiscovery(t *testing.T) {
 	compareResponse(response, "testdata/sds.json", t)
 }
 
+// Can we list Services?
+func TestServiceDiscoveryListAllServices(t *testing.T) {
+	ds := makeDiscoveryService(t, mock.MakeRegistry())
+
+	url := "/v1/registration/"
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/all-sds.json", t)
+}
+
 func TestServiceDiscoveryVersion(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := "/v1/registration/" + mock.HelloService.Key(mock.HelloService.Ports[0],

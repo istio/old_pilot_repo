@@ -157,6 +157,15 @@ type host struct {
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
 
+type services struct {
+	Services []*service `json:"services"`
+}
+
+type service struct {
+	Key   string  `json:"key"`
+	Hosts []*host `json:"hosts"`
+}
+
 // Request parameters for discovery services
 const (
 	ServiceKey      = "service-key"
@@ -225,6 +234,15 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 	ws := &restful.WebService{}
 	ws.Produces(restful.MIME_JSON)
 
+	// List all known services (informational, not invoked by Envoy)
+	ws.Route(ws.
+		GET(fmt.Sprintf("/v1/registration/")).
+		To(ds.ListAllEndpoints).
+		Doc("Services in SDS").
+		Produces(restful.MIME_JSON))
+
+	// This route makes discovery act as an Envoy Service discovery service (SDS).
+	// See https://lyft.github.io/envoy/docs/intro/arch_overview/service_discovery.html#arch-overview-service-discovery-sds
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/registration/{%s}", ServiceKey)).
 		To(ds.ListEndpoints).
@@ -300,6 +318,38 @@ func (ds *DiscoveryService) clearCache() {
 	ds.sdsCache.clear()
 	ds.cdsCache.clear()
 	ds.rdsCache.clear()
+}
+
+// ListAllEndpoints responds to SDS requests that are not limited by a key
+func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response *restful.Response) {
+
+	servicesArray := make([]*service, 0)
+	for _, svc := range ds.services.Services() {
+		for _, port := range svc.Ports {
+
+			hostArray := make([]*host, 0)
+			for _, ep := range ds.services.Instances(svc.Hostname, svc.Ports.GetNames(), []model.Tags{}) {
+				hostArray = append(hostArray, &host{
+					Address: ep.Endpoint.Address,
+					Port:    ep.Endpoint.Port,
+				})
+			}
+
+			servicesArray = append(servicesArray, &service{
+				Key:   svc.Key(port, nil),
+				Hosts: hostArray,
+			})
+		}
+	}
+
+	var err error
+	var out []byte
+	if out, err = json.MarshalIndent(services{Services: servicesArray}, " ", " "); err != nil {
+		errorResponse(response, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeResponse(response, out)
 }
 
 // ListEndpoints responds to SDS requests
