@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-2d6eb00')
+@Library('testutils@stable-96c1bdb')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -32,15 +32,19 @@ mainFlow(utils) {
   if (utils.runStage('STABLE_POSTSUBMIT')) {
     stablePostsubmit(gitUtils, bazel, utils)
   }
+  // Regression test to run for modules managed depends on
+  if (utils.runStage('REGRESSION')) {
+    managerRegression(gitUtils, bazel, utils)
+  }
 }
 
 def presubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
     utils.initTestingCluster()
+    sh('ln -s ~/.kube/config platform/kube/')
     stage('Bazel Build') {
       // Use Testing cluster
-      sh('ln -s ~/.kube/config platform/kube/')
       sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
@@ -61,7 +65,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh("bin/e2e.sh -tag ${gitUtils.GIT_SHA} -v 2")
+        sh("bin/e2e.sh -tag ${env.GIT_SHA} -v 2")
       }
     }
     stage('Build istioctl') {
@@ -78,7 +82,7 @@ def stablePresubmit(gitUtils, bazel, utils) {
     sh('ln -s ~/.kube/config platform/kube/')
     stage('Integration Tests') {
       timeout(30) {
-        sh("bin/e2e.sh -count 10 -debug -tag ${gitUtils.GIT_SHA} -v 2")
+        sh("bin/e2e.sh -count 10 -debug -tag ${env.GIT_SHA} -v 2")
       }
     }
     stage('Build istioctl') {
@@ -91,9 +95,10 @@ def stablePresubmit(gitUtils, bazel, utils) {
 def stablePostsubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
+    sh('ln -s ~/.kube/config platform/kube/')
     stage('Docker Push') {
       def images = 'init,init_debug,app,app_debug,proxy,proxy_debug,manager,manager_debug'
-      def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
+      def tags = "${env.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
       utils.publishDockerImagesToDockerHub(images, tags)
       utils.publishDockerImagesToContainerRegistry(images, tags, '', 'gcr.io/istio-io')
     }
@@ -115,6 +120,28 @@ def postsubmit(gitUtils, bazel, utils) {
       sh('bin/init.sh')
       sh('bin/codecov.sh')
       utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
+    }
+    utils.fastForwardStable('manager')
+  }
+}
+
+def managerRegression(gitUtils, bazel, utils) {
+  goBuildNode(gitUtils, 'istio.io/manager') {
+    bazel.updateBazelRc()
+    utils.initTestingCluster()
+    stage('Bazel Build') {
+      // Use Testing cluster
+      sh('ln -s ~/.kube/config platform/kube/')
+      bazel.fetch('-k //...')
+      bazel.build('//...')
+    }
+    stage('Bazel Tests') {
+      bazel.test('//...')
+    }
+    stage('Integration Tests') {
+      timeout(15) {
+        sh("bin/e2e.sh -tag ${env.GIT_SHA} -v 2")
+      }
     }
   }
 }
