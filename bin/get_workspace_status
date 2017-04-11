@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BUILD_GIT_REVISION=$(git rev-parse --short HEAD 2> /dev/null)
+GIT_SHA="${BUILD_GIT_REVISION}"
 if [[  $? == 0 ]]; then
     git diff-index --quiet HEAD
     if [[  $? != 0 ]]; then
@@ -10,8 +11,25 @@ else
     BUILD_GIT_REVISION=unknown
 fi
 
-echo buildAppVersion    $(git describe 2> /dev/null || echo unknown)
+function get_branch() {
+    local branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    local remote=''
+    if [[ "${branch}" == 'HEAD' ]]; then
+      remote="$(git remote | head -n 1)"
+      branch="$(git show-ref | grep "${GIT_SHA}" \
+        | grep remotes | grep -v HEAD | sed -e "s/.*remotes.${remote}.//")"
+    fi
+    if [[ -n "${branch}" ]]; then
+      echo "${branch}"
+    else
+      echo 'unknown'
+    fi
+}
+
+get_branch
+
+echo buildAppVersion    "$(git describe 2> /dev/null || echo unknown)"
 echo buildGitRevision   "${BUILD_GIT_REVISION}"
-echo buildGitBranch     $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
-echo buildUser          $(whoami)
-echo buildHost          $(hostname -f)
+echo buildGitBranch     "$(get_branch)"
+echo buildUser          "$(whoami)"
+echo buildHost          "$(hostname -f)"
