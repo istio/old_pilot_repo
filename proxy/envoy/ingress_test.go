@@ -46,7 +46,8 @@ func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = r.Post(model.Key{Kind: model.IngressRule, Name: fmt.Sprintf("route_%d", i), Namespace: ingressNamespace}, msg); err != nil {
+		key := model.Key{Kind: model.IngressRule, Name: fmt.Sprintf("route_%d", i), Namespace: ingressNamespace}
+		if err = r.Post(key, msg); err != nil {
 			t.Fatal(err)
 		}
 	}
