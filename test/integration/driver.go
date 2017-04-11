@@ -62,7 +62,7 @@ const (
 type parameters struct {
 	hub        string
 	tag        string
-	caImage string
+	caImage    string
 	mixerImage string
 	namespace  string
 	kubeconfig string
