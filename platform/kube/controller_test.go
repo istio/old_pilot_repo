@@ -65,7 +65,7 @@ func TestSecret(t *testing.T) {
 	secret := "istio-secret"
 	_, err := cl.client.Core().Secrets(ns).Create(&v1.Secret{
 		ObjectMeta: meta_v1.ObjectMeta{Name: secret},
-		Data:       map[string][]byte{secretCert: []byte(cert), secretKey:[]byte(key)},
+		Data:       map[string][]byte{secretCert: []byte(cert), secretKey: []byte(key)},
 	})
 	if err != nil {
 		t.Error(err)
