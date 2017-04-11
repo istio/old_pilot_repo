@@ -24,14 +24,12 @@ go_library(
 go_binary(
     name = "integration",
     data = [
+        "ca.yaml.tmpl",
         "app.yaml.tmpl",
         "cert.crt",
         "cert.key",
         "config.yaml",
         "config-auth.yaml",
-        "default_certs/cert-chain.pem",
-        "default_certs/key.pem",
-        "default_certs/root-cert.pem",
         "egress-proxy.yaml.tmpl",
         "ingress.yaml",
         "ingress-proxy.yaml.tmpl",

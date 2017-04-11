@@ -56,6 +56,7 @@ func (r *reachability) run(auth bool) error {
 	}
 
 	if !auth {
+		// Currently ingress cannot talk in Istio auth to cluster pods.
 		if err := r.verifyIngress(); err != nil {
 			return err
 		}
@@ -122,14 +123,11 @@ func (r *reachability) makeRequests(auth bool) error {
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b"}
 	if !auth {
+		// t is not behind proxy, so it cannot talk in Istio auth.
 		testPods = append(testPods, "t")
 	}
 	for _, src := range testPods {
 		for _, dst := range testPods {
-			// Bug: SSL can't talk to itself.
-			if dst != src {
-				continue
-			}
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + params.namespace} {
 					if params.parallel {

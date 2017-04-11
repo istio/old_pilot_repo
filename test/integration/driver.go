@@ -44,11 +44,15 @@ const (
 	mixer            = "mixer"
 	egressProxy      = "egress-proxy"
 	ingressProxy     = "ingress-proxy"
+	CA               = "ca"
 	app              = "app"
 	SecretName       = "istio.default"
 
 	// budget is the maximum number of retries with 1s delays
 	budget = 90
+
+	// CA image tag is the short SHA *update manually*
+	caTag = "f063b41"
 
 	// Mixer image tag is the short SHA *update manually*
 	mixerTag = "6655a67"
@@ -61,11 +65,12 @@ const (
 type parameters struct {
 	hub        string
 	tag        string
+	caImage string
 	mixerImage string
 	namespace  string
 	kubeconfig string
 	count      int
-	auth       bool
+	auth       string
 	debug      bool
 	parallel   bool
 	logs       bool
@@ -84,11 +89,16 @@ var (
 
 	// indicates whether the namespace is auto-generated
 	nameSpaceCreated bool
+
+	// Whether enable auth for the tests.
+	enableAuth bool
 )
 
 func init() {
 	flag.StringVar(&params.hub, "hub", "gcr.io/istio-testing", "Docker hub")
 	flag.StringVar(&params.tag, "tag", "", "Docker tag")
+	flag.StringVar(&params.caImage, "ca", "gcr.io/istio-testing/istio-ca:"+caTag,
+		"CA Docker image")
 	flag.StringVar(&params.mixerImage, "mixer", "gcr.io/istio-testing/mixer:"+mixerTag,
 		"Mixer Docker image")
 	flag.StringVar(&params.namespace, "n", "",
@@ -96,7 +106,7 @@ func init() {
 	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
-	flag.BoolVar(&params.auth, "auth", false, "Enable/disable auth.")
+	flag.StringVar(&params.auth, "authmode", "both", "Enable / disable auth, or test both.")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
@@ -104,16 +114,40 @@ func init() {
 
 func main() {
 	flag.Parse()
+	switch params.auth {
+	case "enable":
+		enableAuth = true
+		runTest()
+		break
+	case "disable":
+		enableAuth = false
+		runTest()
+		break
+	case "both":
+		enableAuth = false
+		runTest()
+		time.Sleep(30 * time.Second)
+		enableAuth = true
+		runTest()
+		break
+	default:
+		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", params.auth)
+	}
+}
+
+func runTest() {
+	glog.Infof("\n--------------- Run tests with auth: %t ---------------", enableAuth)
+
 	setup()
 
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
-		check((&reachability{}).run(params.auth))
+		check((&reachability{}).run(enableAuth))
 		check(testRouting())
 	}
 
 	teardown()
-	glog.Infof("All tests passed %d time(s)!", params.count)
+	glog.Infof("\n--------------- All tests passed %d time(s) with auth: %t! ---------------\n", params.count, enableAuth)
 }
 
 func setup() {
@@ -145,7 +179,8 @@ func setup() {
 
 	pods = make(map[string]string)
 
-	if params.auth {
+	if enableAuth {
+		check(deploy("ca", "ca", CA, "", "", "", "", "unversioned", false))
 		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config-auth.yaml", params.namespace))
 	} else {
 		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
@@ -160,15 +195,6 @@ func setup() {
 
 	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/ingress.yaml", params.namespace))
 	check(err)
-
-	if params.auth {
-		// setup auth resources
-                _, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic " + SecretName +
-                 " --from-file=cert-chain.pem=test/integration/default_certs/cert-chain.pem "+
-                 "--from-file=key.pem=test/integration/default_certs/key.pem "+
-                 "--from-file=root-cert.pem=test/integration/default_certs/root-cert.pem",
-                params.namespace))
-	}
 
 	// deploy istio-infra
 	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned", false))
@@ -207,7 +233,7 @@ func teardown() {
 		glog.Warning(err)
 	}
 
-	if params.auth {
+	if enableAuth {
 		if err := run("kubectl delete secret " + SecretName + " -n " + params.namespace); err != nil {
 			glog.Warning(err)
                 }
@@ -251,7 +277,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		mesh := envoy.DefaultMeshConfig
 		mesh.MixerAddress = "istio-mixer:9091"
 		mesh.DiscoveryAddress = "istio-manager:8080"
-		if params.auth {
+		if enableAuth {
 			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 		}
 		p := &inject.Params{
@@ -350,6 +376,7 @@ func write(in string, data map[string]string, out io.Writer) error {
 	values := make(map[string]string)
 	values["hub"] = params.hub
 	values["tag"] = params.tag
+	values["caImage"] = params.caImage
 	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
 	values["verbosity"] = strconv.Itoa(params.verbosity)

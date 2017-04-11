@@ -16,7 +16,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -tag) tag="$2"; shift ;;
         -hub) hub="$2"; args=$args" -hub $hub"; shift ;;
-        -auth) auth="$2"; args=$args" -auth" ;;
         -debug) debug_suffix="_debug" ; args=$args" -debug" ;;
         *) args=$args" $1" ;;
     esac
