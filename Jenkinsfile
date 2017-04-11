@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('testutils@stable-518be06')
+@Library('testutils@stable-96c1bdb')
 
 import org.istio.testutils.Utilities
 import org.istio.testutils.GitUtilities
@@ -42,9 +42,9 @@ def presubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
     utils.initTestingCluster()
+    sh('ln -s ~/.kube/config platform/kube/')
     stage('Bazel Build') {
       // Use Testing cluster
-      sh('ln -s ~/.kube/config platform/kube/')
       sh('bin/install-prereqs.sh')
       bazel.fetch('-k //...')
       bazel.build('//...')
@@ -65,7 +65,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh("bin/e2e.sh -tag ${gitUtils.GIT_SHA} -v 2")
+        sh("bin/e2e.sh -tag ${env.GIT_SHA} -v 2")
       }
     }
     stage('Build istioctl') {
@@ -82,7 +82,7 @@ def stablePresubmit(gitUtils, bazel, utils) {
     sh('ln -s ~/.kube/config platform/kube/')
     stage('Integration Tests') {
       timeout(30) {
-        sh("bin/e2e.sh -count 10 -debug -tag ${gitUtils.GIT_SHA} -v 2")
+        sh("bin/e2e.sh -count 10 -debug -tag ${env.GIT_SHA} -v 2")
       }
     }
     stage('Build istioctl') {
@@ -95,9 +95,10 @@ def stablePresubmit(gitUtils, bazel, utils) {
 def stablePostsubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/manager') {
     bazel.updateBazelRc()
+    sh('ln -s ~/.kube/config platform/kube/')
     stage('Docker Push') {
       def images = 'init,init_debug,app,app_debug,proxy,proxy_debug,manager,manager_debug'
-      def tags = "${gitUtils.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
+      def tags = "${env.GIT_SHORT_SHA},\$(date +%Y-%m-%d-%H.%M.%S),latest"
       utils.publishDockerImagesToDockerHub(images, tags)
       utils.publishDockerImagesToContainerRegistry(images, tags, '', 'gcr.io/istio-io')
     }
@@ -139,7 +140,7 @@ def managerRegression(gitUtils, bazel, utils) {
     }
     stage('Integration Tests') {
       timeout(15) {
-        sh("bin/e2e.sh -tag ${gitUtils.GIT_SHA} -v 2")
+        sh("bin/e2e.sh -tag ${env.GIT_SHA} -v 2")
       }
     }
   }
