@@ -51,7 +51,7 @@ iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port ${ISTIO_PROXY_PORT}
 iptables -t nat -A OUTPUT -p tcp -o lo -j REDIRECT \
   ! -d 127.0.0.1/32 --to-port ${ISTIO_PROXY_PORT}
 
-# 3. Locally generated traffic not sent explicitly to loopback IP
+# 3. Locally generated traffic not sent explicitly from loopback IP
 # (i.e. proxy aware) or not from the proxy itself is redirected proxy port.
 iptables -t nat -A OUTPUT -p tcp -j REDIRECT ! -s 127.0.0.1/32 \
   --to-port ${ISTIO_PROXY_PORT} -m owner '!' --uid-owner ${ISTIO_PROXY_UID}
