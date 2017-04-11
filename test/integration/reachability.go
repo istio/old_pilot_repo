@@ -271,14 +271,10 @@ func (r *reachability) verifyTCPRouting() error {
 
 // makeEgressRequest creates a function to make egress requests; done should return true to quickly exit the
 // retry loop
-func (r *reachability) makeEgressRequest(src, dst string, secure bool, done func() bool) func() error {
+func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func() error {
 	return func() error {
-		var url string
-		if secure {
-			url = fmt.Sprintf("https://%s:443/headers", dst)
-		} else {
-			url = fmt.Sprintf("http://%s:80/headers", dst)
-		}
+		url := fmt.Sprintf("http://%s/headers", dst)
+
 		for n := 0; n < budget; n++ {
 			trace := fmt.Sprint(time.Now().UnixNano())
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
@@ -288,7 +284,7 @@ func (r *reachability) makeEgressRequest(src, dst string, secure bool, done func
 				return err
 			}
 
-			if strings.Contains(resp, trace) {
+			if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
 				return nil
 			}
 
@@ -305,15 +301,15 @@ func (r *reachability) makeEgressRequest(src, dst string, secure bool, done func
 func (r *reachability) verifyEgress() error {
 	g, ctx := errgroup.WithContext(context.Background())
 
-	extServices := map[string]bool{
-		"httpbin": false,
-		//"httpsbin": true, TODO
+	extServices := []string{
+		"httpbin",
+		//"httpsbin",TODO
 	}
 
 	for _, src := range []string{"a", "b"} {
-		for srv, secure := range extServices {
+		for _, extSrv := range extServices {
 			if params.parallel {
-				g.Go(r.makeEgressRequest(src, srv, secure, func() bool {
+				g.Go(r.makeEgressRequest(src, extSrv, func() bool {
 					select {
 					case <-time.After(time.Second):
 					// try again
@@ -324,7 +320,7 @@ func (r *reachability) verifyEgress() error {
 
 				}))
 			} else {
-				if err := r.makeEgressRequest(src, srv, secure, func() bool {
+				if err := r.makeEgressRequest(src, extSrv, func() bool {
 					return false
 				})(); err != nil {
 					return err

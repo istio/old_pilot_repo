@@ -14,8 +14,7 @@
                 {
                   "name": "httpbin.org|80",
                   "domains": [
-                    "httpbin.default.svc.cluster.local",
-                    "httpbin.org"
+                    "httpbin.default.svc.cluster.local"
                   ],
                   "routes": [
                     {

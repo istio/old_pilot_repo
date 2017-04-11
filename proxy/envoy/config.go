@@ -272,7 +272,7 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 
 				if service.External {
 					for _, route := range routes {
-						route.HostRewrite = service.Address
+						route.HostRewrite = service.Hostname
 						for _, cluster := range route.clusters {
 							cluster.ServiceName = ""
 							cluster.Type = ClusterTypeStrictDNS

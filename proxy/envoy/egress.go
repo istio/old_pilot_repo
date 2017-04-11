@@ -165,7 +165,7 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 
 			host = &VirtualHost{
 				Name:    buildEgressClusterName(svc.Address, servicePort.Port),
-				Domains: []string{svc.Hostname, svc.Address},
+				Domains: []string{svc.Hostname},
 				Routes:  []*HTTPRoute{route},
 			}
 

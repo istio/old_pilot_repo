@@ -42,7 +42,7 @@
     "routes": [
      {
       "prefix": "/",
-      "host_rewrite": "httpbin.org",
+      "host_rewrite": "httpbin.default.svc.cluster.local",
       "cluster": "out.httpbin.default.svc.cluster.local|http"
      }
     ]
