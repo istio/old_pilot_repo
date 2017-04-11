@@ -41,6 +41,12 @@ if [[ -z "${ISTIO_PROXY_PORT-}" ]] || [[ -z "${ISTIO_PROXY_UID-}" ]]; then
 fi
 
 iptables -t nat -A PREROUTING -p tcp -j REDIRECT --to-port ${ISTIO_PROXY_PORT}
+# To make sure when pod A wants to talk to service A, which is backed by pod A,
+# the traffic is going through proxy twice, client-side and server-side.
+# lo traffic doesn't go through PREROUTING, so needed to be processed in OUTPUT.
+iptables -t nat -A OUTPUT -p tcp -j REDIRECT -o lo \
+  ! -d 127.0.0.1/32 --to-port ${ISTIO_PROXY_PORT}
+
 iptables -t nat -A OUTPUT -p tcp -j REDIRECT ! -s 127.0.0.1/32 \
   --to-port ${ISTIO_PROXY_PORT} -m owner '!' --uid-owner ${ISTIO_PROXY_UID}
 
