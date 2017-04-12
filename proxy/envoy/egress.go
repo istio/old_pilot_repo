@@ -77,12 +77,11 @@ type EgressConfig struct {
 }
 
 func generateEgress(conf *EgressConfig) *Config {
-
 	// Create a VirtualHost for each external service
 	vhosts := make([]*VirtualHost, 0)
 	services := conf.Services.Services()
 	for _, service := range services {
-		if service.External {
+		if service.External != "" {
 			if host := buildEgressHTTPRoute(service); host != nil {
 				vhosts = append(vhosts, host)
 			}
@@ -138,39 +137,34 @@ func generateEgress(conf *EgressConfig) *Config {
 func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 	var host *VirtualHost
 
-	// TODO Cluster names are not unique if external service definition contains more than one port
 	for _, servicePort := range svc.Ports {
 		protocol := servicePort.Protocol
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-
 			route := &HTTPRoute{
 				Prefix:          "/",
-				Cluster:         buildEgressClusterName(svc.Address, servicePort.Port),
+				Cluster:         buildEgressClusterName(svc.External, servicePort.Port),
 				AutoHostRewrite: true,
 			}
 			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil)
 
 			// configure cluster for strict_dns
-			cluster.Name = buildEgressClusterName(svc.Address, servicePort.Port)
+			cluster.Name = buildEgressClusterName(svc.External, servicePort.Port)
 			cluster.ServiceName = ""
 			cluster.Type = ClusterTypeStrictDNS
 			cluster.Hosts = []Host{
 				{
-					URL: fmt.Sprintf("tcp://%s:%d", svc.Address, servicePort.Port),
+					URL: fmt.Sprintf("tcp://%s:%d", svc.External, servicePort.Port),
 				},
 			}
 
 			route.clusters = append(route.clusters, cluster)
 
 			host = &VirtualHost{
-				Name:    buildEgressClusterName(svc.Address, servicePort.Port),
+				Name:    cluster.Name,
 				Domains: []string{svc.Hostname},
 				Routes:  []*HTTPRoute{route},
 			}
-
-		case model.ProtocolTCP, model.ProtocolHTTPS:
-		// TODO
 
 		default:
 			glog.Warningf("Unsupported outbound protocol %v for port %#v", protocol, servicePort)

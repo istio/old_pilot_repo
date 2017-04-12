@@ -26,9 +26,9 @@ var (
 	HelloService   = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
 	WorldService   = MakeService("world.default.svc.cluster.local", "10.2.0.0")
 	ExtHTTPService = MakeExternalHTTPService("httpbin.default.svc.cluster.local",
-		"httpbin.org", "10.3.0.0")
+		"httpbin.org", "")
 	ExtHTTPSService = MakeExternalHTTPSService("httpsbin.default.svc.cluster.local",
-		"httpbin.org", "10.4.0.0")
+		"httpbin.org", "")
 	Discovery model.ServiceDiscovery = &ServiceDiscovery{
 		services: map[string]*model.Service{
 			HelloService.Hostname:   HelloService,
@@ -69,8 +69,8 @@ func MakeService(hostname, address string) *model.Service {
 func MakeExternalHTTPService(hostname, external string, address string) *model.Service {
 	return &model.Service{
 		Hostname: hostname,
-		Address:  external,
-		External: true,
+		Address:  address,
+		External: external,
 		Ports: []*model.Port{{
 			Name:     "http",
 			Port:     80,
@@ -83,8 +83,8 @@ func MakeExternalHTTPService(hostname, external string, address string) *model.S
 func MakeExternalHTTPSService(hostname, external string, address string) *model.Service {
 	return &model.Service{
 		Hostname: hostname,
-		Address:  external,
-		External: true,
+		Address:  address,
+		External: external,
 		Ports: []*model.Port{{
 			Name:     "https",
 			Port:     443,
@@ -116,7 +116,7 @@ func MakeInstance(service *model.Service, port *model.Port, version int) *model.
 func MakeIP(service *model.Service, version int) string {
 	ip := net.ParseIP(service.Address).To4()
 	if ip == nil {
-		return service.Address
+		return service.External
 	}
 	ip[2] = byte(1)
 	ip[3] = byte(version)

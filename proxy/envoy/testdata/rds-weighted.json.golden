@@ -35,9 +35,7 @@
      "httpbin.default.svc.cluster:80",
      "httpbin.default.svc.cluster",
      "httpbin.default.svc.cluster.local:80",
-     "httpbin.default.svc.cluster.local",
-     "httpbin.org:80",
-     "httpbin.org"
+     "httpbin.default.svc.cluster.local"
     ],
     "routes": [
      {
