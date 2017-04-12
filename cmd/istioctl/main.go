@@ -28,7 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
+	"net/http"
+	"net/url"
+
 	"istio.io/manager/apiserver"
+	"istio.io/manager/client/proxy"
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
@@ -36,17 +40,19 @@ import (
 )
 
 var (
-	kubeconfig string
-	namespace  string
-	client     *kube.Client
-
-	config model.ConfigRegistry
+	namespace string
+	apiClient proxy.Client
 
 	// input file name
 	file string
 
 	// output format (yaml or short)
 	outputFormat string
+
+	// kube-inject, can be removed when inject.go is removed
+	kubeconfig string
+	client     *kube.Client
+	config     model.ConfigRegistry
 
 	key    model.Key
 	schema model.ProtoSchema
@@ -58,6 +64,20 @@ var (
 		Long: fmt.Sprintf("Istio configuration command line utility. Available configuration types: %v",
 			model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
+			// Get manager address
+			add := os.Getenv("ISTIO_MANAGER_ADDRESS")
+			if add == "" {
+				return errors.New("manager address environment variable is not set," +
+					"please set ISTIO_MANAGER_ADDRESS to the location and port of you Istio manager")
+			}
+			url, err := url.Parse(add)
+			if err != nil {
+				return err
+			}
+			// Setup manager client
+			apiClient = proxy.NewManagerClient(*url, "v1alpha1", &http.Client{})
+
+			// Kube-inject, can be removed when inject.go is removed
 			if kubeconfig == "" {
 				if v := os.Getenv("KUBECONFIG"); v != "" {
 					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
@@ -98,18 +118,18 @@ var (
 			if len(varr) == 0 {
 				return errors.New("nothing to create")
 			}
-			for _, v := range varr {
-				if err = setup(v.Type, v.Name); err != nil {
+			for _, config := range varr {
+				if err = setup(config.Type, config.Name); err != nil {
 					return err
 				}
-				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
+				if err = model.IstioConfig.ValidateConfig(&key, config.ParsedSpec); err != nil {
 					return err
 				}
-				err = config.Post(key, v.ParsedSpec)
+				err = apiClient.AddConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Posted %v %v\n", v.Type, v.Name)
+				fmt.Printf("Posted %v %v\n", config.Type, config.Name)
 			}
 
 			return nil
@@ -131,18 +151,18 @@ var (
 			if len(varr) == 0 {
 				return errors.New("nothing to replace")
 			}
-			for _, v := range varr {
-				if err = setup(v.Type, v.Name); err != nil {
+			for _, config := range varr {
+				if err = setup(config.Type, config.Name); err != nil {
 					return err
 				}
-				if err = model.IstioConfig.ValidateConfig(&key, v.ParsedSpec); err != nil {
+				if err = model.IstioConfig.ValidateConfig(&key, config.ParsedSpec); err != nil {
 					return err
 				}
-				err = config.Put(key, v.ParsedSpec)
+				err = apiClient.UpdateConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Put %v %v\n", v.Type, v.Name)
+				fmt.Printf("Put %v %v\n", config.Type, config.Name)
 			}
 
 			return nil
@@ -163,11 +183,11 @@ var (
 					c.Println(c.UsageString())
 					return err
 				}
-				item, exists := config.Get(key)
-				if !exists {
-					return fmt.Errorf("%q does not exist", key)
+				config, err := apiClient.GetConfig(key)
+				if err != nil {
+					return err
 				}
-				out, err := schema.ToYAML(item)
+				out, err := schema.ToYAML(config.ParsedSpec)
 				if err != nil {
 					return err
 				}
@@ -178,9 +198,18 @@ var (
 					return err
 				}
 
-				list, err := config.List(key.Kind, key.Namespace)
+				list, err := apiClient.ListConfig(key.Kind, key.Namespace)
 				if err != nil {
-					return fmt.Errorf("error listing %s: %v", key.Kind, err)
+					return err
+				}
+				printList := make(map[model.Key]proto.Message)
+				for _, config := range list {
+					tempKey := model.Key{
+						Name:      config.Name,
+						Namespace: key.Namespace,
+						Kind:      key.Kind,
+					}
+					printList[tempKey] = config.ParsedSpec
 				}
 
 				var outputters = map[string](func(map[model.Key]proto.Message) error){
@@ -188,7 +217,7 @@ var (
 					"short": printShortOutput,
 				}
 				if outputFunc, ok := outputters[outputFormat]; ok {
-					if err := outputFunc(list); err != nil {
+					if err := outputFunc(printList); err != nil {
 						return err
 					}
 				} else {
@@ -215,7 +244,7 @@ var (
 					if err := setup(args[0], args[i]); err != nil {
 						return err
 					}
-					if err := config.Delete(key); err != nil {
+					if err := apiClient.DeleteConfig(key); err != nil {
 						return err
 					}
 					fmt.Printf("Deleted %v %v\n", args[0], args[i])
@@ -239,7 +268,7 @@ var (
 				if err = setup(v.Type, v.Name); err != nil {
 					return err
 				}
-				err = config.Delete(key)
+				err = apiClient.DeleteConfig(key)
 				if err != nil {
 					return err
 				}
@@ -271,7 +300,7 @@ func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(deleteCmd)
-	rootCmd.AddCommand(injectCmd)
+	// rootCmd.AddCommand(injectCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }
 

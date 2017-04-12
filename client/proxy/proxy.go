@@ -21,6 +21,15 @@ type ManagerClient struct {
 	client           *http.Client
 }
 
+// Client defines the interface for the proxy specific functionality of the manager client
+type Client interface {
+	GetConfig(model.Key) (*apiserver.Config, error)
+	AddConfig(model.Key, apiserver.Config) error
+	UpdateConfig(model.Key, apiserver.Config) error
+	DeleteConfig(model.Key) error
+	ListConfig(string, string) ([]apiserver.Config, error)
+}
+
 // NewManagerClient creates a new ManagerClient instance. It trims the apiVersion of leading and trailing slashes
 // and the base path of trailing slashes to ensure consistency
 func NewManagerClient(base url.URL, apiVersion string, client *http.Client) *ManagerClient {
