@@ -51,7 +51,7 @@ type Service struct {
 	Ports PortList `json:"ports,omitempty"`
 
 	// External service
-	External string `json:"external"`
+	ExternalName string `json:"external"`
 }
 
 // Port represents a network port where a service is listening for

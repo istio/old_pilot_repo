@@ -60,10 +60,10 @@ func (r *reachability) run() error {
 		if err := r.verifyIngress(); err != nil {
 			return err
 		}
-	}
 
-	if err := r.verifyEgress(); err != nil {
-		return err
+		if err := r.verifyEgress(); err != nil {
+			return err
+		}
 	}
 
 	if glog.V(2) {

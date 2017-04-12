@@ -96,10 +96,10 @@ func convertService(svc v1.Service) *model.Service {
 	}
 
 	return &model.Service{
-		Hostname: serviceHostname(svc.Name, svc.Namespace),
-		Ports:    ports,
-		Address:  addr,
-		External: external,
+		Hostname:     serviceHostname(svc.Name, svc.Namespace),
+		Ports:        ports,
+		Address:      addr,
+		ExternalName: external,
 	}
 }
 

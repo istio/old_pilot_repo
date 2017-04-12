@@ -185,13 +185,10 @@ var (
 		Use:   "egress",
 		Short: "Istio Proxy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			controller := kube.NewController(client, kube.ControllerConfig{
-				Namespace:       flags.namespace,
-				ResyncPeriod:    flags.resyncPeriod,
-				IngressSyncMode: kube.IngressOff,
-			})
+			flags.controllerOptions.IngressSyncMode = kube.IngressOff
+			controller := kube.NewController(client, flags.controllerOptions)
 			config := &envoy.EgressConfig{
-				Namespace: flags.namespace,
+				Namespace: flags.controllerOptions.Namespace,
 				Mesh:      mesh,
 				Services:  controller,
 			}

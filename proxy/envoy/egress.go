@@ -81,7 +81,7 @@ func generateEgress(conf *EgressConfig) *Config {
 	vhosts := make([]*VirtualHost, 0)
 	services := conf.Services.Services()
 	for _, service := range services {
-		if service.External != "" {
+		if service.ExternalName != "" {
 			if host := buildEgressHTTPRoute(service); host != nil {
 				vhosts = append(vhosts, host)
 			}
@@ -143,18 +143,18 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			route := &HTTPRoute{
 				Prefix:          "/",
-				Cluster:         buildEgressClusterName(svc.External, servicePort.Port),
+				Cluster:         buildEgressClusterName(svc.ExternalName, servicePort.Port),
 				AutoHostRewrite: true,
 			}
 			cluster := buildOutboundCluster(svc.Hostname, servicePort, nil)
 
 			// configure cluster for strict_dns
-			cluster.Name = buildEgressClusterName(svc.External, servicePort.Port)
+			cluster.Name = buildEgressClusterName(svc.ExternalName, servicePort.Port)
 			cluster.ServiceName = ""
 			cluster.Type = ClusterTypeStrictDNS
 			cluster.Hosts = []Host{
 				{
-					URL: fmt.Sprintf("tcp://%s:%d", svc.External, servicePort.Port),
+					URL: fmt.Sprintf("tcp://%s:%d", svc.ExternalName, servicePort.Port),
 				},
 			}
 
