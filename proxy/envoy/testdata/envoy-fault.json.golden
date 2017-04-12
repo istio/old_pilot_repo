@@ -23,11 +23,11 @@
                   "mixer_attributes": {
                     "target.ip": "10.1.1.0",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "uid://10.1.1.0"
+                    "target.uid": "uid://10.1.1.0.my-namespace"
                   },
                   "forward_attributes": {
                     "source.ip": "10.1.1.0",
-                    "source.uid": "uid://10.1.1.0"
+                    "source.uid": "uid://10.1.1.0.my-namespace"
                   }
                 }
               },
@@ -102,11 +102,11 @@
                   "mixer_attributes": {
                     "target.ip": "10.1.1.0",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "uid://10.1.1.0"
+                    "target.uid": "uid://10.1.1.0.my-namespace"
                   },
                   "forward_attributes": {
                     "source.ip": "10.1.1.0",
-                    "source.uid": "uid://10.1.1.0"
+                    "source.uid": "uid://10.1.1.0.my-namespace"
                   }
                 }
               },
@@ -225,11 +225,11 @@
                   "mixer_attributes": {
                     "target.ip": "10.1.1.0",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "uid://10.1.1.0"
+                    "target.uid": "uid://10.1.1.0.my-namespace"
                   },
                   "forward_attributes": {
                     "source.ip": "10.1.1.0",
-                    "source.uid": "uid://10.1.1.0"
+                    "source.uid": "uid://10.1.1.0.my-namespace"
                   }
                 }
               },
@@ -346,11 +346,11 @@
                   "mixer_attributes": {
                     "target.ip": "10.1.1.0",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "uid://10.1.1.0"
+                    "target.uid": "uid://10.1.1.0.my-namespace"
                   },
                   "forward_attributes": {
                     "source.ip": "10.1.1.0",
-                    "source.uid": "uid://10.1.1.0"
+                    "source.uid": "uid://10.1.1.0.my-namespace"
                   }
                 }
               },
