@@ -41,7 +41,6 @@ type args struct {
 	ipAddress     string
 	podName       string
 	ingressSecret string
-	passthrough   []int
 	apiserverPort int
 
 	controllerOptions kube.ControllerOptions
@@ -137,12 +136,11 @@ var (
 			flags.controllerOptions.IngressSyncMode = kube.IngressOff
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
-				Discovery:        controller,
-				Accounts:         controller,
-				Config:           &model.IstioRegistry{ConfigRegistry: controller},
-				MeshConfig:       mesh,
-				IPAddress:        flags.ipAddress,
-				PassthroughPorts: flags.passthrough,
+				Discovery:  controller,
+				Accounts:   controller,
+				Config:     &model.IstioRegistry{ConfigRegistry: controller},
+				MeshConfig: mesh,
+				IPAddress:  flags.ipAddress,
 			}
 			w, err := envoy.NewWatcher(controller, context)
 			if err != nil {
@@ -217,9 +215,6 @@ func init() {
 		"IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
 		"Pod name. If not provided uses ${POD_NAME} environment variable")
-
-	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
-		"Passthrough ports for health checks")
 
 	// TODO: remove this once we write the logic to obtain secrets dynamically
 	ingressCmd.PersistentFlags().StringVar(&flags.ingressSecret, "secret", "",
