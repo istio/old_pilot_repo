@@ -122,10 +122,22 @@ func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 	listeners := append(inbound, outbound...)
 	clusters := append(inClusters, outClusters...)
 
+	// create passthrough listeners if they are missing
+	for _, port := range context.PassthroughPorts {
+		addr := fmt.Sprintf("tcp://%s:%d", context.IPAddress, port)
+		if listeners.GetByAddress(addr) == nil {
+			cluster := buildInboundCluster(port, model.ProtocolTCP, context.MeshConfig.ConnectTimeout)
+			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{context.IPAddress})},
+			}, context.IPAddress, port))
+			clusters = append(clusters, cluster)
+		}
+	}
+
 	listeners = listeners.normalize()
 	clusters = clusters.normalize()
 
-	// inject Mixer filter with proxy identities
+	// inject static Mixer filter with proxy identities for all HTTP filters
 	insertMixerFilter(listeners, instances, context)
 
 	return listeners, clusters

@@ -21,12 +21,13 @@
                 "config": {
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
+                    "target.ip": "10.1.1.1",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "uid://10.1.1.1.my-namespace"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.ip": "10.1.1.1",
+                    "source.uid": "uid://10.1.1.1.my-namespace"
                   }
                 }
               },
@@ -67,12 +68,13 @@
                 "config": {
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
+                    "target.ip": "10.1.1.1",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "uid://10.1.1.1.my-namespace"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.ip": "10.1.1.1",
+                    "source.uid": "uid://10.1.1.1.my-namespace"
                   }
                 }
               },
@@ -157,12 +159,13 @@
                 "config": {
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
+                    "target.ip": "10.1.1.1",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "uid://10.1.1.1.my-namespace"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.ip": "10.1.1.1",
+                    "source.uid": "uid://10.1.1.1.my-namespace"
                   }
                 }
               },
@@ -199,6 +202,29 @@
               "routes": [
                 {
                   "cluster": "in.1090",
+                  "destination_ip_list": [
+                    "10.1.1.1/32"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "bind_to_port": false
+    },
+    {
+      "address": "tcp://10.1.1.1:3333",
+      "filters": [
+        {
+          "type": "read",
+          "name": "tcp_proxy",
+          "config": {
+            "stat_prefix": "tcp",
+            "route_config": {
+              "routes": [
+                {
+                  "cluster": "in.3333",
                   "destination_ip_list": [
                     "10.1.1.1/32"
                   ]
@@ -259,12 +285,13 @@
                 "config": {
                   "mixer_server": "mixer:9091",
                   "mixer_attributes": {
+                    "target.ip": "10.1.1.1",
                     "target.service": "hello.default.svc.cluster.local",
-                    "target.uid": "10.1.1.1"
+                    "target.uid": "uid://10.1.1.1.my-namespace"
                   },
                   "forward_attributes": {
-                    "source.service": "hello.default.svc.cluster.local",
-                    "source.uid": "10.1.1.1"
+                    "source.ip": "10.1.1.1",
+                    "source.uid": "uid://10.1.1.1.my-namespace"
                   }
                 }
               },
@@ -344,6 +371,17 @@
         "hosts": [
           {
             "url": "tcp://127.0.0.1:1090"
+          }
+        ]
+      },
+      {
+        "name": "in.3333",
+        "connect_timeout_ms": 1000,
+        "type": "static",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://127.0.0.1:3333"
           }
         ]
       },
