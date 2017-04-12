@@ -43,15 +43,15 @@ func MakeService(hostname, address string) *model.Service {
 		Address:  address,
 		Ports: []*model.Port{{
 			Name:     "http",
-			Port:     80,
+			Port:     80, // target port 80
 			Protocol: model.ProtocolHTTP,
 		}, {
 			Name:     "http-status",
-			Port:     81,
+			Port:     81, // target port 1081
 			Protocol: model.ProtocolHTTP,
 		}, {
 			Name:     "custom",
-			Port:     90,
+			Port:     90, // target port 1090
 			Protocol: model.ProtocolTCP,
 		}},
 	}

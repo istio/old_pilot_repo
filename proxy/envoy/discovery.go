@@ -29,6 +29,7 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
+	"istio.io/manager/proxy"
 )
 
 // DiscoveryService publishes services, clusters, and routes for all proxies
@@ -345,7 +346,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 		// skip computing the actual HTTP routes
 		instances := ds.services.HostInstances(map[string]bool{ip: true})
 		services := ds.services.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
+		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &proxy.Context{
 			Discovery:  ds.services,
 			Config:     ds.config,
 			MeshConfig: ds.mesh,
@@ -396,7 +397,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 
 		instances := ds.services.HostInstances(map[string]bool{ip: true})
 		services := ds.services.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
+		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &proxy.Context{
 			Discovery:  ds.services,
 			Config:     ds.config,
 			MeshConfig: ds.mesh,

@@ -26,24 +26,16 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
+	"istio.io/manager/proxy"
 )
 
 // Config generation main functions.
 // The general flow of the generation process consists of the following steps:
 // - routes are created for each destination, with referenced clusters stored as a special field
-// - routes are grouped organized into listeners for inbound and outbound traffic
-// - the outbound and inbound listeners are merged with preference given to the inbound traffic
-// - clusters are aggregated and normalized.
-
-// Requirements for the additions to the generation routines:
-// - extra policies and filters should be added as additional passes over abstract config structures
-// - lists in the config must be de-duplicated and ordered in a canonical way
-
-// TODO: missing features in the config generation:
-// - HTTP pod port collision creates duplicate virtual host entries
-// - (bug) two service ports with the same target port create two virtual hosts with same domains
-//   (not allowed by envoy). FIXME - need to detect and eliminate such ports in validation
-// TODO: no RDS for TCP
+// - routes are organized into listeners for inbound and outbound traffic
+// - clusters are aggregated and normalized across routes
+// - extra policies and filters are added by additional passes over abstract config structures
+// - configuration elements are de-duplicated and ordered in a canonical way
 
 // WriteFile saves config to a file
 func (conf *Config) WriteFile(fname string) error {
@@ -78,7 +70,7 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 // Generate Envoy sidecar proxy configuration
-func Generate(context *ProxyContext) *Config {
+func Generate(context *proxy.Context) *Config {
 	mesh := context.MeshConfig
 	listeners, clusters := buildListeners(context)
 
@@ -87,7 +79,7 @@ func Generate(context *ProxyContext) *Config {
 		listener.BindToPort = false
 	}
 
-	// add an extra listener that binds to a port
+	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	listeners = append(listeners, &Listener{
 		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyListenPort),
 		BindToPort:     true,
@@ -119,7 +111,7 @@ func Generate(context *ProxyContext) *Config {
 // buildListeners produces a list of listeners and referenced clusters
 // (due to lack of RDS support for TCP proxy filter, all referenced clusters in TCP routes
 // must be present)
-func buildListeners(context *ProxyContext) (Listeners, Clusters) {
+func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 	// query the services model
 	instances := context.Discovery.HostInstances(map[string]bool{context.IPAddress: true})
 	services := context.Discovery.Services()
@@ -128,9 +120,22 @@ func buildListeners(context *ProxyContext) (Listeners, Clusters) {
 	outbound, outClusters := buildOutboundListeners(instances, services, context)
 
 	listeners := append(inbound, outbound...)
-	listeners.normalize()
+	clusters := append(inClusters, outClusters...)
 
-	clusters := append(inClusters, outClusters...).normalize()
+	// create passthrough listeners if they are missing
+	for _, port := range context.PassthroughPorts {
+		addr := fmt.Sprintf("tcp://%s:%d", context.IPAddress, port)
+		if listeners.GetByAddress(addr) == nil {
+			cluster := buildInboundCluster(port, model.ProtocolTCP, context.MeshConfig.ConnectTimeout)
+			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{context.IPAddress})},
+			}, context.IPAddress, port))
+			clusters = append(clusters, cluster)
+		}
+	}
+
+	listeners = listeners.normalize()
+	clusters = clusters.normalize()
 
 	// inject Mixer filter with proxy identities
 	insertMixerFilter(listeners, instances, context)
@@ -209,7 +214,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
-	context *ProxyContext) (Listeners, Clusters) {
+	context *proxy.Context) (Listeners, Clusters) {
 	httpOutbound := buildOutboundHTTPRoutes(instances, services, context)
 	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 	for port, routeConfig := range httpOutbound {
@@ -221,7 +226,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 // buildOutboundHTTPRoutes creates HTTP route configs indexed by ports for the
 // traffic outbound from the proxy instance
 func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*model.Service,
-	context *ProxyContext) HTTPRouteConfigs {
+	context *proxy.Context) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
 
 	// used for shortcut domain names for outbound hostnames
@@ -338,7 +343,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 // buildInboundListeners creates listeners for the server-side (inbound)
 // configuration for co-located service instances. The function also returns
 // all inbound clusters since they are statically declared in the proxy
-// configuration and do no utilize CDS.
+// configuration and do not utilize CDS.
 func buildInboundListeners(instances []*model.ServiceInstance,
 	mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
 	// used for shortcut domain names for hostnames
@@ -354,7 +359,7 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 		endpoint := instance.Endpoint
 		servicePort := endpoint.ServicePort
 		protocol := servicePort.Protocol
-		cluster := buildInboundCluster(service.Hostname, endpoint.Port, protocol)
+		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
 		clusters = append(clusters, cluster)
 
 		// Local service instances can be accessed through one of three
@@ -398,6 +403,5 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 		}
 	}
 
-	clusters.setTimeout(mesh.ConnectTimeout)
 	return listeners, clusters
 }
