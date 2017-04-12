@@ -343,11 +343,11 @@ func (ds *DiscoveryService) clearCache() {
 func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response *restful.Response) {
 
 	var services []*keyAndService
-	for _, service := range ds.services.Services() {
+	for _, service := range ds.Discovery.Services() {
 		for _, port := range service.Ports {
 
 			var hosts []*host
-			for _, instance := range ds.services.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
+			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
 				hosts = append(hosts, &host{
 					Address: instance.Endpoint.Address,
 					Port:    instance.Endpoint.Port,
@@ -409,25 +409,20 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 		// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 		// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 		// skip computing the actual HTTP routes
-		instances := ds.services.HostInstances(map[string]bool{ip: true})
-		services := ds.services.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
-			Discovery:  ds.services,
-			Config:     ds.config,
-			MeshConfig: ds.mesh,
-			IPAddress:  ip,
-		})
+		instances := ds.Discovery.HostInstances(map[string]bool{ip: true})
+		services := ds.Discovery.Services()
+		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
 
 		// de-duplicate and canonicalize clusters
 		clusters := httpRouteConfigs.clusters().normalize()
 
 		// apply custom policies for HTTP clusters
 		for _, cluster := range clusters {
-			insertDestinationPolicy(ds.config, cluster)
+			insertDestinationPolicy(ds.Config, cluster)
 		}
 
 		allClusters = append(allClusters, nodeAndCluster{
-			ServiceCluster: ds.mesh.IstioServiceCluster,
+			ServiceCluster: ds.MeshConfig.IstioServiceCluster,
 			ServiceNode:    ip,
 			Clusters:       clusters,
 		})
@@ -486,30 +481,33 @@ func (ds *DiscoveryService) ListAllRoutes(request *restful.Request, response *re
 
 	endpoints := allServiceNodes(ds)
 
-	// This sort is not needed, but discovery_test excepts consistent output and sorting achieves it
-	sort.Strings(endpoints)
-
 	for _, ip := range endpoints {
 
-		instances := ds.services.HostInstances(map[string]bool{ip: true})
-		services := ds.services.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, &ProxyContext{
-			Discovery:  ds.services,
-			Config:     ds.config,
-			MeshConfig: ds.mesh,
-			IPAddress:  ip,
-		})
+		instances := ds.Discovery.HostInstances(map[string]bool{ip: true})
+		services := ds.Discovery.Services()
+		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
 
 		for port, httpRouteConfig := range httpRouteConfigs {
 
 			allRoutes = append(allRoutes, routeConfigAndMetadata{
 				RouteConfigName: strconv.Itoa(port),
-				ServiceCluster:  ds.mesh.IstioServiceCluster,
+				ServiceCluster:  ds.MeshConfig.IstioServiceCluster,
 				ServiceNode:     ip,
 				VirtualHosts:    httpRouteConfig.VirtualHosts,
 			})
 		}
 	}
+
+	// This sort is not needed, but discovery_test excepts consistent output and sorting achieves it
+	// Primary sort key RouteConfigName, secondary ServiceNode, tertiary ServiceCluster
+	sort.Slice(allRoutes, func(i, j int) bool {
+		if allRoutes[i].RouteConfigName != allRoutes[j].RouteConfigName {
+			return allRoutes[i].RouteConfigName < allRoutes[j].RouteConfigName
+		} else if allRoutes[i].ServiceNode != allRoutes[j].ServiceNode {
+			return allRoutes[i].ServiceNode < allRoutes[j].ServiceNode
+		}
+		return allRoutes[i].ServiceCluster < allRoutes[j].ServiceCluster
+	})
 
 	if err := response.WriteEntity(allRoutes); err != nil {
 		glog.Warning(err)
@@ -578,11 +576,11 @@ func allServiceNodes(ds *DiscoveryService) []string {
 
 	// Gather service nodes
 	endpoints := make(map[string]bool)
-	for _, service := range ds.services.Services() {
+	for _, service := range ds.Discovery.Services() {
 		// service has Hostname, Address, Ports
 		for _, port := range service.Ports {
 			// var instances []*model.ServiceInstance
-			for _, instance := range ds.services.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
+			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
 				endpoints[instance.Endpoint.Address] = true
 			}
 		}
