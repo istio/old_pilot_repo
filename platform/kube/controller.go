@@ -250,7 +250,7 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 			return nil
 		}
 
-		c.mapIngressSecrets(ingress.Spec.TLS)
+		c.mapIngressSecrets(ingress.Spec.TLS, ev)
 
 		// Convert the ingress into a map[Key]Message, and invoke handler for each
 		// TODO: This works well for Add and Delete events, but no so for Update:
@@ -757,17 +757,23 @@ func (c *Controller) shouldProcessIngress(ingress *v1beta1.Ingress) bool {
 	}
 }
 
-func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS) {
+func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS, ev model.Event) {
 	for _, t := range tls {
 		if t.SecretName == "" {
 			continue
 		}
 
-		if len(t.Hosts) == 0 {
-			c.secrets.put(c.config.Namespace, "*", t.SecretName)
-		} else {
-			for _, host := range t.Hosts {
+		hosts := t.Hosts
+		if len(hosts) == 0 {
+			hosts = []string{"*"} // default to wildcard
+		}
+
+		for _, host := range hosts {
+			switch ev {
+			case model.EventAdd, model.EventUpdate:
 				c.secrets.put(c.config.Namespace, host, t.SecretName)
+			case model.EventDelete:
+				c.secrets.delete(c.config.Namespace, host, t.SecretName)
 			}
 		}
 	}

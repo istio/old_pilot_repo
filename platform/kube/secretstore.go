@@ -38,7 +38,7 @@ func newSecretStore(client kubernetes.Interface) *secretStore {
 }
 
 type secretStore struct {
-	mutex   sync.Mutex
+	mutex   sync.RWMutex
 	secrets map[string]map[string]string
 	client  kubernetes.Interface
 }
@@ -52,10 +52,22 @@ func (s *secretStore) put(namespace, host, secretName string) {
 	s.secrets[namespace][host] = secretName
 }
 
-// GetTLSSecret retrieves the TLS secret for a host
-func (s *secretStore) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
+func (s *secretStore) delete(namespace, host, secretName string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	if s.secrets[namespace] == nil {
+		return
+	}
+	delete(s.secrets[namespace], host)
+	if len(s.secrets[namespace]) == 0 {
+		delete(s.secrets, namespace)
+	}
+}
+
+// GetTLSSecret retrieves the TLS secret for a host
+func (s *secretStore) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 
 	if s.secrets[namespace] == nil {
 		return nil, nil
