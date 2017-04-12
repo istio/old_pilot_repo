@@ -347,7 +347,7 @@ func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response 
 		for _, port := range service.Ports {
 
 			var hosts []*host
-			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
+			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, nil) {
 				hosts = append(hosts, &host{
 					Address: instance.Endpoint.Address,
 					Port:    instance.Endpoint.Port,
@@ -394,12 +394,12 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	writeResponse(response, out)
 }
 
-// ListAllClusters responds to CDS requests that are not limited by a key
+// ListAllClusters responds to CDS requests that are not limited by a service-cluster and service-node
 func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *restful.Response) {
 
 	var allClusters []nodeAndCluster
 
-	endpoints := allServiceNodes(ds)
+	endpoints := ds.allServiceNodes()
 
 	// This sort is not needed, but discovery_test excepts consistent output and sorting achieves it
 	sort.Strings(endpoints)
@@ -474,12 +474,12 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	writeResponse(response, out)
 }
 
-// ListAllRoutes responds to RDS requests that are not limited by a key
+// ListAllRoutes responds to RDS requests that are not limited by a route-config, service-cluster, nor service-node
 func (ds *DiscoveryService) ListAllRoutes(request *restful.Request, response *restful.Response) {
 
 	var allRoutes []routeConfigAndMetadata
 
-	endpoints := allServiceNodes(ds)
+	endpoints := ds.allServiceNodes()
 
 	for _, ip := range endpoints {
 
@@ -572,7 +572,7 @@ func writeResponse(r *restful.Response, data []byte) {
 }
 
 // Get a map where the keys are the service nodes (typically IPv4 addresses) and the values are all true
-func allServiceNodes(ds *DiscoveryService) []string {
+func (ds *DiscoveryService) allServiceNodes() []string {
 
 	// Gather service nodes
 	endpoints := make(map[string]bool)
@@ -580,7 +580,7 @@ func allServiceNodes(ds *DiscoveryService) []string {
 		// service has Hostname, Address, Ports
 		for _, port := range service.Ports {
 			// var instances []*model.ServiceInstance
-			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
+			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, nil) {
 				endpoints[instance.Endpoint.Address] = true
 			}
 		}
