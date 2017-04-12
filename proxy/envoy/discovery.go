@@ -158,12 +158,8 @@ type host struct {
 	Weight int `json:"load_balancing_weight,omitempty"`
 }
 
-type services struct {
-	Services []*service `json:"services"`
-}
-
-type service struct {
-	Key   string  `json:"key"`
+type keyAndService struct {
+	Key   string  `json:"service-key"`
 	Hosts []*host `json:"hosts"`
 }
 
@@ -237,7 +233,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 
 	// List all known services (informational, not invoked by Envoy)
 	ws.Route(ws.
-		GET(fmt.Sprintf("/v1/registration/")).
+		GET("/v1/registration").
 		To(ds.ListAllEndpoints).
 		Doc("Services in SDS").
 		Produces(restful.MIME_JSON))
@@ -321,33 +317,33 @@ func (ds *DiscoveryService) clearCache() {
 	ds.rdsCache.clear()
 }
 
-// ListAllEndpoints responds with all Services and is restricted to a single service key
+// ListAllEndpoints responds with all Services and is not restricted to a single service-key
 func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response *restful.Response) {
 
-	var servicesArray []*service
-	for _, svc := range ds.services.Services() {
-		for _, port := range svc.Ports {
+	var services []*keyAndService
+	for _, service := range ds.services.Services() {
+		for _, port := range service.Ports {
 
-			var hostArray []*host
-			for _, ep := range ds.services.Instances(svc.Hostname, []string{port.Name}, []model.Tags{}) {
-				hostArray = append(hostArray, &host{
-					Address: ep.Endpoint.Address,
-					Port:    ep.Endpoint.Port,
+			var hosts []*host
+			for _, instance := range ds.services.Instances(service.Hostname, []string{port.Name}, []model.Tags{}) {
+				hosts = append(hosts, &host{
+					Address: instance.Endpoint.Address,
+					Port:    instance.Endpoint.Port,
 				})
 			}
 
-			servicesArray = append(servicesArray, &service{
-				Key:   svc.Key(port, nil),
-				Hosts: hostArray,
+			services = append(services, &keyAndService{
+				Key:   service.Key(port, nil),
+				Hosts: hosts,
 			})
 		}
 	}
 
 	// Sort servicesArray.  This is not strictly necessary, but discovery_test.go will
 	// be comparing against a golden example using test/util/diff.go which does a textual comparison
-	sort.Slice(servicesArray, func(i, j int) bool { return servicesArray[i].Key < servicesArray[j].Key })
+	sort.Slice(services, func(i, j int) bool { return services[i].Key < services[j].Key })
 
-	if err := response.WriteEntity(services{Services: servicesArray}); err != nil {
+	if err := response.WriteEntity(services); err != nil {
 		glog.Warning(err)
 	}
 }
