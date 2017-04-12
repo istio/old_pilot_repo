@@ -40,23 +40,17 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(discovery model.ServiceDiscovery, ctl model.Controller,
-	registry *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, ipAddress string) (Watcher, error) {
-	glog.V(2).Infof("Local instance address: %s", ipAddress)
+func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
+	glog.V(2).Infof("Local instance address: %s", context.IPAddress)
 
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
-	agent := proxy.NewAgent(runEnvoy(mesh, ipAddress), cleanupEnvoy(mesh), 10, 100*time.Millisecond)
+	agent := proxy.NewAgent(runEnvoy(context.MeshConfig, context.IPAddress), cleanupEnvoy(context.MeshConfig), 10, 100*time.Millisecond)
 
 	out := &watcher{
-		agent: agent,
-		context: &proxy.Context{
-			Discovery:  discovery,
-			Config:     registry,
-			MeshConfig: mesh,
-			IPAddress:  ipAddress,
-		},
-		ctl: ctl,
+		agent:   agent,
+		context: context,
+		ctl:     ctl,
 	}
 
 	// Initialize envoy according to the current model state,

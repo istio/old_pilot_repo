@@ -23,9 +23,9 @@ import (
 
 // Mock values
 var (
-	HelloService                        = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
-	WorldService                        = MakeService("world.default.svc.cluster.local", "10.2.0.0")
-	Discovery    model.ServiceDiscovery = &ServiceDiscovery{
+	HelloService = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
+	WorldService = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	Discovery    = &ServiceDiscovery{
 		services: map[string]*model.Service{
 			HelloService.Hostname: HelloService,
 			WorldService.Hostname: WorldService,

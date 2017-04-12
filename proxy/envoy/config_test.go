@@ -232,6 +232,7 @@ const (
 func testConfig(r *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
 	config := Generate(&proxy.Context{
 		Discovery:  mock.Discovery,
+		Accounts:   mock.Discovery,
 		Config:     r,
 		MeshConfig: mesh,
 		IPAddress:  instance,

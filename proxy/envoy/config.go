@@ -215,7 +215,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 // buildOutboundListeners combines HTTP routes and TCP listeners
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
 	context *proxy.Context) (Listeners, Clusters) {
-	httpOutbound := buildOutboundHTTPRoutes(instances, services, context)
+	httpOutbound := buildOutboundHTTPRoutes(instances, services, context.Accounts, context.MeshConfig, context.Config)
 	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
@@ -225,15 +225,19 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 
 // buildOutboundHTTPRoutes creates HTTP route configs indexed by ports for the
 // traffic outbound from the proxy instance
-func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*model.Service,
-	context *proxy.Context) HTTPRouteConfigs {
+func buildOutboundHTTPRoutes(
+	instances []*model.ServiceInstance,
+	services []*model.Service,
+	accounts model.ServiceAccounts,
+	mesh *proxyconfig.ProxyMeshConfig,
+	config *model.IstioRegistry) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
 
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 
 	// get all the route rules applicable to the instances
-	rules := context.Config.RouteRulesBySource("", instances)
+	rules := config.RouteRulesBySource("", instances)
 
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
@@ -287,19 +291,19 @@ func buildOutboundHTTPRoutes(instances []*model.ServiceInstance, services []*mod
 			}
 		}
 
-		clusters.setTimeout(context.MeshConfig.ConnectTimeout)
+		clusters.setTimeout(mesh.ConnectTimeout)
 
 		// apply SSL context to outbound clusters for authentication policy
-		switch context.MeshConfig.AuthPolicy {
+		switch mesh.AuthPolicy {
 		case proxyconfig.ProxyMeshConfig_NONE:
 		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-			serviceAccounts := context.Discovery.GetIstioServiceAccounts(service.Hostname, service.Ports.GetNames())
-			sslContext := buildClusterSSLContext(context.MeshConfig.AuthCertsPath, serviceAccounts)
+			serviceAccounts := accounts.GetIstioServiceAccounts(service.Hostname, service.Ports.GetNames())
+			sslContext := buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
 			for _, cluster := range clusters {
 				cluster.SSLContext = sslContext
 			}
 		default:
-			glog.Warningf("Unknown auth policy: %v", context.MeshConfig.AuthPolicy)
+			glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
 		}
 	}
 

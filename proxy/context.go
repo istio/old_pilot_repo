@@ -24,6 +24,9 @@ type Context struct {
 	// Discovery interface for listing services and instances
 	Discovery model.ServiceDiscovery
 
+	// Accounts interface for listing service accounts
+	Accounts model.ServiceAccounts
+
 	// Config interface for listing routing rules
 	Config *model.IstioRegistry
 
