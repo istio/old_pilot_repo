@@ -67,7 +67,7 @@ type parameters struct {
 	namespace  string
 	kubeconfig string
 	count      int
-	auth       string
+	auth       bool
 	debug      bool
 	parallel   bool
 	logs       bool
@@ -87,8 +87,8 @@ var (
 	// indicates whether the namespace is auto-generated
 	nameSpaceCreated bool
 
-	// Whether enable auth for the tests.
-	enableAuth bool
+	// Enable/disable auth, or run both for the tests.
+	authmode string
 )
 
 func init() {
@@ -103,7 +103,7 @@ func init() {
 	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
-	flag.StringVar(&params.auth, "auth", "both", "Enable / disable auth, or test both.")
+	flag.StringVar(&authmode, "auth", "both", "Enable / disable auth, or test both.")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
 	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
@@ -111,40 +111,36 @@ func init() {
 
 func main() {
 	flag.Parse()
-	switch params.auth {
+	switch authmode {
 	case "enable":
-		enableAuth = true
-		runTest()
-		break
+		params.auth = true
+		runTests()
 	case "disable":
-		enableAuth = false
-		runTest()
-		break
+		params.auth = false
+		runTests()
 	case "both":
-		enableAuth = false
-		runTest()
-		time.Sleep(30 * time.Second)
-		enableAuth = true
-		runTest()
-		break
+		params.auth = false
+		runTests()
+		params.auth = true
+		runTests()
 	default:
 		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", params.auth)
 	}
 }
 
-func runTest() {
-	glog.Infof("\n--------------- Run tests with auth: %t ---------------", enableAuth)
+func runTests() {
+	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.auth)
 
 	setup()
 
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
-		check((&reachability{}).run(enableAuth))
+		check((&reachability{}).run())
 		check(testRouting())
 	}
 
 	teardown()
-	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", enableAuth, params.count)
+	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", params.auth, params.count)
 }
 
 func setup() {
@@ -176,7 +172,7 @@ func setup() {
 
 	pods = make(map[string]string)
 
-	if enableAuth {
+	if params.auth {
 		check(deploy("ca", "ca", ca, "", "", "", "", "unversioned", false))
 		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config-auth.yaml", params.namespace))
 	} else {
@@ -268,7 +264,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		mesh := envoy.DefaultMeshConfig
 		mesh.MixerAddress = "istio-mixer:9091"
 		mesh.DiscoveryAddress = "istio-manager:8080"
-		if enableAuth {
+		if params.auth {
 			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 		}
 		p := &inject.Params{

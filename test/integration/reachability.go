@@ -38,7 +38,7 @@ type reachability struct {
 	mixerLogs map[string]string
 }
 
-func (r *reachability) run(auth bool) error {
+func (r *reachability) run() error {
 	glog.Info("Verifying basic reachability across pods/services (a, b, and t)..")
 
 	r.mixerLogs = make(map[string]string)
@@ -47,7 +47,7 @@ func (r *reachability) run(auth bool) error {
 		r.accessLogs[app] = make([]string, 0)
 	}
 
-	if err := r.makeRequests(auth); err != nil {
+	if err := r.makeRequests(); err != nil {
 		return err
 	}
 
@@ -55,7 +55,7 @@ func (r *reachability) run(auth bool) error {
 		return err
 	}
 
-	if !auth {
+	if !params.auth {
 		// Currently ingress cannot talk in Istio auth to cluster pods.
 		if err := r.verifyIngress(); err != nil {
 			return err
@@ -119,10 +119,10 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 }
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func (r *reachability) makeRequests(auth bool) error {
+func (r *reachability) makeRequests() error {
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b"}
-	if !auth {
+	if !params.auth {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		testPods = append(testPods, "t")
 	}
