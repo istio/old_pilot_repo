@@ -36,4 +36,11 @@ type Context struct {
 	// IPAddress is the IP address of the proxy used to identify it and its
 	// co-located service instances
 	IPAddress string
+
+	// PassthroughPorts is a list of ports on the proxy IP address that must be
+	// allowed through irrespective of the services model. In case, there is an
+	// overlap, that is the port is utilized by a service for a service instance,
+	// the passthrough port can be assumed to be handled. These ports are
+	// utilized by the underlying platform infrastructure for health checking.
+	PassthroughPorts []int
 }
