@@ -136,7 +136,7 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 	tlsValid := true
 	tlsHosts := make(map[string]bool)
 	for host := range rulesByHost {
-		if t, err := conf.Secrets.GetTLSSecret(conf.Namespace, host); err != nil {
+		if t, err := conf.Secrets.GetTLSSecret(host); err != nil {
 			tlsValid = false
 			tlsHosts[host] = true // count this as a TLS host so that it is omitted from the config
 
@@ -145,7 +145,7 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 			if tls == nil {
 				tls = t
 			} else if string(tls.PrivateKey) != string(t.PrivateKey) || string(tls.Certificate) != string(t.Certificate) {
-				glog.Warningf("Unsupported ingress configuration %q: multiple TLS configs", host)
+				glog.Warningf("Unsupported ingress configuration for host %q: multiple TLS configs", host)
 				tlsValid = false
 			}
 			tlsHosts[host] = true

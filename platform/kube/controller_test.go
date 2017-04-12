@@ -86,7 +86,7 @@ func TestSecret(t *testing.T) {
 				{SecretName: secret},
 			},
 			Backend: &v1beta1.IngressBackend{
-				ServiceName: "default-service",
+				ServiceName: "world",
 				ServicePort: intstr.FromInt(80),
 			},
 			Rules: []v1beta1.IngressRule{},
@@ -98,7 +98,8 @@ func TestSecret(t *testing.T) {
 		return notificationCount == 1
 	}, t)
 
-	if tls, err := ctl.GetTLSSecret(ns, "*"); err != nil {
+	host := fmt.Sprintf("world.%v.svc.cluster.local", ns)
+	if tls, err := ctl.GetTLSSecret(host); err != nil {
 		t.Errorf("GetTLSSecret => got %q", err)
 	} else if tls == nil {
 		t.Errorf("GetTLSSecret => no secret")

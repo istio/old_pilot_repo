@@ -19,6 +19,8 @@ import (
 
 	"fmt"
 
+	"strings"
+
 	"istio.io/manager/model"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -33,50 +35,57 @@ const (
 func newSecretStore(client kubernetes.Interface) *secretStore {
 	return &secretStore{
 		client:  client,
-		secrets: make(map[string]map[string]string),
+		secrets: make(map[string]string),
 	}
 }
 
 type secretStore struct {
-	mutex   sync.RWMutex
-	secrets map[string]map[string]string
-	client  kubernetes.Interface
+	mutex             sync.RWMutex
+	secrets           map[string]string
+	wildcardNamespace string
+	wildcardSecret    string
+	client            kubernetes.Interface
 }
 
-func (s *secretStore) put(namespace, host, secretName string) {
+func (s *secretStore) setWildcard(namespace, secretName string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if s.secrets[namespace] == nil {
-		s.secrets[namespace] = make(map[string]string)
-	}
-	s.secrets[namespace][host] = secretName
+	s.wildcardNamespace = namespace
+	s.wildcardSecret = secretName
 }
 
-func (s *secretStore) delete(namespace, host, secretName string) {
+func (s *secretStore) put(uri, secretName string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if s.secrets[namespace] == nil {
-		return
-	}
-	delete(s.secrets[namespace], host)
-	if len(s.secrets[namespace]) == 0 {
-		delete(s.secrets, namespace)
-	}
+	s.secrets[uri] = secretName
+}
+
+func (s *secretStore) delete(uri string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	delete(s.secrets, uri)
 }
 
 // GetTLSSecret retrieves the TLS secret for a host.
-func (s *secretStore) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
+func (s *secretStore) GetTLSSecret(uri string) (*model.TLSSecret, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	if s.secrets[namespace] == nil {
-		return nil, nil
+	var namespace string
+	if uri == "*" {
+		namespace = s.wildcardNamespace
+	} else {
+		parts := strings.Split(uri, ".")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("%q is not in the expected URI format: name.namespace.svc.cluster.local", uri)
+		}
+		namespace = parts[1]
 	}
 
 	// get the secret name
-	name := s.secrets[namespace][host]
+	name := s.secrets[uri]
 	if name == "" {
-		name = s.secrets[namespace][""] // try falling back to wildcard
+		name = s.wildcardSecret
 	}
 	if name == "" {
 		return nil, nil // no secret name for this host

@@ -3,6 +3,8 @@ package mock
 import (
 	"testing"
 
+	"fmt"
+
 	"istio.io/manager/model"
 )
 
@@ -12,12 +14,12 @@ func TestSecret(t *testing.T) {
 		PrivateKey:  []byte("ghijkl"),
 	}
 	ns := "default"
-	host := "host1"
+	uri := fmt.Sprintf("%v.%v", ns, "host1")
 
-	s := SecretRegistry{ns: {host: tls}}
-	if secret, err := s.GetTLSSecret(ns, host); err != nil {
-		t.Fatalf("GetTLSSecret(%q, %q) -> %q", ns, host, err)
+	s := SecretRegistry{uri: tls}
+	if secret, err := s.GetTLSSecret(uri); err != nil {
+		t.Fatalf("GetTLSSecret(%q) -> %q", uri, err)
 	} else if secret == nil {
-		t.Fatalf("GetTLSSecret(%q, %q) -> not found", ns, host)
+		t.Fatalf("GetTLSSecret(%q) -> not found", uri)
 	}
 }

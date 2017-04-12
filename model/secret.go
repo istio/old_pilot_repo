@@ -19,8 +19,8 @@ package model
 // the data immediately to the client of this interface.
 // TODO: add controller hooks for notification about changes to the secret
 type SecretRegistry interface {
-	// GetTLSSecret retrieves a TLS secret by namespace and host
-	GetTLSSecret(namespace, host string) (*TLSSecret, error)
+	// GetTLSSecret retrieves a TLS secret by implementation specific URI
+	GetTLSSecret(uri string) (*TLSSecret, error)
 }
 
 // TLSSecret defines a TLS configuration.

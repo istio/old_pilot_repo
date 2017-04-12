@@ -621,8 +621,8 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 }
 
 // GetTLSSecret implements secret registry operation.
-func (c *Controller) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
-	return c.secrets.GetTLSSecret(namespace, host)
+func (c *Controller) GetTLSSecret(uri string) (*model.TLSSecret, error) {
+	return c.secrets.GetTLSSecret(uri)
 }
 
 const (
@@ -763,17 +763,21 @@ func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS, ev model.Event)
 			continue
 		}
 
-		hosts := t.Hosts
-		if len(hosts) == 0 {
-			hosts = []string{""} // default to wildcard
-		}
-
-		for _, host := range hosts {
+		if len(t.Hosts) == 0 {
 			switch ev {
 			case model.EventAdd, model.EventUpdate:
-				c.secrets.put(c.options.Namespace, host, t.SecretName)
+				c.secrets.setWildcard(c.options.Namespace, t.SecretName)
 			case model.EventDelete:
-				c.secrets.delete(c.options.Namespace, host, t.SecretName)
+				c.secrets.setWildcard("", "")
+			}
+		} else {
+			for _, host := range t.Hosts {
+				switch ev {
+				case model.EventAdd, model.EventUpdate:
+					c.secrets.put(host, t.SecretName)
+				case model.EventDelete:
+					c.secrets.delete(host)
+				}
 			}
 		}
 	}

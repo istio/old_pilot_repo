@@ -67,7 +67,7 @@ func TestIngressRoutes(t *testing.T) {
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{ingressNamespace: {"": ingressTLSSecret}}
+	s := &mock.SecretRegistry{"*": ingressTLSSecret}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
@@ -83,7 +83,7 @@ func TestIngressRoutesSSL(t *testing.T) {
 
 func TestIngressRoutesPartialSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{ingressNamespace: {"world.default.svc.cluster.local": ingressTLSSecret}}
+	s := &mock.SecretRegistry{fmt.Sprintf("world.%v.svc.cluster.local", ingressNamespace): ingressTLSSecret}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,
