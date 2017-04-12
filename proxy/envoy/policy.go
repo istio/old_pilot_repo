@@ -58,7 +58,7 @@ func insertMixerFilter(listeners []*Listener, instances []*model.ServiceInstance
 						},
 						ForwardAttributes: map[string]string{
 							"source.uid":     context.IPAddress,
-							"source.service": service,
+							"source.name": service,
 						},
 					},
 				}}, http.Filters...)
