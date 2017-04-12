@@ -40,8 +40,10 @@ type args struct {
 
 	ipAddress     string
 	podName       string
+	passthrough   []int
 	apiserverPort int
 
+	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
@@ -93,33 +95,38 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			flags.controllerOptions.IngressSyncMode = kube.IngressOff
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
-				Discovery: controller,
-				Accounts:  controller,
-				Config: &model.IstioRegistry{
-					ConfigRegistry: controller,
-				},
+				Discovery:  controller,
+				Accounts:   controller,
+				Config:     &model.IstioRegistry{ConfigRegistry: controller},
 				MeshConfig: mesh,
 			}
 			discovery, err := envoy.NewDiscoveryService(controller, context, flags.discoveryOptions)
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
-			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
-				Version: "v1alpha1",
-				Port:    flags.apiserverPort,
-				Registry: &model.IstioRegistry{
-					ConfigRegistry: controller,
-				},
-			})
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go discovery.Run()
-			go apiserver.Run()
 			cmd.WaitSignal(stop)
 			return
+		},
+	}
+
+	apiserverCmd = &cobra.Command{
+		Use:   "apiserver",
+		Short: "Start Istio Manager config API service",
+		Run: func(*cobra.Command, []string) {
+			controller := kube.NewController(client, flags.controllerOptions)
+			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
+				Version:  "v1alpha1",
+				Port:     flags.apiserverPort,
+				Registry: &model.IstioRegistry{ConfigRegistry: controller},
+			})
+			stop := make(chan struct{})
+			go apiserver.Run()
+			cmd.WaitSignal(stop)
 		},
 	}
 
@@ -132,14 +139,14 @@ var (
 		Use:   "sidecar",
 		Short: "Istio Proxy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			flags.controllerOptions.IngressSyncMode = kube.IngressOff
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
-				Discovery:  controller,
-				Accounts:   controller,
-				Config:     &model.IstioRegistry{ConfigRegistry: controller},
-				MeshConfig: mesh,
-				IPAddress:  flags.ipAddress,
+				Discovery:        controller,
+				Accounts:         controller,
+				Config:           &model.IstioRegistry{ConfigRegistry: controller},
+				MeshConfig:       mesh,
+				IPAddress:        flags.ipAddress,
+				PassthroughPorts: flags.passthrough,
 			}
 			w, err := envoy.NewWatcher(controller, context)
 			if err != nil {
@@ -206,14 +213,16 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	discoveryCmd.PersistentFlags().IntVar(&flags.apiserverPort, "apiPort", 8081,
-		"API service port")
+	apiserverCmd.PersistentFlags().IntVar(&flags.apiserverPort, "port", 8081,
+		"Config API service port")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
 		"IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
 		"Pod name. If not provided uses ${POD_NAME} environment variable")
-
+	
+	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
+		"Passthrough ports for health checks")
 	ingressCmd.PersistentFlags().StringVar(&flags.controllerOptions.IngressClass, "ingress_class", "istio",
 		"The class of ingress resources to be processed by this ingress controller")
 	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller", true,
@@ -227,6 +236,7 @@ func init() {
 	cmd.AddFlags(rootCmd)
 
 	rootCmd.AddCommand(discoveryCmd)
+	rootCmd.AddCommand(apiserverCmd)
 	rootCmd.AddCommand(proxyCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }
