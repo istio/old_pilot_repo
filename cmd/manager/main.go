@@ -220,7 +220,7 @@ func init() {
 		"IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
 		"Pod name. If not provided uses ${POD_NAME} environment variable")
-	
+
 	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
 		"Passthrough ports for health checks")
 	ingressCmd.PersistentFlags().StringVar(&flags.controllerOptions.IngressClass, "ingress_class", "istio",
