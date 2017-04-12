@@ -765,7 +765,7 @@ func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS, ev model.Event)
 
 		hosts := t.Hosts
 		if len(hosts) == 0 {
-			hosts = []string{"*"} // default to wildcard
+			hosts = []string{""} // default to wildcard
 		}
 
 		for _, host := range hosts {

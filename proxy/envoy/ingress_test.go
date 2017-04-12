@@ -67,7 +67,7 @@ func TestIngressRoutes(t *testing.T) {
 
 func TestIngressRoutesSSL(t *testing.T) {
 	r := mock.MakeRegistry()
-	s := &mock.SecretRegistry{ingressNamespace: {"*": ingressTLSSecret}}
+	s := &mock.SecretRegistry{ingressNamespace: {"": ingressTLSSecret}}
 	addIngressRoutes(r, t)
 	testIngressConfig(&IngressConfig{
 		CertFile:  ingressCertFile,

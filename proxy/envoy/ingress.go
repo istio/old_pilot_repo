@@ -132,18 +132,11 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 	// figure out which hosts are configured to terminate TLS
 	// ensure that only one TLS config is used
 	// TODO: extensive tests for the TLS logic
+	var tls *model.TLSSecret
 	tlsValid := true
-	tls, err := conf.Secrets.GetTLSSecret(conf.Namespace, "*")
-	if err != nil {
-		glog.Warningf("Error retrieving TLS context for wildcard: %v", err)
-		tlsValid = false
-	}
-	wildcardTLS := tls != nil
-
 	tlsHosts := make(map[string]bool)
 	for host := range rulesByHost {
-		t, err := conf.Secrets.GetTLSSecret(conf.Namespace, host)
-		if err != nil {
+		if t, err := conf.Secrets.GetTLSSecret(conf.Namespace, host); err != nil {
 			tlsValid = false
 			tlsHosts[host] = true // count this as a TLS host so that it is omitted from the config
 
@@ -155,8 +148,6 @@ func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *m
 				glog.Warningf("Unsupported ingress configuration %q: multiple TLS configs", host)
 				tlsValid = false
 			}
-			tlsHosts[host] = true
-		} else if wildcardTLS {
 			tlsHosts[host] = true
 		}
 	}

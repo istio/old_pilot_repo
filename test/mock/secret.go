@@ -12,5 +12,8 @@ func (s SecretRegistry) GetTLSSecret(namespace, host string) (*model.TLSSecret, 
 	if s[namespace] == nil {
 		return nil, nil
 	}
-	return s[namespace][host], nil
+	if s[namespace][host] != nil {
+		return s[namespace][host], nil
+	}
+	return s[namespace][""], nil // try wildcard
 }

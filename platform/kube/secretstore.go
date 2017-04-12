@@ -64,7 +64,7 @@ func (s *secretStore) delete(namespace, host, secretName string) {
 	}
 }
 
-// GetTLSSecret retrieves the TLS secret for a host
+// GetTLSSecret retrieves the TLS secret for a host.
 func (s *secretStore) GetTLSSecret(namespace, host string) (*model.TLSSecret, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -76,7 +76,7 @@ func (s *secretStore) GetTLSSecret(namespace, host string) (*model.TLSSecret, er
 	// get the secret name
 	name := s.secrets[namespace][host]
 	if name == "" {
-		name = s.secrets[namespace]["*"] // try falling back to wildcard
+		name = s.secrets[namespace][""] // try falling back to wildcard
 	}
 	if name == "" {
 		return nil, nil // no secret name for this host
