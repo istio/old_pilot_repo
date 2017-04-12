@@ -38,14 +38,15 @@ type args struct {
 	kubeconfig string
 	meshConfig string
 
+	ipAddress     string
+	podName       string
+	ingressSecret string
+	passthrough   []int
+	apiserverPort int
+
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
-	ipAddress                string
-	podName                  string
-	passthrough              []int
-	apiserverPort            int
-	ingressSecret            string
 	defaultIngressController bool
 }
 

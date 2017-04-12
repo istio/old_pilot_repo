@@ -171,7 +171,8 @@ type DiscoveryServiceOptions struct {
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
-func NewDiscoveryService(ctl model.Controller, context *proxy.Context, o DiscoveryServiceOptions) (*DiscoveryService, error) {
+func NewDiscoveryService(ctl model.Controller, context *proxy.Context,
+	o DiscoveryServiceOptions) (*DiscoveryService, error) {
 	out := &DiscoveryService{
 		Context:  context,
 		sdsCache: newDiscoveryCache(o.EnableCaching),

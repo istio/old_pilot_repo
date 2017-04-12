@@ -70,11 +70,9 @@ func (r *reachability) run() error {
 		if err := r.checkProxyAccessLogs(); err != nil {
 			return err
 		}
-		/* TODO: enable mixer logs when it gets less flaky
 		if err := r.checkMixerLogs(); err != nil {
 			return err
 		}
-		*/
 	}
 	glog.Info("Success!")
 	return nil

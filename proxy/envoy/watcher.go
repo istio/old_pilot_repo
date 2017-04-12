@@ -45,7 +45,8 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
-	agent := proxy.NewAgent(runEnvoy(context.MeshConfig, context.IPAddress), cleanupEnvoy(context.MeshConfig), 10, 100*time.Millisecond)
+	agent := proxy.NewAgent(runEnvoy(context.MeshConfig, context.IPAddress),
+		cleanupEnvoy(context.MeshConfig), 10, 100*time.Millisecond)
 
 	out := &watcher{
 		agent:   agent,
