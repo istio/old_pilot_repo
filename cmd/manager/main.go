@@ -118,7 +118,7 @@ var (
 	apiserverCmd = &cobra.Command{
 		Use:   "apiserver",
 		Short: "Start Istio Manager config API service",
-		RunE: func(*cobra.Command, []string) (err error) {
+		Run: func(*cobra.Command, []string) {
 			controller := kube.NewController(client, flags.controllerOptions)
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version:  "v1alpha1",
@@ -128,7 +128,6 @@ var (
 			stop := make(chan struct{})
 			go apiserver.Run()
 			cmd.WaitSignal(stop)
-			return
 		},
 	}
 
