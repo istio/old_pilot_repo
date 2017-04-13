@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "config.go",
         "discovery.go",
+        "egress.go",
         "fault.go",
         "header.go",
         "ingress.go",
@@ -22,7 +23,6 @@ go_library(
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_golang_protobuf//ptypes:go_default_library",
         "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-        "@com_github_hashicorp_errwrap//:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
         "@io_istio_api//:go_default_library",
     ],
@@ -34,6 +34,7 @@ go_test(
     srcs = [
         "config_test.go",
         "discovery_test.go",
+        "egress_test.go",
         "ingress_test.go",
         "route_test.go",
     ],
