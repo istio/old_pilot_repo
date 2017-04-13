@@ -92,6 +92,7 @@ func generateEgress(conf *EgressConfig) *Config {
 
 	rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
 
+	// External services are expected to have only one external port or they will get conflated
 	listener := &Listener{
 		Address:    fmt.Sprintf("tcp://%s:80", WildcardAddress),
 		BindToPort: true,

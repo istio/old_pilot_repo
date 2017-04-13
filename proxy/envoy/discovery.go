@@ -347,7 +347,6 @@ func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response 
 		for _, port := range service.Ports {
 
 			var hosts []*host
-
 			for _, instance := range ds.Discovery.Instances(service.Hostname, []string{port.Name}, nil) {
 				hosts = append(hosts, &host{
 					Address: instance.Endpoint.Address,
@@ -404,7 +403,7 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 
 	// This sort is not needed, but discovery_test excepts consistent output and sorting achieves it
 	sort.Strings(endpoints)
-	fmt.Println(endpoints)
+
 	for _, ip := range endpoints {
 		// CDS computes clusters that are referenced by RDS routes for a particular proxy node
 		// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
