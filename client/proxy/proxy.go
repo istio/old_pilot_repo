@@ -56,8 +56,7 @@ func (m *ManagerClient) GetConfig(key model.Key) (config *apiserver.Config, err 
 		return nil, err
 	}
 
-	defer func() { err = response.Body.Close() }()
-
+	defer func() { _ = response.Body.Close() }() // #nosec
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
@@ -120,7 +119,7 @@ func (m *ManagerClient) ListConfig(kind, namespace string) (config []apiserver.C
 		return nil, err
 	}
 
-	defer func() { err = response.Body.Close() }()
+	defer func() { _ = response.Body.Close() }() // #nosec
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
