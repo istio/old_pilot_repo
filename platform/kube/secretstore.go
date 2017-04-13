@@ -19,8 +19,6 @@ import (
 
 	"fmt"
 
-	"strings"
-
 	"istio.io/manager/model"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -71,28 +69,13 @@ func (s *secretStore) GetTLSSecret(uri string) (*model.TLSSecret, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	var namespace string
-	if uri == "*" {
-		namespace = s.wildcardNamespace
-	} else {
-		parts := strings.Split(uri, ".")
-		if len(parts) < 2 {
-			return nil, fmt.Errorf("%q is not in the expected URI format: name.namespace.svc.cluster.local", uri)
-		}
-		namespace = parts[1]
-	}
-
-	// get the secret name
-	name := s.secrets[uri]
-	if name == "" {
-		name = s.wildcardSecret
-	}
-	if name == "" {
-		return nil, nil // no secret name for this host
+	// TODO: host -> secret mapping. Currently we only support obtaining the secret for the wildcard.
+	if s.wildcardNamespace == "" || s.wildcardSecret == "" {
+		return nil, nil
 	}
 
 	// retrieve the secret
-	secret, err := s.client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := s.client.Core().Secrets(s.wildcardNamespace).Get(s.wildcardSecret, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
