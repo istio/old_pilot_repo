@@ -5,4 +5,4 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-proxy/envoy/envoy -l trace -c proxy/envoy/testdata/envoy-v0.json.golden --service-cluster istio-proxy --service-node 10.0.0.1
+#proxy/envoy/envoy -l trace -c proxy/envoy/testdata/envoy-v0.json.golden --service-cluster istio-proxy --service-node 10.0.0.1
