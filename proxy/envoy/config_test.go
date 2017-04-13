@@ -312,6 +312,7 @@ func TestMockConfig(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
@@ -320,6 +321,7 @@ func TestMockConfigWithAuth(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0ConfigAuth, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1ConfigAuth, t)
@@ -329,6 +331,7 @@ func TestMockConfigTimeout(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	addTimeout(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -338,6 +341,7 @@ func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	addCircuitBreaker(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -347,6 +351,7 @@ func TestMockConfigWeighted(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	addWeightedRoute(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
@@ -356,6 +361,7 @@ func TestMockConfigFault(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := DefaultMeshConfig
 	mesh.MixerAddress = "mixer:9091"
+	mesh.DiscoveryAddress = "localhost:8080"
 	addFaultRoute(r, t)
 	// Fault rule uses source condition, hence the different golden artifacts
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyFaultConfig, t)

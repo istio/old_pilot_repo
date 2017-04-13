@@ -407,7 +407,7 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://manager:8080"
+            "url": "tcp://localhost:8080"
           }
         ]
       }
@@ -420,7 +420,7 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://manager:8080"
+            "url": "tcp://localhost:8080"
           }
         ]
       },
@@ -434,7 +434,7 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://manager:8080"
+            "url": "tcp://localhost:8080"
           }
         ]
       },
