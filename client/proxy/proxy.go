@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,12 +14,15 @@ import (
 	"istio.io/manager/model"
 )
 
+// ManagerClient is a client wrapper that contains the base URL and API version
 type ManagerClient struct {
 	base             url.URL
 	versionedAPIPath string
 	client           *http.Client
 }
 
+// NewManagerClient creates a new ManagerClient instance. It trims the apiVersion of leading and trailing slashes
+// and the base path of trailing slashes to ensure consistency
 func NewManagerClient(base url.URL, apiVersion string, client *http.Client) *ManagerClient {
 	base.Path = strings.TrimSuffix(base.Path, "/")
 	return &ManagerClient{
@@ -37,43 +39,39 @@ func (m *ManagerClient) do(request *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("unable to parse URL: %v", err)
 	}
 	request.URL = fullURL
+	response, err := m.client.Do(request)
 	if err != nil {
 		return nil, err
 	}
-	response, err := m.client.Do(request)
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		defer response.Body.Close()
-		body, err := ioutil.ReadAll(response.Body)
-		if err == nil && len(body) > 0 {
-			if response.StatusCode == 404 {
-				return nil, &model.ItemNotFoundError{Msg: string(body)}
-			}
-			return nil, errors.New(string(body))
-		}
 		return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
 	}
-	return response, err
+	return response, nil
 }
 
-func (m *ManagerClient) GetConfig(key model.Key) (*apiserver.Config, error) {
+// GetConfig retrieves the configuration resource for the passed key
+func (m *ManagerClient) GetConfig(key model.Key) (config *apiserver.Config, err error) {
 	response, err := m.doConfigCRUD(key, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	defer response.Body.Close()
+	defer func() { err = response.Body.Close() }()
+
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &apiserver.Config{}
+	config = &apiserver.Config{}
 	if err = json.Unmarshal(body, config); err != nil {
 		return nil, err
 	}
 	return config, nil
 }
 
+// AddConfig creates a configuration resources for the passed key using the passed configuration
+// It is idempotent
 func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
@@ -85,6 +83,8 @@ func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error 
 	return nil
 }
 
+// UpdateConfig updates the configuration resource for the passed key using the passed configuration
+// It is idempotent
 func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
@@ -96,14 +96,15 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 	return nil
 }
 
+// DeleteConfig deletes the configuration resource for the passed key
 func (m *ManagerClient) DeleteConfig(key model.Key) error {
-	if _, err := m.doConfigCRUD(key, http.MethodDelete, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := m.doConfigCRUD(key, http.MethodDelete, nil)
+	return err
 }
 
-func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, error) {
+// ListConfig retrieves all configuration resources of the passed kind in the given namespace
+// If namespace is an empty string it retrieves all configs of the passed kind across all namespaces
+func (m *ManagerClient) ListConfig(kind, namespace string) (config []apiserver.Config, err error) {
 	var reqURL string
 	if namespace != "" {
 		reqURL = fmt.Sprintf("config/%v/%v", kind, namespace)
@@ -119,13 +120,13 @@ func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, 
 		return nil, err
 	}
 
-	defer response.Body.Close()
+	defer func() { err = response.Body.Close() }()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	config := []apiserver.Config{}
+	config = []apiserver.Config{}
 	if err = json.Unmarshal(body, &config); err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, 
 func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) (*http.Response, error) {
 	reqURL := fmt.Sprintf("config/%v/%v/%v", key.Kind, key.Namespace, key.Name)
 	var body io.Reader
-	if inBody != nil && len(inBody) > 0 {
+	if len(inBody) > 0 {
 		body = bytes.NewBuffer(inBody)
 	}
 	request, err := http.NewRequest(method, reqURL, body)

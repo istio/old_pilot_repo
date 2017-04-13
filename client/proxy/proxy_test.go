@@ -23,7 +23,7 @@ func (f *FakeHandler) HandlerFunc(w http.ResponseWriter, r *http.Request) {
 	for k, v := range f.wantHeaders {
 		w.Header().Set(k, v[0])
 	}
-	w.Write([]byte(f.wantResponse))
+	_, _ = w.Write([]byte(f.wantResponse))
 }
 
 func TestNewManagerClient(t *testing.T) {
@@ -218,8 +218,8 @@ func TestGetAddUpdateDeleteListConfig(t *testing.T) {
 			kind:      "kind",
 			namespace: "namespace",
 			wantConfigSlice: []apiserver.Config{
-				apiserver.Config{Type: "type", Name: "name", Spec: "spec"},
-				apiserver.Config{Type: "type", Name: "name2", Spec: "spec"},
+				{Type: "type", Name: "name", Spec: "spec"},
+				{Type: "type", Name: "name2", Spec: "spec"},
 			},
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantStatus:  http.StatusOK,
@@ -229,8 +229,8 @@ func TestGetAddUpdateDeleteListConfig(t *testing.T) {
 			function: "list",
 			kind:     "kind",
 			wantConfigSlice: []apiserver.Config{
-				apiserver.Config{Type: "type", Name: "name", Spec: "spec"},
-				apiserver.Config{Type: "type", Name: "name2", Spec: "spec"},
+				{Type: "type", Name: "name", Spec: "spec"},
+				{Type: "type", Name: "name2", Spec: "spec"},
 			},
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantStatus:  http.StatusOK,
@@ -287,7 +287,7 @@ func TestGetAddUpdateDeleteListConfig(t *testing.T) {
 		}
 
 		// Verify
-		if c.wantError == false && err != nil {
+		if !c.wantError && err != nil {
 			t.Errorf("%s: unexpected error: %v", c.name, err)
 		} else if c.function == "get" {
 			if !reflect.DeepEqual(config, c.wantConfig) {
