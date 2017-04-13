@@ -153,9 +153,15 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags mode
 	out := make([]*model.ServiceInstance, 0)
 	for _, name := range ports {
 		if port, ok := service.Ports.Get(name); ok {
-			for v := 0; v < sd.versions; v++ {
-				if tags.HasSubsetOf(map[string]string{"version": fmt.Sprintf("v%d", v)}) {
-					out = append(out, MakeInstance(service, port, v))
+			if service.ExternalName != "" {
+				if tags.HasSubsetOf(map[string]string{"version": fmt.Sprintf("v%d", 0)}) {
+					out = append(out, MakeInstance(service, port, 0))
+				}
+			} else {
+				for v := 0; v < sd.versions; v++ {
+					if tags.HasSubsetOf(map[string]string{"version": fmt.Sprintf("v%d", v)}) {
+						out = append(out, MakeInstance(service, port, v))
+					}
 				}
 			}
 		}
@@ -167,10 +173,16 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags mode
 func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	out := make([]*model.ServiceInstance, 0)
 	for _, service := range sd.services {
-		for v := 0; v < sd.versions; v++ {
-			if addrs[MakeIP(service, v)] {
-				for _, port := range service.Ports {
-					out = append(out, MakeInstance(service, port, v))
+		if service.ExternalName != "" {
+			if addrs[MakeIP(service, 0)] {
+				out = append(out, MakeInstance(service, service.Ports[0], 0))
+			}
+		} else {
+			for v := 0; v < sd.versions; v++ {
+				if addrs[MakeIP(service, v)] {
+					for _, port := range service.Ports {
+						out = append(out, MakeInstance(service, port, v))
+					}
 				}
 			}
 		}
