@@ -12,9 +12,6 @@ ENVOY="$1 -l trace --service-cluster istio-proxy --service-node 10.0.0.1"
 CONFIG_FILE=$2
 BASE_ID=$3
 
-echo "##############################"
-echo "# Testing ${CONFIG_FILE}..."
-echo "##############################"
 ${ENVOY} --base-id ${BASE_ID} -c ${CONFIG_FILE} &
 PID=$!
 sleep 0.200
