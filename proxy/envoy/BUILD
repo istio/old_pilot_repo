@@ -54,15 +54,13 @@ go_test(
 genrule(
     name = "envoy_bin",
     srcs = ["@istio_proxy_debug//file"],
-    cmd = "tar xzf $(location @istio_proxy_debug//file); mv usr/local/bin/envoy $@",
     outs = ["envoy"],
+    cmd = "tar xzf $(location @istio_proxy_debug//file); mv usr/local/bin/envoy $@",
 )
 
 sh_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.sh"],
-    data = glob(["testdata/*.golden"]) + [
-        "envoy"
-    ],
+    data = glob(["testdata/*.golden"]) + ["envoy"],
 )
