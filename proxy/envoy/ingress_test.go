@@ -30,6 +30,8 @@ var (
 )
 
 func testIngressConfig(c *IngressConfig, envoyConfig string, t *testing.T) {
+	c.Port = 8080
+	c.SSLPort = 8443
 	config := generateIngress(c)
 	if config == nil {
 		t.Fatal("Failed to generate config")
