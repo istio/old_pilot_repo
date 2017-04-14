@@ -65,5 +65,4 @@ sh_test(
     data = glob(["testdata/*.golden"]) + [
         "envoy"
     ],
-    local = True,
 )
