@@ -224,10 +224,8 @@ func buildIngressListeners(conf *IngressConfig) (Listeners, Clusters) {
 		sort.Slice(vhosts, func(i, j int) bool { return vhosts[i].Name < vhosts[j].Name })
 
 		rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
-
 		address := fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Port)
-		listener := buildIngressListener(address, "http", rConfig, nil)
-		listeners = append(listeners, listener)
+		listeners = append(listeners, buildIngressListener(address, "http", rConfig, nil))
 		clusters = append(clusters, rConfig.clusters()...)
 	}
 
@@ -242,9 +240,8 @@ func buildIngressListeners(conf *IngressConfig) (Listeners, Clusters) {
 				CertChainFile:  conf.CertFile,
 				PrivateKeyFile: conf.KeyFile,
 			}
-			addr := fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.SSLPort)
-			listener := buildIngressListener(addr, "https", rConfig, ssl)
-			listeners = append(listeners, listener)
+			address := fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.SSLPort)
+			listeners = append(listeners, buildIngressListener(address, "https", rConfig, ssl))
 			clusters = append(clusters, rConfig.clusters()...)
 		}
 	}
