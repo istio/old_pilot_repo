@@ -60,64 +60,64 @@ genrule(
 
 sh_test(
     name = "envoy_config_v0_test",
+    size = "small",
+    srcs = ["config_test.sh"],
     args = [
         "$(location envoy)",
         "$(location testdata/envoy-v0.json.golden)",
         "0",
     ],
-    size = "small",
-    srcs = ["config_test.sh"],
-    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/envoy-v0.json.golden",
     ],
+    tags = ["exclusive"],
 )
 
 sh_test(
     name = "envoy_config_ingress_test",
+    size = "small",
+    srcs = ["config_test.sh"],
     args = [
         "$(location envoy)",
         "$(location testdata/ingress-envoy.json.golden)",
         "1",
     ],
-    size = "small",
-    srcs = ["config_test.sh"],
-    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/ingress-envoy.json.golden",
     ],
+    tags = ["exclusive"],
 )
 
 sh_test(
     name = "envoy_config_egress_test",
+    size = "small",
+    srcs = ["config_test.sh"],
     args = [
         "$(location envoy)",
         "$(location testdata/egress-envoy.json.golden)",
         "2",
     ],
-    size = "small",
-    srcs = ["config_test.sh"],
-    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/egress-envoy.json.golden",
     ],
+    tags = ["exclusive"],
 )
 
 sh_test(
     name = "envoy_config_fault_test",
+    size = "small",
+    srcs = ["config_test.sh"],
     args = [
         "$(location envoy)",
         "$(location testdata/envoy-fault.json.golden)",
         "3",
     ],
-    size = "small",
-    srcs = ["config_test.sh"],
-    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/envoy-fault.json.golden",
     ],
+    tags = ["exclusive"],
 )
