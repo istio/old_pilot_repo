@@ -50,3 +50,74 @@ go_test(
         "@io_istio_api//:go_default_library",
     ],
 )
+
+genrule(
+    name = "envoy_bin",
+    srcs = ["@istio_proxy_debug//file"],
+    outs = ["envoy"],
+    cmd = "tar xzf $(location @istio_proxy_debug//file); mv usr/local/bin/envoy $@",
+)
+
+sh_test(
+    name = "envoy_config_v0_test",
+    size = "small",
+    srcs = ["config_test.sh"],
+    args = [
+        "$(location envoy)",
+        "$(location testdata/envoy-v0.json.golden)",
+        "0",
+    ],
+    data = [
+        "envoy",
+        "testdata/envoy-v0.json.golden",
+    ],
+    tags = ["exclusive"],
+)
+
+sh_test(
+    name = "envoy_config_ingress_test",
+    size = "small",
+    srcs = ["config_test.sh"],
+    args = [
+        "$(location envoy)",
+        "$(location testdata/ingress-envoy.json.golden)",
+        "1",
+    ],
+    data = [
+        "envoy",
+        "testdata/ingress-envoy.json.golden",
+    ],
+    tags = ["exclusive"],
+)
+
+sh_test(
+    name = "envoy_config_egress_test",
+    size = "small",
+    srcs = ["config_test.sh"],
+    args = [
+        "$(location envoy)",
+        "$(location testdata/egress-envoy.json.golden)",
+        "2",
+    ],
+    data = [
+        "envoy",
+        "testdata/egress-envoy.json.golden",
+    ],
+    tags = ["exclusive"],
+)
+
+sh_test(
+    name = "envoy_config_fault_test",
+    size = "small",
+    srcs = ["config_test.sh"],
+    args = [
+        "$(location envoy)",
+        "$(location testdata/envoy-fault.json.golden)",
+        "3",
+    ],
+    data = [
+        "envoy",
+        "testdata/envoy-fault.json.golden",
+    ],
+    tags = ["exclusive"],
+)
