@@ -34,9 +34,10 @@ func testRouting() error {
 	// Create a bytes buffer to hold the YAML form of rules
 	glog.Info("Routing all traffic to world-v1 and verifying..")
 	deployDynamicConfig("rule-default-route.yaml.tmpl", map[string]string{
-		"destination": "world",
-	}, model.RouteRule, "default-route", "hello")
-	check(verifyRouting("hello", "world", "", "",
+		"destination": "c",
+		"namespace":   params.namespace,
+	}, model.RouteRule, "default-route", "a")
+	check(verifyRouting("a", "c", "", "",
 		100, map[string]int{
 			"v1": 100,
 			"v2": 0,
@@ -45,9 +46,10 @@ func testRouting() error {
 
 	glog.Info("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
 	deployDynamicConfig("rule-weighted-route.yaml.tmpl", map[string]string{
-		"destination": "world",
-	}, model.RouteRule, "default-route", "hello")
-	check(verifyRouting("hello", "world", "", "",
+		"destination": "c",
+		"namespace":   params.namespace,
+	}, model.RouteRule, "default-route", "a")
+	check(verifyRouting("a", "c", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
@@ -56,10 +58,11 @@ func testRouting() error {
 
 	glog.Info("Routing 100 percent to world-v2 using header based routing and verifying..")
 	deployDynamicConfig("rule-content-route.yaml.tmpl", map[string]string{
-		"source":      "hello",
-		"destination": "world",
-	}, model.RouteRule, "content-route", "hello")
-	check(verifyRouting("hello", "world", "version", "v2",
+		"source":      "a",
+		"destination": "c",
+		"namespace":   params.namespace,
+	}, model.RouteRule, "content-route", "a")
+	check(verifyRouting("a", "c", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
@@ -68,10 +71,11 @@ func testRouting() error {
 
 	glog.Info("Testing fault injection..")
 	deployDynamicConfig("rule-fault-injection.yaml.tmpl", map[string]string{
-		"source":      "hello",
-		"destination": "world",
-	}, model.RouteRule, "fault-injection", "hello")
-	check(verifyFaultInjection("hello", "world", "version", "v2", time.Second*5, 503))
+		"source":      "a",
+		"destination": "c",
+		"namespace":   params.namespace,
+	}, model.RouteRule, "fault-injection", "a")
+	check(verifyFaultInjection("a", "c", "version", "v2", time.Second*5, 503))
 	glog.Info("Success!")
 
 	glog.Info("Cleaning up route rules...")

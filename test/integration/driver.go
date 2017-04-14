@@ -209,9 +209,9 @@ func setup() {
 	// deploy a healthy mix of apps, with and without proxy
 	check(deployApp("t", "t", "8080", "80", "9090", "90", "unversioned", false))
 	check(deployApp("a", "a", "8080", "80", "9090", "90", "v1", true))
-	check(deployApp("b-v1", "b", "80", "8080", "90", "9090", "v1", true))
-	check(deployApp("b-v2", "b", "80", "8080", "90", "9090", "v2", true))
-	check(deployApp("c", "c", "80", "8080", "90", "9090", "unversioned", true))
+	check(deployApp("b", "b", "80", "8080", "90", "9090", "unversioned", true))
+	check(deployApp("c-v1", "c", "80", "8080", "90", "9090", "v1", true))
+	check(deployApp("c-v2", "c", "80", "8080", "90", "9090", "v2", true))
 
 	apps, err = util.GetAppPods(client, params.namespace)
 	check(err)
