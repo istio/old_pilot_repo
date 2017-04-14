@@ -59,8 +59,61 @@ genrule(
 )
 
 sh_test(
-    name = "config_test",
+    name = "envoy_config_v0_test",
+    args = [
+        "$(location envoy)",
+        "$(location testdata/envoy-v0.json.golden)",
+        "0",
+    ],
     size = "small",
     srcs = ["config_test.sh"],
-    data = glob(["testdata/*.golden"]) + ["envoy"],
+    data = [
+        "envoy",
+        "testdata/envoy-v0.json.golden",
+    ],
+)
+
+sh_test(
+    name = "envoy_config_ingress_test",
+    args = [
+        "$(location envoy)",
+        "$(location testdata/ingress-envoy.json.golden)",
+        "1",
+    ],
+    size = "small",
+    srcs = ["config_test.sh"],
+    data = [
+        "envoy",
+        "testdata/ingress-envoy.json.golden",
+    ],
+)
+
+sh_test(
+    name = "envoy_config_egress_test",
+    args = [
+        "$(location envoy)",
+        "$(location testdata/egress-envoy.json.golden)",
+        "2",
+    ],
+    size = "small",
+    srcs = ["config_test.sh"],
+    data = [
+        "envoy",
+        "testdata/egress-envoy.json.golden",
+    ],
+)
+
+sh_test(
+    name = "envoy_config_fault_test",
+    args = [
+        "$(location envoy)",
+        "$(location testdata/envoy-fault.json.golden)",
+        "3",
+    ],
+    size = "small",
+    srcs = ["config_test.sh"],
+    data = [
+        "envoy",
+        "testdata/envoy-fault.json.golden",
+    ],
 )
