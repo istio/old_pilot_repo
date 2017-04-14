@@ -17,5 +17,5 @@ echo "# Testing ${CONFIG_FILE}..."
 echo "##############################"
 ${ENVOY} --base-id $3 -c ${CONFIG_FILE} &
 PID=$!
-sleep 1
+sleep 0.200
 kill -KILL $PID

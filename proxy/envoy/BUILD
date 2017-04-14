@@ -67,6 +67,7 @@ sh_test(
     ],
     size = "small",
     srcs = ["config_test.sh"],
+    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/envoy-v0.json.golden",
@@ -82,6 +83,7 @@ sh_test(
     ],
     size = "small",
     srcs = ["config_test.sh"],
+    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/ingress-envoy.json.golden",
@@ -97,6 +99,7 @@ sh_test(
     ],
     size = "small",
     srcs = ["config_test.sh"],
+    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/egress-envoy.json.golden",
@@ -112,6 +115,7 @@ sh_test(
     ],
     size = "small",
     srcs = ["config_test.sh"],
+    tags = ["exclusive"],
     data = [
         "envoy",
         "testdata/envoy-fault.json.golden",
