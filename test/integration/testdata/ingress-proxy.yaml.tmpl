@@ -26,8 +26,8 @@ spec:
     spec:
       containers:
       - name: proxy
-        image: {{.hub}}/proxy:{{.tag}}
-        args: ["proxy", "ingress", "-v", "{{.verbosity}}"]
+        image: {{.Hub}}/proxy:{{.Tag}}
+        args: ["proxy", "ingress", "-v", "{{.Verbosity}}"]
         imagePullPolicy: Always
         ports:
         - containerPort: 443

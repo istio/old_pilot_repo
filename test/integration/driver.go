@@ -19,51 +19,33 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"os"
-	"strconv"
-	"strings"
 	"text/template"
 	"time"
 
 	"github.com/golang/glog"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
-	"istio.io/manager/platform/kube/inject"
-	"istio.io/manager/proxy/envoy"
-	"istio.io/manager/test/util"
 )
 
 const (
-	app = "app"
-
 	// CA image tag is the short SHA *update manually*
 	caTag = "f063b41"
 
 	// Mixer image tag is the short SHA *update manually*
 	mixerTag = "6655a67"
-
-	ingressServiceName = "istio-ingress-controller"
 )
 
 type parameters struct {
-	hub        string
-	tag        string
-	caImage    string
-	mixerImage string
-	namespace  string
+	infra
 	kubeconfig string
 	count      int
-	auth       bool
 	debug      bool
 	parallel   bool
 	logs       bool
-
-	verbosity int
 }
 
 var (
@@ -72,12 +54,6 @@ var (
 	client      kubernetes.Interface
 	istioClient *kube.Client
 
-	// mapping from app name to pod names (write once, read only)
-	apps map[string][]string
-
-	// indicates whether the namespace is auto-generated
-	namespaceCreated bool
-
 	// Enable/disable auth, or run both for the tests.
 	authmode string
 
@@ -85,13 +61,13 @@ var (
 )
 
 func init() {
-	flag.StringVar(&params.hub, "hub", "gcr.io/istio-testing", "Docker hub")
-	flag.StringVar(&params.tag, "tag", "", "Docker tag")
-	flag.StringVar(&params.caImage, "ca", "gcr.io/istio-testing/istio-ca:"+caTag,
+	flag.StringVar(&params.infra.Hub, "hub", "gcr.io/istio-testing", "Docker hub")
+	flag.StringVar(&params.infra.Tag, "tag", "", "Docker tag")
+	flag.StringVar(&params.infra.CaImage, "ca", "gcr.io/istio-testing/istio-ca:"+caTag,
 		"CA Docker image")
-	flag.StringVar(&params.mixerImage, "mixer", "gcr.io/istio-testing/mixer:"+mixerTag,
+	flag.StringVar(&params.infra.MixerImage, "mixer", "gcr.io/istio-testing/mixer:"+mixerTag,
 		"Mixer Docker image")
-	flag.StringVar(&params.namespace, "n", "",
+	flag.StringVar(&params.infra.Namespace, "n", "",
 		"Namespace to use for testing (empty to create/delete temporary one)")
 	flag.StringVar(&params.kubeconfig, "kubeconfig", "platform/kube/config",
 		"kube config file (missing or empty file makes the test use in-cluster kube config instead)")
@@ -102,195 +78,93 @@ func init() {
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
 }
 
+type test interface {
+	setup() error
+	run() error
+	teardown()
+}
+
 func main() {
 	flag.Parse()
+	if params.infra.Tag == "" {
+		glog.Fatal("No docker tag specified")
+	}
+
+	if params.debug {
+		params.infra.Verbosity = 3
+	} else {
+		params.infra.Verbosity = 2
+	}
+
+	glog.Infof("params %#v", params)
+
+	check(setupClient())
+
 	switch authmode {
 	case "enable":
-		params.auth = true
+		params.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 		runTests()
 	case "disable":
-		params.auth = false
+		params.Auth = proxyconfig.ProxyMeshConfig_NONE
 		runTests()
 	case "both":
-		params.auth = false
+		params.Auth = proxyconfig.ProxyMeshConfig_NONE
 		runTests()
-		params.auth = true
+		params.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 		runTests()
 	default:
-		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", params.auth)
+		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", params.Auth)
 	}
 }
 
 func runTests() {
-	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.auth)
+	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.Auth)
 
-	setup()
+	infra := params.infra
+	infra.Mixer = true
+	infra.Egress = true
+	infra.Ingress = true
+
+	check(infra.setup())
+	check(infra.deployApps())
+
+	tests := []test{
+		&reachability{},
+		&ingress{&infra},
+		&egress{&infra},
+		// testRouting
+	}
 
 	for i := 0; i < params.count; i++ {
 		glog.Infof("Test run: %d", i)
-		check((&reachability{}).run())
-		check(testRouting())
-	}
-
-	teardown()
-	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", params.auth, params.count)
-}
-
-// deploy complete infrastructure to ensure no conflict between components across test cases
-func deployInfra(auth bool, namespace string) error {
-	authPolicy := proxyconfig.ProxyMeshConfig_NONE.String()
-	if auth {
-		authPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS.String()
-	}
-
-	values := map[string]string{
-		"hub":        params.hub,
-		"tag":        params.tag,
-		"verbosity":  strconv.Itoa(params.verbosity),
-		"mixerImage": params.mixerImage,
-		"caImage":    params.caImage,
-		"authPolicy": authPolicy,
-	}
-
-	for _, infra := range []string{
-		"config.yaml.tmpl",
-		"manager.yaml.tmpl",
-		"mixer.yaml.tmpl",
-		"ca.yaml.tmpl",
-		"ingress-proxy.yaml.tmpl",
-		"egress-proxy.yaml.tmpl"} {
-		if yaml, err := fill(infra, values); err != nil {
-			return err
-		} else if err = kubeApply(yaml, namespace); err != nil {
-			return err
+		for _, test := range tests {
+			check(test.setup())
+			check(test.run())
+			test.teardown()
 		}
 	}
 
-	return nil
-}
-
-func setup() {
-	if params.tag == "" {
-		glog.Fatal("No docker tag specified")
-	}
-	glog.Infof("params %#v", params)
-
-	if params.debug {
-		params.verbosity = 3
-	} else {
-		params.verbosity = 2
-	}
-
-	check(setupClient())
-
-	var err error
-	if params.namespace == "" {
-		if params.namespace, err = util.CreateNamespace(client); err != nil {
-			check(err)
-		}
-		namespaceCreated = true
-	} else {
-		_, err = client.Core().Namespaces().Get(params.namespace, meta_v1.GetOptions{})
-		check(err)
-	}
-
-	// setup ingress resources
-	_, _ = util.Shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
-		"--from-file=tls.key=test/integration/testdata/cert.key "+
-		"--from-file=tls.crt=test/integration/testdata/cert.crt",
-		params.namespace))
-
-	_, err = util.Shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/ingress.yaml", params.namespace))
-	check(err)
-
-	// deploy istio-infra
-	check(deployInfra(params.auth, params.namespace))
-
-	// deploy a healthy mix of apps, with and without proxy
-	check(deployApp("t", "t", "8080", "80", "9090", "90", "unversioned", false))
-	check(deployApp("a", "a", "8080", "80", "9090", "90", "v1", true))
-	check(deployApp("b", "b", "80", "8080", "90", "9090", "unversioned", true))
-	check(deployApp("c-v1", "c", "80", "8080", "90", "9090", "v1", true))
-	check(deployApp("c-v2", "c", "80", "8080", "90", "9090", "v2", true))
-
-	apps, err = util.GetAppPods(client, params.namespace)
-	check(err)
+	infra.teardown()
+	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", params.Auth, params.count)
 }
 
 // check function correctly cleans up on failure
 func check(err error) {
 	if err != nil {
 		glog.Info(err)
-		if glog.V(2) {
-			for _, pods := range apps {
-				for _, pod := range pods {
-					glog.Info(util.FetchLogs(client, pod, params.namespace, "proxy"))
+		/*
+			if glog.V(2) {
+				for _, pods := range apps {
+					for _, pod := range pods {
+						glog.Info(util.FetchLogs(client, pod, params.Namespace, "proxy"))
+					}
 				}
 			}
-		}
-		teardown()
+		*/
+		// TODO: teardown()
 		glog.Info(err)
 		os.Exit(1)
 	}
-}
-
-// teardown removes resources
-func teardown() {
-	glog.Info("Cleaning up ingress secret.")
-	if err := util.Run("kubectl delete secret ingress -n " + params.namespace); err != nil {
-		glog.Warning(err)
-	}
-
-	if namespaceCreated {
-		util.DeleteNamespace(client, params.namespace)
-		params.namespace = ""
-	}
-	glog.Flush()
-}
-
-func deployApp(deployment, svcName, port1, port2, port3, port4, version string, injectProxy bool) error {
-	w, err := fill("app.yaml.tmpl", map[string]string{
-		"hub":        params.hub,
-		"tag":        params.tag,
-		"service":    svcName,
-		"deployment": deployment,
-		"port1":      port1,
-		"port2":      port2,
-		"port3":      port3,
-		"port4":      port4,
-		"version":    version,
-	})
-	if err != nil {
-		return err
-	}
-
-	writer := new(bytes.Buffer)
-
-	if injectProxy {
-		mesh := envoy.DefaultMeshConfig
-		mesh.MixerAddress = "istio-mixer:9091"
-		mesh.DiscoveryAddress = "istio-manager:8080"
-		if params.auth {
-			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-		}
-		p := &inject.Params{
-			InitImage:       inject.InitImageName(params.hub, params.tag),
-			ProxyImage:      inject.ProxyImageName(params.hub, params.tag),
-			Verbosity:       params.verbosity,
-			SidecarProxyUID: inject.DefaultSidecarProxyUID,
-			Version:         "manager-integration-test",
-			Mesh:            &mesh,
-		}
-		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
-			return err
-		}
-	} else {
-		if _, err := io.Copy(writer, strings.NewReader(w)); err != nil {
-			return err
-		}
-	}
-
-	return kubeApply(writer.String(), params.namespace)
 }
 
 /*
@@ -314,7 +188,7 @@ func waitForNewRestartEpoch(pod string, start int) error {
 // getRestartEpoch gets the current restart epoch of a pod by calling the Envoy admin API.
 func getRestartEpoch(pod string) (int, error) {
 	url := "http://localhost:5000/server_info"
-	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], params.namespace, url)
+	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], params.Namespace, url)
 	out, err := util.Shell(cmd, true)
 	if err != nil {
 		return 0, err
@@ -343,7 +217,7 @@ func addConfig(config []byte, kind, name string, create bool) {
 	key := model.Key{
 		Kind:      kind,
 		Name:      name,
-		Namespace: params.namespace,
+		Namespace: params.Namespace,
 	}
 	if create {
 		check(istioClient.Post(key, v))
@@ -355,19 +229,14 @@ func addConfig(config []byte, kind, name string, create bool) {
 func deployDynamicConfig(inFile string, data map[string]string, kind, name, envoy string) {
 	config, err := fill(inFile, data)
 	check(err)
-	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.namespace})
+	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.Namespace})
 	addConfig([]byte(config), kind, name, !exists)
 	glog.Info("Sleeping for the config to propagate")
 	time.Sleep(3 * time.Second)
 }
 
-// apply a kube config
-func kubeApply(yaml, namespace string) error {
-	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", namespace), yaml)
-}
-
 // fill a file based on a template
-func fill(inFile string, values map[string]string) (string, error) {
+func fill(inFile string, values interface{}) (string, error) {
 	var bytes bytes.Buffer
 	w := bufio.NewWriter(&bytes)
 

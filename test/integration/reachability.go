@@ -24,13 +24,16 @@ import (
 	"sync"
 	"time"
 
-	"istio.io/manager/test/util"
-
 	"github.com/golang/glog"
 	"github.com/golang/sync/errgroup"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/test/util"
 )
 
 type reachability struct {
+	*infra
+
 	accessMu sync.Mutex
 
 	// accessLogs is a mapping from app name to a list of request ids that should be present in it
@@ -38,6 +41,17 @@ type reachability struct {
 
 	// mixerLogs is a collection of request IDs that we expect to find in the mixer logs
 	mixerLogs map[string]string
+
+	apps map[string][]string
+}
+
+func (r *reachability) setup() error {
+	var err error
+	r.apps, err = util.GetAppPods(client, params.Namespace)
+	return err
+}
+
+func (r *reachability) teardown() {
 }
 
 func (r *reachability) run() error {
@@ -45,7 +59,7 @@ func (r *reachability) run() error {
 
 	r.mixerLogs = make(map[string]string)
 	r.accessLogs = make(map[string][]string)
-	for app := range apps {
+	for app := range r.apps {
 		r.accessLogs[app] = make([]string, 0)
 	}
 
@@ -57,7 +71,7 @@ func (r *reachability) run() error {
 		return err
 	}
 
-	if !params.auth {
+	if params.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// Currently ingress cannot talk in Istio auth to cluster pods.
 		if err := r.verifyIngress(); err != nil {
 			return err
@@ -91,7 +105,7 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				apps[src][0], params.namespace, url))
+				r.apps[src][0], params.Namespace, url))
 			if err != nil {
 				return err
 			}
@@ -128,14 +142,14 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 func (r *reachability) makeRequests() error {
 	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b"}
-	if !params.auth {
+	if params.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		testPods = append(testPods, "t")
 	}
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
-				for _, domain := range []string{"", "." + params.namespace} {
+				for _, domain := range []string{"", "." + params.Namespace} {
 					if params.parallel {
 						g.Go(r.makeRequest(src, dst, port, domain, func() bool {
 							select {
@@ -169,7 +183,7 @@ func (r *reachability) checkProxyAccessLogs() error {
 		found := true
 		for _, pod := range []string{"a", "b"} {
 			glog.Infof("Checking access log of %s\n", pod)
-			access := util.FetchLogs(client, apps[pod][0], params.namespace, "proxy")
+			access := util.FetchLogs(client, r.apps[pod][0], params.Namespace, "proxy")
 			if strings.Contains(access, "segmentation fault") {
 				return fmt.Errorf("segmentation fault in proxy %s", pod)
 			}
@@ -202,7 +216,7 @@ func (r *reachability) checkMixerLogs() error {
 
 	for n := 0; n < budget; n++ {
 		found := true
-		access := util.FetchLogs(client, apps["mixer"][0], params.namespace, "mixer")
+		access := util.FetchLogs(client, r.apps["mixer"][0], params.Namespace, "mixer")
 
 		for id, desc := range r.mixerLogs {
 			if !strings.Contains(access, id) {
@@ -227,7 +241,7 @@ func (r *reachability) makeTCPRequest(src, dst, port, domain string, done func()
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				apps[src][0], params.namespace, url))
+				r.apps[src][0], params.Namespace, url))
 			if err != nil {
 				return err
 			}
@@ -249,7 +263,7 @@ func (r *reachability) verifyTCPRouting() error {
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{":90", ":9090"} {
-				for _, domain := range []string{"", "." + params.namespace} {
+				for _, domain := range []string{"", "." + params.Namespace} {
 					if params.parallel {
 						g.Go(r.makeTCPRequest(src, dst, port, domain, func() bool {
 							select {
@@ -288,7 +302,7 @@ func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func
 			trace := fmt.Sprint(time.Now().UnixNano())
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			resp, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
-				apps[src][0], params.namespace, url, trace))
+				r.apps[src][0], params.Namespace, url, trace))
 			if err != nil {
 				return err
 			}
@@ -353,7 +367,7 @@ func (r *reachability) makeIngressRequest(src, dst string, done func() bool) fun
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
-				apps[src][0], params.namespace, url))
+				r.apps[src][0], params.Namespace, url))
 			if err != nil {
 				return err
 			}

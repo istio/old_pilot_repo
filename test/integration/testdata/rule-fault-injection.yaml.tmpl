@@ -1,7 +1,7 @@
-destination: {{.destination}}.{{.namespace}}.svc.cluster.local
+destination: {{.destination}}.{{.Namespace}}.svc.cluster.local
 precedence: 3
 match:
-  source: {{.source}}.{{.namespace}}.svc.cluster.local
+  source: {{.source}}.{{.Namespace}}.svc.cluster.local
   source_tags:
     version: v1
   httpHeaders:

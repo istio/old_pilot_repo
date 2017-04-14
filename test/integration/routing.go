@@ -16,26 +16,14 @@
 
 package main
 
-import (
-	"errors"
-	"fmt"
-	"regexp"
-	"strconv"
-	"time"
-
-	"github.com/golang/glog"
-
-	"istio.io/manager/model"
-	"istio.io/manager/test/util"
-)
-
+/*
 func testRouting() error {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
 	glog.Info("Routing all traffic to world-v1 and verifying..")
 	deployDynamicConfig("rule-default-route.yaml.tmpl", map[string]string{
 		"destination": "c",
-		"namespace":   params.namespace,
+		"Namespace":   params.Namespace,
 	}, model.RouteRule, "default-route", "a")
 	check(verifyRouting("a", "c", "", "",
 		100, map[string]int{
@@ -47,7 +35,7 @@ func testRouting() error {
 	glog.Info("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
 	deployDynamicConfig("rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "c",
-		"namespace":   params.namespace,
+		"Namespace":   params.Namespace,
 	}, model.RouteRule, "default-route", "a")
 	check(verifyRouting("a", "c", "", "",
 		100, map[string]int{
@@ -60,7 +48,7 @@ func testRouting() error {
 	deployDynamicConfig("rule-content-route.yaml.tmpl", map[string]string{
 		"source":      "a",
 		"destination": "c",
-		"namespace":   params.namespace,
+		"Namespace":   params.Namespace,
 	}, model.RouteRule, "content-route", "a")
 	check(verifyRouting("a", "c", "version", "v2",
 		100, map[string]int{
@@ -73,13 +61,13 @@ func testRouting() error {
 	deployDynamicConfig("rule-fault-injection.yaml.tmpl", map[string]string{
 		"source":      "a",
 		"destination": "c",
-		"namespace":   params.namespace,
+		"Namespace":   params.Namespace,
 	}, model.RouteRule, "fault-injection", "a")
 	check(verifyFaultInjection("a", "c", "version", "v2", time.Second*5, 503))
 	glog.Info("Success!")
 
 	glog.Info("Cleaning up route rules...")
-	check(util.Run("kubectl delete istioconfigs --all -n " + params.namespace))
+	check(util.Run("kubectl delete istioconfigs --all -n " + params.Namespace))
 
 	return nil
 }
@@ -95,7 +83,7 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 	glog.Infof("Making %d requests (%s) from %s...\n", samples, url, src)
 
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d -key %s -val %s",
-		apps[src][0], params.namespace, url, samples, headerKey, headerVal)
+		apps[src][0], params.Namespace, url, samples, headerKey, headerVal)
 	request, err := util.Shell(cmd)
 	glog.V(2).Info(request)
 	if err != nil {
@@ -134,7 +122,7 @@ func verifyFaultInjection(src, dst, headerKey, headerVal string,
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	glog.Infof("Making 1 request (%s) from %s...\n", url, src)
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -key %s -val %s",
-		apps[src][0], params.namespace, url, headerKey, headerVal)
+		apps[src][0], params.Namespace, url, headerKey, headerVal)
 
 	start := time.Now()
 	request, err := util.Shell(cmd)
@@ -162,3 +150,4 @@ func verifyFaultInjection(src, dst, headerKey, headerVal string,
 	}
 	return nil
 }
+*/
