@@ -40,7 +40,6 @@ type args struct {
 
 	ipAddress     string
 	podName       string
-	ingressSecret string
 	passthrough   []int
 	apiserverPort int
 
@@ -171,8 +170,7 @@ var (
 				CertFile:  "/etc/tls.crt",
 				KeyFile:   "/etc/tls.key",
 				Namespace: flags.controllerOptions.Namespace,
-				Secret:    flags.ingressSecret,
-				Secrets:   client,
+				Secrets:   controller,
 				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
 				Mesh:      mesh,
 			}
@@ -191,8 +189,20 @@ var (
 		Use:   "egress",
 		Short: "Istio Proxy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			// TODO: implement this method
+			flags.controllerOptions.IngressSyncMode = kube.IngressOff
+			controller := kube.NewController(client, flags.controllerOptions)
+			config := &envoy.EgressConfig{
+				Namespace: flags.controllerOptions.Namespace,
+				Mesh:      mesh,
+				Services:  controller,
+			}
+			w, err := envoy.NewEgressWatcher(controller, config)
+			if err != nil {
+				return err
+			}
+
 			stop := make(chan struct{})
+			go w.Run(stop)
 			cmd.WaitSignal(stop)
 			return nil
 		},
@@ -226,10 +236,6 @@ func init() {
 
 	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
 		"Passthrough ports for health checks")
-
-	// TODO: remove this once we write the logic to obtain secrets dynamically
-	ingressCmd.PersistentFlags().StringVar(&flags.ingressSecret, "secret", "",
-		"Kubernetes secret name for ingress SSL termination")
 	ingressCmd.PersistentFlags().StringVar(&flags.controllerOptions.IngressClass, "ingress_class", "istio",
 		"The class of ingress resources to be processed by this ingress controller")
 	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller", true,

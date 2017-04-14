@@ -23,12 +23,20 @@ import (
 
 // Mock values
 var (
-	HelloService = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
-	WorldService = MakeService("world.default.svc.cluster.local", "10.2.0.0")
-	Discovery    = &ServiceDiscovery{
+	HelloService   = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
+	WorldService   = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	ExtHTTPService = MakeExternalHTTPService("httpbin.default.svc.cluster.local",
+		"httpbin.org", "")
+	ExtHTTPSService = MakeExternalHTTPSService("httpsbin.default.svc.cluster.local",
+		"httpbin.org", "")
+	Discovery = &ServiceDiscovery{
 		services: map[string]*model.Service{
-			HelloService.Hostname: HelloService,
-			WorldService.Hostname: WorldService,
+			HelloService.Hostname:   HelloService,
+			WorldService.Hostname:   WorldService,
+			ExtHTTPService.Hostname: ExtHTTPService,
+			// TODO external https is not currently supported - this service
+			// should NOT be in any of the .golden json files
+			ExtHTTPSService.Hostname: ExtHTTPSService,
 		},
 		versions: 2,
 	}
@@ -57,8 +65,40 @@ func MakeService(hostname, address string) *model.Service {
 	}
 }
 
+// MakeExternalHTTPService creates mock external service
+func MakeExternalHTTPService(hostname, external string, address string) *model.Service {
+	return &model.Service{
+		Hostname:     hostname,
+		Address:      address,
+		ExternalName: external,
+		Ports: []*model.Port{{
+			Name:     "http",
+			Port:     80,
+			Protocol: model.ProtocolHTTP,
+		}},
+	}
+}
+
+// MakeExternalHTTPSService creates mock external service
+func MakeExternalHTTPSService(hostname, external string, address string) *model.Service {
+	return &model.Service{
+		Hostname:     hostname,
+		Address:      address,
+		ExternalName: external,
+		Ports: []*model.Port{{
+			Name:     "https",
+			Port:     443,
+			Protocol: model.ProtocolHTTPS,
+		}},
+	}
+}
+
 // MakeInstance creates a mock instance, version enumerates endpoints
 func MakeInstance(service *model.Service, port *model.Port, version int) *model.ServiceInstance {
+	if service.External() {
+		return nil
+	}
+
 	// we make port 80 same as endpoint port, otherwise, it's distinct
 	target := port.Port
 	if target != 80 {
@@ -78,6 +118,10 @@ func MakeInstance(service *model.Service, port *model.Port, version int) *model.
 
 // MakeIP creates a fake IP address for a service and instance version
 func MakeIP(service *model.Service, version int) string {
+	// external services have no instances
+	if service.External() {
+		return ""
+	}
 	ip := net.ParseIP(service.Address).To4()
 	ip[2] = byte(1)
 	ip[3] = byte(version)
@@ -112,6 +156,9 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags mode
 		return nil
 	}
 	out := make([]*model.ServiceInstance, 0)
+	if service.External() {
+		return out
+	}
 	for _, name := range ports {
 		if port, ok := service.Ports.Get(name); ok {
 			for v := 0; v < sd.versions; v++ {
@@ -128,10 +175,12 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags mode
 func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	out := make([]*model.ServiceInstance, 0)
 	for _, service := range sd.services {
-		for v := 0; v < sd.versions; v++ {
-			if addrs[MakeIP(service, v)] {
-				for _, port := range service.Ports {
-					out = append(out, MakeInstance(service, port, v))
+		if !service.External() {
+			for v := 0; v < sd.versions; v++ {
+				if addrs[MakeIP(service, v)] {
+					for _, port := range service.Ports {
+						out = append(out, MakeInstance(service, port, v))
+					}
 				}
 			}
 		}
