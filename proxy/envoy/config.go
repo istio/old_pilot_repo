@@ -279,7 +279,7 @@ func buildOutboundHTTPRoutes(
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
-				if service.ExternalName != "" {
+				if service.External() {
 					for _, route := range routes {
 						route.HostRewrite = service.Hostname
 						for _, cluster := range route.clusters {
@@ -301,7 +301,7 @@ func buildOutboundHTTPRoutes(
 				clusters = append(clusters, host.clusters()...)
 
 			case model.ProtocolHTTPS:
-				if service.ExternalName != "" {
+				if service.External() {
 					routes := make([]*HTTPRoute, 0)
 
 					cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
@@ -368,9 +368,8 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 	for _, service := range services {
-		if service.ExternalName != "" {
-			continue // TODO TCP and HTTPS external services not currently supported
-
+		if service.External() {
+			continue // TODO TCP external services not currently supported
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {

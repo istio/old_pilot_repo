@@ -291,7 +291,7 @@ func (r *reachability) makeEgressRequest(src, dst, path string, done func() bool
 				return err
 			}
 
-			if strings.Contains(resp, "StatusCode=200"){
+			if strings.Contains(resp, "StatusCode=200") {
 				return nil
 			}
 
@@ -309,8 +309,8 @@ func (r *reachability) verifyEgress() error {
 	g, ctx := errgroup.WithContext(context.Background())
 
 	extServices := map[string]string{
-		"httpbin":"/headers",
-		"httpsgoogle:443": "",//TODO
+		"httpbin":         "/headers",
+		"httpsgoogle:443": "",
 	}
 
 	for _, src := range []string{"a", "b"} {

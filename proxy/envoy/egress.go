@@ -82,7 +82,7 @@ func generateEgress(conf *EgressConfig) *Config {
 	vhosts := make([]*VirtualHost, 0)
 	services := conf.Services.Services()
 	for _, service := range services {
-		if service.ExternalName != "" {
+		if service.External() {
 			if host := buildEgressHTTPRoute(service); host != nil {
 				vhosts = append(vhosts, host)
 			}
@@ -161,8 +161,7 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 			}
 
 			if protocol == model.ProtocolHTTPS {
-				cluster.SSLContext = &SSLContextWithSAN{
-				}
+				cluster.SSLContext = &SSLContextWithSAN{}
 			}
 
 			route.clusters = append(route.clusters, cluster)
