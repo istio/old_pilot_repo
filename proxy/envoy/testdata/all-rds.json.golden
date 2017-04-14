@@ -28,6 +28,28 @@
      ]
     },
     {
+     "name": "httpbin.default.svc.cluster.local|http",
+     "domains": [
+      "httpbin:80",
+      "httpbin",
+      "httpbin.default:80",
+      "httpbin.default",
+      "httpbin.default.svc:80",
+      "httpbin.default.svc",
+      "httpbin.default.svc.cluster:80",
+      "httpbin.default.svc.cluster",
+      "httpbin.default.svc.cluster.local:80",
+      "httpbin.default.svc.cluster.local"
+     ],
+     "routes": [
+      {
+       "prefix": "/",
+       "host_rewrite": "httpbin.default.svc.cluster.local",
+       "cluster": "out.httpbin.default.svc.cluster.local|http"
+      }
+     ]
+    },
+    {
      "name": "world.default.svc.cluster.local|http",
      "domains": [
       "world:80",
@@ -77,6 +99,28 @@
       {
        "prefix": "/",
        "cluster": "out.hello.default.svc.cluster.local|http"
+      }
+     ]
+    },
+    {
+     "name": "httpbin.default.svc.cluster.local|http",
+     "domains": [
+      "httpbin:80",
+      "httpbin",
+      "httpbin.default:80",
+      "httpbin.default",
+      "httpbin.default.svc:80",
+      "httpbin.default.svc",
+      "httpbin.default.svc.cluster:80",
+      "httpbin.default.svc.cluster",
+      "httpbin.default.svc.cluster.local:80",
+      "httpbin.default.svc.cluster.local"
+     ],
+     "routes": [
+      {
+       "prefix": "/",
+       "host_rewrite": "httpbin.default.svc.cluster.local",
+       "cluster": "out.httpbin.default.svc.cluster.local|http"
       }
      ]
     },
@@ -134,6 +178,28 @@
      ]
     },
     {
+     "name": "httpbin.default.svc.cluster.local|http",
+     "domains": [
+      "httpbin:80",
+      "httpbin",
+      "httpbin.default:80",
+      "httpbin.default",
+      "httpbin.default.svc:80",
+      "httpbin.default.svc",
+      "httpbin.default.svc.cluster:80",
+      "httpbin.default.svc.cluster",
+      "httpbin.default.svc.cluster.local:80",
+      "httpbin.default.svc.cluster.local"
+     ],
+     "routes": [
+      {
+       "prefix": "/",
+       "host_rewrite": "httpbin.default.svc.cluster.local",
+       "cluster": "out.httpbin.default.svc.cluster.local|http"
+      }
+     ]
+    },
+    {
      "name": "world.default.svc.cluster.local|http",
      "domains": [
       "world:80",
@@ -183,6 +249,28 @@
       {
        "prefix": "/",
        "cluster": "out.hello.default.svc.cluster.local|http"
+      }
+     ]
+    },
+    {
+     "name": "httpbin.default.svc.cluster.local|http",
+     "domains": [
+      "httpbin:80",
+      "httpbin",
+      "httpbin.default:80",
+      "httpbin.default",
+      "httpbin.default.svc:80",
+      "httpbin.default.svc",
+      "httpbin.default.svc.cluster:80",
+      "httpbin.default.svc.cluster",
+      "httpbin.default.svc.cluster.local:80",
+      "httpbin.default.svc.cluster.local"
+     ],
+     "routes": [
+      {
+       "prefix": "/",
+       "host_rewrite": "httpbin.default.svc.cluster.local",
+       "cluster": "out.httpbin.default.svc.cluster.local|http"
       }
      ]
     },

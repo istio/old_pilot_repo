@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -80,7 +79,8 @@ type Controller struct {
 	endpoints cacheHandler
 	ingresses cacheHandler
 
-	pods *PodCache
+	pods    *PodCache
+	secrets *secretStore
 }
 
 type cacheHandler struct {
@@ -94,6 +94,7 @@ func NewController(client *Client, options ControllerOptions) *Controller {
 	out := &Controller{
 		client:  client,
 		options: options,
+		secrets: newSecretStore(client.GetKubernetesClient()),
 		queue:   NewQueue(1 * time.Second),
 		kinds:   make(map[string]cacheHandler),
 	}
@@ -247,6 +248,8 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Key, prot
 		if !c.shouldProcessIngress(ingress) {
 			return nil
 		}
+
+		c.mapIngressSecrets(ingress.Spec.TLS, ev)
 
 		// Convert the ingress into a map[Key]Message, and invoke handler for each
 		// TODO: This works well for Add and Delete events, but no so for Update:
@@ -517,33 +520,6 @@ func (c *Controller) Instances(hostname string, ports []string, tagsList model.T
 		}
 	}
 
-	switch item.Spec.Type {
-	case v1.ServiceTypeClusterIP, v1.ServiceTypeNodePort:
-	case v1.ServiceTypeLoadBalancer:
-		// TODO: load balancer service will get traffic from external IPs
-	case v1.ServiceTypeExternalName:
-		// resolve to external name service, and update name and namespace
-		target, exists := c.GetService(item.Spec.ExternalName)
-		if !exists {
-			glog.V(2).Infof("Missing target service %q for %q", item.Spec.ExternalName, hostname)
-			return nil
-		}
-		name, namespace, err = parseHostname(target.Hostname)
-		if err != nil {
-			return nil
-		}
-
-		// rewrite service ports to use target service port names, which are just numbers
-		targetPorts := make(map[string]*model.Port)
-		for _, port := range svcPorts {
-			targetPorts[strconv.Itoa(port.Port)] = port
-		}
-		svcPorts = targetPorts
-	default:
-		glog.Warningf("Unexpected service type %q", item.Spec.Type)
-		return nil
-	}
-
 	// TODO: single port service missing name
 	for _, item := range c.endpoints.informer.GetStore().List() {
 		ep := *item.(*v1.Endpoints)
@@ -614,6 +590,11 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 		}
 	}
 	return out
+}
+
+// GetTLSSecret implements secret registry operation.
+func (c *Controller) GetTLSSecret(uri string) (*model.TLSSecret, error) {
+	return c.secrets.GetTLSSecret(uri)
 }
 
 const (
@@ -745,5 +726,31 @@ func (c *Controller) shouldProcessIngress(ingress *v1beta1.Ingress) bool {
 	default:
 		glog.Warningf("Invalid ingress synchronization mode: %v", c.options.IngressSyncMode)
 		return false
+	}
+}
+
+func (c *Controller) mapIngressSecrets(tls []v1beta1.IngressTLS, ev model.Event) {
+	for _, t := range tls {
+		if t.SecretName == "" {
+			continue
+		}
+
+		if len(t.Hosts) == 0 {
+			switch ev {
+			case model.EventAdd, model.EventUpdate:
+				c.secrets.setWildcard(c.options.Namespace, t.SecretName)
+			case model.EventDelete:
+				c.secrets.setWildcard("", "")
+			}
+		} else {
+			for _, host := range t.Hosts {
+				switch ev {
+				case model.EventAdd, model.EventUpdate:
+					c.secrets.put(host, t.SecretName)
+				case model.EventDelete:
+					c.secrets.delete(host)
+				}
+			}
+		}
 	}
 }

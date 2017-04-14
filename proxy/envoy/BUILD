@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "config.go",
         "discovery.go",
+        "egress.go",
         "fault.go",
         "header.go",
         "ingress.go",
@@ -22,7 +23,6 @@ go_library(
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_golang_protobuf//ptypes:go_default_library",
         "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-        "@com_github_hashicorp_errwrap//:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
         "@io_istio_api//:go_default_library",
     ],
@@ -34,6 +34,7 @@ go_test(
     srcs = [
         "config_test.go",
         "discovery_test.go",
+        "egress_test.go",
         "ingress_test.go",
         "route_test.go",
     ],
@@ -48,4 +49,18 @@ go_test(
         "@com_github_golang_protobuf//proto:go_default_library",
         "@io_istio_api//:go_default_library",
     ],
+)
+
+genrule(
+    name = "envoy_bin",
+    srcs = ["@istio_proxy_debug//file"],
+    outs = ["envoy"],
+    cmd = "tar xzf $(location @istio_proxy_debug//file); mv usr/local/bin/envoy $@",
+)
+
+sh_test(
+    name = "config_test",
+    size = "small",
+    srcs = ["config_test.sh"],
+    data = glob(["testdata/*.golden"]) + ["envoy"],
 )
