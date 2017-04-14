@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -179,36 +178,32 @@ func (infra *infra) kubeApply(yaml string) error {
 
 func (infra *infra) checkProxyAccessLogs(accessLogs map[string][]string) error {
 	glog.Info("Checking access logs of pods to correlate request IDs...")
-	for n := 0; n < budget; n++ {
-		found := true
-		for app, ids := range accessLogs {
-			if len(ids) > 0 {
-				glog.Infof("Checking access log of %s\n", app)
-				access := util.FetchLogs(client, infra.apps[app][0], infra.Namespace, "proxy")
-				if strings.Contains(access, "segmentation fault") {
-					return fmt.Errorf("segmentation fault in proxy %s", app)
-				}
-				if strings.Contains(access, "assert failure") {
-					return fmt.Errorf("assert failure in proxy %s", app)
-				}
-				for _, id := range ids {
-					if !strings.Contains(access, id) {
-						glog.Infof("Failed to find request id %s in log of %s\n", id, app)
-						found = false
-						break
+	funcs := make(map[string]func() status)
+	for app, ids := range accessLogs {
+		if len(ids) > 0 {
+			name := fmt.Sprintf("Checking access log of %s", app)
+			funcs[name] = (func(app string) func() status {
+				return func() status {
+					access := util.FetchLogs(client, infra.apps[app][0], infra.Namespace, "proxy")
+					if strings.Contains(access, "segmentation fault") {
+						glog.Errorf("segmentation fault in proxy %s", app)
+						return failure
 					}
+					if strings.Contains(access, "assert failure") {
+						glog.Errorf("assert failure in proxy %s", app)
+						return failure
+					}
+					ids := accessLogs[app]
+					for _, id := range ids {
+						if !strings.Contains(access, id) {
+							glog.Infof("Failed to find request id %s in log of %s\n", id, app)
+							return again
+						}
+					}
+					return success
 				}
-				if !found {
-					break
-				}
-			}
+			})(app)
 		}
-
-		if found {
-			return nil
-		}
-
-		time.Sleep(time.Second)
 	}
-	return fmt.Errorf("exceeded budget for checking access logs")
+	return parallel(funcs)
 }

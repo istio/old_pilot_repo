@@ -155,11 +155,13 @@ func runTests() error {
 	infra.apps, errs = util.GetAppPods(client, infra.Namespace)
 
 	tests := []test{
-		&reachability{infra: &infra},
-		&tcp{infra: &infra},
-		&ingress{infra: &infra},
-		&egress{infra: &infra},
-		// testRouting
+		/*
+			&reachability{infra: &infra},
+			&tcp{infra: &infra},
+			&ingress{infra: &infra},
+			&egress{infra: &infra},
+		*/
+		&routing{infra: &infra},
 	}
 
 	for i := 0; i < params.count; i++ {
@@ -180,54 +182,25 @@ func runTests() error {
 		}
 	}
 
-	if errs == nil {
-		log("Passed all tests!", fmt.Sprintf("tests: %#v, count: %d", tests, params.count))
-	} else {
-		log("Failed tests!", fmt.Sprintf("%#v", errs))
-		//  spill proxy logs on error
+	//  spill proxy logs on error
+	if errs != nil {
 		for _, pod := range util.GetPods(client, infra.Namespace) {
 			log("Proxy log", pod)
 			glog.Info(util.FetchLogs(client, pod, infra.Namespace, "proxy"))
 		}
-		log("Failed tests!", fmt.Sprintf("%#v", errs))
 	}
 
 	// always remove infra even if the tests fail
 	log("Tearing down infrastructure", spew.Sdump(infra))
 	infra.teardown()
+
+	if errs == nil {
+		log("Passed all tests!", fmt.Sprintf("tests: %v, count: %d", tests, params.count))
+	} else {
+		log("Failed tests!", errs.Error())
+	}
 	return errs
 }
-
-/*
-func addConfig(config []byte, kind, name string, create bool) {
-	glog.Infof("Add config %s", string(config))
-	istioKind, ok := model.IstioConfig[kind]
-	if !ok {
-		check(fmt.Errorf("Invalid kind %s", kind))
-	}
-	v, err := istioKind.FromYAML(string(config))
-	check(err)
-	key := model.Key{
-		Kind:      kind,
-		Name:      name,
-		Namespace: params.Namespace,
-	}
-	if create {
-		check(istioClient.Post(key, v))
-	} else {
-		check(istioClient.Put(key, v))
-	}
-}
-
-func deployDynamicConfig(inFile string, data map[string]string, kind, name, envoy string) {
-	config, err := fill(inFile, data)
-	check(err)
-	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.Namespace})
-	addConfig([]byte(config), kind, name, !exists)
-	glog.Info("Sleeping for the config to propagate")
-	time.Sleep(3 * time.Second)
-}
-*/
 
 // fill a file based on a template
 func fill(inFile string, values interface{}) (string, error) {

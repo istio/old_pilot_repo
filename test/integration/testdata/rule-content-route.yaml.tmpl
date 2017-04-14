@@ -2,7 +2,7 @@ destination: {{.destination}}.{{.Namespace}}.svc.cluster.local
 precedence: 2
 match:
   source: {{.source}}.{{.Namespace}}.svc.cluster.local
-  source_tags:
+  sourceTags:
     version: v1
   httpHeaders:
     version:

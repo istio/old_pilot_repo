@@ -16,64 +16,111 @@
 
 package main
 
-/*
-func testRouting() error {
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"time"
+
+	"github.com/golang/glog"
+	"istio.io/manager/model"
+	"istio.io/manager/test/util"
+)
+
+type routing struct {
+	*infra
+}
+
+const (
+	defaultRoute = "default-route"
+	contentRoute = "content-route"
+	faultRoute   = "fault-route"
+)
+
+func (t *routing) String() string {
+	return "routing rules"
+}
+
+func (t *routing) setup() error {
+	return nil
+}
+
+func (t *routing) run() error {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
 	glog.Info("Routing all traffic to world-v1 and verifying..")
-	deployDynamicConfig("rule-default-route.yaml.tmpl", map[string]string{
+	if err := t.applyConfig("rule-default-route.yaml.tmpl", map[string]string{
 		"destination": "c",
-		"Namespace":   params.Namespace,
-	}, model.RouteRule, "default-route", "a")
-	check(verifyRouting("a", "c", "", "",
+		"Namespace":   t.Namespace,
+	}, model.RouteRule, defaultRoute, "a"); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("a", "c", "", "",
 		100, map[string]int{
 			"v1": 100,
 			"v2": 0,
-		}))
+		}); err != nil {
+		return err
+	}
 	glog.Info("Success!")
 
 	glog.Info("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
-	deployDynamicConfig("rule-weighted-route.yaml.tmpl", map[string]string{
+	if err := t.applyConfig("rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "c",
-		"Namespace":   params.Namespace,
-	}, model.RouteRule, "default-route", "a")
-	check(verifyRouting("a", "c", "", "",
+		"Namespace":   t.Namespace,
+	}, model.RouteRule, defaultRoute, "a"); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("a", "c", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
-		}))
+		}); err != nil {
+		return err
+	}
 	glog.Info("Success!")
 
 	glog.Info("Routing 100 percent to world-v2 using header based routing and verifying..")
-	deployDynamicConfig("rule-content-route.yaml.tmpl", map[string]string{
+	if err := t.applyConfig("rule-content-route.yaml.tmpl", map[string]string{
 		"source":      "a",
 		"destination": "c",
-		"Namespace":   params.Namespace,
-	}, model.RouteRule, "content-route", "a")
-	check(verifyRouting("a", "c", "version", "v2",
+		"Namespace":   t.Namespace,
+	}, model.RouteRule, contentRoute, "a"); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("a", "c", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
-		}))
+		}); err != nil {
+		return err
+	}
 	glog.Info("Success!")
 
 	glog.Info("Testing fault injection..")
-	deployDynamicConfig("rule-fault-injection.yaml.tmpl", map[string]string{
+	if err := t.applyConfig("rule-fault-injection.yaml.tmpl", map[string]string{
 		"source":      "a",
 		"destination": "c",
-		"Namespace":   params.Namespace,
-	}, model.RouteRule, "fault-injection", "a")
-	check(verifyFaultInjection("a", "c", "version", "v2", time.Second*5, 503))
+		"Namespace":   t.Namespace,
+	}, model.RouteRule, faultRoute, "a"); err != nil {
+		return err
+	}
+	if err := t.verifyFaultInjection("a", "c", "version", "v2", time.Second*5, 503); err != nil {
+		return err
+	}
 	glog.Info("Success!")
-
-	glog.Info("Cleaning up route rules...")
-	check(util.Run("kubectl delete istioconfigs --all -n " + params.Namespace))
 
 	return nil
 }
 
+func (t *routing) teardown() {
+	glog.Info("Cleaning up route rules...")
+	check(util.Run("kubectl delete istioconfigs --all -n " + t.Namespace))
+}
+
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
+func (t *routing) verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0
@@ -83,7 +130,7 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 	glog.Infof("Making %d requests (%s) from %s...\n", samples, url, src)
 
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d -key %s -val %s",
-		apps[src][0], params.Namespace, url, samples, headerKey, headerVal)
+		t.apps[src][0], t.Namespace, url, samples, headerKey, headerVal)
 	request, err := util.Shell(cmd)
 	glog.V(2).Info(request)
 	if err != nil {
@@ -116,13 +163,13 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 }
 
 // verifyFaultInjection verifies if the fault filter was setup properly
-func verifyFaultInjection(src, dst, headerKey, headerVal string,
+func (t *routing) verifyFaultInjection(src, dst, headerKey, headerVal string,
 	respTime time.Duration, respCode int) error {
 
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	glog.Infof("Making 1 request (%s) from %s...\n", url, src)
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -key %s -val %s",
-		apps[src][0], params.Namespace, url, headerKey, headerVal)
+		t.apps[src][0], t.Namespace, url, headerKey, headerVal)
 
 	start := time.Now()
 	request, err := util.Shell(cmd)
@@ -150,4 +197,37 @@ func verifyFaultInjection(src, dst, headerKey, headerVal string,
 	}
 	return nil
 }
-*/
+
+func (t *routing) addConfig(config []byte, kind, name string, create bool) error {
+	glog.Infof("Add config %s", string(config))
+	istioKind, ok := model.IstioConfig[kind]
+	if !ok {
+		return fmt.Errorf("Invalid kind %s", kind)
+	}
+	v, err := istioKind.FromYAML(string(config))
+	check(err)
+	key := model.Key{
+		Kind:      kind,
+		Name:      name,
+		Namespace: t.Namespace,
+	}
+	if create {
+		return istioClient.Post(key, v)
+	}
+
+	return istioClient.Put(key, v)
+}
+
+func (t *routing) applyConfig(inFile string, data map[string]string, kind, name, envoy string) error {
+	config, err := fill(inFile, data)
+	if err != nil {
+		return err
+	}
+	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: t.Namespace})
+	if err := t.addConfig([]byte(config), kind, name, !exists); err != nil {
+		return err
+	}
+	glog.Info("Sleeping for the config to propagate")
+	time.Sleep(3 * time.Second)
+	return nil
+}
