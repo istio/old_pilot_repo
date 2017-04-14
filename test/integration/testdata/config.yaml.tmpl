@@ -6,3 +6,5 @@ data:
   mesh: |-
     mixerAddress: istio-mixer:9091
     discoveryAddress: istio-manager:8080
+    authPolicy: {{ .authPolicy }}
+    authCertsPath: /etc/certs

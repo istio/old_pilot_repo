@@ -137,16 +137,23 @@ func runTests() {
 }
 
 // deploy complete infrastructure to ensure no conflict between components across test cases
-func deployInfra(namespace string) error {
+func deployInfra(auth bool, namespace string) error {
+	authPolicy := proxyconfig.ProxyMeshConfig_NONE.String()
+	if auth {
+		authPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS.String()
+	}
+
 	values := map[string]string{
 		"hub":        params.hub,
 		"tag":        params.tag,
 		"verbosity":  strconv.Itoa(params.verbosity),
 		"mixerImage": params.mixerImage,
 		"caImage":    params.caImage,
+		"authPolicy": authPolicy,
 	}
 
 	for _, infra := range []string{
+		"config.yaml.tmpl",
 		"manager.yaml.tmpl",
 		"mixer.yaml.tmpl",
 		"ca.yaml.tmpl",
@@ -190,13 +197,6 @@ func setup() {
 		check(err)
 	}
 
-	if params.auth {
-		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config-auth.yaml", params.namespace))
-	} else {
-		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config.yaml", params.namespace))
-	}
-	check(err)
-
 	// setup ingress resources
 	_, _ = util.Shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/testdata/cert.key "+
@@ -207,15 +207,16 @@ func setup() {
 	check(err)
 
 	// deploy istio-infra
-	check(deployInfra(params.namespace))
+	check(deployInfra(params.auth, params.namespace))
 
 	// deploy a healthy mix of apps, with and without proxy
-	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned", false))
-	check(deploy("a", "a", app, "8080", "80", "9090", "90", "unversioned", true))
-	check(deploy("b", "b", app, "80", "8080", "90", "9090", "unversioned", true))
-	check(deploy("hello", "hello", app, "8080", "80", "9090", "90", "v1", true))
-	check(deploy("world-v1", "world", app, "80", "8000", "90", "9090", "v1", true))
-	check(deploy("world-v2", "world", app, "80", "8000", "90", "9090", "v2", true))
+	check(deployApp("t", "t", "8080", "80", "9090", "90", "unversioned", false))
+
+	check(deployApp("a", "a", "8080", "80", "9090", "90", "v1", true))
+	check(deployApp("b-v1", "b", "80", "8080", "90", "9090", "v1", true))
+	check(deployApp("b-v2", "b", "80", "8080", "90", "9090", "v2", true))
+	check(deployApp("c", "c", "80", "8080", "90", "9090", "unversioned", true))
+
 	pods, err = util.GetAppPods(client, params.namespace)
 	check(err)
 }
@@ -248,34 +249,24 @@ func teardown() {
 	glog.Flush()
 }
 
-func deploy(name, svcName, dType, port1, port2, port3, port4, version string, injectProxy bool) error {
-	// write template
-	configFile := name + "-" + dType + ".yaml"
-
-	f, err := os.Create(configFile)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			glog.Info("Error closing file " + configFile)
-		}
-	}()
-
-	w, err := fill(dType+".yaml.tmpl", map[string]string{
-		"service": svcName,
-		"name":    name,
-		"port1":   port1,
-		"port2":   port2,
-		"port3":   port3,
-		"port4":   port4,
-		"version": version,
+func deployApp(deployment, svcName, port1, port2, port3, port4, version string, injectProxy bool) error {
+	w, err := fill("app.yaml.tmpl", map[string]string{
+		"hub":        params.hub,
+		"tag":        params.tag,
+		"service":    svcName,
+		"deployment": deployment,
+		"port1":      port1,
+		"port2":      port2,
+		"port3":      port3,
+		"port4":      port4,
+		"version":    version,
 	})
 	if err != nil {
 		return err
 	}
 
-	writer := bufio.NewWriter(f)
+	writer := new(bytes.Buffer)
+
 	if injectProxy {
 		mesh := envoy.DefaultMeshConfig
 		mesh.MixerAddress = "istio-mixer:9091"
@@ -299,11 +290,8 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 			return err
 		}
 	}
-	if err := writer.Flush(); err != nil {
-		return err
-	}
 
-	return util.Run("kubectl apply -f " + configFile + " -n " + params.namespace)
+	return kubeApply(writer.String(), params.namespace)
 }
 
 /*
@@ -374,27 +362,17 @@ func deployDynamicConfig(inFile string, data map[string]string, kind, name, envo
 	time.Sleep(3 * time.Second)
 }
 
+// apply a kube config
 func kubeApply(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", namespace), yaml)
 }
 
 // fill a file based on a template
-func fill(inFile string, data map[string]string) (string, error) {
+func fill(inFile string, values map[string]string) (string, error) {
 	var bytes bytes.Buffer
 	w := bufio.NewWriter(&bytes)
 
-	// fallback to params values in data
-	values := make(map[string]string)
-	values["hub"] = params.hub
-	values["tag"] = params.tag
-	values["namespace"] = params.namespace
-	values["verbosity"] = strconv.Itoa(params.verbosity)
-
-	for k, v := range data {
-		values[k] = v
-	}
 	tmpl, err := template.ParseFiles("test/integration/testdata/" + inFile)
-
 	if err != nil {
 		return "", err
 	}
