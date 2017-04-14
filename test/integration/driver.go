@@ -155,12 +155,10 @@ func runTests() error {
 	infra.apps, errs = util.GetAppPods(client, infra.Namespace)
 
 	tests := []test{
-		/*
-			&reachability{infra: &infra},
-			&tcp{infra: &infra},
-			&ingress{infra: &infra},
-			&egress{infra: &infra},
-		*/
+		&reachability{infra: &infra},
+		&tcp{infra: &infra},
+		&ingress{infra: &infra},
+		&egress{infra: &infra},
 		&routing{infra: &infra},
 	}
 

@@ -17,13 +17,13 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 	"istio.io/manager/model"
 	"istio.io/manager/test/util"
 )
@@ -116,7 +116,9 @@ func (t *routing) run() error {
 
 func (t *routing) teardown() {
 	glog.Info("Cleaning up route rules...")
-	check(util.Run("kubectl delete istioconfigs --all -n " + t.Namespace))
+	if err := util.Run("kubectl delete istioconfigs --all -n " + t.Namespace); err != nil {
+		glog.Warning(err)
+	}
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
@@ -147,19 +149,15 @@ func (t *routing) verifyRouting(src, dst, headerKey, headerVal string, samples i
 
 	epsilon := 5
 
-	var failures int
+	var errs error
 	for version, expected := range expectedCount {
 		if count[version] > expected+epsilon || count[version] < expected-epsilon {
-			glog.Infof("Expected %v requests (+/-%v) to reach %s => Got %v\n", expected, epsilon, version, count[version])
-			failures++
+			errs = multierror.Append(errs, fmt.Errorf("expected %v requests (+/-%v) to reach %s => Got %v",
+				expected, epsilon, version, count[version]))
 		}
 	}
 
-	if failures > 0 {
-		glog.Info(request)
-		return errors.New("routing verification failed")
-	}
-	return nil
+	return errs
 }
 
 // verifyFaultInjection verifies if the fault filter was setup properly
@@ -190,10 +188,10 @@ func (t *routing) verifyFaultInjection(src, dst, headerKey, headerVal string,
 
 	// +/- 1s variance
 	epsilon := time.Second * 2
-	glog.Infof("Response time is %s with status code %d\n", elapsed, statusCode)
-	glog.Infof("Expected response time is %s +/- %s with status code %d\n", respTime, epsilon, respCode)
 	if elapsed > respTime+epsilon || elapsed < respTime-epsilon || respCode != statusCode {
-		return errors.New("fault injection verification failed")
+		return fmt.Errorf("fault injection verification failed: "+
+			"response time is %s with status code %d, "+
+			"expected response time is %s +/- %s with status code %d", elapsed, statusCode, respTime, epsilon, respCode)
 	}
 	return nil
 }
