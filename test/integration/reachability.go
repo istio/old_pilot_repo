@@ -45,7 +45,7 @@ func (r *reachability) run() error {
 
 	r.mixerLogs = make(map[string]string)
 	r.accessLogs = make(map[string][]string)
-	for app := range pods {
+	for app := range apps {
 		r.accessLogs[app] = make([]string, 0)
 	}
 
@@ -91,7 +91,7 @@ func (r *reachability) makeRequest(src, dst, port, domain string, done func() bo
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				pods[src], params.namespace, url))
+				apps[src][0], params.namespace, url))
 			if err != nil {
 				return err
 			}
@@ -169,7 +169,7 @@ func (r *reachability) checkProxyAccessLogs() error {
 		found := true
 		for _, pod := range []string{"a", "b"} {
 			glog.Infof("Checking access log of %s\n", pod)
-			access := util.FetchLogs(client, pods[pod], params.namespace, "proxy")
+			access := util.FetchLogs(client, apps[pod][0], params.namespace, "proxy")
 			if strings.Contains(access, "segmentation fault") {
 				return fmt.Errorf("segmentation fault in proxy %s", pod)
 			}
@@ -202,7 +202,7 @@ func (r *reachability) checkMixerLogs() error {
 
 	for n := 0; n < budget; n++ {
 		found := true
-		access := util.FetchLogs(client, pods["mixer"], params.namespace, "mixer")
+		access := util.FetchLogs(client, apps["mixer"][0], params.namespace, "mixer")
 
 		for id, desc := range r.mixerLogs {
 			if !strings.Contains(access, id) {
@@ -227,7 +227,7 @@ func (r *reachability) makeTCPRequest(src, dst, port, domain string, done func()
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				pods[src], params.namespace, url))
+				apps[src][0], params.namespace, url))
 			if err != nil {
 				return err
 			}
@@ -288,7 +288,7 @@ func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func
 			trace := fmt.Sprint(time.Now().UnixNano())
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			resp, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
-				pods[src], params.namespace, url, trace))
+				apps[src][0], params.namespace, url, trace))
 			if err != nil {
 				return err
 			}
@@ -353,7 +353,7 @@ func (r *reachability) makeIngressRequest(src, dst string, done func() bool) fun
 		for n := 0; n < budget; n++ {
 			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
 			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
-				pods[src], params.namespace, url))
+				apps[src][0], params.namespace, url))
 			if err != nil {
 				return err
 			}

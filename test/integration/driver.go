@@ -72,8 +72,8 @@ var (
 	client      kubernetes.Interface
 	istioClient *kube.Client
 
-	// pods is a mapping from app name to a pod name (write once, read only)
-	pods map[string]string
+	// mapping from app name to pod names (write once, read only)
+	apps map[string][]string
 
 	// indicates whether the namespace is auto-generated
 	namespaceCreated bool
@@ -173,9 +173,6 @@ func setup() {
 	if params.tag == "" {
 		glog.Fatal("No docker tag specified")
 	}
-	if params.mixerImage == "" {
-		glog.Fatal("No mixer image specified")
-	}
 	glog.Infof("params %#v", params)
 
 	if params.debug {
@@ -211,13 +208,12 @@ func setup() {
 
 	// deploy a healthy mix of apps, with and without proxy
 	check(deployApp("t", "t", "8080", "80", "9090", "90", "unversioned", false))
-
 	check(deployApp("a", "a", "8080", "80", "9090", "90", "v1", true))
 	check(deployApp("b-v1", "b", "80", "8080", "90", "9090", "v1", true))
 	check(deployApp("b-v2", "b", "80", "8080", "90", "9090", "v2", true))
 	check(deployApp("c", "c", "80", "8080", "90", "9090", "unversioned", true))
 
-	pods, err = util.GetAppPods(client, params.namespace)
+	apps, err = util.GetAppPods(client, params.namespace)
 	check(err)
 }
 
@@ -226,11 +222,14 @@ func check(err error) {
 	if err != nil {
 		glog.Info(err)
 		if glog.V(2) {
-			for _, pod := range pods {
-				glog.Info(util.FetchLogs(client, pod, params.namespace, "proxy"))
+			for _, pods := range apps {
+				for _, pod := range pods {
+					glog.Info(util.FetchLogs(client, pod, params.namespace, "proxy"))
+				}
 			}
 		}
 		teardown()
+		glog.Info(err)
 		os.Exit(1)
 	}
 }

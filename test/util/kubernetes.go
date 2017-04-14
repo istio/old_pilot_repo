@@ -69,9 +69,9 @@ func GetPods(cl kubernetes.Interface, ns string) []string {
 }
 
 // GetAppPods awaits till all pods are running in a namespace, and returns a map
-// from "app" label value to the pod name.
-func GetAppPods(cl kubernetes.Interface, ns string) (map[string]string, error) {
-	pods := make(map[string]string)
+// from "app" label value to the pod names.
+func GetAppPods(cl kubernetes.Interface, ns string) (map[string][]string, error) {
+	pods := make(map[string][]string)
 	var items []v1.Pod
 	for n := 0; ; n++ {
 		glog.Info("Checking all pods are running...")
@@ -103,7 +103,7 @@ func GetAppPods(cl kubernetes.Interface, ns string) (map[string]string, error) {
 
 	for _, pod := range items {
 		if app, exists := pod.Labels["app"]; exists {
-			pods[app] = pod.Name
+			pods[app] = append(pods[app], pod.Name)
 		}
 	}
 

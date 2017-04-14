@@ -71,7 +71,7 @@ func testRouting() error {
 		"source":      "hello",
 		"destination": "world",
 	}, model.RouteRule, "fault-injection", "hello")
-	check(verifyFaultInjection(pods, "hello", "world", "version", "v2", time.Second*5, 503))
+	check(verifyFaultInjection("hello", "world", "version", "v2", time.Second*5, 503))
 	glog.Info("Success!")
 
 	glog.Info("Cleaning up route rules...")
@@ -91,7 +91,7 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 	glog.Infof("Making %d requests (%s) from %s...\n", samples, url, src)
 
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d -key %s -val %s",
-		pods[src], params.namespace, url, samples, headerKey, headerVal)
+		apps[src][0], params.namespace, url, samples, headerKey, headerVal)
 	request, err := util.Shell(cmd)
 	glog.V(2).Info(request)
 	if err != nil {
@@ -124,13 +124,13 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 }
 
 // verifyFaultInjection verifies if the fault filter was setup properly
-func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal string,
+func verifyFaultInjection(src, dst, headerKey, headerVal string,
 	respTime time.Duration, respCode int) error {
 
 	url := fmt.Sprintf("http://%s/%s", dst, src)
 	glog.Infof("Making 1 request (%s) from %s...\n", url, src)
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -key %s -val %s",
-		pods[src], params.namespace, url, headerKey, headerVal)
+		apps[src][0], params.namespace, url, headerKey, headerVal)
 
 	start := time.Now()
 	request, err := util.Shell(cmd)
