@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+
+	"github.com/golang/glog"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -29,10 +32,12 @@ import (
 )
 
 type infra struct {
+	// docker tags
 	Hub, Tag   string
 	MixerImage string
 	CaImage    string
 
+	// switches for infrastructure components
 	Auth    proxyconfig.ProxyMeshConfig_AuthPolicy
 	Mixer   bool
 	Ingress bool
@@ -42,6 +47,9 @@ type infra struct {
 	Verbosity int
 
 	namespaceCreated bool
+
+	// map from app to pods
+	apps map[string][]string
 }
 
 func (infra *infra) setup() error {
@@ -167,4 +175,40 @@ func (infra *infra) teardown() {
 
 func (infra *infra) kubeApply(yaml string) error {
 	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", infra.Namespace), yaml)
+}
+
+func (infra *infra) checkProxyAccessLogs(accessLogs map[string][]string) error {
+	glog.Info("Checking access logs of pods to correlate request IDs...")
+	for n := 0; n < budget; n++ {
+		found := true
+		for app, ids := range accessLogs {
+			if len(ids) > 0 {
+				glog.Infof("Checking access log of %s\n", app)
+				access := util.FetchLogs(client, infra.apps[app][0], infra.Namespace, "proxy")
+				if strings.Contains(access, "segmentation fault") {
+					return fmt.Errorf("segmentation fault in proxy %s", app)
+				}
+				if strings.Contains(access, "assert failure") {
+					return fmt.Errorf("assert failure in proxy %s", app)
+				}
+				for _, id := range ids {
+					if !strings.Contains(access, id) {
+						glog.Infof("Failed to find request id %s in log of %s\n", id, app)
+						found = false
+						break
+					}
+				}
+				if !found {
+					break
+				}
+			}
+		}
+
+		if found {
+			return nil
+		}
+
+		time.Sleep(time.Second)
+	}
+	return fmt.Errorf("exceeded budget for checking access logs")
 }

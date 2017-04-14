@@ -16,6 +16,8 @@ package main
 
 import (
 	"fmt"
+	"regexp"
+	"sync"
 
 	"github.com/golang/glog"
 
@@ -24,16 +26,27 @@ import (
 
 type ingress struct {
 	*infra
+	accessMu   sync.Mutex
+	accessLogs map[string][]string
 }
 
 const (
 	ingressServiceName = "istio-ingress-controller"
 )
 
+func (t *ingress) String() string {
+	return "ingress controller"
+}
+
 func (t *ingress) setup() error {
 	if !t.Ingress {
 		return nil
 	}
+	t.accessLogs = make(map[string][]string)
+	for app := range t.apps {
+		t.accessLogs[app] = make([]string, 0)
+	}
+
 	// setup ingress resources
 	if err := util.Run(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/testdata/cert.key "+
@@ -53,6 +66,44 @@ func (t *ingress) run() error {
 	if !t.Ingress {
 		return nil
 	}
+	src := "t"
+	funcs := make(map[string]func() status)
+	for _, dst := range []string{"a", "b"} {
+		name := fmt.Sprintf("TLS Ingress request to /%s", dst)
+		funcs[name] = (func(dst string) func() status {
+			url := fmt.Sprintf("https://%s:443/%s", ingressServiceName, dst)
+			return func() status {
+				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
+					t.apps[src][0], t.Namespace, url))
+				if err != nil {
+					glog.Error(err)
+					return failure
+				}
+				match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
+				if len(match) > 1 {
+					id := match[1]
+					glog.V(2).Infof("id=%s\n", id)
+					t.accessMu.Lock()
+					t.accessLogs[dst] = append(t.accessLogs[dst], id)
+					t.accessLogs["ingress"] = append(t.accessLogs["ingress"], id)
+					t.accessMu.Unlock()
+					return success
+				}
+				return again
+			}
+		})(dst)
+	}
+
+	if err := parallel(funcs); err != nil {
+		return err
+	}
+
+	if params.logs {
+		if err := t.checkProxyAccessLogs(t.accessLogs); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

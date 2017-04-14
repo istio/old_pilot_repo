@@ -17,7 +17,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -25,7 +24,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/sync/errgroup"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/test/util"
@@ -41,14 +39,19 @@ type reachability struct {
 
 	// mixerLogs is a collection of request IDs that we expect to find in the mixer logs
 	mixerLogs map[string]string
+}
 
-	apps map[string][]string
+func (r *reachability) String() string {
+	return "HTTP reachability"
 }
 
 func (r *reachability) setup() error {
-	var err error
-	r.apps, err = util.GetAppPods(client, params.Namespace)
-	return err
+	r.mixerLogs = make(map[string]string)
+	r.accessLogs = make(map[string][]string)
+	for app := range r.apps {
+		r.accessLogs[app] = make([]string, 0)
+	}
+	return nil
 }
 
 func (r *reachability) teardown() {
@@ -56,159 +59,74 @@ func (r *reachability) teardown() {
 
 func (r *reachability) run() error {
 	glog.Info("Verifying basic reachability across pods/services (a, b, and t)..")
-
-	r.mixerLogs = make(map[string]string)
-	r.accessLogs = make(map[string][]string)
-	for app := range r.apps {
-		r.accessLogs[app] = make([]string, 0)
-	}
-
 	if err := r.makeRequests(); err != nil {
 		return err
 	}
-
-	if err := r.verifyTCPRouting(); err != nil {
-		return err
-	}
-
-	if params.Auth == proxyconfig.ProxyMeshConfig_NONE {
-		// Currently ingress cannot talk in Istio auth to cluster pods.
-		if err := r.verifyIngress(); err != nil {
-			return err
-		}
-
-		if err := r.verifyEgress(); err != nil {
-			return err
-		}
-	}
-
-	if glog.V(2) {
-		glog.Infof("requests: %#v", r.accessLogs)
-	}
-
 	if params.logs {
-		if err := r.checkProxyAccessLogs(); err != nil {
+		if err := r.checkProxyAccessLogs(r.accessLogs); err != nil {
 			return err
 		}
 		if err := r.checkMixerLogs(); err != nil {
 			return err
 		}
 	}
-	glog.Info("Success!")
 	return nil
-}
-
-// makeRequest creates a function to make requests; done should return true to quickly exit the retry loop
-func (r *reachability) makeRequest(src, dst, port, domain string, done func() bool) func() error {
-	return func() error {
-		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-		for n := 0; n < budget; n++ {
-			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
-			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				r.apps[src][0], params.Namespace, url))
-			if err != nil {
-				return err
-			}
-			match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 {
-				id := match[1]
-				glog.V(2).Infof("id=%s\n", id)
-				r.accessMu.Lock()
-				r.accessLogs[src] = append(r.accessLogs[src], id)
-				r.accessLogs[dst] = append(r.accessLogs[dst], id)
-				// TODO no logs when source and destination is same (e.g. from "a" pod to "a" pod)
-				// server side should have a proxy, so skip "t" destined requests
-				if src != dst && dst != "t" {
-					r.mixerLogs[id] = fmt.Sprintf("from %s to %s, port %s", src, dst, port)
-				}
-				r.accessMu.Unlock()
-				return nil
-			}
-
-			// Expected no match
-			if src == "t" && dst == "t" {
-				glog.V(2).Info("Expected no match for t->t")
-				return nil
-			}
-			if done() {
-				return nil
-			}
-		}
-		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
-	}
 }
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
 func (r *reachability) makeRequests() error {
-	g, ctx := errgroup.WithContext(context.Background())
 	testPods := []string{"a", "b"}
-	if params.Auth == proxyconfig.ProxyMeshConfig_NONE {
+	if r.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		testPods = append(testPods, "t")
 	}
+	funcs := make(map[string]func() status)
 	for _, src := range testPods {
 		for _, dst := range testPods {
 			for _, port := range []string{"", ":80", ":8080"} {
-				for _, domain := range []string{"", "." + params.Namespace} {
-					if params.parallel {
-						g.Go(r.makeRequest(src, dst, port, domain, func() bool {
-							select {
-							case <-time.After(time.Second):
-								// try again
-							case <-ctx.Done():
-								return true
+				for _, domain := range []string{"", "." + r.Namespace} {
+					name := fmt.Sprintf("HTTP request from %s to %s%s%s", src, dst, domain, port)
+					funcs[name] = (func(src, dst, port, domain string) func() status {
+						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+						return func() status {
+							request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
+								r.apps[src][0], r.Namespace, url))
+							if err != nil {
+								glog.Error(err)
+								return failure
 							}
-							return false
-						}))
-					} else {
-						if err := r.makeRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
-							return err
+							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
+							if len(match) > 1 {
+								id := match[1]
+								r.accessMu.Lock()
+								if src != "t" {
+									r.accessLogs[src] = append(r.accessLogs[src], id)
+								}
+								if dst != "t" {
+									r.accessLogs[dst] = append(r.accessLogs[dst], id)
+								}
+								r.accessMu.Unlock()
+
+								// TODO no logs when source and destination is same (e.g. from "a" pod to "a" pod)
+								// server side should have a proxy, so skip "t" destined requests
+								if src != dst && dst != "t" {
+									r.mixerLogs[id] = fmt.Sprintf("from %s to %s, port %s", src, dst, port)
+								}
+
+								return success
+							}
+							if src == "t" && dst == "t" {
+								glog.V(2).Info("Expected no match for t->t")
+								return success
+							}
+							return again
 						}
-					}
+					})(src, dst, port, domain)
 				}
 			}
 		}
 	}
-	if params.parallel {
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *reachability) checkProxyAccessLogs() error {
-	glog.Info("Checking access logs of pods to correlate request IDs...")
-	for n := 0; n < budget; n++ {
-		found := true
-		for _, pod := range []string{"a", "b"} {
-			glog.Infof("Checking access log of %s\n", pod)
-			access := util.FetchLogs(client, r.apps[pod][0], params.Namespace, "proxy")
-			if strings.Contains(access, "segmentation fault") {
-				return fmt.Errorf("segmentation fault in proxy %s", pod)
-			}
-			if strings.Contains(access, "assert failure") {
-				return fmt.Errorf("assert failure in proxy %s", pod)
-			}
-			for _, id := range r.accessLogs[pod] {
-				if !strings.Contains(access, id) {
-					glog.Infof("Failed to find request id %s in log of %s\n", id, pod)
-					found = false
-					break
-				}
-			}
-			if !found {
-				break
-			}
-		}
-
-		if found {
-			return nil
-		}
-
-		time.Sleep(time.Second)
-	}
-	return fmt.Errorf("exceeded budget for checking access logs")
+	return parallel(funcs)
 }
 
 func (r *reachability) checkMixerLogs() error {
@@ -216,7 +134,7 @@ func (r *reachability) checkMixerLogs() error {
 
 	for n := 0; n < budget; n++ {
 		found := true
-		access := util.FetchLogs(client, r.apps["mixer"][0], params.Namespace, "mixer")
+		access := util.FetchLogs(client, r.apps["mixer"][0], r.Namespace, "mixer")
 
 		for id, desc := range r.mixerLogs {
 			if !strings.Contains(access, id) {
@@ -233,185 +151,4 @@ func (r *reachability) checkMixerLogs() error {
 		time.Sleep(time.Second)
 	}
 	return fmt.Errorf("exceeded budget for checking mixer logs")
-}
-
-func (r *reachability) makeTCPRequest(src, dst, port, domain string, done func() bool) func() error {
-	return func() error {
-		url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-		for n := 0; n < budget; n++ {
-			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
-			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-				r.apps[src][0], params.Namespace, url))
-			if err != nil {
-				return err
-			}
-			match := regexp.MustCompile("StatusCode=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 && match[1] == "200" {
-				return nil
-			}
-			if done() {
-				return nil
-			}
-		}
-		return fmt.Errorf("failed to verify TCP routing from %s to %s (url %s)", src, dst, url)
-	}
-}
-
-func (r *reachability) verifyTCPRouting() error {
-	g, ctx := errgroup.WithContext(context.Background())
-	testPods := []string{"a", "b", "t"}
-	for _, src := range testPods {
-		for _, dst := range testPods {
-			for _, port := range []string{":90", ":9090"} {
-				for _, domain := range []string{"", "." + params.Namespace} {
-					if params.parallel {
-						g.Go(r.makeTCPRequest(src, dst, port, domain, func() bool {
-							select {
-							case <-time.After(time.Second):
-								// try again
-							case <-ctx.Done():
-								return true
-							}
-							return false
-
-						}))
-					} else {
-						if err := r.makeTCPRequest(src, dst, port, domain, func() bool { return false })(); err != nil {
-							return err
-						}
-					}
-				}
-			}
-		}
-	}
-	if params.parallel {
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// makeEgressRequest creates a function to make egress requests; done should return true to quickly exit the
-// retry loop
-func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func() error {
-	return func() error {
-		url := fmt.Sprintf("http://%s/headers", dst)
-
-		for n := 0; n < budget; n++ {
-			trace := fmt.Sprint(time.Now().UnixNano())
-			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
-			resp, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
-				r.apps[src][0], params.Namespace, url, trace))
-			if err != nil {
-				return err
-			}
-
-			if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
-				return nil
-			}
-
-			glog.Errorf("Failed to find trace id in response from external service")
-
-			if done() {
-				return nil
-			}
-		}
-		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
-	}
-}
-
-func (r *reachability) verifyEgress() error {
-	g, ctx := errgroup.WithContext(context.Background())
-
-	extServices := []string{
-		"httpbin",
-		//"httpsbin",TODO
-	}
-
-	for _, src := range []string{"a", "b"} {
-		for _, extSrv := range extServices {
-			if params.parallel {
-				g.Go(r.makeEgressRequest(src, extSrv, func() bool {
-					select {
-					case <-time.After(time.Second):
-					// try again
-					case <-ctx.Done():
-						return true
-					}
-					return false
-
-				}))
-			} else {
-				if err := r.makeEgressRequest(src, extSrv, func() bool {
-					return false
-				})(); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	if params.parallel {
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// makeIngressRequest creates a function to make ingress requests; done should return true to quickly exit the
-// retry loop
-func (r *reachability) makeIngressRequest(src, dst string, done func() bool) func() error {
-	return func() error {
-		url := fmt.Sprintf("https://%s:443/%s", ingressServiceName, dst)
-		for n := 0; n < budget; n++ {
-			glog.Infof("Making a request %s from %s (attempt %d)...\n", url, src, n)
-			request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
-				r.apps[src][0], params.Namespace, url))
-			if err != nil {
-				return err
-			}
-			match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-			if len(match) > 1 {
-				id := match[1]
-				glog.V(2).Infof("id=%s\n", id)
-				r.accessMu.Lock()
-				r.accessLogs[dst] = append(r.accessLogs[dst], id)
-				r.accessMu.Unlock()
-				return nil
-			}
-			if done() {
-				return nil
-			}
-		}
-		return fmt.Errorf("failed to inject proxy from %s to %s (url %s)", src, dst, url)
-	}
-}
-
-func (r *reachability) verifyIngress() error {
-	g, ctx := errgroup.WithContext(context.Background())
-	for _, dst := range []string{"a", "b"} {
-		if params.parallel {
-			g.Go(r.makeIngressRequest("t", dst, func() bool {
-				select {
-				case <-time.After(time.Second):
-				// try again
-				case <-ctx.Done():
-					return true
-				}
-				return false
-
-			}))
-		} else {
-			if err := r.makeIngressRequest("t", dst, func() bool { return false })(); err != nil {
-				return err
-			}
-		}
-	}
-	if params.parallel {
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

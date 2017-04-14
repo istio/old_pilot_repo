@@ -14,8 +14,22 @@
 
 package main
 
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/golang/glog"
+
+	"istio.io/manager/test/util"
+)
+
 type egress struct {
 	*infra
+}
+
+func (t *egress) String() string {
+	return "egress proxy"
 }
 
 func (t *egress) setup() error {
@@ -26,7 +40,34 @@ func (t *egress) run() error {
 	if !t.Egress {
 		return nil
 	}
-	return nil
+	extServices := []string{
+		"httpbin",
+		//"httpsbin",TODO
+	}
+
+	funcs := make(map[string]func() status)
+	for _, src := range []string{"a", "b"} {
+		for _, dst := range extServices {
+			name := fmt.Sprintf("External request from %s to %s", src, dst)
+			funcs[name] = (func(src, dst string) func() status {
+				url := fmt.Sprintf("http://%s/headers", dst)
+				trace := fmt.Sprint(time.Now().UnixNano())
+				return func() status {
+					resp, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
+						t.apps[src][0], t.Namespace, url, trace))
+					if err != nil {
+						glog.Error(err)
+						return failure
+					}
+					if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
+						return success
+					}
+					return again
+				}
+			})(src, dst)
+		}
+	}
+	return parallel(funcs)
 }
 
 func (t *egress) teardown() {

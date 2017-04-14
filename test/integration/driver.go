@@ -17,18 +17,23 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"text/template"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/golang/sync/errgroup"
+	multierror "github.com/hashicorp/go-multierror"
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
+	"istio.io/manager/test/util"
 )
 
 const (
@@ -40,11 +45,10 @@ const (
 )
 
 type parameters struct {
-	infra
+	infra      infra
 	kubeconfig string
 	count      int
 	debug      bool
-	parallel   bool
 	logs       bool
 }
 
@@ -74,11 +78,11 @@ func init() {
 	flag.IntVar(&params.count, "count", 1, "Number of times to run the tests after deploying")
 	flag.StringVar(&authmode, "auth", "both", "Enable / disable auth, or test both.")
 	flag.BoolVar(&params.debug, "debug", false, "Extra logging in the containers")
-	flag.BoolVar(&params.parallel, "parallel", true, "Run requests in parallel")
 	flag.BoolVar(&params.logs, "logs", true, "Validate pod logs (expensive in long-running tests)")
 }
 
 type test interface {
+	String() string
 	setup() error
 	run() error
 	teardown()
@@ -96,116 +100,105 @@ func main() {
 		params.infra.Verbosity = 2
 	}
 
-	glog.Infof("params %#v", params)
-
 	check(setupClient())
 
+	params.infra.Mixer = true
 	switch authmode {
 	case "enable":
-		params.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-		runTests()
+		params.infra.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+		params.infra.Ingress = false
+		params.infra.Egress = false
+		check(runTests())
 	case "disable":
-		params.Auth = proxyconfig.ProxyMeshConfig_NONE
-		runTests()
+		params.infra.Auth = proxyconfig.ProxyMeshConfig_NONE
+		params.infra.Ingress = true
+		params.infra.Egress = true
+		check(runTests())
 	case "both":
-		params.Auth = proxyconfig.ProxyMeshConfig_NONE
-		runTests()
-		params.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-		runTests()
+		params.infra.Auth = proxyconfig.ProxyMeshConfig_NONE
+		params.infra.Ingress = true
+		params.infra.Egress = true
+		check(runTests())
+		params.infra.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+		params.infra.Ingress = false
+		params.infra.Egress = false
+		check(runTests())
 	default:
-		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", params.Auth)
+		glog.Infof("Invald auth flag: %s. Please choose from: enable/disable/both.", authmode)
 	}
 }
 
-func runTests() {
-	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.Auth)
-
-	infra := params.infra
-	infra.Mixer = true
-	infra.Egress = true
-	infra.Ingress = true
-
-	check(infra.setup())
-	check(infra.deployApps())
-
-	tests := []test{
-		&reachability{},
-		&ingress{&infra},
-		&egress{&infra},
-		// testRouting
-	}
-
-	for i := 0; i < params.count; i++ {
-		glog.Infof("Test run: %d", i)
-		for _, test := range tests {
-			check(test.setup())
-			check(test.run())
-			test.teardown()
-		}
-	}
-
-	infra.teardown()
-	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", params.Auth, params.count)
-}
-
-// check function correctly cleans up on failure
 func check(err error) {
 	if err != nil {
-		glog.Info(err)
-		/*
-			if glog.V(2) {
-				for _, pods := range apps {
-					for _, pod := range pods {
-						glog.Info(util.FetchLogs(client, pod, params.Namespace, "proxy"))
-					}
-				}
-			}
-		*/
-		// TODO: teardown()
 		glog.Info(err)
 		os.Exit(1)
 	}
 }
 
+func log(header, s string) {
+	glog.Infof("\n\n"+
+		"=================== %s =====================\n"+
+		"%s\n\n", header, s)
+}
+
+func runTests() error {
+	infra := params.infra
+	log("Deploying infrastructure", spew.Sdump(infra))
+
+	if err := infra.setup(); err != nil {
+		return err
+	}
+	if err := infra.deployApps(); err != nil {
+		return err
+	}
+	var errs error
+	infra.apps, errs = util.GetAppPods(client, infra.Namespace)
+
+	tests := []test{
+		&reachability{infra: &infra},
+		&tcp{infra: &infra},
+		&ingress{infra: &infra},
+		&egress{infra: &infra},
+		// testRouting
+	}
+
+	for i := 0; i < params.count; i++ {
+		for _, test := range tests {
+			log("Setting up test", test.String())
+			if err := test.setup(); err != nil {
+				errs = multierror.Append(errs, multierror.Prefix(err, test.String()))
+			} else {
+				log("Running test", test.String())
+				if err := test.run(); err != nil {
+					errs = multierror.Append(errs, multierror.Prefix(err, test.String()))
+				} else {
+					log("Success!", test.String())
+				}
+			}
+			log("Tearing down test", test.String())
+			test.teardown()
+		}
+	}
+
+	if errs == nil {
+		log("Passed all tests!", fmt.Sprintf("tests: %#v, count: %d", tests, params.count))
+	} else {
+		log("Failed tests!", fmt.Sprintf("%#v", errs))
+		//  spill proxy logs on error
+		for _, pod := range util.GetPods(client, infra.Namespace) {
+			log("Proxy log", pod)
+			glog.Info(util.FetchLogs(client, pod, infra.Namespace, "proxy"))
+		}
+		log("Failed tests!", fmt.Sprintf("%#v", errs))
+	}
+
+	// always remove infra even if the tests fail
+	log("Tearing down infrastructure", spew.Sdump(infra))
+	infra.teardown()
+	return errs
+}
+
 /*
-func waitForNewRestartEpoch(pod string, start int) error {
-	log.Println("Waiting for Envoy restart epoch to increment from ", start)
-	for n := 0; n < budget; n++ {
-		current, err := getRestartEpoch(pod)
-		if err != nil {
-			log.Printf("Could not obtain Envoy restart epoch for %s: %v", pod, err)
-		}
-
-		if current > start {
-			return nil
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	return fmt.Errorf("exceeded budget for waiting for envoy restart epoch to increment")
-}
-
-// getRestartEpoch gets the current restart epoch of a pod by calling the Envoy admin API.
-func getRestartEpoch(pod string) (int, error) {
-	url := "http://localhost:5000/server_info"
-	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], params.Namespace, url)
-	out, err := util.Shell(cmd, true)
-	if err != nil {
-		return 0, err
-	}
-
-	// Response body is of the form: envoy 267724/RELEASE live 1571 1571 0
-	// The last value is the restart epoch.
-	match := regexp.MustCompile(`envoy .+/\w+ \w+ \d+ \d+ (\d+)`).FindStringSubmatch(out)
-	if len(match) > 1 {
-		epoch, err := strconv.ParseInt(match[1], 10, 32)
-		return int(epoch), err
-	}
-
-	return 0, fmt.Errorf("could not obtain envoy restart epoch")
-}
-*/
-
 func addConfig(config []byte, kind, name string, create bool) {
 	glog.Infof("Add config %s", string(config))
 	istioKind, ok := model.IstioConfig[kind]
@@ -234,6 +227,7 @@ func deployDynamicConfig(inFile string, data map[string]string, kind, name, envo
 	glog.Info("Sleeping for the config to propagate")
 	time.Sleep(3 * time.Second)
 }
+*/
 
 // fill a file based on a template
 func fill(inFile string, values interface{}) (string, error) {
@@ -254,6 +248,44 @@ func fill(inFile string, values interface{}) (string, error) {
 	}
 
 	return bytes.String(), nil
+}
+
+type status int
+
+const (
+	success status = iota
+	failure
+	again
+)
+
+// run in parallel with retries. all funcs must succeed for the function to succeed
+func parallel(fs map[string]func() status) error {
+	g, ctx := errgroup.WithContext(context.Background())
+	repeat := func(name string, f func() status) func() error {
+		return func() error {
+			for n := 0; n < budget; n++ {
+				glog.Infof("%s (attempt %d)", name, n)
+				switch f() {
+				case failure:
+					return fmt.Errorf("Failed %s at attempt %d", name, n)
+				case success:
+					return nil
+				case again:
+				}
+				select {
+				case <-time.After(time.Second):
+					// try again
+				case <-ctx.Done():
+					return nil
+				}
+			}
+			return fmt.Errorf("Failed all %d attempts for %s", budget, name)
+		}
+	}
+	for name, f := range fs {
+		g.Go(repeat(name, f))
+	}
+	return g.Wait()
 }
 
 // connect to K8S cluster and register TPRs
