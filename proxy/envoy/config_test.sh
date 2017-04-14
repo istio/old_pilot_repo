@@ -11,9 +11,6 @@ CONFIG_FILES="envoy-v0 envoy-fault ingress-envoy"
 
 # TODO the test skips over SSL configuration files since referenced cert files are not in the right places
 
-ls /dev/shm/
-touch /dev/shm/test
-
 for f in ${CONFIG_FILES}; do
   echo "##############################"
   echo "# Testing $f..."
