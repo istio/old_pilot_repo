@@ -122,7 +122,8 @@ func (t *routing) teardown() {
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func (t *routing) verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedCount map[string]int) error {
+func (t *routing) verifyRouting(src, dst, headerKey, headerVal string,
+	samples int, expectedCount map[string]int) error {
 	count := make(map[string]int)
 	for version := range expectedCount {
 		count[version] = 0

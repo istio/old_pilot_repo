@@ -379,7 +379,7 @@ func TestControllerCacheFreshness(t *testing.T) {
 				t.Errorf("Got %#v, expected %d element(s) on ADD event", elts, 1)
 			}
 			glog.Infof("Calling Delete(%#v)", k)
-			err := ctl.Delete(k)
+			err = ctl.Delete(k)
 			if err != nil {
 				t.Error(err)
 			}

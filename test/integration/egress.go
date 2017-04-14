@@ -53,7 +53,8 @@ func (t *egress) run() error {
 				url := fmt.Sprintf("http://%s/headers", dst)
 				trace := fmt.Sprint(time.Now().UnixNano())
 				return func() status {
-					resp, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
+					resp, err := util.Shell(fmt.Sprintf(
+						"kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
 						t.apps[src][0], t.Namespace, url, trace))
 					if err != nil {
 						glog.Error(err)

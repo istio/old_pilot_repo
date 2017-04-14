@@ -142,24 +142,24 @@ func log(header, s string) {
 }
 
 func runTests() error {
-	infra := params.infra
-	log("Deploying infrastructure", spew.Sdump(infra))
+	istio := params.infra
+	log("Deploying infrastructure", spew.Sdump(istio))
 
-	if err := infra.setup(); err != nil {
+	if err := istio.setup(); err != nil {
 		return err
 	}
-	if err := infra.deployApps(); err != nil {
+	if err := istio.deployApps(); err != nil {
 		return err
 	}
 	var errs error
-	infra.apps, errs = util.GetAppPods(client, infra.Namespace)
+	istio.apps, errs = util.GetAppPods(client, istio.Namespace)
 
 	tests := []test{
-		&reachability{infra: &infra},
-		&tcp{infra: &infra},
-		&ingress{infra: &infra},
-		&egress{infra: &infra},
-		&routing{infra: &infra},
+		&reachability{infra: &istio},
+		&tcp{infra: &istio},
+		&ingress{infra: &istio},
+		&egress{infra: &istio},
+		&routing{infra: &istio},
 	}
 
 	for i := 0; i < params.count; i++ {
@@ -182,15 +182,15 @@ func runTests() error {
 
 	//  spill proxy logs on error
 	if errs != nil {
-		for _, pod := range util.GetPods(client, infra.Namespace) {
+		for _, pod := range util.GetPods(client, istio.Namespace) {
 			log("Proxy log", pod)
-			glog.Info(util.FetchLogs(client, pod, infra.Namespace, "proxy"))
+			glog.Info(util.FetchLogs(client, pod, istio.Namespace, "proxy"))
 		}
 	}
 
 	// always remove infra even if the tests fail
-	log("Tearing down infrastructure", spew.Sdump(infra))
-	infra.teardown()
+	log("Tearing down infrastructure", spew.Sdump(istio))
+	istio.teardown()
 
 	if errs == nil {
 		log("Passed all tests!", fmt.Sprintf("tests: %v, count: %d", tests, params.count))

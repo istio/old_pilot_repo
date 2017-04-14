@@ -55,7 +55,8 @@ func (t *ingress) setup() error {
 		return err
 	}
 
-	if err := util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/ingress.yaml", t.Namespace)); err != nil {
+	if err := util.Run(fmt.Sprintf(
+		"kubectl -n %s apply -f test/integration/testdata/ingress.yaml", t.Namespace)); err != nil {
 		return err
 	}
 

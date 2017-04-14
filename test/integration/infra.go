@@ -36,19 +36,20 @@ type infra struct {
 	MixerImage string
 	CaImage    string
 
+	Namespace string
+	Verbosity int
+
+	// map from app to pods
+	apps map[string][]string
+
+	Auth proxyconfig.ProxyMeshConfig_AuthPolicy
+
 	// switches for infrastructure components
-	Auth    proxyconfig.ProxyMeshConfig_AuthPolicy
 	Mixer   bool
 	Ingress bool
 	Egress  bool
 
-	Namespace string
-	Verbosity int
-
 	namespaceCreated bool
-
-	// map from app to pods
-	apps map[string][]string
 }
 
 func (infra *infra) setup() error {
