@@ -197,6 +197,7 @@ var (
 				Namespace: flags.controllerOptions.Namespace,
 				Mesh:      mesh,
 				Services:  controller,
+				Port:      80,
 			}
 			w, err := envoy.NewEgressWatcher(controller, config)
 			if err != nil {

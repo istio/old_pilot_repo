@@ -7,7 +7,7 @@ set -o nounset
 set -o pipefail
 
 ENVOY="proxy/envoy/envoy -l trace --service-cluster istio-proxy --service-node 10.0.0.1"
-CONFIG_FILES="envoy-v0 envoy-fault ingress-envoy"
+CONFIG_FILES="envoy-v0 envoy-fault ingress-envoy egress-envoy"
 
 # TODO the test skips over SSL configuration files since referenced cert files are not in the right places
 
