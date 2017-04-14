@@ -278,9 +278,9 @@ func (r *reachability) verifyTCPRouting() error {
 
 // makeEgressRequest creates a function to make egress requests; done should return true to quickly exit the
 // retry loop
-func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func() error {
+func (r *reachability) makeEgressRequest(src, dst, path string, done func() bool) func() error {
 	return func() error {
-		url := fmt.Sprintf("http://%s/headers", dst)
+		url := fmt.Sprintf("http://%s%s", dst, path)
 
 		for n := 0; n < budget; n++ {
 			trace := fmt.Sprint(time.Now().UnixNano())
@@ -291,11 +291,11 @@ func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func
 				return err
 			}
 
-			if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
+			if strings.Contains(resp, "StatusCode=200"){
 				return nil
 			}
 
-			glog.Errorf("Failed to find trace id in response from external service")
+			glog.Errorf("Failed to reach external service")
 
 			if done() {
 				return nil
@@ -308,15 +308,15 @@ func (r *reachability) makeEgressRequest(src, dst string, done func() bool) func
 func (r *reachability) verifyEgress() error {
 	g, ctx := errgroup.WithContext(context.Background())
 
-	extServices := []string{
-		"httpbin",
-		//"httpsbin",TODO
+	extServices := map[string]string{
+		"httpbin":"/headers",
+		"httpsgoogle:443": "",//TODO
 	}
 
 	for _, src := range []string{"a", "b"} {
-		for _, extSrv := range extServices {
+		for name, path := range extServices {
 			if params.parallel {
-				g.Go(r.makeEgressRequest(src, extSrv, func() bool {
+				g.Go(r.makeEgressRequest(src, name, path, func() bool {
 					select {
 					case <-time.After(time.Second):
 					// try again
@@ -327,7 +327,7 @@ func (r *reachability) verifyEgress() error {
 
 				}))
 			} else {
-				if err := r.makeEgressRequest(src, extSrv, func() bool {
+				if err := r.makeEgressRequest(src, name, path, func() bool {
 					return false
 				})(); err != nil {
 					return err

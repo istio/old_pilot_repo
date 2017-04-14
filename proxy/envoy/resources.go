@@ -409,10 +409,10 @@ type SSLContext struct {
 
 // SSLContextWithSAN definition, VerifySubjectAltName cannot be nil.
 type SSLContextWithSAN struct {
-	CertChainFile        string   `json:"cert_chain_file"`
-	PrivateKeyFile       string   `json:"private_key_file"`
+	CertChainFile        string   `json:"cert_chain_file,omitempty"`
+	PrivateKeyFile       string   `json:"private_key_file,omitempty"`
 	CaCertFile           string   `json:"ca_cert_file,omitempty"`
-	VerifySubjectAltName []string `json:"verify_subject_alt_name"`
+	VerifySubjectAltName []string `json:"verify_subject_alt_name,omitempty"`
 }
 
 // Admin definition

@@ -141,7 +141,7 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 	for _, servicePort := range svc.Ports {
 		protocol := servicePort.Protocol
 		switch protocol {
-		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolHTTPS:
 			route := &HTTPRoute{
 				Prefix:          "/",
 				Cluster:         buildEgressClusterName(svc.ExternalName, servicePort.Port),
@@ -157,6 +157,11 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 				{
 					URL: fmt.Sprintf("tcp://%s:%d", svc.ExternalName, servicePort.Port),
 				},
+			}
+
+			if protocol == model.ProtocolHTTPS {
+				cluster.SSLContext = &SSLContextWithSAN{
+				}
 			}
 
 			route.clusters = append(route.clusters, cluster)
