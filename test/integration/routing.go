@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"istio.io/manager/model"
+	"istio.io/manager/test/util"
 )
 
 func testRouting() error {
@@ -74,7 +75,7 @@ func testRouting() error {
 	glog.Info("Success!")
 
 	glog.Info("Cleaning up route rules...")
-	check(run("kubectl delete istioconfigs --all -n " + params.namespace))
+	check(util.Run("kubectl delete istioconfigs --all -n " + params.namespace))
 
 	return nil
 }
@@ -91,7 +92,7 @@ func verifyRouting(src, dst, headerKey, headerVal string, samples int, expectedC
 
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d -key %s -val %s",
 		pods[src], params.namespace, url, samples, headerKey, headerVal)
-	request, err := shell(cmd)
+	request, err := util.Shell(cmd)
 	glog.V(2).Info(request)
 	if err != nil {
 		return err
@@ -132,7 +133,7 @@ func verifyFaultInjection(pods map[string]string, src, dst, headerKey, headerVal
 		pods[src], params.namespace, url, headerKey, headerVal)
 
 	start := time.Now()
-	request, err := shell(cmd)
+	request, err := util.Shell(cmd)
 	glog.V(2).Info(request)
 	elapsed := time.Since(start)
 	if err != nil {

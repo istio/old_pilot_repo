@@ -21,22 +21,21 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
-	"strings"
 	"text/template"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/golang/glog"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
 	"istio.io/manager/proxy/envoy"
+	"istio.io/manager/test/util"
 )
 
 const (
@@ -46,9 +45,6 @@ const (
 	ingressProxy     = "ingress-proxy"
 	ca               = "ca"
 	app              = "app"
-
-	// budget is the maximum number of retries with 1s delays
-	budget = 90
 
 	// CA image tag is the short SHA *update manually*
 	caTag = "f063b41"
@@ -85,10 +81,12 @@ var (
 	pods map[string]string
 
 	// indicates whether the namespace is auto-generated
-	nameSpaceCreated bool
+	namespaceCreated bool
 
 	// Enable/disable auth, or run both for the tests.
 	authmode string
+
+	budget = 90
 )
 
 func init() {
@@ -129,7 +127,7 @@ func main() {
 }
 
 func runTests() {
-	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.auth)
+	color.Green("\n--------------- Run tests with auth: %t ---------------", params.auth)
 
 	setup()
 
@@ -162,31 +160,30 @@ func setup() {
 
 	var err error
 	if params.namespace == "" {
-		if params.namespace, err = generateNamespace(client); err != nil {
+		if params.namespace, err = util.CreateNamespace(client); err != nil {
 			check(err)
 		}
+		namespaceCreated = true
 	} else {
 		_, err = client.Core().Namespaces().Get(params.namespace, meta_v1.GetOptions{})
 		check(err)
 	}
 
-	pods = make(map[string]string)
-
 	if params.auth {
 		check(deploy("ca", "ca", ca, "", "", "", "", "unversioned", false))
-		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config-auth.yaml", params.namespace))
+		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config-auth.yaml", params.namespace))
 	} else {
-		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config.yaml", params.namespace))
+		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config.yaml", params.namespace))
 	}
 	check(err)
 
 	// setup ingress resources
-	_, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
+	_, _ = util.Shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
 		"--from-file=tls.key=test/integration/testdata/cert.key "+
 		"--from-file=tls.crt=test/integration/testdata/cert.crt",
 		params.namespace))
 
-	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/ingress.yaml", params.namespace))
+	_, err = util.Shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/ingress.yaml", params.namespace))
 	check(err)
 
 	// deploy istio-infra
@@ -202,7 +199,8 @@ func setup() {
 	check(deploy("hello", "hello", app, "8080", "80", "9090", "90", "v1", true))
 	check(deploy("world-v1", "world", app, "80", "8000", "90", "9090", "v1", true))
 	check(deploy("world-v2", "world", app, "80", "8000", "90", "9090", "v2", true))
-	check(setPods())
+	pods, err = util.GetAppPods(client, params.namespace)
+	check(err)
 }
 
 // check function correctly cleans up on failure
@@ -211,7 +209,7 @@ func check(err error) {
 		glog.Info(err)
 		if glog.V(2) {
 			for _, pod := range pods {
-				glog.Info(podLogs(pod, "proxy"))
+				glog.Info(util.FetchLogs(client, pod, params.namespace, "proxy"))
 			}
 		}
 		teardown()
@@ -222,14 +220,15 @@ func check(err error) {
 // teardown removes resources
 func teardown() {
 	glog.Info("Cleaning up ingress secret.")
-	if err := run("kubectl delete secret ingress -n " + params.namespace); err != nil {
+	if err := util.Run("kubectl delete secret ingress -n " + params.namespace); err != nil {
 		glog.Warning(err)
 	}
 
-	if nameSpaceCreated {
-		deleteNamespace(client, params.namespace)
+	if namespaceCreated {
+		util.DeleteNamespace(client, params.namespace)
 		params.namespace = ""
 	}
+	glog.Flush()
 }
 
 func deploy(name, svcName, dType, port1, port2, port3, port4, version string, injectProxy bool) error {
@@ -287,7 +286,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		return err
 	}
 
-	return run("kubectl apply -f " + configFile + " -n " + params.namespace)
+	return util.Run("kubectl apply -f " + configFile + " -n " + params.namespace)
 }
 
 /*
@@ -312,7 +311,7 @@ func waitForNewRestartEpoch(pod string, start int) error {
 func getRestartEpoch(pod string) (int, error) {
 	url := "http://localhost:5000/server_info"
 	cmd := fmt.Sprintf("kubectl exec %s -n %s -c app client %s", pods[pod], params.namespace, url)
-	out, err := shell(cmd, true)
+	out, err := util.Shell(cmd, true)
 	if err != nil {
 		return 0, err
 	}
@@ -396,29 +395,6 @@ func writeString(in string, data map[string]string) ([]byte, error) {
 	return bytes.Bytes(), nil
 }
 
-func run(command string) error {
-	glog.Info(command)
-	parts := strings.Split(command, " ")
-	/* #nosec */
-	c := exec.Command(parts[0], parts[1:]...)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
-}
-
-func shell(command string) (string, error) {
-	glog.Info(command)
-	parts := strings.Split(command, " ")
-	/* #nosec */
-	c := exec.Command(parts[0], parts[1:]...)
-	bytes, err := c.CombinedOutput()
-	if err != nil {
-		glog.V(2).Info(string(bytes))
-		return "", fmt.Errorf("command failed: %q %v", string(bytes), err)
-	}
-	return string(bytes), nil
-}
-
 // connect to K8S cluster and register TPRs
 func setupClient() error {
 	var err error
@@ -428,83 +404,4 @@ func setupClient() error {
 	}
 	client = istioClient.GetKubernetesClient()
 	return istioClient.RegisterResources()
-}
-
-func setPods() error {
-	var items []v1.Pod
-	for n := 0; ; n++ {
-		glog.Info("Checking all pods are running...")
-		list, err := client.CoreV1().Pods(params.namespace).List(meta_v1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		items = list.Items
-		ready := true
-
-		for _, pod := range items {
-			if pod.Status.Phase != "Running" {
-				glog.Infof("Pod %s has status %s\n", pod.Name, pod.Status.Phase)
-				ready = false
-				break
-			}
-		}
-
-		if ready {
-			break
-		}
-
-		if n > budget {
-			for _, pod := range items {
-				glog.Infof(podLogs(pod.Name, "proxy"))
-			}
-			return fmt.Errorf("exceeded budget for checking pod status")
-		}
-
-		time.Sleep(time.Second)
-	}
-
-	for _, pod := range items {
-		if app, exists := pod.Labels["app"]; exists {
-			pods[app] = pod.Name
-		}
-	}
-
-	return nil
-}
-
-// podLogs gets pod logs by container
-func podLogs(name string, container string) string {
-	glog.Infof("Pod proxy logs %q", name)
-	raw, err := client.CoreV1().Pods(params.namespace).
-		GetLogs(name, &v1.PodLogOptions{Container: container}).
-		Do().Raw()
-	if err != nil {
-		glog.Info("Request error", err)
-		return ""
-	}
-
-	return string(raw)
-}
-
-func generateNamespace(cl kubernetes.Interface) (string, error) {
-	ns, err := cl.Core().Namespaces().Create(&v1.Namespace{
-		ObjectMeta: meta_v1.ObjectMeta{
-			GenerateName: "istio-integration-",
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-	glog.Infof("Created namespace %s\n", ns.Name)
-	nameSpaceCreated = true
-	return ns.Name, nil
-}
-
-func deleteNamespace(cl kubernetes.Interface, ns string) {
-	if cl != nil && ns != "" && ns != "default" {
-		if err := cl.Core().Namespaces().Delete(ns, &meta_v1.DeleteOptions{}); err != nil {
-			glog.Infof("Error deleting namespace: %v\n", err)
-		}
-		glog.Infof("Deleted namespace %s\n", ns)
-	}
 }
