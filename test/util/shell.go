@@ -34,6 +34,18 @@ func Run(command string) error {
 	return c.Run()
 }
 
+// RunInput command and pass input via stdin
+func RunInput(command, input string) error {
+	glog.Infof("Run %q on input:\n%s", command, input)
+	parts := strings.Split(command, " ")
+	/* #nosec */
+	c := exec.Command(parts[0], parts[1:]...)
+	c.Stdin = strings.NewReader(input)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
+}
+
 // Shell out a command and aggregate output
 func Shell(command string) (string, error) {
 	glog.Info(command)

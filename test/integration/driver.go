@@ -22,10 +22,10 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/golang/glog"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -39,12 +39,7 @@ import (
 )
 
 const (
-	managerDiscovery = "manager-discovery"
-	mixer            = "mixer"
-	egressProxy      = "egress-proxy"
-	ingressProxy     = "ingress-proxy"
-	ca               = "ca"
-	app              = "app"
+	app = "app"
 
 	// CA image tag is the short SHA *update manually*
 	caTag = "f063b41"
@@ -127,7 +122,7 @@ func main() {
 }
 
 func runTests() {
-	color.Green("\n--------------- Run tests with auth: %t ---------------", params.auth)
+	glog.Infof("\n--------------- Run tests with auth: %t ---------------", params.auth)
 
 	setup()
 
@@ -139,6 +134,32 @@ func runTests() {
 
 	teardown()
 	glog.Infof("\n--------------- All tests with auth: %t passed %d time(s)! ---------------\n", params.auth, params.count)
+}
+
+// deploy complete infrastructure to ensure no conflict between components across test cases
+func deployInfra(namespace string) error {
+	values := map[string]string{
+		"hub":        params.hub,
+		"tag":        params.tag,
+		"verbosity":  strconv.Itoa(params.verbosity),
+		"mixerImage": params.mixerImage,
+		"caImage":    params.caImage,
+	}
+
+	for _, infra := range []string{
+		"manager.yaml.tmpl",
+		"mixer.yaml.tmpl",
+		"ca.yaml.tmpl",
+		"ingress-proxy.yaml.tmpl",
+		"egress-proxy.yaml.tmpl"} {
+		if yaml, err := fill(infra, values); err != nil {
+			return err
+		} else if err = kubeApply(yaml, namespace); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func setup() {
@@ -170,7 +191,6 @@ func setup() {
 	}
 
 	if params.auth {
-		check(deploy("ca", "ca", ca, "", "", "", "", "unversioned", false))
 		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config-auth.yaml", params.namespace))
 	} else {
 		err = util.Run(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config.yaml", params.namespace))
@@ -187,10 +207,7 @@ func setup() {
 	check(err)
 
 	// deploy istio-infra
-	check(deploy("http-discovery", "http-discovery", managerDiscovery, "8080", "80", "9090", "90", "unversioned", false))
-	check(deploy("mixer", "mixer", mixer, "8080", "80", "9090", "90", "unversioned", false))
-	check(deploy("istio-egress", "istio-egress", egressProxy, "8080", "80", "9090", "90", "unversioned", false))
-	check(deploy("istio-ingress", "istio-ingress", ingressProxy, "8080", "80", "9090", "90", "unversioned", false))
+	check(deployInfra(params.namespace))
 
 	// deploy a healthy mix of apps, with and without proxy
 	check(deploy("t", "t", app, "8080", "80", "9090", "90", "unversioned", false))
@@ -245,8 +262,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		}
 	}()
 
-	w := &bytes.Buffer{}
-	if err := write("test/integration/testdata/"+dType+".yaml.tmpl", map[string]string{
+	w, err := fill(dType+".yaml.tmpl", map[string]string{
 		"service": svcName,
 		"name":    name,
 		"port1":   port1,
@@ -254,7 +270,8 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 		"port3":   port3,
 		"port4":   port4,
 		"version": version,
-	}, w); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -274,11 +291,11 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 			Version:         "manager-integration-test",
 			Mesh:            &mesh,
 		}
-		if err := inject.IntoResourceFile(p, w, writer); err != nil {
+		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
 			return err
 		}
 	} else {
-		if _, err := io.Copy(writer, w); err != nil {
+		if _, err := io.Copy(writer, strings.NewReader(w)); err != nil {
 			return err
 		}
 	}
@@ -348,51 +365,49 @@ func addConfig(config []byte, kind, name string, create bool) {
 	}
 }
 
-func deployDynamicConfig(in string, data map[string]string, kind, name, envoy string) {
-	config, err := writeString(in, data)
+func deployDynamicConfig(inFile string, data map[string]string, kind, name, envoy string) {
+	config, err := fill(inFile, data)
 	check(err)
 	_, exists := istioClient.Get(model.Key{Kind: kind, Name: name, Namespace: params.namespace})
-	addConfig(config, kind, name, !exists)
+	addConfig([]byte(config), kind, name, !exists)
 	glog.Info("Sleeping for the config to propagate")
 	time.Sleep(3 * time.Second)
 }
 
-func write(in string, data map[string]string, out io.Writer) error {
+func kubeApply(yaml, namespace string) error {
+	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", namespace), yaml)
+}
+
+// fill a file based on a template
+func fill(inFile string, data map[string]string) (string, error) {
+	var bytes bytes.Buffer
+	w := bufio.NewWriter(&bytes)
+
 	// fallback to params values in data
 	values := make(map[string]string)
 	values["hub"] = params.hub
 	values["tag"] = params.tag
-	values["caImage"] = params.caImage
-	values["mixerImage"] = params.mixerImage
 	values["namespace"] = params.namespace
 	values["verbosity"] = strconv.Itoa(params.verbosity)
 
 	for k, v := range data {
 		values[k] = v
 	}
-	tmpl, err := template.ParseFiles(in)
+	tmpl, err := template.ParseFiles("test/integration/testdata/" + inFile)
 
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := tmpl.Execute(out, values); err != nil {
-		return err
-	}
-	return nil
-}
 
-func writeString(in string, data map[string]string) ([]byte, error) {
-	var bytes bytes.Buffer
-	w := bufio.NewWriter(&bytes)
-	if err := write(in, data, w); err != nil {
-		return nil, err
+	if err := tmpl.Execute(w, values); err != nil {
+		return "", err
 	}
 
 	if err := w.Flush(); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return bytes.Bytes(), nil
+	return bytes.String(), nil
 }
 
 // connect to K8S cluster and register TPRs
