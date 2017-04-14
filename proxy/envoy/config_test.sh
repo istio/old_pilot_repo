@@ -15,7 +15,7 @@ BASE_ID=$3
 echo "##############################"
 echo "# Testing ${CONFIG_FILE}..."
 echo "##############################"
-${ENVOY} --base-id $3 -c ${CONFIG_FILE} &
+${ENVOY} --base-id ${BASE_ID} -c ${CONFIG_FILE} &
 PID=$!
 sleep 0.200
 kill -KILL $PID
