@@ -23,24 +23,7 @@ go_library(
 
 go_binary(
     name = "integration",
-    data = [
-        "app.yaml.tmpl",
-        "ca.yaml.tmpl",
-        "cert.crt",
-        "cert.key",
-        "config.yaml",
-        "config-auth.yaml",
-        "egress-proxy.yaml.tmpl",
-        "ingress.yaml",
-        "ingress-proxy.yaml.tmpl",
-        "manager-discovery.yaml.tmpl",
-        "mixer.yaml.tmpl",
-        "rule-content-route.yaml.tmpl",
-        "rule-default-route.yaml.tmpl",
-        "rule-fault-injection.yaml.tmpl",
-        "rule-weighted-route.yaml.tmpl",
-        "//platform/kube:kubeconfig",
-    ],
+    data = glob(["testdata/*"]) + ["//platform/kube:kubeconfig"],
     library = ":go_default_library",
     tags = ["manual"],
 )

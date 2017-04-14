@@ -32,7 +32,7 @@ func testRouting() error {
 	// First test default routing
 	// Create a bytes buffer to hold the YAML form of rules
 	glog.Info("Routing all traffic to world-v1 and verifying..")
-	deployDynamicConfig("test/integration/rule-default-route.yaml.tmpl", map[string]string{
+	deployDynamicConfig("test/integration/testdata/rule-default-route.yaml.tmpl", map[string]string{
 		"destination": "world",
 	}, model.RouteRule, "default-route", "hello")
 	check(verifyRouting("hello", "world", "", "",
@@ -43,7 +43,7 @@ func testRouting() error {
 	glog.Info("Success!")
 
 	glog.Info("Routing 75 percent to world-v1, 25 percent to world-v2 and verifying..")
-	deployDynamicConfig("test/integration/rule-weighted-route.yaml.tmpl", map[string]string{
+	deployDynamicConfig("test/integration/testdata/rule-weighted-route.yaml.tmpl", map[string]string{
 		"destination": "world",
 	}, model.RouteRule, "default-route", "hello")
 	check(verifyRouting("hello", "world", "", "",
@@ -54,7 +54,7 @@ func testRouting() error {
 	glog.Info("Success!")
 
 	glog.Info("Routing 100 percent to world-v2 using header based routing and verifying..")
-	deployDynamicConfig("test/integration/rule-content-route.yaml.tmpl", map[string]string{
+	deployDynamicConfig("test/integration/testdata/rule-content-route.yaml.tmpl", map[string]string{
 		"source":      "hello",
 		"destination": "world",
 	}, model.RouteRule, "content-route", "hello")
@@ -66,7 +66,7 @@ func testRouting() error {
 	glog.Info("Success!")
 
 	glog.Info("Testing fault injection..")
-	deployDynamicConfig("test/integration/rule-fault-injection.yaml.tmpl", map[string]string{
+	deployDynamicConfig("test/integration/testdata/rule-fault-injection.yaml.tmpl", map[string]string{
 		"source":      "hello",
 		"destination": "world",
 	}, model.RouteRule, "fault-injection", "hello")

@@ -174,19 +174,19 @@ func setup() {
 
 	if params.auth {
 		check(deploy("ca", "ca", ca, "", "", "", "", "unversioned", false))
-		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config-auth.yaml", params.namespace))
+		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config-auth.yaml", params.namespace))
 	} else {
-		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/config.yaml", params.namespace))
+		_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/config.yaml", params.namespace))
 	}
 	check(err)
 
 	// setup ingress resources
 	_, _ = shell(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
-		"--from-file=tls.key=test/integration/cert.key "+
-		"--from-file=tls.crt=test/integration/cert.crt",
+		"--from-file=tls.key=test/integration/testdata/cert.key "+
+		"--from-file=tls.crt=test/integration/testdata/cert.crt",
 		params.namespace))
 
-	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/ingress.yaml", params.namespace))
+	_, err = shell(fmt.Sprintf("kubectl -n %s apply -f test/integration/testdata/ingress.yaml", params.namespace))
 	check(err)
 
 	// deploy istio-infra
@@ -247,7 +247,7 @@ func deploy(name, svcName, dType, port1, port2, port3, port4, version string, in
 	}()
 
 	w := &bytes.Buffer{}
-	if err := write("test/integration/"+dType+".yaml.tmpl", map[string]string{
+	if err := write("test/integration/testdata/"+dType+".yaml.tmpl", map[string]string{
 		"service": svcName,
 		"name":    name,
 		"port1":   port1,
