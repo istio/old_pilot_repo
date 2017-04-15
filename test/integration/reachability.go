@@ -105,13 +105,13 @@ func (r *reachability) makeRequests() error {
 								if dst != "t" {
 									r.accessLogs[dst] = append(r.accessLogs[dst], id)
 								}
-								r.accessMu.Unlock()
 
 								// TODO no logs when source and destination is same (e.g. from "a" pod to "a" pod)
 								// server side should have a proxy, so skip "t" destined requests
 								if src != dst && dst != "t" {
 									r.mixerLogs[id] = fmt.Sprintf("from %s to %s, port %s", src, dst, port)
 								}
+								r.accessMu.Unlock()
 
 								return success
 							}
