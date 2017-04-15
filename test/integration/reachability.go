@@ -62,10 +62,10 @@ func (r *reachability) run() error {
 	if err := r.makeRequests(); err != nil {
 		return err
 	}
-	if params.logs {
-		if err := r.checkProxyAccessLogs(r.accessLogs); err != nil {
-			return err
-		}
+	if err := r.checkProxyAccessLogs(r.accessLogs); err != nil {
+		return err
+	}
+	if r.checkLogs {
 		if err := r.checkMixerLogs(); err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (r *reachability) makeRequests() error {
 								return success
 							}
 							if src == "t" && dst == "t" {
-								glog.V(2).Info("Expected no match for t->t")
+								// Expected no match for t->t
 								return success
 							}
 							return again
