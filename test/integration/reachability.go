@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -31,14 +30,7 @@ import (
 
 type reachability struct {
 	*infra
-
-	accessMu sync.Mutex
-
-	// accessLogs is a mapping from app name to a list of request ids that should be present in it
-	accessLogs map[string][]string
-
-	// mixerLogs is a collection of request IDs that we expect to find in the mixer logs
-	mixerLogs map[string]string
+	logs *accessLogs
 }
 
 func (r *reachability) String() string {
@@ -46,11 +38,7 @@ func (r *reachability) String() string {
 }
 
 func (r *reachability) setup() error {
-	r.mixerLogs = make(map[string]string)
-	r.accessLogs = make(map[string][]string)
-	for app := range r.apps {
-		r.accessLogs[app] = make([]string, 0)
-	}
+	r.logs = makeAccessLogs()
 	return nil
 }
 
@@ -98,7 +86,6 @@ func (r *reachability) makeRequests() error {
 							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
 							if len(match) > 1 {
 								id := match[1]
-								r.accessMu.Lock()
 								if src != "t" {
 									r.accessLogs[src] = append(r.accessLogs[src], id)
 								}
@@ -111,7 +98,6 @@ func (r *reachability) makeRequests() error {
 								if src != dst && dst != "t" {
 									r.mixerLogs[id] = fmt.Sprintf("from %s to %s, port %s", src, dst, port)
 								}
-								r.accessMu.Unlock()
 
 								return success
 							}
