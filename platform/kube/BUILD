@@ -32,6 +32,8 @@ go_library(
         "@io_k8s_client_go//tools/cache:go_default_library",
         "@io_k8s_client_go//tools/clientcmd:go_default_library",
         "@io_k8s_client_go//util/flowcontrol:go_default_library",
+        "@io_k8s_ingress//core/pkg/ingress/status:go_default_library",
+        "@io_k8s_ingress//core/pkg/ingress/store:go_default_library",
     ],
 )
 

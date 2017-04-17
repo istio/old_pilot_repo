@@ -31,8 +31,10 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	ingress_store "k8s.io/ingress/core/pkg/ingress/store"
 
 	"istio.io/manager/model"
+	"k8s.io/ingress/core/pkg/ingress/status"
 )
 
 const (
@@ -79,8 +81,9 @@ type Controller struct {
 	endpoints cacheHandler
 	ingresses cacheHandler
 
-	pods    *PodCache
-	secrets *secretStore
+	pods          *PodCache
+	secrets       *secretStore
+	ingressStatus status.Sync
 }
 
 type cacheHandler struct {
@@ -131,6 +134,25 @@ func NewController(client *Client, options ControllerOptions) *Controller {
 			func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				return client.client.ExtensionsV1beta1().Ingresses(options.Namespace).Watch(opts)
 			})
+
+		// Ingress sync mode -> ingress status sync mode. The ingress status is synced in two cases:
+		// 1. default ingress class provided and no annotation on ingress resource
+		// 2. specific ingress class provided and same annotation on ingress resource
+		var ingressClass, defaultIngressClass string
+		switch options.IngressSyncMode {
+		case IngressStrict:
+			ingressClass = options.IngressClass
+		case IngressDefault:
+			defaultIngressClass = options.IngressClass
+		}
+
+		out.ingressStatus = status.NewStatusSyncer(status.Config{
+			Client:              client.client,
+			IngressLister:       ingress_store.IngressLister{Store: out.ingresses.informer.GetStore()},
+			ElectionID:          "ingress-controller-leader", // TODO: configurable?
+			DefaultIngressClass: defaultIngressClass,
+			IngressClass:        ingressClass,
+		})
 	}
 
 	// add stores for TPR kinds
@@ -294,6 +316,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 	if c.options.IngressSyncMode != IngressOff {
 		go c.ingresses.informer.Run(stop)
+		go c.ingressStatus.Run(stop)
 	}
 
 	for _, ctl := range c.kinds {
