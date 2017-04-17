@@ -48,11 +48,7 @@ func makeAccessLogs() *accessLogs {
 func (a *accessLogs) add(app, id, desc string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	v, exists := a.logs[app]
-	if !exists {
-		v = make([]request, 0)
-	}
-	a.logs[app] = append(v, request{id: id, desc: desc})
+	a.logs[app] = append(a.logs[app], request{id: id, desc: desc})
 }
 
 // check logs against a deployment
@@ -91,16 +87,12 @@ func (a *accessLogs) check(infra *infra) error {
 				// find all ids and counts
 				counts := make(map[string]int)
 				for _, request := range a.logs[app] {
-					i, exists := counts[request.id]
-					if !exists {
-						i = 0
-					}
-					counts[request.id] = i + 1
+					counts[request.id] = counts[request.id] + 1
 				}
-				for id, count := range counts {
-					i := strings.Count(logs, id)
-					if i < count {
-						glog.Errorf("Got %d for %s in logs of %s, want %d", i, id, pod, count)
+				for id, want := range counts {
+					got := strings.Count(logs, id)
+					if got < want {
+						glog.Errorf("Got %d for %s in logs of %s, want %d", got, id, pod, want)
 						return again
 					}
 				}
