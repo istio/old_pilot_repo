@@ -19,8 +19,6 @@ package main
 import (
 	"fmt"
 	"regexp"
-	"strings"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -50,13 +48,8 @@ func (r *reachability) run() error {
 	if err := r.makeRequests(); err != nil {
 		return err
 	}
-	if err := r.checkProxyAccessLogs(r.accessLogs); err != nil {
+	if err := r.logs.check(r.infra); err != nil {
 		return err
-	}
-	if r.checkLogs {
-		if err := r.checkMixerLogs(); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -87,18 +80,15 @@ func (r *reachability) makeRequests() error {
 							if len(match) > 1 {
 								id := match[1]
 								if src != "t" {
-									r.accessLogs[src] = append(r.accessLogs[src], id)
+									r.logs.add(src, id, name)
 								}
 								if dst != "t" {
-									r.accessLogs[dst] = append(r.accessLogs[dst], id)
+									r.logs.add(dst, id, name)
 								}
-
-								// TODO no logs when source and destination is same (e.g. from "a" pod to "a" pod)
-								// server side should have a proxy, so skip "t" destined requests
-								if src != dst && dst != "t" {
-									r.mixerLogs[id] = fmt.Sprintf("from %s to %s, port %s", src, dst, port)
+								// mixer filter is invoked on the server side, that is when dst is not "t"
+								if dst != "t" {
+									r.logs.add("mixer", id, name)
 								}
-
 								return success
 							}
 							if src == "t" && dst == "t" {
@@ -113,28 +103,4 @@ func (r *reachability) makeRequests() error {
 		}
 	}
 	return parallel(funcs)
-}
-
-func (r *reachability) checkMixerLogs() error {
-	glog.Info("Checking mixer logs for request IDs...")
-
-	for n := 0; n < budget; n++ {
-		found := true
-		access := util.FetchLogs(client, r.apps["mixer"][0], r.Namespace, "mixer")
-
-		for id, desc := range r.mixerLogs {
-			if !strings.Contains(access, id) {
-				glog.Infof("Failed to find request id %s for %s in mixer logs\n", id, desc)
-				found = false
-				break
-			}
-		}
-
-		if found {
-			return nil
-		}
-
-		time.Sleep(time.Second)
-	}
-	return fmt.Errorf("exceeded budget for checking mixer logs")
 }

@@ -14,7 +14,14 @@
 
 package main
 
-import "sync"
+import (
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/golang/glog"
+	"istio.io/manager/test/util"
+)
 
 // envoy access log testing utilities
 
@@ -22,17 +29,85 @@ import "sync"
 type accessLogs struct {
 	mu sync.Mutex
 
-	// logs is a mapping from app name to a collection of request IDs keyed by unique description text
-	logs map[string]map[string]string
+	// logs is a mapping from app name to requests
+	logs map[string][]request
+}
+
+type request struct {
+	id   string
+	desc string
 }
 
 func makeAccessLogs() *accessLogs {
 	return &accessLogs{
-		logs: make(map[string]map[string]string),
+		logs: make(map[string][]request),
 	}
 }
 
-func (a *accessLogs) add(app, desc, id) {
+// add an access log entry for an app
+func (a *accessLogs) add(app, id, desc string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	v, exists := a.logs[app]
+	if !exists {
+		v = make([]request, 0)
+	}
+	a.logs[app] = append(v, request{id: id, desc: desc})
+}
+
+// check logs against a deployment
+func (a *accessLogs) check(infra *infra) error {
+	if !infra.checkLogs {
+		glog.Info("Log checking is disabled")
+		return nil
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	glog.Info("Checking pod logs for request IDs...")
+	glog.V(3).Info(a.logs)
+
+	funcs := make(map[string]func() status)
+	for app := range a.logs {
+		name := fmt.Sprintf("Checking log of %s", app)
+		funcs[name] = (func(app string) func() status {
+			return func() status {
+				pod := infra.apps[app][0]
+				container := "proxy"
+				if app == "mixer" {
+					container = "mixer"
+				}
+				logs := util.FetchLogs(client, pod, infra.Namespace, container)
+
+				if strings.Contains(logs, "segmentation fault") {
+					glog.Errorf("segmentation fault %s", pod)
+					return failure
+				}
+
+				if strings.Contains(logs, "assert failure") {
+					glog.Errorf("assert failure in %s", pod)
+					return failure
+				}
+
+				// find all ids and counts
+				counts := make(map[string]int)
+				for _, request := range a.logs[app] {
+					i, exists := counts[request.id]
+					if !exists {
+						i = 0
+					}
+					counts[request.id] = i + 1
+				}
+				for id, count := range counts {
+					i := strings.Count(logs, id)
+					if i < count {
+						glog.Errorf("Got %d for %s in logs of %s, want %d", i, id, pod, count)
+						return again
+					}
+				}
+
+				return success
+			}
+		})(app)
+	}
+	return parallel(funcs)
 }
