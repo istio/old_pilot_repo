@@ -75,14 +75,13 @@ var (
 			if flags.podName == "" {
 				flags.podName = os.Getenv("POD_NAME")
 			}
-			configMapNamespace := ""
 			if flags.controllerOptions.Namespace == "" {
-				configMapNamespace = os.Getenv("POD_NAMESPACE")
+				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 			}
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			// receive mesh configuration
-			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), configMapNamespace, flags.meshConfig)
+			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.controllerOptions.Namespace, flags.meshConfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 			}
@@ -96,6 +95,7 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
+			flags.controllerOptions.Namespace = ""
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
 				Discovery:  controller,
@@ -119,6 +119,7 @@ var (
 		Use:   "apiserver",
 		Short: "Start Istio Manager config API service",
 		Run: func(*cobra.Command, []string) {
+			flags.controllerOptions.Namespace = ""
 			controller := kube.NewController(client, flags.controllerOptions)
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version:  "v1alpha1",
@@ -140,10 +141,6 @@ var (
 		Use:   "sidecar",
 		Short: "Istio Proxy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			if flags.controllerOptions.Namespace == "" {
-				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-			}
-
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
 				Discovery:        controller,
