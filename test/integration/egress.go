@@ -41,7 +41,7 @@ func (t *egress) run() error {
 		return nil
 	}
 	extServices := map[string]string{
-		"httpbin": "/headers",
+		"httpbin":         "/headers",
 		"httpsgoogle:443": "",
 	}
 
