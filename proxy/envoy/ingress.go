@@ -103,6 +103,10 @@ func generateIngress(conf *IngressConfig) *Config {
 		},
 		ClusterManager: ClusterManager{
 			Clusters: clusters,
+			CDS: &CDS{
+				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "cds", mesh.ConnectTimeout),
+				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
+			},
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds", conf.Mesh.ConnectTimeout),
 				RefreshDelayMs: (int)(convertDuration(conf.Mesh.DiscoveryRefreshDelay) / time.Millisecond),
