@@ -132,6 +132,8 @@ type FilterMixerConfig struct {
 	// are forwarded as an HTTP header to the server side proxy
 	ForwardAttributes map[string]string `json:"forward_attributes,omitempty"`
 
+	// QuotaName specifies the name of the quota bucket to withdraw tokens from;
+	// an empty name means no quota will be charged.
 	QuotaName string `json:"quota_name"`
 }
 
