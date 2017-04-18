@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_manager")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "87cdda3fc0fd65c63ef0316533be03ea4956f809",  # April 7 2017 (0.4.2)
+    commit = "78d030fc16e7c6e0a188714980db0b04086c4a5e",  # April 12 2017 (0.4.3)
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -108,12 +108,6 @@ new_go_repository(
     name = "com_github_golang_groupcache",
     commit = "02826c3e79038b59d737d3b1c0a1d937f71a4433",
     importpath = "github.com/golang/groupcache",
-)
-
-new_go_repository(
-    name = "com_github_golang_protobuf",
-    commit = "8616e8ee5e20a1704615e6c8d7afcdac06087a67",
-    importpath = "github.com/golang/protobuf",
 )
 
 new_go_repository(
