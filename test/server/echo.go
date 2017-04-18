@@ -25,11 +25,13 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	flag "github.com/spf13/pflag"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	pb "istio.io/manager/test/grpcecho"
 )
 
@@ -72,6 +74,12 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
 	body := bytes.Buffer{}
+	md, ok := metadata.FromContext(ctx)
+	if ok {
+		for key, vals := range md {
+			body.WriteString(key + "=" + strings.Join(vals, " ") + "\n")
+		}
+	}
 	body.WriteString("ServiceVersion=" + version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Echo=" + req.GetMessage())

@@ -12,81 +12,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Reachability tests
-
 package main
 
 import (
 	"fmt"
-	"regexp"
-
-	"github.com/golang/glog"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/test/util"
 )
 
-type reachability struct {
+type grpc struct {
 	*infra
 	logs *accessLogs
 }
 
-func (r *reachability) String() string {
-	return "HTTP reachability"
+func (t *grpc) String() string {
+	return "HTTP/2 reachability"
 }
 
-func (r *reachability) setup() error {
-	r.logs = makeAccessLogs()
+func (t *grpc) setup() error {
+	t.logs = makeAccessLogs()
 	return nil
 }
 
-func (r *reachability) teardown() {
+func (t *grpc) teardown() {
 }
 
-func (r *reachability) run() error {
-	if err := r.makeRequests(); err != nil {
+func (t *grpc) run() error {
+	if err := t.makeRequests(); err != nil {
 		return err
 	}
-	if err := r.logs.check(r.infra); err != nil {
+	if err := t.logs.check(t.infra); err != nil {
 		return err
 	}
 	return nil
 }
 
-// makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func (r *reachability) makeRequests() error {
+func (t *grpc) makeRequests() error {
 	testPods := []string{"a", "b"}
-	if r.Auth == proxyconfig.ProxyMeshConfig_NONE {
+	if t.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		testPods = append(testPods, "t")
 	}
 	funcs := make(map[string]func() status)
 	for _, src := range testPods {
 		for _, dst := range testPods {
-			for _, port := range []string{"", ":80", ":8080"} {
-				for _, domain := range []string{"", "." + r.Namespace} {
-					name := fmt.Sprintf("HTTP request from %s to %s%s%s", src, dst, domain, port)
+			for _, port := range []string{":70", ":7070"} {
+				for _, domain := range []string{"", "." + t.Namespace} {
+					name := fmt.Sprintf("grpc connection from %s to %s%s%s", src, dst, domain, port)
 					funcs[name] = (func(src, dst, port, domain string) func() status {
-						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+						url := fmt.Sprintf("grpc://%s%s%s", dst, domain, port)
 						return func() status {
-							request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-								r.apps[src][0], r.Namespace, url))
+							resp, err := t.clientRequest(src, url)
 							if err != nil {
-								glog.Error(err)
 								return failure
 							}
-							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-							if len(match) > 1 {
-								id := match[1]
+							if len(resp.id) > 0 {
+								id := resp.id[0]
 								if src != "t" {
-									r.logs.add(src, id, name)
+									t.logs.add(src, id, name)
 								}
 								if dst != "t" {
-									r.logs.add(dst, id, name)
+									t.logs.add(dst, id, name)
 								}
 								// mixer filter is invoked on the server side, that is when dst is not "t"
-								if r.Mixer && dst != "t" {
-									r.logs.add("mixer", id, name)
+								if t.Mixer && dst != "t" {
+									t.logs.add("mixer", id, name)
 								}
 								return success
 							}

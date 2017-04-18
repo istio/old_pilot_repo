@@ -156,6 +156,7 @@ func runTests(envs ...infra) {
 
 		tests := []test{
 			&reachability{infra: &istio},
+			&grpc{infra: &istio},
 			&tcp{infra: &istio},
 			&ingress{infra: &istio},
 			&egress{infra: &istio},

@@ -85,6 +85,7 @@ func (a *accessLogs) check(infra *infra) error {
 				}
 
 				// find all ids and counts
+				// TODO: this can be optimized for many string submatching
 				counts := make(map[string]int)
 				for _, request := range a.logs[app] {
 					counts[request.id] = counts[request.id] + 1

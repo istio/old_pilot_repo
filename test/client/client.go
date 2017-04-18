@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -45,13 +46,13 @@ var (
 
 func init() {
 	flag.IntVar(&count, "count", 1, "Number of times to make the request")
-	flag.DurationVar(&timeout, "timeout", 60*time.Second, "Request timeout")
+	flag.DurationVar(&timeout, "timeout", 15*time.Second, "Request timeout")
 	flag.StringVar(&url, "url", "", "Specify URL")
 	flag.StringVar(&headerKey, "key", "", "Header key")
 	flag.StringVar(&headerVal, "val", "", "Header value")
 }
 
-func makeHTTPRequest(client *http.Client) func(i int) func() error {
+func makeHTTPRequest(client *http.Client) func(int) func() error {
 	return func(i int) func() error {
 		return func() error {
 			req, err := http.NewRequest("GET", url, nil)
@@ -94,18 +95,22 @@ func makeHTTPRequest(client *http.Client) func(i int) func() error {
 	}
 }
 
-func makeGRPCRequest(client pb.EchoTestServiceClient) func(i int) func() error {
+func makeGRPCRequest(client pb.EchoTestServiceClient) func(int) func() error {
 	return func(i int) func() error {
 		return func() error {
-			log.Printf("[%d] grpcecho.Echo\n", i)
-			r, err := client.Echo(context.Background(),
-				&pb.EchoRequest{Message: fmt.Sprintf("request #%d", i)},
-			)
+			req := &pb.EchoRequest{Message: fmt.Sprintf("request #%d", i)}
+			log.Printf("[%d] grpcecho.Echo(%v)\n", i, req)
+			resp, err := client.Echo(context.Background(), req)
 			if err != nil {
 				log.Printf("[%d error] %v\n", i, err)
 				return err
 			}
-			for _, line := range strings.Split(string(r.GetMessage()), "\n") {
+
+			// when the underlying HTTP2 request returns status 404, GRPC
+			// request does not return an error in grpc-go.
+			// we mandate that echo response is non empty and treat an empty echo
+			// response as an error.
+			for _, line := range strings.Split(string(resp.GetMessage()), "\n") {
 				if line != "" {
 					log.Printf("[%d body] %s\n", i, line)
 				}
@@ -131,7 +136,12 @@ func main() {
 		f = makeHTTPRequest(client)
 	} else if strings.HasPrefix(url, "grpc://") {
 		address := url[len("grpc://"):]
-		conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(timeout))
+		conn, err := grpc.Dial(address,
+			grpc.WithInsecure(),
+			// grpc-go sets incorrect authority header
+			grpc.WithAuthority(address),
+			grpc.WithBlock(),
+			grpc.WithTimeout(timeout))
 		if err != nil {
 			log.Fatalf("did not connect: %v", err)
 		}
@@ -148,6 +158,7 @@ func main() {
 	}
 	if err := g.Wait(); err != nil {
 		log.Printf("Error %s\n", err)
+		os.Exit(1)
 	} else {
 		log.Println("All requests succeeded")
 	}
