@@ -18,12 +18,8 @@ package main
 
 import (
 	"fmt"
-	"regexp"
-
-	"github.com/golang/glog"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/test/util"
 )
 
 type reachability struct {
@@ -69,15 +65,9 @@ func (r *reachability) makeRequests() error {
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
-							request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-								r.apps[src][0], r.Namespace, url))
-							if err != nil {
-								glog.Error(err)
-								return failure
-							}
-							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-							if len(match) > 1 {
-								id := match[1]
+							resp := r.clientRequest(src, url)
+							if len(resp.id) > 0 {
+								id := resp.id[0]
 								if src != "t" {
 									r.logs.add(src, id, name)
 								}

@@ -62,10 +62,7 @@ func (t *grpc) makeRequests() error {
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("grpc://%s%s%s", dst, domain, port)
 						return func() status {
-							resp, err := t.clientRequest(src, url)
-							if err != nil {
-								return failure
-							}
+							resp := t.clientRequest(src, url)
 							if len(resp.id) > 0 {
 								id := resp.id[0]
 								if src != "t" {

@@ -110,7 +110,7 @@ func makeGRPCRequest(client pb.EchoTestServiceClient) func(int) func() error {
 			// request does not return an error in grpc-go.
 			// we mandate that echo response is non empty and treat an empty echo
 			// response as an error.
-			for _, line := range strings.Split(string(resp.GetMessage()), "\n") {
+			for _, line := range strings.Split(resp.GetMessage(), "\n") {
 				if line != "" {
 					log.Printf("[%d body] %s\n", i, line)
 				}
@@ -147,7 +147,11 @@ func main() {
 		}
 		client := pb.NewEchoTestServiceClient(conn)
 		f = makeGRPCRequest(client)
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				log.Println(err)
+			}
+		}()
 	} else {
 		log.Fatalf("Unrecognized protocol %q", url)
 	}

@@ -189,15 +189,16 @@ type response struct {
 	id      []string
 	version []string
 	port    []string
+	code    []string
 }
 
-func (infra *infra) clientRequest(app, url string) (response, error) {
+func (infra *infra) clientRequest(app, url string) response {
 	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
 		infra.apps[app][0], infra.Namespace, url))
 	out := response{}
 	if err != nil {
-		glog.Error(err)
-		return out, err
+		glog.Errorf("client request error %v for %s in %s", err, url, app)
+		return out
 	}
 
 	ids := regexp.MustCompile("(?i)X-Request-Id=(.*)").FindAllStringSubmatch(request, -1)
@@ -215,5 +216,10 @@ func (infra *infra) clientRequest(app, url string) (response, error) {
 		out.port = append(out.port, port[1])
 	}
 
-	return out, nil
+	codes := regexp.MustCompile("StatusCode=(.*)").FindAllStringSubmatch(request, -1)
+	for _, code := range codes {
+		out.code = append(out.code, code[1])
+	}
+
+	return out
 }
