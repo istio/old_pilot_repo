@@ -192,9 +192,9 @@ type response struct {
 	code    []string
 }
 
-func (infra *infra) clientRequest(app, url string) response {
-	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-		infra.apps[app][0], infra.Namespace, url))
+func (infra *infra) clientRequest(app, url string, count int, extra string) response {
+	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d %s",
+		infra.apps[app][0], infra.Namespace, url, count, extra))
 	out := response{}
 	if err != nil {
 		glog.Errorf("client request error %v for %s in %s", err, url, app)

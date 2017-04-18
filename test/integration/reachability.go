@@ -65,7 +65,7 @@ func (r *reachability) makeRequests() error {
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
-							resp := r.clientRequest(src, url)
+							resp := r.clientRequest(src, url, 1, "")
 							if len(resp.id) > 0 {
 								id := resp.id[0]
 								if src != "t" {
