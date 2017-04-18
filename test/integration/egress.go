@@ -55,7 +55,7 @@ func (t *egress) run() error {
 				trace := fmt.Sprint(time.Now().UnixNano())
 				return func() status {
 					resp, err := util.Shell(fmt.Sprintf(
-						"kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
+						"kubectl exec %s -n %s -c app -- client -url %s -key Trace-Id -val %q",
 						t.apps[src][0], t.Namespace, url, trace))
 					if err != nil {
 						glog.Error(err)

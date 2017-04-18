@@ -70,7 +70,7 @@ func (t *ingress) run() error {
 		funcs[name] = (func(dst string) func() status {
 			url := fmt.Sprintf("https://%s:443/%s", ingressServiceName, dst)
 			return func() status {
-				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
+				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
 					t.apps[src][0], t.Namespace, url))
 				if err != nil {
 					glog.Error(err)
