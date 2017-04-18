@@ -134,7 +134,7 @@ type FilterMixerConfig struct {
 
 	// QuotaName specifies the name of the quota bucket to withdraw tokens from;
 	// an empty name means no quota will be charged.
-	QuotaName string `json:"quota_name"`
+	QuotaName string `json:"quota_name,omitempty"`
 }
 
 // FilterFaultConfig definition
