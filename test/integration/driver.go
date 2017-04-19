@@ -263,7 +263,7 @@ func parallel(fs map[string]func() status) error {
 				case errAgain:
 					// do nothing
 				default:
-					return fmt.Errorf("Failed %s at attempt %d: %v", name, n, err)
+					return fmt.Errorf("failed %s at attempt %d: %v", name, n, err)
 				}
 				select {
 				case <-time.After(time.Second):
@@ -272,7 +272,7 @@ func parallel(fs map[string]func() status) error {
 					return nil
 				}
 			}
-			return fmt.Errorf("Failed all %d attempts for %s", budget, name)
+			return fmt.Errorf("failed all %d attempts for %s", budget, name)
 		}
 	}
 	for name, f := range fs {
