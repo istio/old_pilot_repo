@@ -58,13 +58,12 @@ func (t *egress) run() error {
 						"kubectl exec %s -n %s -c app -- client -url %s -key Trace-Id -val %q",
 						t.apps[src][0], t.Namespace, url, trace))
 					if err != nil {
-						glog.Error(err)
-						return failure
+						return err
 					}
 					if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
-						return success
+						return nil
 					}
-					return again
+					return errAgain
 				}
 			})(src, dst)
 		}

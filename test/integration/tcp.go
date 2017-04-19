@@ -44,9 +44,9 @@ func (t *tcp) run() error {
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
 							if len(resp.code) > 0 && resp.code[0] == "200" {
-								return success
+								return nil
 							}
-							return again
+							return errAgain
 						}
 					})(src, dst, port, domain)
 				}

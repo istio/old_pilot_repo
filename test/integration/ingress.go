@@ -73,17 +73,16 @@ func (t *ingress) run() error {
 				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
 					t.apps[src][0], t.Namespace, url))
 				if err != nil {
-					glog.Error(err)
-					return failure
+					return err
 				}
 				match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
 				if len(match) > 1 {
 					id := match[1]
 					t.logs.add(dst, id, name)
 					t.logs.add("ingress", id, name)
-					return success
+					return nil
 				}
-				return again
+				return errAgain
 			}
 		})(dst)
 	}

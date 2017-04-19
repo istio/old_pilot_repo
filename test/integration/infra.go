@@ -33,6 +33,8 @@ import (
 )
 
 type infra struct {
+	Name string
+
 	// docker tags
 	Hub, Tag   string
 	MixerImage string
@@ -192,6 +194,13 @@ type response struct {
 	code    []string
 }
 
+var (
+	idRex      = regexp.MustCompile("(?i)X-Request-Id=(.*)")
+	versionRex = regexp.MustCompile("ServiceVersion=(.*)")
+	portRex    = regexp.MustCompile("ServicePort=(.*)")
+	codeRex    = regexp.MustCompile("StatusCode=(.*)")
+)
+
 func (infra *infra) clientRequest(app, url string, count int, extra string) response {
 	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d %s",
 		infra.apps[app][0], infra.Namespace, url, count, extra))
@@ -201,22 +210,22 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 		return out
 	}
 
-	ids := regexp.MustCompile("(?i)X-Request-Id=(.*)").FindAllStringSubmatch(request, -1)
+	ids := idRex.FindAllStringSubmatch(request, -1)
 	for _, id := range ids {
 		out.id = append(out.id, id[1])
 	}
 
-	versions := regexp.MustCompile("ServiceVersion=(.*)").FindAllStringSubmatch(request, -1)
+	versions := versionRex.FindAllStringSubmatch(request, -1)
 	for _, version := range versions {
 		out.version = append(out.version, version[1])
 	}
 
-	ports := regexp.MustCompile("ServicePort=(.*)").FindAllStringSubmatch(request, -1)
+	ports := portRex.FindAllStringSubmatch(request, -1)
 	for _, port := range ports {
 		out.port = append(out.port, port[1])
 	}
 
-	codes := regexp.MustCompile("StatusCode=(.*)").FindAllStringSubmatch(request, -1)
+	codes := codeRex.FindAllStringSubmatch(request, -1)
 	for _, code := range codes {
 		out.code = append(out.code, code[1])
 	}

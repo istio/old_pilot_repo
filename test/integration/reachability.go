@@ -78,13 +78,13 @@ func (r *reachability) makeRequests() error {
 								if r.Mixer && dst != "t" {
 									r.logs.add("mixer", id, name)
 								}
-								return success
+								return nil
 							}
 							if src == "t" && dst == "t" {
 								// Expected no match for t->t
-								return success
+								return nil
 							}
-							return again
+							return errAgain
 						}
 					})(src, dst, port, domain)
 				}

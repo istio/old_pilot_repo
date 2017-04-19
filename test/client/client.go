@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -27,11 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/grpc"
-
-	"crypto/tls"
-
 	"github.com/golang/sync/errgroup"
+	"google.golang.org/grpc"
 	pb "istio.io/manager/test/grpcecho"
 )
 
@@ -102,14 +100,12 @@ func makeGRPCRequest(client pb.EchoTestServiceClient) func(int) func() error {
 			log.Printf("[%d] grpcecho.Echo(%v)\n", i, req)
 			resp, err := client.Echo(context.Background(), req)
 			if err != nil {
-				log.Printf("[%d error] %v\n", i, err)
 				return err
 			}
 
 			// when the underlying HTTP2 request returns status 404, GRPC
 			// request does not return an error in grpc-go.
-			// we mandate that echo response is non empty and treat an empty echo
-			// response as an error.
+			// instead it just returns an empty response
 			for _, line := range strings.Split(resp.GetMessage(), "\n") {
 				if line != "" {
 					log.Printf("[%d body] %s\n", i, line)
@@ -145,13 +141,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("did not connect: %v", err)
 		}
-		client := pb.NewEchoTestServiceClient(conn)
-		f = makeGRPCRequest(client)
 		defer func() {
 			if err := conn.Close(); err != nil {
 				log.Println(err)
 			}
 		}()
+		client := pb.NewEchoTestServiceClient(conn)
+		f = makeGRPCRequest(client)
 	} else {
 		log.Fatalf("Unrecognized protocol %q", url)
 	}
@@ -163,7 +159,7 @@ func main() {
 	if err := g.Wait(); err != nil {
 		log.Printf("Error %s\n", err)
 		os.Exit(1)
-	} else {
-		log.Println("All requests succeeded")
 	}
+
+	log.Println("All requests succeeded")
 }

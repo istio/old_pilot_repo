@@ -58,7 +58,7 @@ func (t *grpc) makeRequests() error {
 		for _, dst := range testPods {
 			for _, port := range []string{":70", ":7070"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
-					name := fmt.Sprintf("grpc connection from %s to %s%s%s", src, dst, domain, port)
+					name := fmt.Sprintf("GRPC request from %s to %s%s%s", src, dst, domain, port)
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("grpc://%s%s%s", dst, domain, port)
 						return func() status {
@@ -75,13 +75,13 @@ func (t *grpc) makeRequests() error {
 								if t.Mixer && dst != "t" {
 									t.logs.add("mixer", id, name)
 								}
-								return success
+								return nil
 							}
 							if src == "t" && dst == "t" {
 								// Expected no match for t->t
-								return success
+								return nil
 							}
-							return again
+							return errAgain
 						}
 					})(src, dst, port, domain)
 				}
