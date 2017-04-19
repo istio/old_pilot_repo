@@ -53,6 +53,18 @@ const (
 
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
+
+	// IngressTraceOperation denotes the name of trace operation for Envoy
+	IngressTraceOperation = "ingress"
+
+	// ZipkinTraceDriverType denotes the Zipkin HTTP trace driver
+	ZipkinTraceDriverType = "zipkin"
+
+	// ZipkinCollectorCluster denotes the cluster where zipkin server is running
+	ZipkinCollectorCluster = "out.zipkin"
+
+	// ZipkinCollectorEndpoint denotes the REST endpoint where Envoy posts Zipkin spans
+	ZipkinCollectorEndpoint = "/api/v1/spans"
 )
 
 var (
@@ -89,6 +101,29 @@ type Config struct {
 	Listeners      Listeners      `json:"listeners"`
 	Admin          Admin          `json:"admin"`
 	ClusterManager ClusterManager `json:"cluster_manager"`
+	Tracing        *Tracing       `json:"tracing,omitempty"`
+}
+
+// Tracing definition
+type Tracing struct {
+	HTTPTracer HTTPTracer `json:"http"`
+}
+
+// HTTPTracer definition
+type HTTPTracer struct {
+	HTTPTraceDriver HTTPTraceDriver `json:"driver"`
+}
+
+// HTTPTraceDriver definition
+type HTTPTraceDriver struct {
+	HTTPTraceDriverType   string                `json:"type"`
+	HTTPTraceDriverConfig HTTPTraceDriverConfig `json:"config"`
+}
+
+// HTTPTraceDriverConfig definition
+type HTTPTraceDriverConfig struct {
+	CollectorCluster  string `json:"collector_cluster"`
+	CollectorEndpoint string `json:"collector_endpoint"`
 }
 
 // RootRuntime definition.
@@ -287,13 +322,19 @@ type AccessLog struct {
 
 // HTTPFilterConfig definition
 type HTTPFilterConfig struct {
-	CodecType         string           `json:"codec_type"`
-	StatPrefix        string           `json:"stat_prefix"`
-	GenerateRequestID bool             `json:"generate_request_id,omitempty"`
-	RouteConfig       *HTTPRouteConfig `json:"route_config,omitempty"`
-	RDS               *RDS             `json:"rds,omitempty"`
-	Filters           []HTTPFilter     `json:"filters"`
-	AccessLog         []AccessLog      `json:"access_log"`
+	CodecType         string                 `json:"codec_type"`
+	StatPrefix        string                 `json:"stat_prefix"`
+	GenerateRequestID bool                   `json:"generate_request_id,omitempty"`
+	Tracing           *HTTPFilterTraceConfig `json:"tracing,omitempty"`
+	RouteConfig       *HTTPRouteConfig       `json:"route_config,omitempty"`
+	RDS               *RDS                   `json:"rds,omitempty"`
+	Filters           []HTTPFilter           `json:"filters"`
+	AccessLog         []AccessLog            `json:"access_log"`
+}
+
+// HTTPFilterTraceConfig definition
+type HTTPFilterTraceConfig struct {
+	OperationName string `json:"operation_name"`
 }
 
 // TCPRoute definition

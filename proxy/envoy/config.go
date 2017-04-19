@@ -105,6 +105,17 @@ func Generate(context *proxy.Context) *Config {
 				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
 			},
 		},
+		Tracing: &Tracing{
+			HTTPTracer: HTTPTracer{
+				HTTPTraceDriver: HTTPTraceDriver{
+					HTTPTraceDriverType: ZipkinTraceDriverType,
+					HTTPTraceDriverConfig: HTTPTraceDriverConfig{
+						CollectorCluster:  ZipkinCollectorCluster,
+						CollectorEndpoint: ZipkinCollectorEndpoint,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -162,6 +173,10 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
 		}},
+		GenerateRequestID: true,
+		Tracing: &HTTPFilterTraceConfig{
+			OperationName: IngressTraceOperation,
+		},
 		Filters: filters,
 	}
 
