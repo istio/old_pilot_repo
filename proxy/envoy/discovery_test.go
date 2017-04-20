@@ -175,6 +175,15 @@ func TestClusterDiscoveryWithSSLContext(t *testing.T) {
 	compareResponse(response, "testdata/cds-ssl-context.json", t)
 }
 
+func TestClusterDiscoveryIngress(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addIngressRoutes(registry, t)
+	ds := makeDiscoveryService(t, registry)
+	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.MeshConfig.IstioServiceCluster, ingressNode)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/cds-ingress.json", t)
+}
+
 // Test listing all routes
 func TestRouteDiscoveryAllRoutes(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())

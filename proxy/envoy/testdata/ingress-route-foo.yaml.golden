@@ -5,7 +5,7 @@ match:
       prefix: "/bar"
 route:
   - tags:
-       servicePort.name: http
+       servicePort.name: http-status
        servicePort.protocol: http
        servicePort.port: "80"
        tlsSecret: my-secret.default

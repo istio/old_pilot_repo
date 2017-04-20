@@ -4,7 +4,7 @@ match:
     authority:
       exact: world.com
     uri:
-      prefix: "/hello"
+      exact: "/hello"
 route:
   - tags:
        servicePort.name: http
