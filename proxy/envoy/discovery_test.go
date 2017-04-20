@@ -226,6 +226,20 @@ func TestRouteDiscoveryFault(t *testing.T) {
 	compareResponse(response, "testdata/rds-v1.json", t)
 }
 
+func TestRouteDiscoveryIngress(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addIngressRoutes(registry, t)
+	ds := makeDiscoveryService(t, registry)
+
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.MeshConfig.IstioServiceCluster, ingressNode)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-ingress.json", t)
+
+	url = fmt.Sprintf("/v1/routes/443/%s/%s", ds.MeshConfig.IstioServiceCluster, ingressNode)
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-ingress-ssl.json", t)
+}
+
 func TestDiscoveryCache(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 

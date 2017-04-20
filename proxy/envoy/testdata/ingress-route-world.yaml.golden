@@ -2,7 +2,7 @@ destination: world.default.svc.cluster.local
 match:
   http_headers:
     authority:
-      exact: "world.default.svc.cluster.local"
+      exact: world.com
     uri:
       prefix: "/hello"
 route:

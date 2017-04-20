@@ -1,43 +1,49 @@
 {
   "listeners": [
     {
-      "address": "tcp://0.0.0.0:8443",
+      "address": "tcp://0.0.0.0:80",
       "filters": [
         {
           "type": "read",
           "name": "http_connection_manager",
           "config": {
             "codec_type": "auto",
-            "stat_prefix": "https",
-            "route_config": {
-              "virtual_hosts": [
-                {
-                  "name": "foo.default.svc.cluster.local",
-                  "domains": [
-                    "foo.default.svc.cluster.local"
-                  ],
-                  "routes": [
-                    {
-                      "prefix": "/bar",
-                      "host_rewrite": "foo.default.svc.cluster.local:80",
-                      "cluster": "out.foo.default.svc.cluster.local|http"
-                    }
-                  ]
-                },
-                {
-                  "name": "world.default.svc.cluster.local",
-                  "domains": [
-                    "world.default.svc.cluster.local"
-                  ],
-                  "routes": [
-                    {
-                      "prefix": "/hello",
-                      "host_rewrite": "world.default.svc.cluster.local:80",
-                      "cluster": "out.world.default.svc.cluster.local|http"
-                    }
-                  ]
-                }
-              ]
+            "stat_prefix": "http",
+            "rds": {
+              "cluster": "rds",
+              "route_config_name": "80",
+              "refresh_delay_ms": 10
+            },
+            "filters": [
+              {
+                "type": "decoder",
+                "name": "router",
+                "config": {}
+              }
+            ],
+            "access_log": [
+              {
+                "path": "/dev/stdout"
+              }
+            ]
+          }
+        }
+      ],
+      "bind_to_port": true
+    },
+    {
+      "address": "tcp://0.0.0.0:443",
+      "filters": [
+        {
+          "type": "read",
+          "name": "http_connection_manager",
+          "config": {
+            "codec_type": "auto",
+            "stat_prefix": "http",
+            "rds": {
+              "cluster": "rds",
+              "route_config_name": "443",
+              "refresh_delay_ms": 10
             },
             "filters": [
               {
@@ -67,20 +73,6 @@
   },
   "cluster_manager": {
     "clusters": [
-      {
-        "name": "out.foo.default.svc.cluster.local|http",
-        "service_name": "foo.default.svc.cluster.local|http",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
-      },
-      {
-        "name": "out.world.default.svc.cluster.local|http",
-        "service_name": "world.default.svc.cluster.local|http",
-        "connect_timeout_ms": 1000,
-        "type": "sds",
-        "lb_type": "round_robin"
-      },
       {
         "name": "rds",
         "connect_timeout_ms": 1000,

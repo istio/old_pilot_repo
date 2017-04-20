@@ -216,6 +216,7 @@ func createIngressRule(host string, path string, namespace string,
 				// to the proxy configuration generator. This can be improved by using
 				// a dedicated model object for IngressRule (instead of reusing RouteRule),
 				// which exposes the necessary target port field within the "Route" field.
+				// This also carries TLS secret name.
 				Tags: map[string]string{
 					"servicePort.port":     strconv.Itoa(port.Port),
 					"servicePort.name":     port.Name,

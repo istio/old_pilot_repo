@@ -55,7 +55,7 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	//w.agent.ScheduleConfigUpdate(generateIngress(w.context))
 }
 
-func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret) *Config {
+func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
 	listeners := []*Listener{
 		buildHTTPListener(mesh, nil, WildcardAddress, 80, true),
 	}
@@ -64,12 +64,11 @@ func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret) *C
 		if err := writeTLS(certFile, keyFile, tls); err != nil {
 			glog.Warning("Failed to write cert/key")
 		} else {
-			ssl := &SSLContext{
+			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true)
+			listener.SSLContext = &SSLContext{
 				CertChainFile:  certFile,
 				PrivateKeyFile: keyFile,
 			}
-			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true)
-			listener.SSLContext = ssl
 			listeners = append(listeners, listener)
 		}
 	}
@@ -129,7 +128,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 	}
 
 	// normalize config
-	rc := &HTTPRouteConfig{}
+	rc := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHosts, 0)}
 	for host, routes := range vhosts {
 		sort.Sort(RoutesByPath(routes))
 		rc.VirtualHosts = append(rc.VirtualHosts, &VirtualHost{
@@ -139,7 +138,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 		})
 	}
 
-	rcTLS := &HTTPRouteConfig{}
+	rcTLS := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHosts, 0)}
 	for host, routes := range vhostsTLS {
 		sort.Sort(RoutesByPath(routes))
 		rcTLS.VirtualHosts = append(rcTLS.VirtualHosts, &VirtualHost{
@@ -253,9 +252,6 @@ func extractPortAndTags(dst *proxyconfig.DestinationWeight) (*model.Port, model.
 		return nil, nil, "", fmt.Errorf("no protocol specified for service port %d", portNum)
 	}
 	tls, ok := dst.Tags["tlsSecret"]
-	if !ok {
-		return nil, nil, "", fmt.Errorf("missing TLS secret %d", portNum)
-	}
 
 	port := &model.Port{
 		Port:     portNum,
