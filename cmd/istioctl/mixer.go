@@ -62,7 +62,7 @@ var (
 
 	mixerRuleCreateCmd = &cobra.Command{
 		Use:   "create <scope> <subject>",
-		Short: "Create an Istio Mixer rule",
+		Short: "Create Istio Mixer rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 || mixerFile == "" {
 				return errors.New(c.UsageString())
@@ -76,7 +76,7 @@ var (
 	}
 	mixerRuleGetCmd = &cobra.Command{
 		Use:   "get <scope> <subject>",
-		Short: "Get an Istio Mixer rule",
+		Short: "Get Istio Mixer rules",
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return errors.New(c.UsageString())
@@ -99,8 +99,7 @@ func mixerRulePath(host, scope, subject string) string {
 }
 
 func mixerRuleCreate(host, scope, subject string, rule []byte) error {
-	fmt.Println(mixerRulePath(host, scope, subject))
-	request, err := http.NewRequest("PUT", mixerRulePath(host, scope, subject), bytes.NewReader(rule))
+	request, err := http.NewRequest(http.MethodPut, mixerRulePath(host, scope, subject), bytes.NewReader(rule))
 	if err != nil {
 		return fmt.Errorf("failed creating request: %v", err)
 	}
