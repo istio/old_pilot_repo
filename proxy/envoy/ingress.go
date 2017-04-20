@@ -15,8 +15,11 @@
 package envoy
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"sort"
 	"strconv"
 	"time"
@@ -36,8 +39,9 @@ const (
 )
 
 type ingressWatcher struct {
-	agent proxy.Agent
-	mesh  *proxyconfig.ProxyMeshConfig
+	agent   proxy.Agent
+	secrets model.SecretRegistry
+	mesh    *proxyconfig.ProxyMeshConfig
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
@@ -50,9 +54,62 @@ func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig) (Watcher, error) {
 	return out, nil
 }
 
+func fetchSecret(ctx context.Context, client *http.Client, uri string) (string, error) {
+	req, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if err = resp.Body.Close(); err != nil {
+		glog.Warning(err)
+	}
+	return string(data), nil
+}
+
 func (w *ingressWatcher) Run(stop <-chan struct{}) {
+	ctx, cancel := context.WithCancel(context.Background())
 	go w.agent.Run(stop)
-	//w.agent.ScheduleConfigUpdate(generateIngress(w.context))
+	go func() {
+		<-stop
+		glog.V(2).Info("Ingress watcher terminating...")
+		cancel()
+	}()
+
+	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
+	uri := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
+		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, ingressNode)
+
+	config := generateIngress(w.mesh, nil, certFile, keyFile)
+	w.agent.ScheduleConfigUpdate(config)
+
+	for {
+		secret, err := fetchSecret(ctx, client, uri)
+		if err != nil {
+			glog.Warningf("error fetching secret %v", err)
+		} else {
+			tls, err := w.secrets.GetTLSSecret(secret)
+			if err != nil {
+				glog.Warningf("error reading secret %v", err)
+			} else {
+				config = generateIngress(w.mesh, tls, certFile, keyFile)
+				w.agent.ScheduleConfigUpdate(config)
+			}
+		}
+
+		select {
+		case <-time.After(convertDuration(w.mesh.DiscoveryRefreshDelay)):
+			// try again
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
@@ -73,7 +130,14 @@ func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, ce
 		}
 	}
 
-	return buildConfig(listeners, nil, mesh)
+	config := buildConfig(listeners, nil, mesh)
+	if tls != nil {
+		h := sha256.New()
+		h.Write(tls.Certificate)
+		h.Write(tls.PrivateKey)
+		config.Hash = h.Sum(nil)
+	}
+	return config
 }
 
 func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
@@ -128,7 +192,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 	}
 
 	// normalize config
-	rc := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHosts, 0)}
+	rc := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHost, 0)}
 	for host, routes := range vhosts {
 		sort.Sort(RoutesByPath(routes))
 		rc.VirtualHosts = append(rc.VirtualHosts, &VirtualHost{
@@ -138,7 +202,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 		})
 	}
 
-	rcTLS := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHosts, 0)}
+	rcTLS := &HTTPRouteConfig{VirtualHosts: make([]*VirtualHost, 0)}
 	for host, routes := range vhostsTLS {
 		sort.Sort(RoutesByPath(routes))
 		rcTLS.VirtualHosts = append(rcTLS.VirtualHosts, &VirtualHost{

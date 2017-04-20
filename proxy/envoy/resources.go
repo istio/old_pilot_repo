@@ -69,6 +69,8 @@ type Config struct {
 	Listeners      Listeners      `json:"listeners"`
 	Admin          Admin          `json:"admin"`
 	ClusterManager ClusterManager `json:"cluster_manager"`
+	// Special value used to hash all referenced values (e.g. TLS secrets)
+	Hash []byte `json:"-"`
 }
 
 // RootRuntime definition.

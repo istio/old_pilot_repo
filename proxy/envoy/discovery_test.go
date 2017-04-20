@@ -240,6 +240,18 @@ func TestRouteDiscoveryIngress(t *testing.T) {
 	compareResponse(response, "testdata/rds-ingress-ssl.json", t)
 }
 
+func TestSecretDiscovery(t *testing.T) {
+	registry := mock.MakeRegistry()
+	addIngressRoutes(registry, t)
+	ds := makeDiscoveryService(t, registry)
+	url := fmt.Sprintf("/v1alpha/secret/%s/%s", ds.MeshConfig.IstioServiceCluster, ingressNode)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	secret := "my-secret.default"
+	if string(response) != secret {
+		t.Errorf("ListSecret() => Got %q, expected %q", response, secret)
+	}
+}
+
 func TestDiscoveryCache(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 

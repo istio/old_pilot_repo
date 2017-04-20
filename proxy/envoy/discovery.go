@@ -179,7 +179,6 @@ const (
 	ServiceCluster  = "service-cluster"
 	ServiceNode     = "service-node"
 	RouteConfigName = "route-config-name"
-	ListenerKey     = "listener-key"
 )
 
 // DiscoveryServiceOptions contains options for create a new discovery
@@ -285,10 +284,9 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/v1alpha/secret/{%s}/{%s}/{%s}", ListenerKey, ServiceCluster, ServiceNode)).
+		GET(fmt.Sprintf("/v1alpha/secret/{%s}/{%s}", ServiceCluster, ServiceNode)).
 		To(ds.ListSecret).
 		Doc("List TLS secret URI for a listener").
-		Param(ws.PathParameter(ListenerKey, "listener key").DataType("string")).
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
 
