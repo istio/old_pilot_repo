@@ -467,6 +467,9 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 		// de-duplicate and canonicalize clusters
 		clusters := httpRouteConfigs.clusters().normalize()
 
+		// set connect timeout
+		clusters.setTimeout(ds.MeshConfig.ConnectTimeout)
+
 		// apply custom policies for HTTP clusters
 		for _, cluster := range clusters {
 			insertDestinationPolicy(ds.Config, cluster)
@@ -568,26 +571,21 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 
 // ListSecret responds to TLS secret registration
 func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restful.Response) {
-	key := request.Request.URL.String()
-	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
-	if !cached {
-		if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
-			return
-		}
-
-		if sc := request.PathParameter(ServiceNode); sc != ingressNode {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
-			return
-		}
-
-		_, secret := buildIngressRoutes(ds.Config.IngressRules(""))
-		out = []byte(secret)
-		ds.cdsCache.updateCachedDiscoveryResponse(key, out)
+	// caching is disabled due to lack of secret watch notifications
+	if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
+		errorResponse(response, http.StatusNotFound,
+			fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
+		return
 	}
-	writeResponse(response, out)
+
+	if sc := request.PathParameter(ServiceNode); sc != ingressNode {
+		errorResponse(response, http.StatusNotFound,
+			fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
+		return
+	}
+
+	_, secret := buildIngressRoutes(ds.Config.IngressRules(""))
+	writeResponse(response, []byte(secret))
 }
 
 func errorResponse(r *restful.Response, status int, msg string) {

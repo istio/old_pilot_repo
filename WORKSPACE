@@ -341,7 +341,7 @@ http_archive(
 
 new_go_repository(
     name = "org_golang_google_grpc",
-    commit = "8050b9cbc271307e5a716a9d782803d09b0d6f2d", # v1.2.1
+    commit = "8050b9cbc271307e5a716a9d782803d09b0d6f2d",  # v1.2.1
     importpath = "google.golang.org/grpc",
 )
 

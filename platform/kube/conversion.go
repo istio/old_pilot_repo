@@ -181,7 +181,7 @@ func convertIngress(ingress v1beta1.Ingress, getService serviceGetter) map[model
 	if len(ingress.Spec.TLS) > 0 {
 		// due to lack of listener SNI in the proxy, we only support a single secret and ignore secret hosts
 		secret := ingress.Spec.TLS[0]
-		tls = fmt.Sprintf("%s.%s", secret, ingress.Namespace)
+		tls = fmt.Sprintf("%s.%s", secret.SecretName, ingress.Namespace)
 	}
 
 	if ingress.Spec.Backend != nil {

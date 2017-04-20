@@ -45,32 +45,14 @@ type ingressWatcher struct {
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
-func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig) (Watcher, error) {
+func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig, secrets model.SecretRegistry) (Watcher, error) {
 	agent := proxy.NewAgent(runEnvoy(mesh, ingressNode), cleanupEnvoy(mesh), 10, 100*time.Millisecond)
 	out := &ingressWatcher{
-		agent: agent,
-		mesh:  mesh,
+		agent:   agent,
+		secrets: secrets,
+		mesh:    mesh,
 	}
 	return out, nil
-}
-
-func fetchSecret(ctx context.Context, client *http.Client, uri string) (string, error) {
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := client.Do(req.WithContext(ctx))
-	if err != nil {
-		return "", err
-	}
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	if err = resp.Body.Close(); err != nil {
-		glog.Warning(err)
-	}
-	return string(data), nil
 }
 
 func (w *ingressWatcher) Run(stop <-chan struct{}) {
@@ -83,25 +65,18 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	}()
 
 	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
-	uri := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
+	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
 		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, ingressNode)
-
-	config := generateIngress(w.mesh, nil, certFile, keyFile)
-	w.agent.ScheduleConfigUpdate(config)
-
+	initial := true
 	for {
-		secret, err := fetchSecret(ctx, client, uri)
-		if err != nil {
-			glog.Warningf("error fetching secret %v", err)
+		tls, err := fetchSecret(ctx, client, url, w.secrets)
+		if err != nil && !initial {
+			glog.Warning(err)
 		} else {
-			tls, err := w.secrets.GetTLSSecret(secret)
-			if err != nil {
-				glog.Warningf("error reading secret %v", err)
-			} else {
-				config = generateIngress(w.mesh, tls, certFile, keyFile)
-				w.agent.ScheduleConfigUpdate(config)
-			}
+			config := generateIngress(w.mesh, tls, certFile, keyFile)
+			w.agent.ScheduleConfigUpdate(config)
 		}
+		initial = false
 
 		select {
 		case <-time.After(convertDuration(w.mesh.DiscoveryRefreshDelay)):
@@ -112,6 +87,38 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	}
 }
 
+// fetchSecret fetches a TLS secret from discovery and secret storage
+func fetchSecret(ctx context.Context, client *http.Client, url string,
+	secrets model.SecretRegistry) (*model.TLSSecret, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, multierror.Prefix(err, "failed to create a request to "+url)
+	}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, multierror.Prefix(err, "failed to fetch "+url)
+	}
+	uri, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, multierror.Prefix(err, "failed to read request body")
+	}
+	if err = resp.Body.Close(); err != nil {
+		glog.Warning(err)
+	}
+	secret := string(uri)
+	if secret == "" {
+		glog.Info("no secret needed")
+		return nil, nil
+	}
+	out, err := secrets.GetTLSSecret(secret)
+	if err != nil {
+		return nil, multierror.Prefix(err, "failed to read secret from storage")
+	}
+	glog.Info("secret successfully fetched")
+	return out, nil
+}
+
+// generateIngress generates ingress proxy configuration
 func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
 	listeners := []*Listener{
 		buildHTTPListener(mesh, nil, WildcardAddress, 80, true),
@@ -133,10 +140,15 @@ func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, ce
 	config := buildConfig(listeners, nil, mesh)
 	if tls != nil {
 		h := sha256.New()
-		h.Write(tls.Certificate)
-		h.Write(tls.PrivateKey)
+		if _, err := h.Write(tls.Certificate); err != nil {
+			glog.Warning(err)
+		}
+		if _, err := h.Write(tls.PrivateKey); err != nil {
+			glog.Warning(err)
+		}
 		config.Hash = h.Sum(nil)
 	}
+
 	return config
 }
 
@@ -315,7 +327,7 @@ func extractPortAndTags(dst *proxyconfig.DestinationWeight) (*model.Port, model.
 	if !ok {
 		return nil, nil, "", fmt.Errorf("no protocol specified for service port %d", portNum)
 	}
-	tls, ok := dst.Tags["tlsSecret"]
+	tls := dst.Tags["tlsSecret"]
 
 	port := &model.Port{
 		Port:     portNum,

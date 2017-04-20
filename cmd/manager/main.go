@@ -46,8 +46,6 @@ type args struct {
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
-
-	defaultIngressController bool
 }
 
 var (
@@ -164,7 +162,7 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			w, err := envoy.NewIngressWatcher(mesh)
+			w, err := envoy.NewIngressWatcher(mesh, client)
 			if err != nil {
 				return err
 			}
