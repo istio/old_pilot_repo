@@ -53,9 +53,6 @@ type Controller struct {
 	queue  Queue
 	mesh   *proxyconfig.ProxyMeshConfig
 
-	// should go away to minimize dependence on the namespace
-	namespace string
-
 	kinds     map[string]cacheHandler
 	services  cacheHandler
 	endpoints cacheHandler
@@ -73,11 +70,10 @@ type cacheHandler struct {
 func NewController(client *Client, mesh *proxyconfig.ProxyMeshConfig, options ControllerOptions) *Controller {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
-		client:    client,
-		mesh:      mesh,
-		namespace: options.Namespace,
-		queue:     NewQueue(1 * time.Second),
-		kinds:     make(map[string]cacheHandler),
+		client: client,
+		mesh:   mesh,
+		queue:  NewQueue(1 * time.Second),
+		kinds:  make(map[string]cacheHandler),
 	}
 
 	out.services = out.createInformer(&v1.Service{}, options.ResyncPeriod,
