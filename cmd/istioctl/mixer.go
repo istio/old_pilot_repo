@@ -109,7 +109,7 @@ func mixerRuleCreate(host, scope, subject string, rule []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed sending request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
@@ -131,7 +131,7 @@ func mixerRuleGet(host, scope, subject string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed sending request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New(http.StatusText(resp.StatusCode))
@@ -141,7 +141,7 @@ func mixerRuleGet(host, scope, subject string) (string, error) {
 		return "", fmt.Errorf("failed processing response: %v", err)
 	}
 	var response mixerAPIResponse
-	if err := json.Unmarshal(body, &response); err != nil {
+	if err = json.Unmarshal(body, &response); err != nil {
 		return "", fmt.Errorf("failed processing response: %v", err)
 	}
 	data, err := yaml.Marshal(response.Data)

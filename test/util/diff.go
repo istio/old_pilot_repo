@@ -31,6 +31,8 @@ func Refresh() bool {
 	return exists && v == "true"
 }
 
+// Compare compares two byte slices. It returns an error with a
+// contextual diff if they are not equal.
 func Compare(content, golden []byte) error {
 	data := strings.TrimSpace(string(content))
 	expected := strings.TrimSpace(string(golden))
