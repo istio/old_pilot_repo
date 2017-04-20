@@ -88,7 +88,7 @@ func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	return nil
 }
 
-func buildIngressRoutes(ingressRules []*proxyconfig.RouteRule) (HTTPRouteConfigs, string) {
+func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTPRouteConfigs, string) {
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
 	vhostsTLS := make(map[string][]*HTTPRoute)

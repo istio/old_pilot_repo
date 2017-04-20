@@ -60,7 +60,7 @@ type discoveryCacheStats struct {
 type discoveryCacheEntry struct {
 	data []byte
 	hit  uint64 // atomic
-	miss uint64 // atmoic
+	miss uint64 // atomic
 }
 
 type discoveryCache struct {
@@ -179,6 +179,7 @@ const (
 	ServiceCluster  = "service-cluster"
 	ServiceNode     = "service-node"
 	RouteConfigName = "route-config-name"
+	ListenerKey     = "listener-key"
 )
 
 // DiscoveryServiceOptions contains options for create a new discovery
@@ -280,6 +281,14 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		To(ds.ListRoutes).
 		Doc("RDS registration").
 		Param(ws.PathParameter(RouteConfigName, "route configuration name").DataType("string")).
+		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
+		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
+
+	ws.Route(ws.
+		GET(fmt.Sprintf("/v1alpha/secret/{%s}/{%s}/{%s}", ListenerKey, ServiceCluster, ServiceNode)).
+		To(ds.ListSecret).
+		Doc("List TLS secret URI for a listener").
+		Param(ws.PathParameter(ListenerKey, "listener key").DataType("string")).
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
 
@@ -442,14 +451,20 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 		}
 
 		// service-node holds the IP address
-		ip := request.PathParameter(ServiceNode)
+		node := request.PathParameter(ServiceNode)
+
 		// CDS computes clusters that are referenced by RDS routes for a particular proxy node
 		// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 		// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 		// skip computing the actual HTTP routes
-		instances := ds.Discovery.HostInstances(map[string]bool{ip: true})
-		services := ds.Discovery.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+		var httpRouteConfigs HTTPRouteConfigs
+		if node == ingressNode {
+			httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""))
+		} else {
+			instances := ds.Discovery.HostInstances(map[string]bool{node: true})
+			services := ds.Discovery.Services()
+			httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+		}
 
 		// de-duplicate and canonicalize clusters
 		clusters := httpRouteConfigs.clusters().normalize()
@@ -529,25 +544,50 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
+		var httpRouteConfigs HTTPRouteConfigs
 		if node == ingressNode {
-			// TODO:
+			httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""))
 		} else {
 			instances := ds.Discovery.HostInstances(map[string]bool{node: true})
 			services := ds.Discovery.Services()
-			httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+			httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+		}
 
-			routeConfig, ok := httpRouteConfigs[port]
-			if !ok {
-				errorResponse(response, http.StatusNotFound,
-					fmt.Sprintf("Missing route config for port %d", port))
-				return
-			}
-			if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
-				errorResponse(response, http.StatusInternalServerError, err.Error())
-				return
-			}
+		routeConfig, ok := httpRouteConfigs[port]
+		if !ok {
+			errorResponse(response, http.StatusNotFound,
+				fmt.Sprintf("Missing route config for port %d", port))
+			return
+		}
+		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
+			errorResponse(response, http.StatusInternalServerError, err.Error())
+			return
 		}
 		ds.rdsCache.updateCachedDiscoveryResponse(key, out)
+	}
+	writeResponse(response, out)
+}
+
+// ListSecret responds to TLS secret registration
+func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restful.Response) {
+	key := request.Request.URL.String()
+	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
+	if !cached {
+		if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
+			errorResponse(response, http.StatusNotFound,
+				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
+			return
+		}
+
+		if sc := request.PathParameter(ServiceNode); sc != ingressNode {
+			errorResponse(response, http.StatusNotFound,
+				fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
+			return
+		}
+
+		_, secret := buildIngressRoutes(ds.Config.IngressRules(""))
+		out = []byte(secret)
+		ds.cdsCache.updateCachedDiscoveryResponse(key, out)
 	}
 	writeResponse(response, out)
 }

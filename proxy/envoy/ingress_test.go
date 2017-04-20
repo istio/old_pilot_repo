@@ -1,6 +1,16 @@
 package envoy
 
-import "istio.io/manager/model"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/model"
+	"istio.io/manager/test/mock"
+	"istio.io/manager/test/util"
+)
 
 const (
 	ingressEnvoyConfig           = "testdata/ingress-envoy.json"
@@ -19,11 +29,8 @@ var (
 	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
 )
 
-/*
-func testIngressOptions(c *IngressOptions, envoyConfig string, t *testing.T) {
-	c.Port = 8080
-	c.SSLPort = 8443
-	config := generateIngress(c)
+func testIngressOptions(mesh *proxyconfig.ProxyMeshConfig, secret *model.TLSSecret, envoyConfig string, t *testing.T) {
+	config := generateIngress(mesh, secret)
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}
@@ -108,4 +115,3 @@ func TestIngressRoutesPartialSSL(t *testing.T) {
 	compareFile(ingressCertFile, ingressCert, t)
 	compareFile(ingressKeyFile, ingressKey, t)
 }
-*/
