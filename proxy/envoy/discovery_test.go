@@ -47,13 +47,14 @@ func (mockController) AppendInstanceHandler(_ func(*model.ServiceInstance, model
 func (mockController) Run(_ <-chan struct{}) {}
 
 func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryService {
+	mesh := proxy.DefaultMeshConfig()
 	out, err := NewDiscoveryService(
 		&mockController{},
 		&proxy.Context{
 			Discovery:  mock.Discovery,
 			Accounts:   mock.Discovery,
 			Config:     r,
-			MeshConfig: &DefaultMeshConfig,
+			MeshConfig: &mesh,
 		},
 		DiscoveryServiceOptions{
 			EnableCaching:   true,
@@ -66,7 +67,7 @@ func makeDiscoveryService(t *testing.T, r *model.IstioRegistry) *DiscoveryServic
 }
 
 func makeDiscoveryServiceWithSSLContext(t *testing.T, r *model.IstioRegistry) *DiscoveryService {
-	mesh := DefaultMeshConfig
+	mesh := proxy.DefaultMeshConfig()
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
 	out, err := NewDiscoveryService(
 		&mockController{},

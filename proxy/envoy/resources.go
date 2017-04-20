@@ -22,7 +22,6 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 )
 
@@ -53,25 +52,6 @@ const (
 
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
-)
-
-var (
-	// DefaultMeshConfig configuration
-	DefaultMeshConfig = proxyconfig.ProxyMeshConfig{
-		DiscoveryAddress:   "istio-manager:8080",
-		EgressProxyAddress: "istio-egress:80",
-
-		ProxyListenPort:        15001,
-		ProxyAdminPort:         15000,
-		DrainDuration:          ptypes.DurationProto(2 * time.Second),
-		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
-		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
-		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
-		IstioServiceCluster:    "istio-proxy",
-
-		AuthPolicy:    proxyconfig.ProxyMeshConfig_NONE,
-		AuthCertsPath: "/etc/certs",
-	}
 )
 
 // convertDuration converts to golang duration and logs errors

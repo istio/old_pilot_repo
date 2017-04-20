@@ -30,6 +30,10 @@ import (
 	"istio.io/manager/proxy"
 )
 
+const (
+	ingressNode = "ingress"
+)
+
 type ingressWatcher struct {
 	agent   proxy.Agent
 	ctl     model.Controller
@@ -38,7 +42,7 @@ type ingressWatcher struct {
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
 func NewIngressWatcher(ctl model.Controller, context *IngressConfig) (Watcher, error) {
-	agent := proxy.NewAgent(runEnvoy(context.Mesh, "ingress"), cleanupEnvoy(context.Mesh), 10, 100*time.Millisecond)
+	agent := proxy.NewAgent(runEnvoy(context.Mesh, ingressNode), cleanupEnvoy(context.Mesh), 10, 100*time.Millisecond)
 
 	out := &ingressWatcher{
 		agent:   agent,
@@ -94,21 +98,7 @@ type IngressConfig struct {
 
 func generateIngress(conf *IngressConfig) *Config {
 	listeners, clusters := buildIngressListeners(conf)
-
-	return &Config{
-		Listeners: listeners,
-		Admin: Admin{
-			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Mesh.ProxyAdminPort),
-		},
-		ClusterManager: ClusterManager{
-			Clusters: clusters,
-			SDS: &SDS{
-				Cluster:        buildDiscoveryCluster(conf.Mesh.DiscoveryAddress, "sds", conf.Mesh.ConnectTimeout),
-				RefreshDelayMs: (int)(convertDuration(conf.Mesh.DiscoveryRefreshDelay) / time.Millisecond),
-			},
-		},
-	}
+	return buildConfig(listeners, clusters, conf.Mesh)
 }
 
 func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *model.TLSSecret) {

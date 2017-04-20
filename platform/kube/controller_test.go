@@ -34,6 +34,7 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
+	"istio.io/manager/proxy"
 	"istio.io/manager/test/mock"
 	"istio.io/manager/test/util"
 )
@@ -46,11 +47,10 @@ func TestSecret(t *testing.T) {
 	}
 	defer util.DeleteNamespace(cl.client, ns)
 
-	ctl := NewController(cl, ControllerOptions{
-		Namespace:       ns,
-		ResyncPeriod:    resync,
-		IngressSyncMode: IngressDefault,
-		IngressClass:    "istio",
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{
+		Namespace:    ns,
+		ResyncPeriod: resync,
 	})
 
 	stop := make(chan struct{})
@@ -121,11 +121,10 @@ func TestIngressController(t *testing.T) {
 	}
 	defer util.DeleteNamespace(cl.client, ns)
 
-	ctl := NewController(cl, ControllerOptions{
-		Namespace:       ns,
-		ResyncPeriod:    resync,
-		IngressSyncMode: IngressDefault,
-		IngressClass:    "istio",
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{
+		Namespace:    ns,
+		ResyncPeriod: resync,
 	})
 
 	stop := make(chan struct{})
@@ -270,16 +269,16 @@ func TestIngressClass(t *testing.T) {
 	defer util.DeleteNamespace(cl.client, ns)
 
 	cases := []struct {
-		ingressMode   IngressSyncMode
+		ingressMode   proxyconfig.ProxyMeshConfig_IngressControllerMode
 		ingressClass  string
 		shouldProcess bool
 	}{
-		{ingressMode: IngressDefault, ingressClass: "nginx", shouldProcess: false},
-		{ingressMode: IngressStrict, ingressClass: "nginx", shouldProcess: false},
-		{ingressMode: IngressDefault, ingressClass: "istio", shouldProcess: true},
-		{ingressMode: IngressStrict, ingressClass: "istio", shouldProcess: true},
-		{ingressMode: IngressDefault, ingressClass: "", shouldProcess: true},
-		{ingressMode: IngressStrict, ingressClass: "", shouldProcess: false},
+		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "nginx", shouldProcess: false},
+		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "nginx", shouldProcess: false},
+		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "istio", shouldProcess: true},
+		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "istio", shouldProcess: true},
+		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "", shouldProcess: true},
+		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "", shouldProcess: false},
 	}
 
 	for _, c := range cases {
@@ -297,11 +296,11 @@ func TestIngressClass(t *testing.T) {
 			},
 		}
 
-		ctl := NewController(cl, ControllerOptions{
-			Namespace:       ns,
-			ResyncPeriod:    resync,
-			IngressSyncMode: c.ingressMode,
-			IngressClass:    "istio",
+		mesh := proxy.DefaultMeshConfig()
+		mesh.IngressControllerMode = c.ingressMode
+		ctl := NewController(cl, &mesh, ControllerOptions{
+			Namespace:    ns,
+			ResyncPeriod: resync,
 		})
 
 		if c.ingressClass != "" {
@@ -326,7 +325,8 @@ func TestController(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	ctl := NewController(cl, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 	added, deleted := 0, 0
 	n := 5
 	err = ctl.AppendConfigHandler(mock.Kind, func(k model.Key, o proto.Message, ev model.Event) {
@@ -362,7 +362,8 @@ func TestControllerCacheFreshness(t *testing.T) {
 	}
 	defer util.DeleteNamespace(cl.client, ns)
 	stop := make(chan struct{})
-	ctl := NewController(cl, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 
 	// test interface implementation
 	var _ model.Controller = ctl
@@ -435,7 +436,8 @@ func TestControllerClientSync(t *testing.T) {
 	}
 
 	// check in the controller cache
-	ctl := NewController(cl, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 	go ctl.Run(stop)
 	eventually(func() bool { return ctl.HasSynced() }, t)
 	os, _ := ctl.List(mock.Kind, ns)
@@ -510,7 +512,8 @@ func TestServices(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	ctl := NewController(cl, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
+	mesh := proxy.DefaultMeshConfig()
+	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 	go ctl.Run(stop)
 
 	hostname := fmt.Sprintf("%s.%s.%s", testService, ns, ServiceSuffix)
@@ -561,7 +564,8 @@ func makeService(n, ns string, cl kubernetes.Interface, t *testing.T) {
 
 func TestController_GetIstioServiceAccounts(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
-	controller := NewController(&Client{client: clientSet}, ControllerOptions{
+	mesh := proxy.DefaultMeshConfig()
+	controller := NewController(&Client{client: clientSet}, &mesh, ControllerOptions{
 		Namespace:    "default",
 		ResyncPeriod: resync,
 	})

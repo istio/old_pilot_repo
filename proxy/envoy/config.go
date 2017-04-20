@@ -87,7 +87,11 @@ func Generate(context *proxy.Context) *Config {
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout))
+	return buildConfig(listeners, clusters, mesh)
+}
+
+// buildConfig creates a proxy config with discovery services and admin port
+func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -95,7 +99,8 @@ func Generate(context *proxy.Context) *Config {
 			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
-			Clusters: clusters,
+			Clusters: append(clusters,
+				buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout)),
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds", mesh.ConnectTimeout),
 				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
