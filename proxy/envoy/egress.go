@@ -161,7 +161,7 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 			}
 
 			if protocol == model.ProtocolHTTPS {
-				cluster.SSLContext = &SSLContextWithSAN{}
+				cluster.SSLContext = &SSLContextExternal{}
 			}
 
 			route.clusters = append(route.clusters, cluster)

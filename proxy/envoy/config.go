@@ -283,14 +283,7 @@ func buildOutboundHTTPRoutes(
 					for _, route := range routes {
 						route.HostRewrite = service.Hostname
 						for _, cluster := range route.clusters {
-							cluster.ServiceName = ""
-							cluster.Type = ClusterTypeStrictDNS
-							cluster.Hosts = []Host{
-								{
-									URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
-								},
-							}
-
+							useEgressCluster(mesh, cluster)
 						}
 					}
 				}
@@ -305,13 +298,7 @@ func buildOutboundHTTPRoutes(
 					routes := make([]*HTTPRoute, 0)
 
 					cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-					cluster.ServiceName = ""
-					cluster.Type = ClusterTypeStrictDNS
-					cluster.Hosts = []Host{
-						{
-							URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
-						},
-					}
+					useEgressCluster(mesh, cluster)
 
 					route := buildDefaultRoute(cluster)
 					route.HostRewrite = service.Hostname
@@ -350,6 +337,16 @@ func buildOutboundHTTPRoutes(
 
 	httpConfigs.normalize()
 	return httpConfigs
+}
+
+func useEgressCluster(mesh *proxyconfig.ProxyMeshConfig, cluster *Cluster) {
+	cluster.ServiceName = ""
+	cluster.Type = ClusterTypeStrictDNS
+	cluster.Hosts = []Host{
+		{
+			URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
+		},
+	}
 }
 
 // buildOutboundTCPListeners lists listeners and referenced clusters for TCP

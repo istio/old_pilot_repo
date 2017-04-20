@@ -9,7 +9,8 @@
     "ssl_context": {
      "cert_chain_file": "/etc/certs/cert-chain.pem",
      "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem"
+     "ca_cert_file": "/etc/certs/root-cert.pem",
+     "verify_subject_alt_name": []
     }
    },
    {
@@ -21,7 +22,8 @@
     "ssl_context": {
      "cert_chain_file": "/etc/certs/cert-chain.pem",
      "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem"
+     "ca_cert_file": "/etc/certs/root-cert.pem",
+     "verify_subject_alt_name": []
     }
    },
    {
@@ -37,7 +39,8 @@
     "ssl_context": {
      "cert_chain_file": "/etc/certs/cert-chain.pem",
      "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem"
+     "ca_cert_file": "/etc/certs/root-cert.pem",
+     "verify_subject_alt_name": []
     }
    },
    {
@@ -53,7 +56,8 @@
     "ssl_context": {
      "cert_chain_file": "/etc/certs/cert-chain.pem",
      "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem"
+     "ca_cert_file": "/etc/certs/root-cert.pem",
+     "verify_subject_alt_name": []
     }
    },
    {
