@@ -164,18 +164,7 @@ var (
 		Use:   "ingress",
 		Short: "Istio Proxy ingress controller",
 		RunE: func(c *cobra.Command, args []string) error {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
-			config := &envoy.IngressConfig{
-				CertFile:  "/etc/tls.crt",
-				KeyFile:   "/etc/tls.key",
-				Namespace: flags.controllerOptions.Namespace,
-				Secrets:   controller,
-				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
-				Mesh:      mesh,
-				Port:      80,
-				SSLPort:   443,
-			}
-			w, err := envoy.NewIngressWatcher(controller, config)
+			w, err := envoy.NewIngressWatcher(mesh)
 			if err != nil {
 				return err
 			}

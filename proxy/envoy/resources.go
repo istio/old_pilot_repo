@@ -234,8 +234,7 @@ func (routes HTTPRouteConfigs) clusters() Clusters {
 func (routes HTTPRouteConfigs) normalize() {
 	// sort HTTP routes by virtual hosts, rest should be deterministic
 	for _, routeConfig := range routes {
-		hosts := routeConfig.VirtualHosts
-		sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
+		routeConfig.normalize()
 	}
 }
 
@@ -256,6 +255,11 @@ func (rc *HTTPRouteConfig) clusters() Clusters {
 		out = append(out, host.clusters()...)
 	}
 	return out
+}
+
+func (rc *HTTPRouteConfig) normalize() {
+	hosts := rc.VirtualHosts
+	sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
 }
 
 // AccessLog definition.

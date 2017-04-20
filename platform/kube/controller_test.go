@@ -80,30 +80,8 @@ func TestSecret(t *testing.T) {
 		return secret != nil && err == nil
 	}, t)
 
-	ingress := v1beta1.Ingress{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name:      "test-ingress",
-			Namespace: ns,
-		},
-		Spec: v1beta1.IngressSpec{
-			TLS: []v1beta1.IngressTLS{
-				{SecretName: secret},
-			},
-			Backend: &v1beta1.IngressBackend{
-				ServiceName: "world",
-				ServicePort: intstr.FromInt(80),
-			},
-			Rules: []v1beta1.IngressRule{},
-		},
-	}
-	createIngress(&ingress, cl.client, t)
-
-	eventually(func() bool {
-		return notificationCount == 1
-	}, t)
-
-	host := fmt.Sprintf("world.%v.svc.cluster.local", ns)
-	if tls, err := ctl.GetTLSSecret(host); err != nil {
+	uri := fmt.Sprintf("%s.%s", secret, ns)
+	if tls, err := ctl.client.GetTLSSecret(uri); err != nil {
 		t.Errorf("GetTLSSecret => got %q", err)
 	} else if tls == nil {
 		t.Errorf("GetTLSSecret => no secret")

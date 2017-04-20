@@ -223,6 +223,9 @@ func NewDiscoveryService(ctl model.Controller, context *proxy.Context,
 	if err := ctl.AppendConfigHandler(model.RouteRule, configHandler); err != nil {
 		return nil, err
 	}
+	if err := ctl.AppendConfigHandler(model.IngressRule, configHandler); err != nil {
+		return nil, err
+	}
 	if err := ctl.AppendConfigHandler(model.DestinationPolicy, configHandler); err != nil {
 		return nil, err
 	}
@@ -515,7 +518,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 		// service-node holds the IP address
-		ip := request.PathParameter(ServiceNode)
+		node := request.PathParameter(ServiceNode)
 
 		// route-config-name holds the listener port
 		routeConfigName := request.PathParameter(RouteConfigName)
@@ -526,19 +529,23 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
-		instances := ds.Discovery.HostInstances(map[string]bool{ip: true})
-		services := ds.Discovery.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+		if node == ingressNode {
+			// TODO:
+		} else {
+			instances := ds.Discovery.HostInstances(map[string]bool{node: true})
+			services := ds.Discovery.Services()
+			httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
 
-		routeConfig, ok := httpRouteConfigs[port]
-		if !ok {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Missing route config for port %d", port))
-			return
-		}
-		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
-			errorResponse(response, http.StatusInternalServerError, err.Error())
-			return
+			routeConfig, ok := httpRouteConfigs[port]
+			if !ok {
+				errorResponse(response, http.StatusNotFound,
+					fmt.Sprintf("Missing route config for port %d", port))
+				return
+			}
+			if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
+				errorResponse(response, http.StatusInternalServerError, err.Error())
+				return
+			}
 		}
 		ds.rdsCache.updateCachedDiscoveryResponse(key, out)
 	}

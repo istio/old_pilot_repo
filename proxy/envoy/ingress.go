@@ -22,224 +22,59 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/go-multierror"
 
-	"istio.io/api/proxy/v1/config"
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/proxy"
 )
 
 const (
 	ingressNode = "ingress"
+	certFile    = "/etc/tls.crt"
+	keyFile     = "/etc/tls.key"
 )
 
 type ingressWatcher struct {
-	agent   proxy.Agent
-	ctl     model.Controller
-	context *IngressConfig
+	agent proxy.Agent
+	mesh  *proxyconfig.ProxyMeshConfig
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
-func NewIngressWatcher(ctl model.Controller, context *IngressConfig) (Watcher, error) {
-	agent := proxy.NewAgent(runEnvoy(context.Mesh, ingressNode), cleanupEnvoy(context.Mesh), 10, 100*time.Millisecond)
-
+func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig) (Watcher, error) {
+	agent := proxy.NewAgent(runEnvoy(mesh, ingressNode), cleanupEnvoy(mesh), 10, 100*time.Millisecond)
 	out := &ingressWatcher{
-		agent:   agent,
-		ctl:     ctl,
-		context: context,
+		agent: agent,
+		mesh:  mesh,
 	}
-
-	if err := ctl.AppendConfigHandler(model.IngressRule, func(model.Key, proto.Message, model.Event) {
-		out.reload()
-	}); err != nil {
-		return nil, err
-	}
-
-	// ingress rule listing depends on the service declaration being up to date
-	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) {
-		out.reload()
-	}); err != nil {
-		return nil, err
-	}
-
 	return out, nil
-}
-
-func (w *ingressWatcher) reload() {
-	w.agent.ScheduleConfigUpdate(generateIngress(w.context))
 }
 
 func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	go w.agent.Run(stop)
-
-	// Initialize envoy according to the current model state,
-	// instead of waiting for the first event to arrive.
-	// Note that this is currently done synchronously (blocking),
-	// to avoid racing with controller events lurking around the corner.
-	// This can be improved once we switch to a mechanism where reloads
-	// are linearized (e.g., by a single goroutine reloader).
-	w.reload()
-	w.ctl.Run(stop)
+	//w.agent.ScheduleConfigUpdate(generateIngress(w.context))
 }
 
-// IngressConfig defines information for ingress
-type IngressConfig struct {
-	// TODO: cert/key filenames will need to be dynamic for multiple key/cert pairs
-	CertFile  string
-	KeyFile   string
-	Namespace string
-	Secrets   model.SecretRegistry
-	Registry  *model.IstioRegistry
-	Mesh      *config.ProxyMeshConfig
-	Port      int
-	SSLPort   int
-}
-
-func generateIngress(conf *IngressConfig) *Config {
-	listeners, clusters := buildIngressListeners(conf)
-	return buildConfig(listeners, clusters, conf.Mesh)
-}
-
-func buildIngressVhosts(conf *IngressConfig) ([]*VirtualHost, []*VirtualHost, *model.TLSSecret) {
-	rules := conf.Registry.IngressRules(conf.Namespace)
-
-	rulesByHost := make(map[string][]*config.RouteRule, len(rules))
-	for _, rule := range rules {
-		host := "*"
-		if rule.Match != nil {
-			if authority, ok := rule.Match.HttpHeaders["authority"]; ok {
-				switch match := authority.GetMatchType().(type) {
-				case *config.StringMatch_Exact:
-					host = match.Exact
-				default:
-					glog.Warningf("Unsupported match type for authority condition: %T", match)
-				}
-			}
-		}
-
-		rulesByHost[host] = append(rulesByHost[host], rule)
+func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret) *Config {
+	listeners := []*Listener{
+		buildHTTPListener(mesh, nil, WildcardAddress, 80, true),
 	}
 
-	// figure out which hosts are configured to terminate TLS
-	// ensure that only one TLS config is used
-	// TODO: extensive tests for the TLS logic
-	var tls *model.TLSSecret
-	tlsValid := true
-	tlsHosts := make(map[string]bool)
-	for host := range rulesByHost {
-		if t, err := conf.Secrets.GetTLSSecret(host); err != nil {
-			tlsValid = false
-			tlsHosts[host] = true // count this as a TLS host so that it is omitted from the config
-
-			glog.Warningf("Error retrieving TLS context for %q: %v", host, err)
-		} else if t != nil {
-			if tls == nil {
-				tls = t
-			} else if string(tls.PrivateKey) != string(t.PrivateKey) || string(tls.Certificate) != string(t.Certificate) {
-				glog.Warningf("Unsupported ingress configuration for host %q: multiple TLS configs", host)
-				tlsValid = false
-			}
-			tlsHosts[host] = true
-		}
-	}
-
-	// build vhosts
-	vhosts := make([]*VirtualHost, 0, len(rulesByHost))
-	vhostsTLS := make([]*VirtualHost, 0, len(rulesByHost))
-	for host, hostRules := range rulesByHost {
-		routes := make([]*HTTPRoute, 0, len(hostRules))
-		for _, rule := range hostRules {
-			route, err := buildIngressRoute(rule)
-			if err != nil {
-				glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
-				continue
-			}
-			routes = append(routes, route)
-		}
-		sort.Sort(RoutesByPath(routes))
-		vhost := &VirtualHost{
-			Name:    host,
-			Domains: []string{host},
-			Routes:  routes,
-		}
-
-		// sort into TLS and non-TLS
-		if tlsHosts[host] {
-			if tlsValid { // only add TLS vhosts when the TLS config is valid
-				vhostsTLS = append(vhostsTLS, vhost)
-			}
-		} else {
-			vhosts = append(vhosts, vhost)
-		}
-	}
-
-	return vhosts, vhostsTLS, tls
-}
-
-func buildIngressListener(address, statPrefix string, routeConfig *HTTPRouteConfig, ssl *SSLContext) *Listener {
-	return &Listener{
-		Address:    address,
-		SSLContext: ssl,
-		BindToPort: true,
-		Filters: []*NetworkFilter{
-			{
-				Type: "read",
-				Name: HTTPConnectionManager,
-				Config: HTTPFilterConfig{
-					CodecType:   "auto",
-					StatPrefix:  statPrefix,
-					AccessLog:   []AccessLog{{Path: DefaultAccessLog}},
-					RouteConfig: routeConfig,
-					Filters: []HTTPFilter{
-						{
-							Type:   "decoder",
-							Name:   "router",
-							Config: FilterRouterConfig{},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func buildIngressListeners(conf *IngressConfig) (Listeners, Clusters) {
-	vhosts, vhostsTLS, tls := buildIngressVhosts(conf)
-
-	clusters := make(Clusters, 0)
-	listeners := make([]*Listener, 0)
-
-	if len(vhosts) > 0 {
-		sort.Slice(vhosts, func(i, j int) bool { return vhosts[i].Name < vhosts[j].Name })
-
-		rConfig := &HTTPRouteConfig{VirtualHosts: vhosts}
-		address := fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.Port)
-		listeners = append(listeners, buildIngressListener(address, "http", rConfig, nil))
-		clusters = append(clusters, rConfig.clusters()...)
-	}
-
-	if len(vhostsTLS) > 0 && tls != nil {
-		if err := writeTLS(conf.CertFile, conf.KeyFile, tls); err != nil {
+	if tls != nil {
+		if err := writeTLS(certFile, keyFile, tls); err != nil {
 			glog.Warning("Failed to write cert/key")
 		} else {
-			sort.Slice(vhostsTLS, func(i, j int) bool { return vhostsTLS[i].Name < vhostsTLS[j].Name })
-
-			rConfig := &HTTPRouteConfig{VirtualHosts: vhostsTLS}
 			ssl := &SSLContext{
-				CertChainFile:  conf.CertFile,
-				PrivateKeyFile: conf.KeyFile,
+				CertChainFile:  certFile,
+				PrivateKeyFile: keyFile,
 			}
-			address := fmt.Sprintf("tcp://%s:%d", WildcardAddress, conf.SSLPort)
-			listeners = append(listeners, buildIngressListener(address, "https", rConfig, ssl))
-			clusters = append(clusters, rConfig.clusters()...)
+			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true)
+			listener.SSLContext = ssl
+			listeners = append(listeners, listener)
 		}
 	}
 
-	clusters = clusters.normalize()
-	clusters.setTimeout(conf.Mesh.ConnectTimeout)
-
-	return listeners, clusters
+	return buildConfig(listeners, nil, mesh)
 }
 
 func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
@@ -253,8 +88,74 @@ func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	return nil
 }
 
+func buildIngressRoutes(ingressRules []*proxyconfig.RouteRule) (HTTPRouteConfigs, string) {
+	// build vhosts
+	vhosts := make(map[string][]*HTTPRoute)
+	vhostsTLS := make(map[string][]*HTTPRoute)
+	tlsAll := ""
+
+	for _, rule := range ingressRules {
+		route, tls, err := buildIngressRoute(rule)
+		if err != nil {
+			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
+			continue
+		}
+
+		host := "*"
+		if rule.Match != nil {
+			if authority, ok := rule.Match.HttpHeaders["authority"]; ok {
+				switch match := authority.GetMatchType().(type) {
+				case *proxyconfig.StringMatch_Exact:
+					host = match.Exact
+				default:
+					glog.Warningf("Unsupported match type for authority condition %T, falling back to %q", match, host)
+					continue
+				}
+			}
+		}
+		if tls != "" {
+			vhostsTLS[host] = append(vhostsTLS[host], route)
+			if tlsAll == "" {
+				tlsAll = tls
+			} else {
+				glog.Warningf("Multiple secrets detected %q and %q", tls, tlsAll)
+				if tls < tlsAll {
+					tlsAll = tls
+				}
+			}
+		} else {
+			vhosts[host] = append(vhosts[host], route)
+		}
+	}
+
+	// normalize config
+	rc := &HTTPRouteConfig{}
+	for host, routes := range vhosts {
+		sort.Sort(RoutesByPath(routes))
+		rc.VirtualHosts = append(rc.VirtualHosts, &VirtualHost{
+			Name:    host,
+			Domains: []string{host},
+			Routes:  routes,
+		})
+	}
+
+	rcTLS := &HTTPRouteConfig{}
+	for host, routes := range vhostsTLS {
+		sort.Sort(RoutesByPath(routes))
+		rcTLS.VirtualHosts = append(rcTLS.VirtualHosts, &VirtualHost{
+			Name:    host,
+			Domains: []string{host},
+			Routes:  routes,
+		})
+	}
+
+	configs := HTTPRouteConfigs{80: rc, 443: rcTLS}
+	configs.normalize()
+	return configs, tlsAll
+}
+
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
+func buildIngressRoute(rule *proxyconfig.RouteRule) (*HTTPRoute, string, error) {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",
@@ -263,19 +164,20 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 	if rule.Match != nil && rule.Match.HttpHeaders != nil {
 		if uri, ok := rule.Match.HttpHeaders[HeaderURI]; ok {
 			switch m := uri.MatchType.(type) {
-			case *config.StringMatch_Exact:
+			case *proxyconfig.StringMatch_Exact:
 				route.Path = m.Exact
 				route.Prefix = ""
-			case *config.StringMatch_Prefix:
+			case *proxyconfig.StringMatch_Prefix:
 				route.Path = ""
 				route.Prefix = m.Prefix
-			case *config.StringMatch_Regex:
-				return nil, fmt.Errorf("unsupported route match condition: regex")
+			case *proxyconfig.StringMatch_Regex:
+				return nil, "", fmt.Errorf("unsupported route match condition: regex")
 			}
 		}
 	}
 
 	clusters := make([]*WeightedClusterEntry, 0)
+	tlsAll := ""
 	for _, dst := range rule.Route {
 		// fetch route destination, or fallback to rule destination
 		destination := dst.Destination
@@ -283,9 +185,17 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 			destination = rule.Destination
 		}
 
-		port, tags, err := extractPortAndTags(dst)
+		port, tags, tls, err := extractPortAndTags(dst)
 		if err != nil {
-			return nil, multierror.Append(fmt.Errorf("failed to extract routing rule destination port"), err)
+			return nil, "", multierror.Prefix(err, "failed to extract routing rule destination port")
+		}
+
+		if tls != "" {
+			if tlsAll == "" {
+				tlsAll = tls
+			} else {
+				return nil, "", fmt.Errorf("multiple TLS secrets detected %q and %q", tlsAll, tls)
+			}
 		}
 
 		cluster := buildOutboundCluster(destination, port, tags)
@@ -314,13 +224,13 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 		portSet[cluster.port.Port] = struct{}{}
 	}
 	if len(portSet) > 1 {
-		return nil, fmt.Errorf("unsupported multiple destination ports per ingress route rule")
+		return nil, "", fmt.Errorf("unsupported multiple destination ports per ingress route rule")
 	}
 
 	// Rewrite the host header so that inbound proxies can match incoming traffic
 	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, route.clusters[0].port.Port)
 
-	return route, nil
+	return route, tlsAll, nil
 }
 
 // extractPortAndTags extracts the destination service port from the given destination,
@@ -329,18 +239,22 @@ func buildIngressRoute(rule *config.RouteRule) (*HTTPRoute, error) {
 // to the proxy configuration generator. This can be improved by using
 // a dedicated model object for IngressRule (instead of reusing RouteRule),
 // which exposes the necessary target port field within the "Route" field.
-func extractPortAndTags(dst *config.DestinationWeight) (*model.Port, model.Tags, error) {
+func extractPortAndTags(dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
 	portNum, err := strconv.Atoi(dst.Tags["servicePort.port"])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	portName, ok := dst.Tags["servicePort.name"]
 	if !ok {
-		return nil, nil, fmt.Errorf("no name specified for service port %d", portNum)
+		return nil, nil, "", fmt.Errorf("no name specified for service port %d", portNum)
 	}
 	portProto, ok := dst.Tags["servicePort.protocol"]
 	if !ok {
-		return nil, nil, fmt.Errorf("no protocol specified for service port %d", portNum)
+		return nil, nil, "", fmt.Errorf("no protocol specified for service port %d", portNum)
+	}
+	tls, ok := dst.Tags["tlsSecret"]
+	if !ok {
+		return nil, nil, "", fmt.Errorf("missing TLS secret %d", portNum)
 	}
 
 	port := &model.Port{
@@ -350,7 +264,7 @@ func extractPortAndTags(dst *config.DestinationWeight) (*model.Port, model.Tags,
 	}
 
 	var tags model.Tags
-	if len(dst.Tags) > 3 {
+	if len(dst.Tags) > 4 {
 		tags = make(model.Tags, len(dst.Tags)-3)
 		for k, v := range dst.Tags {
 			tags[k] = v
@@ -358,7 +272,8 @@ func extractPortAndTags(dst *config.DestinationWeight) (*model.Port, model.Tags,
 		delete(tags, "servicePort.port")
 		delete(tags, "servicePort.name")
 		delete(tags, "servicePort.protocol")
+		delete(tags, "tlsSecret")
 	}
 
-	return port, tags, nil
+	return port, tags, tls, nil
 }
