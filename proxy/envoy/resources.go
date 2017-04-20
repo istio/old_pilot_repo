@@ -61,7 +61,7 @@ const (
 	ZipkinTraceDriverType = "zipkin"
 
 	// ZipkinCollectorCluster denotes the cluster where zipkin server is running
-	ZipkinCollectorCluster = "out.zipkin"
+	ZipkinCollectorCluster = "out.zipkin.default.svc.cluster.local|zipkin"
 
 	// ZipkinCollectorEndpoint denotes the REST endpoint where Envoy posts Zipkin spans
 	ZipkinCollectorEndpoint = "/api/v1/spans"

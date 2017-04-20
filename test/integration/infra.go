@@ -99,6 +99,9 @@ func (infra *infra) setup() error {
 			return err
 		}
 	}
+	if err := deploy("zipkin.yaml"); err != nil {
+		return err
+	}
 
 	return nil
 }

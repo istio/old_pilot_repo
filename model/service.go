@@ -266,11 +266,9 @@ func (s *Service) Key(port *Port, tag Tags) string {
 func ServiceKey(hostname string, servicePorts PortList, serviceTags TagsList) string {
 	// example: name.namespace|http|env=prod;env=test,version=my-v1
 	var buffer bytes.Buffer
-	// buffer.WriteString(hostname)
-	buffer.WriteString(strings.Split(hostname, ".")[0])
+	buffer.WriteString(hostname)
 	np := len(servicePorts)
 	nt := len(serviceTags)
-	np = 0
 
 	if nt == 1 && serviceTags[0] == nil {
 		nt = 0
