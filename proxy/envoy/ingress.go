@@ -192,8 +192,8 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 			vhostsTLS[host] = append(vhostsTLS[host], route)
 			if tlsAll == "" {
 				tlsAll = tls
-			} else {
-				glog.Warningf("Multiple secrets detected %q and %q", tls, tlsAll)
+			} else if tlsAll != tls {
+				glog.Warningf("Multiple secrets detected %s and %s", tls, tlsAll)
 				if tls < tlsAll {
 					tlsAll = tls
 				}
