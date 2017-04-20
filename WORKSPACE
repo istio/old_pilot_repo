@@ -371,7 +371,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
 load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
-go_prefix("github.com/googleapis/googleapis")
+go_prefix("github.com/googleapis/googleapis/google/rpc")
 
 go_proto_library(
     name = "go_default_library",

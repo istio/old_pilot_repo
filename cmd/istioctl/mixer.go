@@ -24,8 +24,7 @@ import (
 	"os"
 	"strings"
 
-	// TODO This should be github.com/googleapis/googleapis/google/rpc
-	rpc "github.com/googleapis/googleapis"
+	rpc "github.com/googleapis/googleapis/google/rpc"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"

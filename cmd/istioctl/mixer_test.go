@@ -24,7 +24,7 @@ import (
 	"istio.io/manager/test/util"
 
 	"github.com/ghodss/yaml"
-	rpc "github.com/googleapis/googleapis"
+	rpc "github.com/googleapis/googleapis/google/rpc"
 )
 
 func TestMixerRuleCreate(t *testing.T) {
