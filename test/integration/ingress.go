@@ -17,7 +17,6 @@ package main
 import (
 	"fmt"
 	"regexp"
-	"sync"
 
 	"github.com/golang/glog"
 
@@ -26,8 +25,7 @@ import (
 
 type ingress struct {
 	*infra
-	accessMu   sync.Mutex
-	accessLogs map[string][]string
+	logs *accessLogs
 }
 
 const (
@@ -42,10 +40,7 @@ func (t *ingress) setup() error {
 	if !t.Ingress {
 		return nil
 	}
-	t.accessLogs = make(map[string][]string)
-	for app := range t.apps {
-		t.accessLogs[app] = make([]string, 0)
-	}
+	t.logs = makeAccessLogs()
 
 	// setup ingress resources
 	if err := util.Run(fmt.Sprintf("kubectl -n %s create secret generic ingress "+
@@ -65,6 +60,7 @@ func (t *ingress) setup() error {
 
 func (t *ingress) run() error {
 	if !t.Ingress {
+		glog.Info("skipping test since ingress is missing")
 		return nil
 	}
 	src := "t"
@@ -74,22 +70,19 @@ func (t *ingress) run() error {
 		funcs[name] = (func(dst string) func() status {
 			url := fmt.Sprintf("https://%s:443/%s", ingressServiceName, dst)
 			return func() status {
-				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -insecure",
+				request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
 					t.apps[src][0], t.Namespace, url))
 				if err != nil {
-					glog.Error(err)
-					return failure
+					return err
 				}
 				match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
 				if len(match) > 1 {
 					id := match[1]
-					t.accessMu.Lock()
-					t.accessLogs[dst] = append(t.accessLogs[dst], id)
-					t.accessLogs["ingress"] = append(t.accessLogs["ingress"], id)
-					t.accessMu.Unlock()
-					return success
+					t.logs.add(dst, id, name)
+					t.logs.add("ingress", id, name)
+					return nil
 				}
-				return again
+				return errAgain
 			}
 		})(dst)
 	}
@@ -97,11 +90,9 @@ func (t *ingress) run() error {
 	if err := parallel(funcs); err != nil {
 		return err
 	}
-
-	if err := t.checkProxyAccessLogs(t.accessLogs); err != nil {
+	if err := t.logs.check(t.infra); err != nil {
 		return err
 	}
-
 	return nil
 }
 
