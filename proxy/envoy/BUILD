@@ -47,6 +47,7 @@ go_test(
         "//test/util:go_default_library",
         "@com_github_emicklei_go_restful//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
+        "@com_github_golang_protobuf//ptypes:go_default_library",
         "@io_istio_api//:go_default_library",
     ],
 )
@@ -70,22 +71,6 @@ sh_test(
     data = [
         "envoy",
         "testdata/envoy-v0.json.golden",
-    ],
-    tags = ["exclusive"],
-)
-
-sh_test(
-    name = "envoy_config_ingress_test",
-    size = "small",
-    srcs = ["config_test.sh"],
-    args = [
-        "$(location envoy)",
-        "$(location testdata/ingress-envoy.json.golden)",
-        "1",
-    ],
-    data = [
-        "envoy",
-        "testdata/ingress-envoy.json.golden",
     ],
     tags = ["exclusive"],
 )

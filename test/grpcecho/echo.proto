@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+syntax = "proto3";
 
-// SecretRegistry defines a read-only interface for secret key material
-// The implementation should not cache or persist the secrets and pass
-// the data immediately to the client of this interface.
-type SecretRegistry interface {
-	// GetTLSSecret retrieves a TLS secret by implementation specific URI
-	GetTLSSecret(uri string) (*TLSSecret, error)
+package grpecho;
+
+service EchoTestService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
 }
 
-// TLSSecret defines a TLS configuration.
-type TLSSecret struct {
-	Certificate []byte
-	PrivateKey  []byte
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
 }

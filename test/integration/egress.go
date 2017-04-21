@@ -38,32 +38,32 @@ func (t *egress) setup() error {
 
 func (t *egress) run() error {
 	if !t.Egress {
+		glog.Info("skipping test since egress is missing")
 		return nil
 	}
-	extServices := []string{
-		"httpbin",
-		//"httpsbin",TODO
+	extServices := map[string]string{
+		"httpbin":         "/headers",
+		"httpsgoogle:443": "",
 	}
 
 	funcs := make(map[string]func() status)
 	for _, src := range []string{"a", "b"} {
-		for _, dst := range extServices {
+		for dst, path := range extServices {
 			name := fmt.Sprintf("External request from %s to %s", src, dst)
 			funcs[name] = (func(src, dst string) func() status {
-				url := fmt.Sprintf("http://%s/headers", dst)
+				url := fmt.Sprintf("http://%s%s", dst, path)
 				trace := fmt.Sprint(time.Now().UnixNano())
 				return func() status {
 					resp, err := util.Shell(fmt.Sprintf(
-						"kubectl exec %s -n %s -c app -- client -url %s -insecure -key Trace-Id -val %q",
+						"kubectl exec %s -n %s -c app -- client -url %s -key Trace-Id -val %q",
 						t.apps[src][0], t.Namespace, url, trace))
 					if err != nil {
-						glog.Error(err)
-						return failure
+						return err
 					}
 					if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
-						return success
+						return nil
 					}
-					return again
+					return errAgain
 				}
 			})(src, dst)
 		}
