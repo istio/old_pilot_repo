@@ -95,6 +95,7 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
+			flags.controllerOptions.Namespace = ""
 			controller := kube.NewController(client, flags.controllerOptions)
 			context := &proxy.Context{
 				Discovery:  controller,
@@ -118,6 +119,7 @@ var (
 		Use:   "apiserver",
 		Short: "Start Istio Manager config API service",
 		Run: func(*cobra.Command, []string) {
+			flags.controllerOptions.Namespace = ""
 			controller := kube.NewController(client, flags.controllerOptions)
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version:  "v1alpha1",
