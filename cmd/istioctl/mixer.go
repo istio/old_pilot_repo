@@ -39,7 +39,7 @@ type mixerAPIResponse struct {
 }
 
 const (
-	requestTimeout = time.Second
+	requestTimeout = 60 * time.Second
 )
 
 var (
@@ -144,7 +144,7 @@ func mixerRuleGet(host, scope, subject string) (string, error) {
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed processing response: %v", err)
+		return "", fmt.Errorf("failed reading response: %v", err)
 	}
 	var response mixerAPIResponse
 	if err = json.Unmarshal(body, &response); err != nil {
@@ -152,7 +152,7 @@ func mixerRuleGet(host, scope, subject string) (string, error) {
 	}
 	data, err := yaml.Marshal(response.Data)
 	if err != nil {
-		return "", fmt.Errorf("failed processing response: %v", err)
+		return "", fmt.Errorf("failed formatting response: %v", err)
 	}
 	return string(data), nil
 }
