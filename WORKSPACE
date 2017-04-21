@@ -341,7 +341,7 @@ http_archive(
 
 new_go_repository(
     name = "org_golang_google_grpc",
-    commit = "8050b9cbc271307e5a716a9d782803d09b0d6f2d", # v1.2.1
+    commit = "8050b9cbc271307e5a716a9d782803d09b0d6f2d",  # v1.2.1
     importpath = "google.golang.org/grpc",
 )
 
@@ -362,8 +362,37 @@ go_proto_library(
     ],
 )
     """,
-    commit = "14751404111d4dbcb196a9faf8cb96594ed7ba28",  # Apr 14 2017
+    commit = "c6c48baa88b3116fa2930b8b468fdd2493dc683a",  # Apr 19 2017
     remote = "https://github.com/istio/api.git",
+)
+
+GOOGLEAPIS_BUILD_FILE = """
+package(default_visibility = ["//visibility:public"])
+
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
+go_prefix("github.com/googleapis/googleapis/google/rpc")
+
+go_proto_library(
+    name = "go_default_library",
+    srcs = [
+        "google/rpc/code.proto",
+        "google/rpc/error_details.proto",
+        "google/rpc/status.proto",
+    ],
+    deps = [
+        "@com_github_golang_protobuf//ptypes/any:go_default_library",
+        "@com_github_golang_protobuf//ptypes/duration:go_default_library",
+        "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
+    ],
+)
+"""
+
+new_git_repository(
+    name = "com_github_googleapis_googleapis",
+    build_file_content = GOOGLEAPIS_BUILD_FILE,
+    commit = "13ac2436c5e3d568bd0e938f6ed58b77a48aba15",  # Oct 21, 2016 (only release pre-dates sha)
+    remote = "https://github.com/googleapis/googleapis.git",
 )
 
 ##
