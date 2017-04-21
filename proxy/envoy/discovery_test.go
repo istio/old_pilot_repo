@@ -254,10 +254,10 @@ func TestSecretDiscovery(t *testing.T) {
 	addIngressRoutes(registry, t)
 	ds := makeDiscoveryService(t, registry)
 	url := fmt.Sprintf("/v1alpha/secret/%s/%s", ds.MeshConfig.IstioServiceCluster, ingressNode)
-	response := makeDiscoveryRequest(ds, "GET", url, t)
-	secret := "my-secret.default"
-	if string(response) != secret {
-		t.Errorf("ListSecret() => Got %q, expected %q", response, secret)
+	got := makeDiscoveryRequest(ds, "GET", url, t)
+	want := "my-secret.default"
+	if string(got) != want {
+		t.Errorf("ListSecret() => Got %q, expected %q", got, want)
 	}
 }
 

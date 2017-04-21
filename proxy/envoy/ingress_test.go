@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/test/util"
 )
@@ -25,19 +24,6 @@ var (
 	ingressKey       = []byte("qrstuvwxyz123456")
 	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
 )
-
-func testIngressOptions(mesh *proxyconfig.ProxyMeshConfig, secret *model.TLSSecret, envoyConfig string, t *testing.T) {
-	config := generateIngress(mesh, secret, ingressCertFile, ingressKeyFile)
-	if config == nil {
-		t.Fatal("Failed to generate config")
-	}
-
-	if err := config.WriteFile(envoyConfig); err != nil {
-		t.Fatal(err)
-	}
-
-	util.CompareYAML(envoyConfig, t)
-}
 
 func addIngressRoutes(r *model.IstioRegistry, t *testing.T) {
 	for i, file := range []string{ingressRouteRule1, ingressRouteRule2} {
@@ -68,7 +54,16 @@ func compareFile(filename string, golden []byte, t *testing.T) {
 
 func TestIngressRoutesSSL(t *testing.T) {
 	mesh := makeMeshConfig()
-	testIngressOptions(&mesh, ingressTLSSecret, ingressEnvoyConfig, t)
+	config := generateIngress(&mesh, ingressTLSSecret, ingressCertFile, ingressKeyFile)
+	if config == nil {
+		t.Fatal("Failed to generate config")
+	}
+
+	if err := config.WriteFile(ingressEnvoyConfig); err != nil {
+		t.Fatal(err)
+	}
+
+	util.CompareYAML(ingressEnvoyConfig, t)
 	compareFile(ingressCertFile, ingressCert, t)
 	compareFile(ingressKeyFile, ingressKey, t)
 }
