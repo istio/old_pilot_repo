@@ -67,16 +67,17 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
 	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
 		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, ingressNode)
-	initial := true
+
+	config := generateIngress(w.mesh, nil, certFile, keyFile)
+	w.agent.ScheduleConfigUpdate(config)
 	for {
 		tls, err := fetchSecret(ctx, client, url, w.secrets)
-		if err != nil && !initial {
+		if err != nil {
 			glog.Warning(err)
 		} else {
-			config := generateIngress(w.mesh, tls, certFile, keyFile)
+			config = generateIngress(w.mesh, tls, certFile, keyFile)
 			w.agent.ScheduleConfigUpdate(config)
 		}
-		initial = false
 
 		select {
 		case <-time.After(convertDuration(w.mesh.DiscoveryRefreshDelay)):
@@ -99,11 +100,9 @@ func fetchSecret(ctx context.Context, client *http.Client, url string,
 		return nil, multierror.Prefix(err, "failed to fetch "+url)
 	}
 	uri, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close() // nolint: errcheck
 	if err != nil {
 		return nil, multierror.Prefix(err, "failed to read request body")
-	}
-	if err = resp.Body.Close(); err != nil {
-		glog.Warning(err)
 	}
 	secret := string(uri)
 	if secret == "" {
@@ -114,7 +113,6 @@ func fetchSecret(ctx context.Context, client *http.Client, url string,
 	if err != nil {
 		return nil, multierror.Prefix(err, "failed to read secret from storage")
 	}
-	glog.Info("secret successfully fetched")
 	return out, nil
 }
 
@@ -337,7 +335,7 @@ func extractPortAndTags(dst *proxyconfig.DestinationWeight) (*model.Port, model.
 
 	var tags model.Tags
 	if len(dst.Tags) > 4 {
-		tags = make(model.Tags, len(dst.Tags)-3)
+		tags = make(model.Tags, len(dst.Tags)-4)
 		for k, v := range dst.Tags {
 			tags[k] = v
 		}
