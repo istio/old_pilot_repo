@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	rpc "github.com/googleapis/googleapis/google/rpc"
 
@@ -36,6 +37,10 @@ type mixerAPIResponse struct {
 	Data   interface{} `json:"data,omitempty"`
 	Status rpc.Status  `json:"status,omitempty"`
 }
+
+const (
+	requestTimeout = time.Second
+)
 
 var (
 	mixerFile          string
@@ -104,7 +109,7 @@ func mixerRuleCreate(host, scope, subject string, rule []byte) error {
 	}
 	request.Header.Set("Content-Type", "application/yaml")
 
-	var client http.Client
+	client := http.Client{Timeout: requestTimeout}
 	resp, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("failed sending request: %v", err)
@@ -127,7 +132,8 @@ func mixerRuleCreate(host, scope, subject string, rule []byte) error {
 }
 
 func mixerRuleGet(host, scope, subject string) (string, error) {
-	resp, err := http.Get(mixerRulePath(host, scope, subject))
+	client := http.Client{Timeout: requestTimeout}
+	resp, err := client.Get(mixerRulePath(host, scope, subject))
 	if err != nil {
 		return "", fmt.Errorf("failed sending request: %v", err)
 	}
