@@ -94,7 +94,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_gogo_protobuf",
-    commit = "e18d7aa8f8c624c915db340349aad4c49b10d173",
+    commit = "100ba4e885062801d56799d78530b73b178a78f3", # Mar 7 2017
     importpath = "github.com/gogo/protobuf",
 )
 
@@ -256,6 +256,55 @@ new_go_repository(
     name = "com_github_golang_sync",
     commit = "450f422ab23cf9881c94e2db30cac0eb1b7cf80c",
     importpath = "github.com/golang/sync",
+)
+
+##
+## Protobuf definitions
+##
+
+git_repository(
+    name = "org_pubref_rules_protobuf",
+    remote = "https://github.com/pubref/rules_protobuf",
+    commit = "d42e895387c658eda90276aea018056fcdcb30e4" , # Feb 17 2017
+)
+
+load("@org_pubref_rules_protobuf//gogo:rules.bzl", "gogo_proto_repositories")
+gogo_proto_repositories()
+
+new_git_repository(
+    name = "com_github_istio_api",
+    build_file_content = """
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@org_pubref_rules_protobuf//gogo:rules.bzl", "gogoslick_proto_library")
+package(default_visibility = ["//visibility:public"])
+go_prefix("istio.io/api")
+gogoslick_proto_library(
+    name = "proxy/v1/config",
+    importmap = {
+        "google/protobuf/any.proto": "github.com/gogo/protobuf/types",
+        "google/protobuf/wrappers.proto": "github.com/gogo/protobuf/types",
+    },
+    imports = [
+        "../../external/com_github_gogo_protobuf",
+        "../../external/com_github_google_protobuf/src",
+    ],
+    inputs = [
+        "@com_github_google_protobuf//:well_known_protos",
+        "@com_github_gogo_protobuf//gogoproto:go_default_library_protos",
+    ],
+    protos = [
+        "proxy/v1/config/cfg.proto"
+    ],
+    deps = [
+        "@com_github_gogo_protobuf//types:go_default_library",
+        "@com_github_gogo_protobuf//sortkeys:go_default_library",
+    ],
+    with_grpc = False,
+    verbose = 0,
+)
+    """,
+    commit = "8d8055effe8f3bef5cb2ce3fcc8529969e14fbc9", # Mar 09 2017
+    remote = "https://github.com/istio/api.git",
 )
 
 ##
