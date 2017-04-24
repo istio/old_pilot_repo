@@ -8,7 +8,7 @@ set -ex
 # customize for development / debug setup
 HUB=docker.io/$(whoami)
 TAG=test
-NAMESPACE=ccc
+NAMESPACE=prepare_proxy_test0
 GCLOUD_CLUSTER_NAME=c1
 GCLOUD_CLUSTER_ZONE=us-central1-a
 ENVOY_UID=1337
