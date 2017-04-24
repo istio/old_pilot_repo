@@ -653,9 +653,9 @@ func TestValidateProxyAddress(t *testing.T) {
 
 func TestValidateDuration(t *testing.T) {
 	durations := map[duration.Duration]bool{
-		duration.Duration{Seconds: 1}:              true,
-		duration.Duration{Seconds: 1, Nanos: -1}:   false,
-		duration.Duration{Seconds: -11, Nanos: -1}: false,
+		{Seconds: 1}:              true,
+		{Seconds: 1, Nanos: -1}:   false,
+		{Seconds: -11, Nanos: -1}: false,
 	}
 	for duration, valid := range durations {
 		if got := validateDuration(&duration); (got == nil) != valid {
