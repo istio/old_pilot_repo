@@ -78,7 +78,7 @@ type Params struct {
 	EnableCoreDump    bool
 	Mesh              *proxyconfig.ProxyMeshConfig
 	MeshConfigMapName string
-	// Comma seperated list of IP ranges in CIDR form. If set, only
+	// Comma separated list of IP ranges in CIDR form. If set, only
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
 	IncludeIPRanges string
