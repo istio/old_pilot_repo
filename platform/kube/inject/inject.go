@@ -78,14 +78,10 @@ type Params struct {
 	EnableCoreDump    bool
 	Mesh              *proxyconfig.ProxyMeshConfig
 	MeshConfigMapName string
-	// (optional): comma seperated list of IP ranges in CIDR form to
-	// include for traffic redirection. All traffic outside these
-	// ranges is not redirected.
+	// Comma seperated list of IP ranges in CIDR form. If set, only
+	// redirect outbound traffic to Envoy for these IP
+	// ranges. Otherwise all outbound traffic is redirected to Envoy.
 	IncludeIPRanges string
-	// (optional): comma seperated list of IP ranges in CIDR form to
-	// exclude from traffic redirection. All traffic outside of these
-	// ranges is redirected to proxy.
-	ExcludeIPRanges string
 }
 
 var enableCoreDumpContainer = map[string]interface{}{
@@ -125,8 +121,6 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	}
 	if p.IncludeIPRanges != "" {
 		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
-	} else if p.ExcludeIPRanges != "" {
-		initArgs = append(initArgs, "-e", p.ExcludeIPRanges)
 	}
 	annotations = append(annotations, map[string]interface{}{
 		"name":            initContainerName,

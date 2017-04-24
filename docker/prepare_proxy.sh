@@ -1,5 +1,5 @@
 #!/bin/bash
-# Proxy initialization script responsible for setting up port forwarding.
+# Envoy initialization script responsible for setting up port forwarding.
 
 set -o errexit
 set -o nounset
@@ -8,33 +8,28 @@ set -o pipefail
 usage() {
   echo "${0} -p PORT -u UID [-h]"
   echo ''
-  echo '  -p: Specify the proxy port to which redirect all TCP traffic'
+  echo '  -p: Specify the envoy port to which redirect all TCP traffic'
   echo '  -u: Specify the UID of the user for which the redirection is not'
-  echo '  -e: Comma seperated list of IP ranges in CIDR form to exclude from outbound redirection to proxy (optional)'
-  echo '  -i: Comma seperated list of IP ranges in CIDR form to redirection to proxy (optional)'
   echo '      applied. Typically, this is the UID of the proxy container'
+  echo '  -i: Comma separated list of IP ranges in CIDR form to redirection to envoy (optional)'
   echo ''
 }
 
 ISTIO_IP_RANGES_INCLUDE=""
-ISTIO_IP_RANGES_EXCLUDE=""
 
 while getopts ":p:u:e:i:h" opt; do
   case ${opt} in
     p)
-      ISTIO_PROXY_PORT=${OPTARG}
+      ENVOY_PORT=${OPTARG}
       ;;
     u)
-      ISTIO_PROXY_UID=${OPTARG}
-      ;;
-    e)
-      ISTIO_IP_RANGES_EXCLUDE=${OPTARG}
+      ENVOY_UID=${OPTARG}
       ;;
     i)
       ISTIO_IP_RANGES_INCLUDE=${OPTARG}
       ;;
     h)
-      usage
+      usagey
       exit 0
       ;;
     \?)
@@ -45,59 +40,52 @@ while getopts ":p:u:e:i:h" opt; do
   esac
 done
 
-if [[ -z "${ISTIO_PROXY_PORT-}" ]] || [[ -z "${ISTIO_PROXY_UID-}" ]]; then
+if [[ -z "${ENVOY_PORT-}" ]] || [[ -z "${ENVOY_UID-}" ]]; then
   echo "Please set both -p and -u parameters"
   usage
   exit 1
 fi
 
-iptables -t nat -F
-
 # Create a new chain for redirecting inbound and outbound traffic to
-# the common Istio proxy port.
-iptables -t nat -N ISTIO_REDIRECT                                                   -m comment --comment "istio/redirect-common-chain"
-iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-ports ${ISTIO_PROXY_PORT} -m comment --comment "istio/redirect-to-proxy-port"
+# the common Envoy port.
+iptables -t nat -N ISTIO_REDIRECT                                             -m comment --comment "istio/redirect-common-chain"
+iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-ports ${ENVOY_PORT} -m comment --comment "istio/redirect-to-envoy-port"
 
-# Redirect all inbound traffic to the proxy.
-iptables -t nat -A PREROUTING -j ISTIO_REDIRECT                                     -m comment --comment "istio/install-istio-prerouting"
+# Redirect all inbound traffic to Envoy.
+iptables -t nat -A PREROUTING -j ISTIO_REDIRECT                               -m comment --comment "istio/install-istio-prerouting"
 
 # Create a new chain for selectively redirecting outbound packets to
-# istio and attach it the OUTPUT rule for all tcp traffic. '-j RETURN'
-# bypasses the proxy port; '-j ISTIO_REDIRECT' redirects to the proxy
-# port.
-iptables -t nat -N ISTIO_OUTPUT
-iptables -t nat -A OUTPUT -p tcp -j ISTIO_OUTPUT                                    -m comment --comment "istio/install-istio-output"
+# Envoy.
+iptables -t nat -N ISTIO_OUTPUT                                               -m comment --comment "istio/common-output-chain"
 
-# Locally routed traffic is not captured by PREROUTING chain. Redirect
-# loopback back traffic when the DST_IP is not explicitly the loopback
-# address to handles appN => proxy (client) => proxy (server) => appN.
-iptables -t nat -A ISTIO_OUTPUT -o lo ! -d 127.0.0.1/32 -j ISTIO_REDIRECT           -m comment --comment "istio/implicit-loopback"
+# Jump to the ISTIO_OUTPUT chain from OUTPUT chain for all tcp
+# traffic. '-j RETURN' bypasses Envoy and '-j ISTIO_REDIRECT'
+# redirects to Envoy.
+iptables -t nat -A OUTPUT -p tcp -j ISTIO_OUTPUT                              -m comment --comment "istio/install-istio-output"
 
-# Avoid infinite loops. Don't redirect proxy traffic directly back to
-# the proxy for non-loopback traffic.
-iptables -t nat -A ISTIO_OUTPUT -m owner --uid-owner ${ISTIO_PROXY_UID} -j RETURN   -m comment --comment "istio/exclude-proxy"
+# Redirect app calls to back itself via Envoy when using the service VIP or endpoint
+# address, e.g. appN => Envoy (client) => Envoy (server) => appN.
+iptables -t nat -A ISTIO_OUTPUT -o lo ! -d 127.0.0.1/32 -j ISTIO_REDIRECT     -m comment --comment "istio/redirect-implicit-loopback"
 
-# Skip redirection for proxy-aware applications and
-# container-to-container traffic which explicitly use localhost.
-iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                           -m comment --comment "istio/explicit-loopback"
+# Avoid infinite loops. Don't redirect Envoy traffic directly back to
+# Envoy for non-loopback traffic.
+iptables -t nat -A ISTIO_OUTPUT -m owner --uid-owner ${ENVOY_UID} -j RETURN   -m comment --comment "istio/bypass-envoy"
 
-# The default outobund redirection policy is opt-out. IP ranges may be
-# selectively excluded from redirection with ISTIO_IP_RANGES_EXCLUDE.
-#
-# If ISTIO_IP_RANGES_INCLUDE is defined the outbound redirection
-# policy is default opt-in. IP ranges may be selectively included for
-# redirection with ISTIO_IP_RANGES_INCLUDE.
+# Skip redirection for Envoy-aware applications and
+# container-to-container traffic both of which explicitly use
+# localhost.
+iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m comment --comment "istio/bypass-explicit-loopback"
+
+# Only redirect outbound traffic to selective IP ranges when
+# ISTIO_IP_RANGES_INCLUDE is non-empty. Otherwise redirect all
+# outbound traffic not already handled by the previous rules to Envoy.
 IFS=,
-if [ "${ISTIO_IP_RANGES_INCLUDE}" = "" ]; then
-    for cidr in ${ISTIO_IP_RANGES_EXCLUDE}; do
-        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j RETURN                        -m comment --comment "istio/exclude-cidr-block-${cidr}"
-    done
-    iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                               -m comment --comment "istio/default-opt-in-redirect"
-else
+if [ "${ISTIO_IP_RANGES_INCLUDE}" != "" ]; then
     for cidr in ${ISTIO_IP_RANGES_INCLUDE}; do
-        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT                -m comment --comment "istio/include-cidr-block-${cidr}"
+        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
     done
-    iptables -t nat -A ISTIO_OUTPUT -j RETURN                                       -m comment --comment "istio/default-opt-out-redirect"
-fi
+    iptables -t nat -A ISTIO_OUTPUT -j RETURN                                 -m comment --comment "istio/bypass-default-outbound"
+else
+    iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                         -m comment --comment "istio/redirect-default-outbound"
 
 exit 0

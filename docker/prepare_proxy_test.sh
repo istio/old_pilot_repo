@@ -11,11 +11,12 @@ TAG=test
 NAMESPACE=ccc
 GCLOUD_CLUSTER_NAME=c1
 GCLOUD_CLUSTER_ZONE=us-central1-a
-ISTIO_PROXY_UID=1337
-ISTIO_PROXY_PORT=80
-SERVER_PORT=${ISTIO_PROXY_PORT}
+ENVOY_UID=1337
+ENVOY_PORT=80
+SERVER_PORT=${ENVOY_PORT}
 CLIENT_PORT=81
 OTHER_PORT=82
+TEST_IP_RANGE_INCLUDE=0
 
 for image in app init proxy; do
     bazel run //docker:${image}_debug
@@ -67,28 +68,29 @@ while [ "$SERVER" = "" ]; do SERVER=$(kc get pod -l app=server -o jsonpath='{.it
 SERVER_IP=
 while [ "$SERVER_IP" = "" ]; do SERVER_IP=$(kc get pod -l app=server -o jsonpath='{.items[0].status.podIP}'); done
 
-if false; then
-    # exclude specific external traffic (opt-out)
-    EXCLUDE_CIDR=$(host httpbin.org | cut -f4 -d' ' | sed -e 's|$|/32|' | paste -sd ",")
-    EXTERNAL=http://httpbin.org/status/418
-    EXTERNAL_MATCH=TEAPOT
+# Return the kubernetes service and pod IP ranges as a comma seperated
+# list, e.g. 10.0.0.1/32,10.2.0.1/16. This function is GKE specific
+# and must modified for other providers, e.g. minikube.
+function k8sClusterAndServiceIPRange() {
+    echo $(gcloud container clusters describe ${GCLOUD_CLUSTER_NAME} --zone=${GCLOUD_CLUSTER_ZONE} |
+	       grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
+	       cut -f2 -d' ' | paste -sd ",")
+}
 
-    # Enable proxy redirection on server only
+if [ "${TEST_IP_RANGE_INCLUDE}" = 1 ]; then
+    # Only redirect service and pod traffic to Envoy.
+    INCLUDE_IP_RANGE=$(k8sClusterAndServiceIPRange)
     kc exec ${SERVER} -c init -- \
-       /usr/local/bin/prepare_proxy.sh -u ${ISTIO_PROXY_UID} -p ${ISTIO_PROXY_PORT} -e ${EXCLUDE_CIDR}
+       /usr/local/bin/prepare_proxy.sh -u ${ENVOY_UID} -p ${ENVOY_PORT} -i ${INCLUDE_IP_RANGE}
 else
-    # include specific internal service and pod traffic (opt-in)
-    INCLUDE_CIDR=$(gcloud container clusters describe ${GCLOUD_CLUSTER_NAME} --zone=${GCLOUD_CLUSTER_ZONE} |
-		       grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
-		       cut -f2 -d' ' | paste -sd ",")
-
+    # redirect all outbound traffic to Envoy.
     kc exec ${SERVER} -c init -- \
-       /usr/local/bin/prepare_proxy.sh -u ${ISTIO_PROXY_UID} -p ${ISTIO_PROXY_PORT} -i ${INCLUDE_CIDR}
+       /usr/local/bin/prepare_proxy.sh -u ${ENVOY_UID} -p ${ENVOY_PORT}
 fi
 
 function redirectedPackets() {
     kc exec ${SERVER} -c init -- iptables -t nat -S ISTIO_REDIRECT -v  | \
-	grep -- '--comment "istio/redirect-to-proxy-port' | \
+	grep -- '--comment "istio/redirect-to-envoy-port' | \
 	sed 's/.*-c \([0-9]*\).*/\1/'
 }
 prev=$(redirectedPackets)
