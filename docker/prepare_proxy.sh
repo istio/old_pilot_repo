@@ -76,9 +76,9 @@ iptables -t nat -A ISTIO_OUTPUT -m owner --uid-owner ${ENVOY_UID} -j RETURN   -m
 # localhost.
 iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m comment --comment "istio/bypass-explicit-loopback"
 
-# Only redirect outbound traffic to selective IP ranges when
-# ISTIO_IP_RANGES_INCLUDE is non-empty. Otherwise redirect all
-# outbound traffic not already handled by the previous rules to Envoy.
+# All outbound traffic will be redirected to Envoy by default. If
+# ISTIO_IP_RANGES_INCLUDE is non-empty, only traffic bound for the
+# destinations specified in this list will be captured.
 IFS=,
 if [ "${ISTIO_IP_RANGES_INCLUDE}" != "" ]; then
     for cidr in ${ISTIO_IP_RANGES_INCLUDE}; do
