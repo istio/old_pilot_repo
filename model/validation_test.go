@@ -676,6 +676,7 @@ func TestValidateProxyMeshConfig(t *testing.T) {
 		DiscoveryRefreshDelay:  ptypes.DurationProto(-1 * time.Second),
 		ConnectTimeout:         ptypes.DurationProto(-1 * time.Second),
 		IstioServiceCluster:    "",
+		AuthPolicy:             -1,
 		AuthCertsPath:          "",
 	}
 
@@ -686,7 +687,7 @@ func TestValidateProxyMeshConfig(t *testing.T) {
 		switch err.(type) {
 		case *multierror.Error:
 			// each field must cause an error in the field
-			if len(err.(*multierror.Error).Errors) < 11 {
+			if len(err.(*multierror.Error).Errors) < 12 {
 				t.Errorf("expected an error for each field %v", err)
 			}
 		default:

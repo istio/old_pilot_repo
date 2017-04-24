@@ -745,5 +745,11 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 		errs = multierror.Append(errs, errors.New("invalid auth certificates path"))
 	}
 
+	switch mesh.AuthPolicy {
+	case proxyconfig.ProxyMeshConfig_NONE, proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+	default:
+		errs = multierror.Append(errs, fmt.Errorf("unrecognized auth policy %q", mesh.AuthPolicy))
+	}
+
 	return
 }
