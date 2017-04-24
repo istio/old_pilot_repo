@@ -100,8 +100,9 @@ Example usage:
 
 			mesh, err := cmd.GetMeshConfig(client.GetKubernetesClient(), namespace, meshConfig)
 			if err != nil {
-				return fmt.Errorf("could not find config map %s/%s. Is Istio system installed in %s?",
-					namespace, meshConfig, namespace)
+				return fmt.Errorf("Istio configuration not found. Verify istio configmap is "+
+					"installed in namespace %q with `kubectl get -n %s configmap istio`",
+					namespace, namespace)
 			}
 			params := &inject.Params{
 				InitImage:       inject.InitImageName(hub, tag),
