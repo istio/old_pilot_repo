@@ -96,7 +96,11 @@ func (infra *infra) setup() error {
 		}
 	}
 	if infra.Ingress {
-		if err := deploy("ingress-proxy.yaml.tmpl"); err != nil {
+		ingressTmpl := "ingress-proxy.yaml.tmpl"
+		if infra.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+			ingressTmpl = "ingress-proxy-mutual-tls.yaml.tmpl"
+		}
+		if err := deploy(ingressTmpl); err != nil {
 			return err
 		}
 	}
