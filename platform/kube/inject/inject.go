@@ -78,6 +78,14 @@ type Params struct {
 	EnableCoreDump    bool
 	Mesh              *proxyconfig.ProxyMeshConfig
 	MeshConfigMapName string
+	// (optional): comma seperated list of IP ranges in CIDR form to
+	// include for traffic redirection. All traffic outside these
+	// ranges is not redirected.
+	IncludeIPRanges string
+	// (optional): comma seperated list of IP ranges in CIDR form to
+	// exclude from traffic redirection. All traffic outside of these
+	// ranges is redirected to proxy.
+	ExcludeIPRanges string
 }
 
 var enableCoreDumpContainer = map[string]interface{}{
@@ -111,13 +119,19 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			return err
 		}
 	}
+	initArgs := []string{
+		"-p", fmt.Sprintf("%d", p.Mesh.ProxyListenPort),
+		"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
+	}
+	if p.IncludeIPRanges != "" {
+		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
+	} else if p.ExcludeIPRanges != "" {
+		initArgs = append(initArgs, "-e", p.ExcludeIPRanges)
+	}
 	annotations = append(annotations, map[string]interface{}{
-		"name":  initContainerName,
-		"image": p.InitImage,
-		"args": []string{
-			"-p", fmt.Sprintf("%d", p.Mesh.ProxyListenPort),
-			"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
-		},
+		"name":            initContainerName,
+		"image":           p.InitImage,
+		"args":            initArgs,
 		"imagePullPolicy": "Always",
 		"securityContext": map[string]interface{}{
 			"capabilities": map[string]interface{}{

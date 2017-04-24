@@ -42,6 +42,8 @@ var (
 	versionStr      string // override build version
 	enableCoreDump  bool
 	meshConfig      string
+	includeIPRanges string
+	excludeIPRanges string
 
 	inFilename  string
 	outFilename string
@@ -110,6 +112,8 @@ Example usage:
 				Version:         versionStr,
 				EnableCoreDump:  enableCoreDump,
 				Mesh:            mesh,
+				IncludeIPRanges: includeIPRanges,
+				ExcludeIPRanges: excludeIPRanges,
 			}
 			if meshConfig != cmd.DefaultConfigMapName {
 				params.MeshConfigMapName = meshConfig
@@ -144,4 +148,8 @@ func init() {
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
 		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
+	injectCmd.PersistentFlags().StringVar(&includeIPRanges, "includeIPRanges", "",
+		"Comma separated list of IP ranges in CIDR form. Only traffic inside these ranges is redirected to proxy")
+	injectCmd.PersistentFlags().StringVar(&excludeIPRanges, "excludeIPRanges", "",
+		"Comma separated list of IP ranges in CIDR form. Only traffic outside these ranges is redirected to proxy")
 }
