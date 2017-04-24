@@ -4,6 +4,7 @@ metadata:
   name: client
   labels:
     app: client
+    iter: TEMPLATE_ITER
 spec:
   ports:
   - port: CLIENT_PORT
@@ -11,6 +12,7 @@ spec:
     name: http
   selector:
     app: client
+    iter: TEMPLATE_ITER
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -22,6 +24,7 @@ spec:
     metadata:
       labels:
         app: client
+        iter: TEMPLATE_ITER
     spec:
       containers:
       - image: TEMPLATE_HUB/app:TEMPLATE_TAG
@@ -37,6 +40,7 @@ metadata:
   name: server
   labels:
     app: server
+    iter: TEMPLATE_ITER
 spec:
   ports:
   - port: SERVER_PORT
@@ -44,6 +48,7 @@ spec:
     name: http
   selector:
     app: server
+    iter: TEMPLATE_ITER
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -55,6 +60,7 @@ spec:
     metadata:
       labels:
         app: server
+        iter: TEMPLATE_ITER
     spec:
       containers:
       - image: TEMPLATE_HUB/init:TEMPLATE_TAG
