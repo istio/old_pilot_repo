@@ -9,8 +9,11 @@ set -ex
 HUB=docker.io/$(whoami)
 TAG=test
 NAMESPACE=prepare-proxy-test0
+
+PLATFORM=gcloud
 GCLOUD_CLUSTER_NAME=c1
 GCLOUD_CLUSTER_ZONE=us-central1-a
+
 ENVOY_UID=1337
 ENVOY_PORT=80
 SERVER_PORT=${ENVOY_PORT}
@@ -55,12 +58,17 @@ function waitDeploymentReady {
 }
 
 # Return the kubernetes service and pod IP ranges as a comma seperated
-# list, e.g. 10.0.0.1/32,10.2.0.1/16. This function is GKE specific
-# and must modified for other providers, e.g. minikube.
+# list, e.g. 10.0.0.1/32,10.2.0.1/16.
 function k8sClusterAndServiceIPRange() {
-    echo $(gcloud container clusters describe ${GCLOUD_CLUSTER_NAME} --zone=${GCLOUD_CLUSTER_ZONE} |
-	       grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
-	       cut -f2 -d' ' | paste -sd ",")
+    case ${PLATFORM} in
+        gcloud)
+            gcloud container clusters describe ${GCLOUD_CLUSTER_NAME} --zone=${GCLOUD_CLUSTER_ZONE} |
+	               grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
+	               cut -f2 -d' ' | paste -sd ","
+            ;;
+        *)
+            echo ""
+    esac
 }
 
 function redirectedPackets() {
