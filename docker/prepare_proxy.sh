@@ -11,11 +11,11 @@ usage() {
   echo '  -p: Specify the envoy port to which redirect all TCP traffic'
   echo '  -u: Specify the UID of the user for which the redirection is not'
   echo '      applied. Typically, this is the UID of the proxy container'
-  echo '  -i: Comma separated list of IP ranges in CIDR form to redirection to envoy (optional)'
+  echo '  -i: Comma separated list of IP ranges in CIDR form to redirect to envoy (optional)'
   echo ''
 }
 
-ISTIO_IP_RANGES_INCLUDE=""
+IP_RANGES_INCLUDE=""
 
 while getopts ":p:u:e:i:h" opt; do
   case ${opt} in
@@ -26,10 +26,10 @@ while getopts ":p:u:e:i:h" opt; do
       ENVOY_UID=${OPTARG}
       ;;
     i)
-      ISTIO_IP_RANGES_INCLUDE=${OPTARG}
+      IP_RANGES_INCLUDE=${OPTARG}
       ;;
     h)
-      usagey
+      usage
       exit 0
       ;;
     \?)
@@ -49,7 +49,7 @@ fi
 # Create a new chain for redirecting inbound and outbound traffic to
 # the common Envoy port.
 iptables -t nat -N ISTIO_REDIRECT                                             -m comment --comment "istio/redirect-common-chain"
-iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-ports ${ENVOY_PORT} -m comment --comment "istio/redirect-to-envoy-port"
+iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-port ${ENVOY_PORT}  -m comment --comment "istio/redirect-to-envoy-port"
 
 # Redirect all inbound traffic to Envoy.
 iptables -t nat -A PREROUTING -j ISTIO_REDIRECT                               -m comment --comment "istio/install-istio-prerouting"
@@ -77,11 +77,11 @@ iptables -t nat -A ISTIO_OUTPUT -m owner --uid-owner ${ENVOY_UID} -j RETURN   -m
 iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m comment --comment "istio/bypass-explicit-loopback"
 
 # All outbound traffic will be redirected to Envoy by default. If
-# ISTIO_IP_RANGES_INCLUDE is non-empty, only traffic bound for the
+# IP_RANGES_INCLUDE is non-empty, only traffic bound for the
 # destinations specified in this list will be captured.
 IFS=,
-if [ "${ISTIO_IP_RANGES_INCLUDE}" != "" ]; then
-    for cidr in ${ISTIO_IP_RANGES_INCLUDE}; do
+if [ "${IP_RANGES_INCLUDE}" != "" ]; then
+    for cidr in ${IP_RANGES_INCLUDE}; do
         iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
     done
     iptables -t nat -A ISTIO_OUTPUT -j RETURN                                 -m comment --comment "istio/bypass-default-outbound"
