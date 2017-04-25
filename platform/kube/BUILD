@@ -7,6 +7,7 @@ go_library(
         "config.go",
         "controller.go",
         "conversion.go",
+        "ingressstatus.go",
         "queue.go",
     ],
     visibility = ["//visibility:public"],
@@ -49,6 +50,7 @@ go_test(
         "client_test.go",
         "controller_test.go",
         "conversion_test.go",
+        "ingressstatus_test.go",
         "queue_test.go",
     ],
     data = [":kubeconfig"],
@@ -67,5 +69,6 @@ go_test(
         "@io_k8s_client_go//kubernetes/fake:go_default_library",
         "@io_k8s_client_go//pkg/api/v1:go_default_library",
         "@io_k8s_client_go//pkg/apis/extensions/v1beta1:go_default_library",
+        "@io_k8s_ingress//core/pkg/ingress/annotations/class:go_default_library",
     ],
 )
