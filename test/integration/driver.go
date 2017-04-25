@@ -125,7 +125,6 @@ func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
 	out.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-	out.Ingress = false
 	out.Egress = false
 	return out
 }
@@ -159,7 +158,7 @@ func runTests(envs ...infra) {
 		istio.apps, errs = util.GetAppPods(client, istio.Namespace)
 
 		tests := []test{
-			&reachability{infra: &istio},
+			&http{infra: &istio},
 			&grpc{infra: &istio},
 			&tcp{infra: &istio},
 			&ingress{infra: &istio},
