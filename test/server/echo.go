@@ -151,12 +151,12 @@ func setResponseFromCodes(request *http.Request, response http.ResponseWriter) e
 	// Keep a cursor for each sequence of response codes
 	var mutex = &sync.Mutex{}
 	mutex.Lock()
-	position, ok := state[responseCodes]
+	position, ok := state[request.URL.String()]
 	if !ok {
-		state[responseCodes] = 0
+		state[request.URL.String()] = 0
 	}
 	if len(codes) > 0 {
-		state[responseCodes] = (position + 1) % len(codes)
+		state[request.URL.String()] = (position + 1) % len(codes)
 	}
 	responseCode := codes[position]
 	mutex.Unlock()
