@@ -39,6 +39,9 @@ var (
 	ports     []int
 	grpcPorts []int
 	version   string
+
+	// Record how many attempts have been made using a particular sequence of codes
+	state map[string]int = make(map[string]int)
 )
 
 func init() {
@@ -53,6 +56,14 @@ type handler struct {
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body := bytes.Buffer{}
+	r.ParseForm()
+
+	// If the request has form ?codes=int[,int]* return those codes, in sequence, rather than 200
+	err := setResponseFromCodes(r, w)
+	if err != nil {
+		body.WriteString("codes error: " + err.Error() + "\n")
+	}
+
 	body.WriteString("ServiceVersion=" + version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Method=" + r.Method + "\n")
@@ -60,13 +71,25 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body.WriteString("Proto=" + r.Proto + "\n")
 	body.WriteString("RemoteAddr=" + r.RemoteAddr + "\n")
 	body.WriteString("Host=" + r.Host + "\n")
+
 	for name, headers := range r.Header {
 		for _, h := range headers {
 			body.WriteString(fmt.Sprintf("%v=%v\n", name, h))
 		}
 	}
+
+	hostname, err := os.Hostname()
+	if err == nil {
+		body.WriteString(fmt.Sprintf("Server instance hostname=%v\n", hostname))
+	}
+
+    for _, envExpr := range os.Environ() {
+    	if strings.HasPrefix(envExpr, "ECHO") {
+			body.WriteString(fmt.Sprintf("Server environment variable %v\n", envExpr))
+		}
+    }
+
 	w.Header().Set("Content-Type", "application/text")
-	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(body.Bytes()); err != nil {
 		log.Println(err.Error())
 	}
@@ -119,4 +142,62 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
+}
+
+func setResponseFromCodes(request *http.Request, response http.ResponseWriter) error {
+	responseCodes := request.FormValue("codes");
+
+	codes, err := validateCodes(responseCodes)
+	if err != nil {
+		return err
+	}
+
+	// Keep a cursor for each sequence of response codes
+	position, ok := state[responseCodes]
+	if !ok {
+		state[responseCodes] = 0
+	}
+	if len(codes) > 0 {
+		state[responseCodes] = (position + 1) % len(codes)
+	}
+
+	response.WriteHeader(codes[position])
+	return nil
+}
+
+
+// codes must be comma-separated HTTP response codes
+func validateCodes(codestrings string) ([]int, error) {
+
+	if codestrings == "" {
+		// Consider no codes to be a repeating sequence of 200,
+		codestrings = strconv.Itoa(http.StatusOK)
+	}
+
+	aCodestrings := strings.Split(codestrings, ",")
+	codes := make([]int, len(aCodestrings), len(aCodestrings))
+
+	for i, codestring := range aCodestrings {
+		code, err := validateCode(codestring)
+		if err != nil {
+			return []int{400}, err
+		}
+		codes[i] = code
+	}
+
+	return codes, nil
+}
+
+// code must be HTTP response code
+func validateCode(code string) (int, error) {
+	n, err := strconv.Atoi(code)
+	if err != nil {
+		return n, err
+	}
+
+	if n < 200 || n > 600 {
+		return 400, fmt.Errorf("invalid HTTP response code %v", n)
+	}
+
+	return n, nil
 }
