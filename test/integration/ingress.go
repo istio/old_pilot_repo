@@ -109,7 +109,6 @@ func (t *ingress) run() error {
 	if err := t.logs.check(t.infra); err != nil {
 		return err
 	}
-
 	return nil
 }
 
