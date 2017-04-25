@@ -143,10 +143,6 @@ func TestClientSideValidation(t *testing.T) {
 			file: "testdata/invalid-type.yaml",
 		},
 		{
-			name: "TestInvalidRuleStructure",
-			file: "testdata/invalid-dest-policy.yaml",
-		},
-		{
 			name: "TestInvalidRouteRule",
 			file: "testdata/invalid-route-rule.yaml",
 		},

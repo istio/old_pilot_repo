@@ -364,9 +364,6 @@ func readInputs() ([]apiserver.Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
-		if err = v.ParseSpec(); err != nil {
-			return nil, err
-		}
 		varr = append(varr, v)
 	}
 
