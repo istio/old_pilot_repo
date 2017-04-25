@@ -29,37 +29,37 @@ func TestConvertIngressControllerMode(t *testing.T) {
 	cases := []struct {
 		Mode       proxyconfig.ProxyMeshConfig_IngressControllerMode
 		Annotation string
-		Valid      bool
+		Ignore     bool
 	}{
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_DEFAULT,
 			Annotation: "",
-			Valid:      true,
+			Ignore:     true,
 		},
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_DEFAULT,
 			Annotation: "istio",
-			Valid:      true,
+			Ignore:     true,
 		},
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_DEFAULT,
 			Annotation: "nginx",
-			Valid:      false,
+			Ignore:     false,
 		},
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_STRICT,
 			Annotation: "",
-			Valid:      false,
+			Ignore:     false,
 		},
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_STRICT,
 			Annotation: "istio",
-			Valid:      true,
+			Ignore:     true,
 		},
 		{
 			Mode:       proxyconfig.ProxyMeshConfig_STRICT,
 			Annotation: "nginx",
-			Valid:      false,
+			Ignore:     false,
 		},
 	}
 
@@ -67,8 +67,8 @@ func TestConvertIngressControllerMode(t *testing.T) {
 		ingressClass, defaultIngressClass := convertIngressControllerMode(c.Mode, "istio")
 
 		ing := makeAnnotatedIngress(c.Annotation)
-		if valid := class.IsValid(ing, ingressClass, defaultIngressClass); valid != c.Valid {
-			t.Errorf("%v -> expected %v, got %v", c, c.Valid, valid)
+		if ignore := class.IsValid(ing, ingressClass, defaultIngressClass); ignore != c.Ignore {
+			t.Errorf("convertIngressControllerMode(%q, %q) => Got ignore %v, want %v", c, c.Ignore, ignore)
 		}
 	}
 }
