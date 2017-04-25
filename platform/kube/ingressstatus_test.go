@@ -1,11 +1,12 @@
 package kube
 
 import (
+	"testing"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/ingress/core/pkg/ingress/annotations/class"
-	"testing"
 )
 
 func makeAnnotatedIngress(annotation string) *extensions.Ingress {

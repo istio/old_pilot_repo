@@ -28,7 +28,9 @@ func (s *IngressStatusSyncer) Run(stopCh <-chan struct{}) {
 }
 
 // NewIngressStatusSyncer creates a new instance
-func NewIngressStatusSyncer(mesh *config.ProxyMeshConfig, client *Client, options ControllerOptions) *IngressStatusSyncer {
+func NewIngressStatusSyncer(mesh *config.ProxyMeshConfig, client *Client,
+	options ControllerOptions) *IngressStatusSyncer {
+
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
