@@ -639,6 +639,7 @@ func TestValidateProxyAddress(t *testing.T) {
 	addresses := map[string]bool{
 		"istio-manager:80":     true,
 		"istio-manager":        false,
+		"isti..:80":            false,
 		"10.0.0.100:9090":      true,
 		"10.0.0.100":           false,
 		"istio-manager:port":   false,

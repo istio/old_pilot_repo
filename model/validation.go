@@ -672,10 +672,16 @@ func validateProxyAddress(hostAddr string) error {
 	if err != nil {
 		return err
 	}
-
 	if err = validatePort(port); err != nil {
 		return err
 	}
+	host := hostAddr[:colon]
+	if err = validateFQDN(host); err != nil {
+		if err = validateIPv4Address(host); err != nil {
+			return fmt.Errorf("%q is not a valid hostname or an IPv4 address", host)
+		}
+	}
+
 	return nil
 }
 
