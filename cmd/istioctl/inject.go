@@ -22,6 +22,8 @@ import (
 
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
+	"istio.io/manager/model"
+	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
 
 	"github.com/spf13/cobra"
@@ -45,6 +47,10 @@ var (
 
 	inFilename  string
 	outFilename string
+
+	kubeconfig string
+	client     *kube.Client
+	config     model.ConfigRegistry
 )
 
 var (
@@ -120,6 +126,9 @@ Example usage:
 )
 
 func init() {
+
+	rootCmd.AddCommand(injectCmd)
+
 	injectCmd.PersistentFlags().StringVar(&hub, "hub",
 		os.Getenv(DefaultHubEnvVar), "Docker hub")
 	injectCmd.PersistentFlags().StringVar(&tag, "tag",

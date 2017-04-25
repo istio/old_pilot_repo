@@ -177,7 +177,7 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 		file              string
 		configKeyMapReq   bool
 		deleteKeySliceReq bool
-		wantError         string
+		wantError         bool
 		arg               []string
 		outFormat         string
 	}{
@@ -191,19 +191,19 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			name:      "TestCreateErrorsPassedBack",
 			command:   "post",
 			file:      "testdata/two-route-rules.yaml",
-			wantError: "an error",
+			wantError: true,
 		},
 		{
 			name:      "TestCreateErrorsWithArg",
 			command:   "post",
 			file:      "testdata/two-route-rules.yaml",
-			wantError: "create takes no arguments",
+			wantError: true,
 			arg:       []string{"arg-im-a-pirate"},
 		},
 		{
 			name:      "TestCreateNoFile",
 			command:   "post",
-			wantError: "nothing to create",
+			wantError: true,
 		},
 		{
 			name:            "TestUpdateSuccess",
@@ -215,19 +215,19 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			name:      "TestUpdateErrorsPassedBack",
 			command:   "put",
 			file:      "testdata/two-route-rules.yaml",
-			wantError: "an error",
+			wantError: true,
 		},
 		{
 			name:      "TestUpdateErrorsWithArg",
 			command:   "put",
 			file:      "testdata/two-route-rules.yaml",
-			wantError: "replace takes no arguments",
+			wantError: true,
 			arg:       []string{"arg-im-a-pirate"},
 		},
 		{
 			name:      "TestUpdateNoFile",
 			command:   "put",
-			wantError: "nothing to replace",
+			wantError: true,
 		},
 		{
 			name:              "TestDeleteSuccessWithFile",
@@ -240,18 +240,18 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			command:   "delete",
 			file:      "testdata/two-route-rules.yaml",
 			arg:       []string{"arg-im-a-pirate"},
-			wantError: "delete takes no arguments when the file option is used",
+			wantError: true,
 		},
 		{
 			name:      "TestDeleteNoArgsErrorWithoutFile",
 			command:   "delete",
-			wantError: "provide configuration type and name or -f option",
+			wantError: true,
 		},
 		{
 			name:      "TestDeleteErrorsPassedBackWithFile",
 			command:   "delete",
 			file:      "testdata/two-route-rules.yaml",
-			wantError: "an error",
+			wantError: true,
 		},
 		{
 			name:              "TestDeleteSuccessWithoutFile",
@@ -263,18 +263,18 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			name:      "TestDeleteErrorsPassedBackWithoutFile",
 			command:   "delete",
 			arg:       []string{"route-rule", "test-v1"},
-			wantError: "an error",
+			wantError: true,
 		},
 		{
 			name:      "TestGetNoArgs",
 			command:   "get",
-			wantError: "specify the type of resource to get. Types are destination-policy, ingress-rule, route-rule",
+			wantError: true,
 		},
 		{
 			name:      "TestListPassesBackErrors",
 			command:   "get",
 			arg:       []string{"route-rule"},
-			wantError: "an error",
+			wantError: true,
 			outFormat: "short",
 		},
 		{
@@ -318,7 +318,7 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			arg:             []string{"route-rule"},
 			configKeyMapReq: true,
 			outFormat:       "not-an-output-format",
-			wantError:       "unknown output format not-an-output-format. Types are yaml|short",
+			wantError:       true,
 		},
 		{
 			name:            "TestGetRouteRuleByName",
@@ -331,7 +331,7 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 			name:      "TestGetRouteRuleByNamePassesBackErrors",
 			command:   "get",
 			arg:       []string{"route-rule", "test-v1"},
-			wantError: "an error",
+			wantError: true,
 			outFormat: "short",
 		},
 	}
@@ -345,8 +345,8 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 		if c.deleteKeySliceReq {
 			stubClient.setupDeleteKeys()
 		}
-		if c.wantError != "" && !strings.Contains(c.wantError, "unknown output format") {
-			stubClient.Error = errors.New(c.wantError)
+		if c.wantError {
+			stubClient.Error = errors.New("an error")
 		}
 		outputFormat = c.outFormat
 		file = c.file
@@ -362,12 +362,10 @@ func TestCreateUpdateDeleteGet(t *testing.T) {
 		case "get":
 			err = getCmd.RunE(getCmd, c.arg)
 		}
-		if err != nil && c.wantError == "" {
+		if err != nil && !c.wantError {
 			t.Fatalf("%v: %v", c.name, err)
-		} else if err == nil && c.wantError != "" {
+		} else if err == nil && c.wantError {
 			t.Fatalf("%v: expected an error", c.name)
-		} else if err != nil && strings.Compare(c.wantError, err.Error()) != 0 {
-			t.Fatalf("%v: expected error to be: %v but received: %v", c.name, c.wantError, err.Error())
 		}
 	}
 }

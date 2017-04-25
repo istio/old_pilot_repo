@@ -40,19 +40,15 @@ import (
 )
 
 var (
-	namespace string
-	apiClient proxy.Client
+	namespace   string
+	apiClient   proxy.Client
+	managerAddr string
 
 	// input file name
 	file string
 
 	// output format (yaml or short)
 	outputFormat string
-
-	// kube-inject, can be removed when inject.go is removed
-	kubeconfig string
-	client     *kube.Client
-	config     model.ConfigRegistry
 
 	key    model.Key
 	schema model.ProtoSchema
@@ -65,12 +61,17 @@ var (
 			model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
 			// Get manager address
-			add := os.Getenv("ISTIO_MANAGER_ADDRESS")
-			if add == "" {
-				return errors.New("manager address environment variable is not set," +
-					"please set ISTIO_MANAGER_ADDRESS to the location and port of you Istio manager")
+			if managerAddr == "" {
+				if a := os.Getenv("ISTIO_MANAGER_ADDRESS"); a != "" {
+					glog.V(2).Infof("Setting manager address from ISTIO_MANAGER_ADDRESS environment variable")
+					managerAddr = a
+				} else {
+					return errors.New("manager address environment variable is not set," +
+						"please set ISTIO_MANAGER_ADDRESS to the location and port of you Istio manager")
+				}
+
 			}
-			url, err := url.Parse(add)
+			url, err := url.Parse(managerAddr)
 			if err != nil {
 				return err
 			}
@@ -122,14 +123,11 @@ var (
 				if err = setup(config.Type, config.Name); err != nil {
 					return err
 				}
-				if err = model.IstioConfig.ValidateConfig(&key, config.ParsedSpec); err != nil {
-					return err
-				}
 				err = apiClient.AddConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Posted %v %v\n", config.Type, config.Name)
+				fmt.Printf("Created config: %v %v\n", config.Type, config.Name)
 			}
 
 			return nil
@@ -155,14 +153,11 @@ var (
 				if err = setup(config.Type, config.Name); err != nil {
 					return err
 				}
-				if err = model.IstioConfig.ValidateConfig(&key, config.ParsedSpec); err != nil {
-					return err
-				}
 				err = apiClient.UpdateConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Put %v %v\n", config.Type, config.Name)
+				fmt.Printf("Updated config: %v %v\n", config.Type, config.Name)
 			}
 
 			return nil
@@ -247,7 +242,7 @@ var (
 					if err := apiClient.DeleteConfig(key); err != nil {
 						return err
 					}
-					fmt.Printf("Deleted %v %v\n", args[0], args[i])
+					fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
 				}
 				return nil
 			}
@@ -272,7 +267,7 @@ var (
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Deleted %v %v\n", v.Type, v.Name)
+				fmt.Printf("Deleted config: %v %v\n", v.Type, v.Name)
 			}
 
 			return nil
@@ -283,6 +278,8 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
+	rootCmd.PersistentFlags().StringVarP(&managerAddr, "managerAddr", "m", "",
+		"Set your Istio manager address")
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
 
@@ -300,7 +297,6 @@ func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(deleteCmd)
-	// rootCmd.AddCommand(injectCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }
 
