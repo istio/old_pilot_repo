@@ -249,6 +249,14 @@ func TestRouteDiscoveryIngress(t *testing.T) {
 	compareResponse(response, "testdata/rds-ingress-ssl.json", t)
 }
 
+func TestRouteDiscoveryEgress(t *testing.T) {
+	registry := mock.MakeRegistry()
+	ds := makeDiscoveryService(t, registry)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.MeshConfig.IstioServiceCluster, egressNode)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-egress.json", t)
+}
+
 func TestSecretDiscovery(t *testing.T) {
 	registry := mock.MakeRegistry()
 	addIngressRoutes(registry, t)

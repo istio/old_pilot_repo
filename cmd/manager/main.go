@@ -160,7 +160,7 @@ var (
 
 	ingressCmd = &cobra.Command{
 		Use:   "ingress",
-		Short: "Istio Proxy ingress controller",
+		Short: "Istio Proxy ingress agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			w, err := envoy.NewIngressWatcher(mesh, client)
 			if err != nil {
@@ -177,18 +177,10 @@ var (
 		Use:   "egress",
 		Short: "Istio Proxy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
-			config := &envoy.EgressConfig{
-				Namespace: flags.controllerOptions.Namespace,
-				Mesh:      mesh,
-				Services:  controller,
-				Port:      80,
-			}
-			w, err := envoy.NewEgressWatcher(controller, config)
+			w, err := envoy.NewEgressWatcher(mesh)
 			if err != nil {
 				return err
 			}
-
 			stop := make(chan struct{})
 			go w.Run(stop)
 			cmd.WaitSignal(stop)

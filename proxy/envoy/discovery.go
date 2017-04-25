@@ -476,6 +476,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			insertDestinationPolicy(ds.Config, cluster)
 		}
 
+		// apply auth policies
 		switch auth := ds.MeshConfig.AuthPolicy; auth {
 		case config.ProxyMeshConfig_NONE:
 		case config.ProxyMeshConfig_MUTUAL_TLS:
@@ -545,6 +546,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
 			return
 		}
+
 		// service-node holds the IP address
 		node := request.PathParameter(ServiceNode)
 
@@ -558,9 +560,12 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		}
 
 		var httpRouteConfigs HTTPRouteConfigs
-		if node == ingressNode {
+		switch node {
+		case ingressNode:
 			httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""))
-		} else {
+		case egressNode:
+			httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
+		default:
 			instances := ds.Discovery.HostInstances(map[string]bool{node: true})
 			services := ds.Discovery.Services()
 			httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
