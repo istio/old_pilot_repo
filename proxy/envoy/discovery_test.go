@@ -184,6 +184,14 @@ func TestClusterDiscoveryIngress(t *testing.T) {
 	compareResponse(response, "testdata/cds-ingress.json", t)
 }
 
+func TestClusterDiscoveryEgress(t *testing.T) {
+	registry := mock.MakeRegistry()
+	ds := makeDiscoveryService(t, registry)
+	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.MeshConfig.IstioServiceCluster, egressNode)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/cds-egress.json", t)
+}
+
 // Test listing all routes
 func TestRouteDiscoveryAllRoutes(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
