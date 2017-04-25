@@ -41,7 +41,7 @@ var (
 	version   string
 
 	// Record how many attempts have been made using a particular sequence of codes
-	state map[string]int = make(map[string]int)
+	state = make(map[string]int)
 )
 
 func init() {
@@ -56,11 +56,13 @@ type handler struct {
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body := bytes.Buffer{}
-	r.ParseForm()
+
+	if err := r.ParseForm(); err != nil {
+		body.WriteString("ParseForm() error: " + err.Error() + "\n")
+	}
 
 	// If the request has form ?codes=int[,int]* return those codes, in sequence, rather than 200
-	err := setResponseFromCodes(r, w)
-	if err != nil {
+	if err := setResponseFromCodes(r, w); err != nil {
 		body.WriteString("codes error: " + err.Error() + "\n")
 	}
 
@@ -78,16 +80,9 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hostname, err := os.Hostname()
-	if err == nil {
-		body.WriteString(fmt.Sprintf("Server instance hostname=%v\n", hostname))
+	if hostname, err := os.Hostname(); err == nil {
+		body.WriteString(fmt.Sprintf("Hostname=%v\n", hostname))
 	}
-
-    for _, envExpr := range os.Environ() {
-    	if strings.HasPrefix(envExpr, "ECHO") {
-			body.WriteString(fmt.Sprintf("Server environment variable %v\n", envExpr))
-		}
-    }
 
 	w.Header().Set("Content-Type", "application/text")
 	if _, err := w.Write(body.Bytes()); err != nil {
@@ -145,7 +140,7 @@ func main() {
 }
 
 func setResponseFromCodes(request *http.Request, response http.ResponseWriter) error {
-	responseCodes := request.FormValue("codes");
+	responseCodes := request.FormValue("codes")
 
 	codes, err := validateCodes(responseCodes)
 	if err != nil {
@@ -160,11 +155,11 @@ func setResponseFromCodes(request *http.Request, response http.ResponseWriter) e
 	if len(codes) > 0 {
 		state[responseCodes] = (position + 1) % len(codes)
 	}
+	responseCode := codes[position]
 
-	response.WriteHeader(codes[position])
+	response.WriteHeader(responseCode)
 	return nil
 }
-
 
 // codes must be comma-separated HTTP response codes
 func validateCodes(codestrings string) ([]int, error) {
@@ -175,12 +170,12 @@ func validateCodes(codestrings string) ([]int, error) {
 	}
 
 	aCodestrings := strings.Split(codestrings, ",")
-	codes := make([]int, len(aCodestrings), len(aCodestrings))
+	codes := make([]int, len(aCodestrings))
 
 	for i, codestring := range aCodestrings {
 		code, err := validateCode(codestring)
 		if err != nil {
-			return []int{400}, err
+			return []int{http.StatusBadRequest}, err
 		}
 		codes[i] = code
 	}
@@ -195,8 +190,8 @@ func validateCode(code string) (int, error) {
 		return n, err
 	}
 
-	if n < 200 || n > 600 {
-		return 400, fmt.Errorf("invalid HTTP response code %v", n)
+	if n < http.StatusOK || n >= 600 {
+		return http.StatusBadRequest, fmt.Errorf("invalid HTTP response code %v", n)
 	}
 
 	return n, nil
