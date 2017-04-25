@@ -482,7 +482,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			}
 
 			// apply auth policies
-			switch auth := ds.MeshConfig.AuthPolicy; auth {
+			switch ds.MeshConfig.AuthPolicy {
 			case config.ProxyMeshConfig_NONE:
 			case config.ProxyMeshConfig_MUTUAL_TLS:
 				// apply SSL context to enable mutual TLS between Envoy proxies
