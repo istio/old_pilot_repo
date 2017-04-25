@@ -26,6 +26,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	flag "github.com/spf13/pflag"
@@ -148,6 +149,8 @@ func setResponseFromCodes(request *http.Request, response http.ResponseWriter) e
 	}
 
 	// Keep a cursor for each sequence of response codes
+	var mutex = &sync.Mutex{}
+	mutex.Lock()
 	position, ok := state[responseCodes]
 	if !ok {
 		state[responseCodes] = 0
@@ -156,6 +159,7 @@ func setResponseFromCodes(request *http.Request, response http.ResponseWriter) e
 		state[responseCodes] = (position + 1) % len(codes)
 	}
 	responseCode := codes[position]
+	mutex.Unlock()
 
 	response.WriteHeader(responseCode)
 	return nil
