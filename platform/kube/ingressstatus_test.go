@@ -83,7 +83,7 @@ func TestConvertIngressControllerMode(t *testing.T) {
 		ing := makeAnnotatedIngress(c.Annotation)
 		if ignore := class.IsValid(ing, ingressClass, defaultIngressClass); ignore != c.Ignore {
 			t.Errorf("convertIngressControllerMode(%q, %q), with Ingress annotation %q => "+
-				"Got ignore %v, want %v", c.Mode, "istio", c.Ignore, ignore)
+				"Got ignore %v, want %v", c.Mode, "istio", c.Annotation, c.Ignore, ignore)
 		}
 	}
 }
