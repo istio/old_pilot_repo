@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 
 	"istio.io/manager/test/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ingress struct {
@@ -110,35 +109,7 @@ func (t *ingress) run() error {
 	if err := t.logs.check(t.infra); err != nil {
 		return err
 	}
-	if err := t.checkIngressStatus(); err != nil {
-		return err
-	}
 
-	return nil
-}
-
-// checkIngressStatus ensures that an IPs/hostnames are in the ingress statuses
-// TODO: retries? the status can take a while to be updated
-func (t *ingress) checkIngressStatus() error {
-	ings, err := client.Extensions().Ingresses(t.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	if len(ings.Items) == 0 {
-		return fmt.Errorf("ingress status failure: no ingress")
-	}
-	for _, ing := range ings.Items {
-		if len(ing.Status.LoadBalancer.Ingress) == 0 {
-			return fmt.Errorf("ingress status failure: ingress %q has no IPs or hostnames", ing.Name)
-		}
-
-		for _, status := range ing.Status.LoadBalancer.Ingress {
-			if status.IP == "" && status.Hostname == "" {
-				return fmt.Errorf("ingress status failure: ingress %q does not have IP or hostname "+
-					"associated with load balancer", ing.Name)
-			}
-		}
-	}
 	return nil
 }
 
