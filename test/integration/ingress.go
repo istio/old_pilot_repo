@@ -111,7 +111,6 @@ func (t *ingress) run() error {
 		return err
 	}
 	if err := t.checkIngressStatus(); err != nil {
-		util.Run(fmt.Sprintf("kubectl get ingress -n %s", t.Namespace))
 		return err
 	}
 
