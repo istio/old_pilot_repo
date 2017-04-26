@@ -82,8 +82,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if hostname, err := os.Hostname(); err == nil {
-		fmt.Printf("Hostname=%v\n", hostname)
-		// body.WriteString(fmt.Sprintf("Hostname=%v\n", hostname))
+		body.WriteString(fmt.Sprintf("Hostname=%v\n", hostname))
 	}
 
 	w.Header().Set("Content-Type", "application/text")
