@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -71,12 +70,12 @@ var (
 				}
 
 			}
-			url, err := url.Parse(managerAddr)
+			managerURL, err := url.Parse(managerAddr)
 			if err != nil {
 				return err
 			}
 			// Setup manager client
-			apiClient = proxy.NewManagerClient(*url, "v1alpha1", &http.Client{})
+			apiClient = proxy.NewManagerClient(*managerURL, "v1alpha1", &http.Client{})
 
 			// Kube-inject, can be removed when inject.go is removed
 			if kubeconfig == "" {
@@ -182,6 +181,9 @@ var (
 				if err != nil {
 					return err
 				}
+				if err = config.ParseSpec(); err != nil {
+					return err
+				}
 				out, err := schema.ToYAML(config.ParsedSpec)
 				if err != nil {
 					return err
@@ -193,26 +195,17 @@ var (
 					return err
 				}
 
-				list, err := apiClient.ListConfig(key.Kind, key.Namespace)
+				configList, err := apiClient.ListConfig(key.Kind, key.Namespace)
 				if err != nil {
 					return err
 				}
-				printList := make(map[model.Key]proto.Message)
-				for _, config := range list {
-					tempKey := model.Key{
-						Name:      config.Name,
-						Namespace: key.Namespace,
-						Kind:      key.Kind,
-					}
-					printList[tempKey] = config.ParsedSpec
-				}
 
-				var outputters = map[string](func(map[model.Key]proto.Message) error){
+				var outputters = map[string](func([]apiserver.Config) error){
 					"yaml":  printYamlOutput,
 					"short": printShortOutput,
 				}
 				if outputFunc, ok := outputters[outputFormat]; ok {
-					if err := outputFunc(printList); err != nil {
+					if err := outputFunc(configList); err != nil {
 						return err
 					}
 				} else {
@@ -371,26 +364,29 @@ func readInputs() ([]apiserver.Config, error) {
 }
 
 // Print a simple list of names
-func printShortOutput(list map[model.Key]proto.Message) error {
-	for key := range list {
-		fmt.Printf("%v\n", key.Name)
+func printShortOutput(configList []apiserver.Config) error {
+	for _, c := range configList {
+		fmt.Printf("%v\n", c.Name)
 	}
 
 	return nil
 }
 
 // Print as YAML
-func printYamlOutput(list map[model.Key]proto.Message) error {
+func printYamlOutput(configList []apiserver.Config) error {
 	var retVal error
 
-	for key, item := range list {
-		out, err := schema.ToYAML(item)
+	for _, c := range configList {
+		if err := c.ParseSpec(); err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
+		out, err := schema.ToYAML(c.ParsedSpec)
 		if err != nil {
 			retVal = multierror.Append(retVal, err)
 		} else {
-			fmt.Printf("kind: %s\n", key.Kind)
-			fmt.Printf("name: %s\n", key.Name)
-			fmt.Printf("namespace: %s\n", key.Namespace)
+			fmt.Printf("kind: %s\n", c.Type)
+			fmt.Printf("name: %s\n", c.Name)
+			fmt.Printf("namespace: %s\n", namespace)
 			fmt.Println("spec:")
 			lines := strings.Split(out, "\n")
 			for _, line := range lines {
