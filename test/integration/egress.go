@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"istio.io/manager/test/util"
 )
@@ -33,6 +34,13 @@ func (t *egress) String() string {
 }
 
 func (t *egress) setup() error {
+	if !t.Egress {
+		return nil
+	}
+	if err := util.Run(fmt.Sprintf(
+		"kubectl -n %s apply -f test/integration/testdata/external-service.yaml", t.Namespace)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -54,13 +62,8 @@ func (t *egress) run() error {
 				url := fmt.Sprintf("http://%s%s", dst, path)
 				trace := fmt.Sprint(time.Now().UnixNano())
 				return func() status {
-					resp, err := util.Shell(fmt.Sprintf(
-						"kubectl exec %s -n %s -c app -- client -url %s -key Trace-Id -val %q",
-						t.apps[src][0], t.Namespace, url, trace))
-					if err != nil {
-						return err
-					}
-					if strings.Contains(resp, trace) && strings.Contains(resp, "StatusCode=200") {
+					resp := t.clientRequest(src, url, 1, fmt.Sprintf("-key Trace-Id -val %q", trace))
+					if len(resp.code) > 0 && resp.code[0] == "200" && strings.Contains(resp.body, trace) {
 						return nil
 					}
 					return errAgain
@@ -72,4 +75,13 @@ func (t *egress) run() error {
 }
 
 func (t *egress) teardown() {
+	if !t.Egress {
+		return
+	}
+	if err := client.CoreV1().Services(t.Namespace).Delete("httpbin", &meta_v1.DeleteOptions{}); err != nil {
+		glog.Warning(err)
+	}
+	if err := client.CoreV1().Services(t.Namespace).Delete("httpsgoogle", &meta_v1.DeleteOptions{}); err != nil {
+		glog.Warning(err)
+	}
 }

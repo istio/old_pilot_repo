@@ -78,6 +78,10 @@ type Params struct {
 	EnableCoreDump    bool
 	Mesh              *proxyconfig.ProxyMeshConfig
 	MeshConfigMapName string
+	// Comma separated list of IP ranges in CIDR form. If set, only
+	// redirect outbound traffic to Envoy for these IP
+	// ranges. Otherwise all outbound traffic is redirected to Envoy.
+	IncludeIPRanges string
 }
 
 var enableCoreDumpContainer = map[string]interface{}{
@@ -86,7 +90,7 @@ var enableCoreDumpContainer = map[string]interface{}{
 	"command": []string{"/bin/sh"},
 	"args": []string{
 		"-c",
-		"sysctl -w kernel.core_pattern=/tmp/core.%e.%p.%t",
+		"sysctl -w kernel.core_pattern=/tmp/core.%e.%p.%t && ulimit -c unlimited",
 	},
 	"imagePullPolicy": "Always",
 	"securityContext": map[string]interface{}{
@@ -111,13 +115,17 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			return err
 		}
 	}
+	initArgs := []string{
+		"-p", fmt.Sprintf("%d", p.Mesh.ProxyListenPort),
+		"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
+	}
+	if p.IncludeIPRanges != "" {
+		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
+	}
 	annotations = append(annotations, map[string]interface{}{
-		"name":  initContainerName,
-		"image": p.InitImage,
-		"args": []string{
-			"-p", fmt.Sprintf("%d", p.Mesh.ProxyListenPort),
-			"-u", strconv.FormatInt(p.SidecarProxyUID, 10),
-		},
+		"name":            initContainerName,
+		"image":           p.InitImage,
+		"args":            initArgs,
 		"imagePullPolicy": "Always",
 		"securityContext": map[string]interface{}{
 			"capabilities": map[string]interface{}{
