@@ -22,6 +22,7 @@ import (
 
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
+	"istio.io/manager/model"
 	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
 
@@ -49,6 +50,7 @@ var (
 
 	kubeconfig string
 	client     *kube.Client
+	config     model.ConfigRegistry
 )
 
 var (

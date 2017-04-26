@@ -15,16 +15,18 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
 	"net/http"
@@ -181,10 +183,11 @@ var (
 				if err != nil {
 					return err
 				}
-				if err = config.ParseSpec(); err != nil {
+				cSpecBytes, err := json.Marshal(config.Spec)
+				if err != nil {
 					return err
 				}
-				out, err := schema.ToYAML(config.ParsedSpec)
+				out, err := yaml.JSONToYAML(cSpecBytes)
 				if err != nil {
 					return err
 				}
@@ -347,7 +350,7 @@ func readInputs() ([]apiserver.Config, error) {
 	var varr []apiserver.Config
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
-	yamlDecoder := yaml.NewYAMLOrJSONDecoder(reader, 512*1024)
+	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
 		v := apiserver.Config{}
 		err = yamlDecoder.Decode(&v)
@@ -377,10 +380,14 @@ func printYamlOutput(configList []apiserver.Config) error {
 	var retVal error
 
 	for _, c := range configList {
-		if err := c.ParseSpec(); err != nil {
+		cSpecBytes, err := json.Marshal(c.Spec)
+		if err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
-		out, err := schema.ToYAML(c.ParsedSpec)
+		out, err := yaml.JSONToYAML(cSpecBytes)
+		if err != nil {
+			retVal = multierror.Append(retVal, err)
+		}
 		if err != nil {
 			retVal = multierror.Append(retVal, err)
 		} else {
@@ -388,7 +395,7 @@ func printYamlOutput(configList []apiserver.Config) error {
 			fmt.Printf("name: %s\n", c.Name)
 			fmt.Printf("namespace: %s\n", namespace)
 			fmt.Println("spec:")
-			lines := strings.Split(out, "\n")
+			lines := strings.Split(string(out), "\n")
 			for _, line := range lines {
 				if line != "" {
 					fmt.Printf("  %s\n", line)
