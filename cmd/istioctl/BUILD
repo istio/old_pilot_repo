@@ -35,13 +35,6 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-go_binary(
-    name = "gendoc",
-    srcs = [ "gendoc.go" ],
-    deps = ["@com_github_spf13_cobra//:go_default_library" ],
-    visibility = ["//visibility:public"],
-)
-
 go_test(
     name = "go_default_test",
     size = "small",
