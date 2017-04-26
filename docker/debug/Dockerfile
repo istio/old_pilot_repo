@@ -15,7 +15,6 @@ RUN apt-get update && \
 	    tcpdump \
 	    net-tools \
 	    libc6-dbg gdb valgrind \
-	    curl \
 	    vim \
 	    nano \
 	    emacs \
