@@ -23,7 +23,7 @@ type FakeHandler struct {
 
 func (f *FakeHandler) HandlerFunc(w http.ResponseWriter, r *http.Request) {
 	if reflect.DeepEqual(r.Header, f.sentHeaders) {
-		w.Write([]byte(fmt.Sprintf("Received unexpected headers, wanted: %v got %v",
+		_, _ = w.Write([]byte(fmt.Sprintf("Received unexpected headers, wanted: %v got %v",
 			f.sentHeaders, r.Header)))
 	}
 	w.WriteHeader(f.wantStatusCode)
