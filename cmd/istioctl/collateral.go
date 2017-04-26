@@ -22,7 +22,9 @@ import (
 )
 
 var (
-	outputDir     string
+	outputDir      string
+	prependContent string
+
 	collateralCmd = &cobra.Command{
 		Use:   "collateral",
 		Short: "Generate istioctl collateral files",
@@ -35,7 +37,9 @@ Generate reference markdown documentation for the Istioctl commands
 and subcommands.
 `,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return doc.GenMarkdownTree(rootCmd, outputDir)
+			prepender := func(_ string) string { return prependContent }
+			linker := func()
+			return doc.GenMarkdownTreeCustom(rootCmd, outputDir, prepender, linker)
 		},
 	}
 	collateralCompleteCmd = &cobra.Command{
@@ -61,9 +65,15 @@ Examples:
 	}
 )
 
+func contentPrepender(_ string) string {
+	return prependContent
+}
+
 func init() {
-	collateralCmd.PersistentFlags().StringVarP(&outputDir, "dir", "d", ".",
-		"Output directory for generated output file(s)")
+	collateralMarkdownCmd.PersistentFlags().StringVar(&outputDir, "dir", ".",
+		"Output directory for generated markdown files")
+	collateralMarkdownCmd.PersistentFlags().StringVar(&prependContent, "prepend", "",
+		"Prepend content to the generated markdown files")
 	collateralCmd.AddCommand(collateralMarkdownCmd)
 	collateralCmd.AddCommand(collateralCompleteCmd)
 	rootCmd.AddCommand(collateralCmd)
