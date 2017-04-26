@@ -48,6 +48,9 @@ func (m *ManagerClient) do(request *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("unable to parse URL: %v", err)
 	}
 	request.URL = fullURL
+	if request.Method == "POST" || request.Method == "PUT" {
+		request.Header.Set("Content-Type", "application/json")
+	}
 	response, err := m.client.Do(request)
 	if err != nil {
 		return nil, err
