@@ -53,7 +53,14 @@ func (m *ManagerClient) do(request *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
+		defer func() { _ = response.Body.Close() }() // #nosec
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		} else if len(body) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", response.StatusCode, string(body))
 	}
 	return response, nil
 }

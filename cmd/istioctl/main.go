@@ -66,7 +66,7 @@ var (
 					glog.V(2).Infof("Setting manager address from ISTIO_MANAGER_ADDRESS environment variable")
 					managerAddr = a
 				} else {
-					return errors.New("manager address environment variable is not set," +
+					return errors.New("manager address environment variable is not set, " +
 						"please set ISTIO_MANAGER_ADDRESS to the location and port of you Istio manager")
 				}
 
