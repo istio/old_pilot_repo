@@ -88,7 +88,10 @@ sh_test(
         "envoy",
         "testdata/envoy-ingress.json.golden",
     ],
-    tags = ["manual", "exclusive"],
+    tags = [
+        "exclusive",
+        "manual",
+    ],
 )
 
 sh_test(
@@ -136,6 +139,8 @@ sh_test(
         "envoy",
         "testdata/envoy-v0-auth.json.golden",
     ],
-    tags = ["manual", "exclusive"],
+    tags = [
+        "exclusive",
+        "manual",
+    ],
 )
-
