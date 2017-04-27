@@ -310,8 +310,12 @@ func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) (errs error) {
 // ValidateHTTPTimeout validates HTTP Timeout
 func ValidateHTTPTimeout(timeout *proxyconfig.HTTPTimeout) error {
 	if simple := timeout.GetSimpleTimeout(); simple != nil {
-		if simple.TimeoutSeconds < 0 {
-			return fmt.Errorf("timeout_seconds must be in range [0..]")
+		dur, err := ptypes.Duration(simple.Timeout)
+		if err != nil {
+			return err
+		}
+		if dur.Seconds() < 0 {
+			return fmt.Errorf("timeout must be in range [0..]")
 		}
 
 		// TODO validate override_header_name?
@@ -327,7 +331,11 @@ func ValidateHTTPRetries(retry *proxyconfig.HTTPRetry) (errs error) {
 			errs = multierror.Append(errs, fmt.Errorf("attempts must be in range [0..]"))
 		}
 
-		if simple.PerTryTimeoutSeconds <= 0 {
+		dur, err := ptypes.Duration(simple.PerTryTimeout)
+		if err != nil {
+			return err
+		}
+		if dur.Seconds() <= 0 {
 			errs = multierror.Append(errs, fmt.Errorf("per_try_timeout_seconds must be >0 seconds"))
 		}
 		// We ignore override_header_name
@@ -427,13 +435,20 @@ func validateIPv4Address(addr string) error {
 
 func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) (errs error) {
 	errs = validateFloatPercent(errs, delay.Percent, "delay")
-
-	if delay.GetFixedDelaySeconds() < 0 {
+	dur, err := ptypes.Duration(delay.GetFixedDelay())
+	if err != nil {
+		return err
+	}
+	if dur.Seconds() < 0 {
 		errs = multierror.Append(errs, fmt.Errorf("delay fixed_seconds invalid"))
 	}
 
-	if delay.GetExponentialDelaySeconds() != 0 {
-		if delay.GetExponentialDelaySeconds() < 0 {
+	if delay.GetExponentialDelay() != nil {
+		dur, err = ptypes.Duration(delay.GetExponentialDelay())
+		if err != nil {
+			return err
+		}
+		if dur.Seconds() < 0 {
 			errs = multierror.Append(errs, fmt.Errorf("delay exponential_seconds invalid"))
 		}
 		errs = multierror.Append(errs, fmt.Errorf("Istio does not support exponential_seconds yet"))
@@ -486,8 +501,12 @@ func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) (errs err
 		errs = multierror.Append(errs, fmt.Errorf("upstream_limit_bps invalid"))
 	}
 
-	if throttle.GetThrottleAfterSeconds() < 0 {
-		errs = multierror.Append(errs, fmt.Errorf("throttle_after_seconds invalid"))
+	dur, err := ptypes.Duration(throttle.GetThrottleAfterPeriod())
+	if err != nil {
+		return err
+	}
+	if dur.Seconds() < 0 {
+		errs = multierror.Append(errs, fmt.Errorf("throttle invalid"))
 	}
 
 	if throttle.GetThrottleAfterBytes() < 0 {
@@ -517,15 +536,25 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 		if simple.HttpMaxRequests < 0 {
 			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker max_requests must be in range [0..]"))
 		}
-		if simple.SleepWindowSeconds < 0 {
+
+		dur, err := ptypes.Duration(simple.SleepWindow)
+		if err != nil {
+			return err
+		}
+		if dur.Seconds() < 0 {
 			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker sleep_window_seconds must be in range [0..]"))
 		}
 		if simple.HttpConsecutiveErrors < 0 {
 			errs = multierror.Append(errs, fmt.Errorf("circuit_breaker http_consecutive_errors must be in range [0..]"))
 		}
-		if simple.HttpDetectionIntervalSeconds < 0 {
+
+		dur, err = ptypes.Duration(simple.HttpDetectionInterval)
+		if err != nil {
+			return err
+		}
+		if dur.Seconds() < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker http_detection_interval_seconds must be in range [0..]"))
+				fmt.Errorf("circuit_breaker http_detection_interval must be in range [0..]"))
 		}
 		if simple.HttpMaxRequestsPerConnection < 0 {
 			errs = multierror.Append(errs,

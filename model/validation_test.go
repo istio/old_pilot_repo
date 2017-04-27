@@ -423,7 +423,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpReqTimeout: &proxyconfig.HTTPTimeout{
 				TimeoutPolicy: &proxyconfig.HTTPTimeout_SimpleTimeout{
-					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{TimeoutSeconds: -1},
+					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{Timeout: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -432,7 +432,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpReqRetries: &proxyconfig.HTTPRetry{
 				RetryPolicy: &proxyconfig.HTTPRetry_SimpleRetry{
-					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{Attempts: -1, PerTryTimeoutSeconds: 0},
+					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{Attempts: -1, PerTryTimeout: &duration.Duration{Seconds: 0}},
 				},
 			},
 		},
@@ -442,7 +442,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent:       -1,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: 3},
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{FixedDelay: &duration.Duration{Seconds: 3}},
 				},
 			},
 		},
@@ -452,7 +452,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent:       100,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelaySeconds{FixedDelaySeconds: -1},
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{FixedDelay: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -482,7 +482,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent:       101,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_ExponentialDelaySeconds{ExponentialDelaySeconds: -1},
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_ExponentialDelay{ExponentialDelay: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -494,11 +494,11 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 					Percent:            101,
 					DownstreamLimitBps: -1,
 					UpstreamLimitBps:   -1,
-					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterSeconds{ThrottleAfterSeconds: -1},
+					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterPeriod{ThrottleAfterPeriod: &duration.Duration{Seconds: -1}},
 				},
 				Terminate: &proxyconfig.L4FaultInjection_Terminate{
-					Percent:               101,
-					TerminateAfterSeconds: -1,
+					Percent:              101,
+					TerminateAfterPeriod: &duration.Duration{Seconds: -1},
 				},
 			},
 		},
@@ -576,9 +576,9 @@ func TestValidateDestinationPolicy(t *testing.T) {
 						MaxConnections:               -1,
 						HttpMaxPendingRequests:       -1,
 						HttpMaxRequests:              -1,
-						SleepWindowSeconds:           -1,
+						SleepWindow:                  &duration.Duration{Seconds: -1},
 						HttpConsecutiveErrors:        -1,
-						HttpDetectionIntervalSeconds: -1,
+						HttpDetectionInterval:        &duration.Duration{Seconds: -1},
 						HttpMaxRequestsPerConnection: -1,
 						HttpMaxEjectionPercent:       -1,
 					},
