@@ -11,6 +11,7 @@ go_library(
         "reachability.go",
         "routing.go",
         "tcp.go",
+        "zipkin.go",
     ],
     deps = [
         "//cmd:go_default_library",

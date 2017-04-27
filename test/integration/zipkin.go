@@ -15,12 +15,9 @@
 package main
 
 import (
-	"fmt"
-	"regexp"
-
-	"github.com/golang/glog"
-
+	"time"
 	"istio.io/manager/test/util"
+	"fmt"
 )
 
 type zipkin struct {
@@ -36,7 +33,16 @@ func (t *zipkin) setup() error {
 }
 
 func (t *zipkin) run() error {
-
+	for i := 0; i<120; i++ {
+		request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url http://%s",
+			t.apps["a"][0], t.Namespace, "b"))
+		if err != nil {
+			return err
+		}
+		fmt.Println(request)
+		time.Sleep(1 * time.Second)
+	}
+	time.Sleep(1 * time.Hour)
 	return nil
 }
 
