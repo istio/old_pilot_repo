@@ -121,7 +121,7 @@ func (t *ingress) run() error {
 	return nil
 }
 
-// ensure that an IPs/hostnames are in the ingress statuses
+// ensure that IPs/hostnames are in the ingress statuses
 func (t *ingress) checkIngressStatus() error {
 	ings, err := client.Extensions().Ingresses(t.Namespace).List(metav1.ListOptions{})
 	if err != nil {
