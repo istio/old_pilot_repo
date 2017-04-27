@@ -25,24 +25,16 @@ var (
 	outputDir      string
 	prependContent string
 
-	collateralCmd = &cobra.Command{
-		Use:   "collateral",
-		Short: "Generate istioctl collateral files",
-	}
-	collateralMarkdownCmd = &cobra.Command{
-		Use:   "markdown",
-		Short: "Generate markdown documentation for Istioctl",
-		Long: `
-Generate reference markdown documentation for the Istioctl commands
-and subcommands.
-`,
+	markdownCmd = &cobra.Command{
+		Use:               "markdown",
+		Short:             "Generate markdown documentation for Istioctl",
+		DisableAutoGenTag: true,
+		Hidden:            true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			prepender := func(_ string) string { return prependContent }
-			linker := func()
-			return doc.GenMarkdownTreeCustom(rootCmd, outputDir, prepender, linker)
+			return doc.GenMarkdownTree(rootCmd, outputDir)
 		},
 	}
-	collateralCompleteCmd = &cobra.Command{
+	completeCmd = &cobra.Command{
 		Use:   "completion",
 		Short: "Generate bash completion for Istioctl",
 		Long: `
@@ -53,10 +45,10 @@ commands.
 Examples:
 
     # Add the following to .bash_profile.
-    source <(istioctl collateral completion)
+    source <(istioctl completion)
 
     # Create a separate completion file and source that from .bash_profile
-    istioctl collateral completion > ~/.istioctl-complete.bash
+    istioctl completion > ~/.istioctl-complete.bash
     echo "source ~/.istioctl-complete.bash" >> ~/.bash_profile
 `,
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -65,16 +57,11 @@ Examples:
 	}
 )
 
-func contentPrepender(_ string) string {
-	return prependContent
-}
-
 func init() {
-	collateralMarkdownCmd.PersistentFlags().StringVar(&outputDir, "dir", ".",
+	markdownCmd.PersistentFlags().StringVar(&outputDir, "dir", ".",
 		"Output directory for generated markdown files")
-	collateralMarkdownCmd.PersistentFlags().StringVar(&prependContent, "prepend", "",
+	markdownCmd.PersistentFlags().StringVar(&prependContent, "prepend", "",
 		"Prepend content to the generated markdown files")
-	collateralCmd.AddCommand(collateralMarkdownCmd)
-	collateralCmd.AddCommand(collateralCompleteCmd)
-	rootCmd.AddCommand(collateralCmd)
+	rootCmd.AddCommand(markdownCmd)
+	rootCmd.AddCommand(completeCmd)
 }
