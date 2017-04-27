@@ -196,10 +196,7 @@ func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) *Li
 	case proxyconfig.ProxyMeshConfig_NONE:
 	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
 		listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
-	default:
-		glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
 	}
-
 	return listener
 }
 
@@ -326,19 +323,6 @@ func buildOutboundHTTPRoutes(
 		}
 
 		clusters.setTimeout(mesh.ConnectTimeout)
-
-		// apply SSL context to outbound clusters for authentication policy
-		switch mesh.AuthPolicy {
-		case proxyconfig.ProxyMeshConfig_NONE:
-		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-			serviceAccounts := accounts.GetIstioServiceAccounts(service.Hostname, service.Ports.GetNames())
-			sslContext := buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
-			for _, cluster := range clusters {
-				cluster.SSLContext = sslContext
-			}
-		default:
-			glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
-		}
 	}
 
 	httpConfigs.normalize()
