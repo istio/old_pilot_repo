@@ -113,6 +113,8 @@ type FilterMixerConfig struct {
 	// ForwardAttributes specifies the list of attribute keys and values that
 	// are forwarded as an HTTP header to the server side proxy
 	ForwardAttributes map[string]string `json:"forward_attributes,omitempty"`
+
+	QuotaName string `json:"quota_name,omitempty"`
 }
 
 // FilterFaultConfig definition
