@@ -82,9 +82,11 @@ contained within the scope.
 Example usage:
 	# The mixer config server can be accessed from outside the
     # kubernetes cluster using port forwarding.
-    CONFIG_PORT=$(kubectl get pod -l istio=mixer -o jsonpath='{.items[0].spec.containers[0].ports[1].containerPort}')
+    CONFIG_PORT=$(kubectl get pod -l istio=mixer \
+		-o jsonpath='{.items[0].spec.containers[0].ports[1].containerPort}')
     export ISTIO_MIXER_API_SERVER=localhost:${CONFIG_PORT}
-    kubectl port-forward $(kubectl get pod -l istio=mixer -o jsonpath='{.items[0].metadata.name}') ${CONFIG_PORT}:${CONFIG_PORT} &
+    kubectl port-forward $(kubectl get pod -l istio=mixer \
+		-o jsonpath='{.items[0].metadata.name}') ${CONFIG_PORT}:${CONFIG_PORT} &
 `,
 		SilenceUsage: true,
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
