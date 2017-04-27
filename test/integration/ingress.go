@@ -66,6 +66,7 @@ func (t *ingress) run() error {
 	}
 
 	funcs := make(map[string]func() status)
+	funcs["Ingress status IP"] = t.checkIngressStatus
 	cases := []struct {
 		dst  string
 		path string
@@ -105,13 +106,6 @@ func (t *ingress) run() error {
 		})(req.dst, req.path, req.tls)
 	}
 
-	funcs["Ingress status IP"] = func() status {
-		if err := t.checkIngressStatus(); err != nil {
-			return errAgain
-		}
-		return nil
-	}
-
 	if err := parallel(funcs); err != nil {
 		return err
 	}
@@ -122,7 +116,7 @@ func (t *ingress) run() error {
 }
 
 // ensure that IPs/hostnames are in the ingress statuses
-func (t *ingress) checkIngressStatus() error {
+func (t *ingress) checkIngressStatus() status {
 	ings, err := client.Extensions().Ingresses(t.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -132,13 +126,12 @@ func (t *ingress) checkIngressStatus() error {
 	}
 	for _, ing := range ings.Items {
 		if len(ing.Status.LoadBalancer.Ingress) == 0 {
-			return fmt.Errorf("ingress status failure: ingress %q has no IPs or hostnames", ing.Name)
+			return errAgain
 		}
 
 		for _, status := range ing.Status.LoadBalancer.Ingress {
 			if status.IP == "" && status.Hostname == "" {
-				return fmt.Errorf("ingress status failure: ingress %q does not have IP or hostname "+
-					"associated with load balancer", ing.Name)
+				return errAgain
 			}
 		}
 	}
