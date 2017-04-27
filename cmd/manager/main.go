@@ -46,8 +46,6 @@ type args struct {
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
-
-	defaultIngressController bool
 }
 
 var (
@@ -58,7 +56,7 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "manager",
 		Short: "Istio Manager",
-		Long:  "Istio Manager provides management plane functionality to the Istio proxy mesh and Istio Mixer.",
+		Long:  "Istio Manager provides management plane functionality to the Istio service mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
 			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
 			if err != nil {
@@ -95,7 +93,7 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio Manager discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			controller := kube.NewController(client, flags.controllerOptions)
+			controller := kube.NewController(client, mesh, flags.controllerOptions)
 			context := &proxy.Context{
 				Discovery:  controller,
 				Accounts:   controller,
@@ -118,7 +116,7 @@ var (
 		Use:   "apiserver",
 		Short: "Start Istio Manager config API service",
 		Run: func(*cobra.Command, []string) {
-			controller := kube.NewController(client, flags.controllerOptions)
+			controller := kube.NewController(client, mesh, flags.controllerOptions)
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
 				Version:  "v1alpha1",
 				Port:     flags.apiserverPort,
@@ -132,14 +130,14 @@ var (
 
 	proxyCmd = &cobra.Command{
 		Use:   "proxy",
-		Short: "Istio Proxy agent",
+		Short: "Envoy agent",
 	}
 
 	sidecarCmd = &cobra.Command{
 		Use:   "sidecar",
-		Short: "Istio Proxy sidecar agent",
+		Short: "Envoy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			controller := kube.NewController(client, flags.controllerOptions)
+			controller := kube.NewController(client, mesh, flags.controllerOptions)
 			context := &proxy.Context{
 				Discovery:        controller,
 				Accounts:         controller,
@@ -162,26 +160,16 @@ var (
 
 	ingressCmd = &cobra.Command{
 		Use:   "ingress",
-		Short: "Istio Proxy ingress controller",
+		Short: "Envoy ingress agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			flags.controllerOptions.IngressSyncMode = kube.IngressStrict
-			controller := kube.NewController(client, flags.controllerOptions)
-			config := &envoy.IngressConfig{
-				CertFile:  "/etc/tls.crt",
-				KeyFile:   "/etc/tls.key",
-				Namespace: flags.controllerOptions.Namespace,
-				Secrets:   controller,
-				Registry:  &model.IstioRegistry{ConfigRegistry: controller},
-				Mesh:      mesh,
-				Port:      80,
-				SSLPort:   443,
-			}
-			w, err := envoy.NewIngressWatcher(controller, config)
+			s := kube.NewIngressStatusSyncer(mesh, client, flags.controllerOptions)
+			w, err := envoy.NewIngressWatcher(mesh, client)
 			if err != nil {
 				return err
 			}
 			stop := make(chan struct{})
 			go w.Run(stop)
+			go s.Run(stop)
 			cmd.WaitSignal(stop)
 			return nil
 		},
@@ -189,21 +177,12 @@ var (
 
 	egressCmd = &cobra.Command{
 		Use:   "egress",
-		Short: "Istio Proxy external service agent",
+		Short: "Envoy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			flags.controllerOptions.IngressSyncMode = kube.IngressOff
-			controller := kube.NewController(client, flags.controllerOptions)
-			config := &envoy.EgressConfig{
-				Namespace: flags.controllerOptions.Namespace,
-				Mesh:      mesh,
-				Services:  controller,
-				Port:      80,
-			}
-			w, err := envoy.NewEgressWatcher(controller, config)
+			w, err := envoy.NewEgressWatcher(mesh)
 			if err != nil {
 				return err
 			}
-
 			stop := make(chan struct{})
 			go w.Run(stop)
 			cmd.WaitSignal(stop)
@@ -220,7 +199,7 @@ func init() {
 	rootCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", time.Second,
 		"Controller resync interval")
 	rootCmd.PersistentFlags().StringVar(&flags.meshConfig, "meshConfig", cmd.DefaultConfigMapName,
-		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", cmd.ConfigMapKey))
+		fmt.Sprintf("ConfigMap name for Istio mesh configuration, config key should be %q", cmd.ConfigMapKey))
 
 	discoveryCmd.PersistentFlags().IntVar(&flags.discoveryOptions.Port, "port", 8080,
 		"Discovery service port")
@@ -239,11 +218,6 @@ func init() {
 
 	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
 		"Passthrough ports for health checks")
-	ingressCmd.PersistentFlags().StringVar(&flags.controllerOptions.IngressClass, "ingress_class", "istio",
-		"The class of ingress resources to be processed by this ingress controller")
-	ingressCmd.PersistentFlags().BoolVar(&flags.defaultIngressController, "default_ingress_controller", true,
-		"Specifies whether running as the cluster's default ingress controller, "+
-			"thereby processing unclassified ingress resources")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)

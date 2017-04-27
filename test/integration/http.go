@@ -18,33 +18,28 @@ package main
 
 import (
 	"fmt"
-	"regexp"
-
-	"github.com/golang/glog"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/test/util"
 )
 
-type reachability struct {
+type http struct {
 	*infra
 	logs *accessLogs
 }
 
-func (r *reachability) String() string {
+func (r *http) String() string {
 	return "HTTP reachability"
 }
 
-func (r *reachability) setup() error {
+func (r *http) setup() error {
 	r.logs = makeAccessLogs()
 	return nil
 }
 
-func (r *reachability) teardown() {
+func (r *http) teardown() {
 }
 
-func (r *reachability) run() error {
-	glog.Info("Verifying basic reachability across pods/services (a, b, and t)..")
+func (r *http) run() error {
 	if err := r.makeRequests(); err != nil {
 		return err
 	}
@@ -55,7 +50,7 @@ func (r *reachability) run() error {
 }
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
-func (r *reachability) makeRequests() error {
+func (r *http) makeRequests() error {
 	testPods := []string{"a", "b"}
 	if r.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
@@ -70,15 +65,9 @@ func (r *reachability) makeRequests() error {
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
-							request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s",
-								r.apps[src][0], r.Namespace, url))
-							if err != nil {
-								glog.Error(err)
-								return failure
-							}
-							match := regexp.MustCompile("X-Request-Id=(.*)").FindStringSubmatch(request)
-							if len(match) > 1 {
-								id := match[1]
+							resp := r.clientRequest(src, url, 1, "")
+							if len(resp.id) > 0 {
+								id := resp.id[0]
 								if src != "t" {
 									r.logs.add(src, id, name)
 								}
@@ -86,16 +75,16 @@ func (r *reachability) makeRequests() error {
 									r.logs.add(dst, id, name)
 								}
 								// mixer filter is invoked on the server side, that is when dst is not "t"
-								if dst != "t" {
+								if r.Mixer && dst != "t" {
 									r.logs.add("mixer", id, name)
 								}
-								return success
+								return nil
 							}
 							if src == "t" && dst == "t" {
 								// Expected no match for t->t
-								return success
+								return nil
 							}
-							return again
+							return errAgain
 						}
 					})(src, dst, port, domain)
 				}

@@ -22,6 +22,8 @@ import (
 
 	"istio.io/manager/cmd"
 	"istio.io/manager/cmd/version"
+	"istio.io/manager/model"
+	"istio.io/manager/platform/kube"
 	"istio.io/manager/platform/kube/inject"
 
 	"github.com/spf13/cobra"
@@ -42,9 +44,14 @@ var (
 	versionStr      string // override build version
 	enableCoreDump  bool
 	meshConfig      string
+	includeIPRanges string
 
 	inFilename  string
 	outFilename string
+
+	kubeconfig string
+	client     *kube.Client
+	config     model.ConfigRegistry
 )
 
 var (
@@ -100,7 +107,9 @@ Example usage:
 
 			mesh, err := cmd.GetMeshConfig(client.GetKubernetesClient(), namespace, meshConfig)
 			if err != nil {
-				return err
+				return fmt.Errorf("Istio configuration not found. Verify istio configmap is "+
+					"installed in namespace %q with `kubectl get -n %s configmap istio`",
+					namespace, namespace)
 			}
 			params := &inject.Params{
 				InitImage:       inject.InitImageName(hub, tag),
@@ -110,6 +119,7 @@ Example usage:
 				Version:         versionStr,
 				EnableCoreDump:  enableCoreDump,
 				Mesh:            mesh,
+				IncludeIPRanges: includeIPRanges,
 			}
 			if meshConfig != cmd.DefaultConfigMapName {
 				params.MeshConfigMapName = meshConfig
@@ -120,6 +130,9 @@ Example usage:
 )
 
 func init() {
+
+	rootCmd.AddCommand(injectCmd)
+
 	injectCmd.PersistentFlags().StringVar(&hub, "hub",
 		os.Getenv(DefaultHubEnvVar), "Docker hub")
 	injectCmd.PersistentFlags().StringVar(&tag, "tag",
@@ -144,4 +157,7 @@ func init() {
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
 		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
+	injectCmd.PersistentFlags().StringVar(&includeIPRanges, "includeIPRanges", "",
+		"Comma separated list of IP ranges in CIDR form. If set, only redirect outbound "+
+			"traffic to Envoy for IP ranges. Otherwise all outbound traffic is redirected")
 }

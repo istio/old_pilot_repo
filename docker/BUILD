@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+load("@bazel_tools//tools/build_defs/docker:docker.bzl", "docker_build")
 load("//docker:manager_docker.bzl", "manager_docker_build")
 
 # Use "manual" target tag to skip rules in the wildcard expansion
@@ -48,12 +49,6 @@ pkg_tar(
 )
 
 manager_docker_build(
-    debs = [
-        "@deb_iptables//file",
-        "@deb_libnfnetlink//file",
-        "@deb_libxtables//file",
-    ],
-    entrypoint = ["/usr/local/bin/prepare_proxy.sh"],
     images = [
         {
             "name": "init",
@@ -64,6 +59,12 @@ manager_docker_build(
             "base": "@ubuntu_xenial_debug//file",
         },
     ],
+    debs = [
+        "@deb_iptables//file",
+        "@deb_libnfnetlink//file",
+        "@deb_libxtables//file",
+    ],
+    entrypoint = ["/usr/local/bin/prepare_proxy.sh"],
     repository = "istio",
     tags = ["manual"],
     tars = [":prepare_proxy_tar"],
@@ -95,18 +96,10 @@ manager_docker_build(
     ],
 )
 
-manager_docker_build(
+docker_build(
+    name = "manager",
+    base = "@docker_ubuntu//:xenial",
     entrypoint = ["/usr/local/bin/manager"],
-    images = [
-        {
-            "name": "manager",
-            "base": "@docker_ubuntu//:xenial",
-        },
-        {
-            "name": "manager_debug",
-            "base": "@ubuntu_xenial_debug//file",
-        },
-    ],
     repository = "istio",
     tags = ["manual"],
     tars = [":manager_tar"],
@@ -126,5 +119,7 @@ manager_docker_build(
     ],
     repository = "istio",
     tags = ["manual"],
-    tars = [":app_tar"],
+    tars = [
+        ":app_tar",
+    ],
 )

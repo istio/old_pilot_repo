@@ -67,6 +67,10 @@ func (a *accessLogs) check(infra *infra) error {
 		name := fmt.Sprintf("Checking log of %s", app)
 		funcs[name] = (func(app string) func() status {
 			return func() status {
+				if len(infra.apps[app]) == 0 {
+					return fmt.Errorf("missing pods for app %q", app)
+				}
+
 				pod := infra.apps[app][0]
 				container := "proxy"
 				if app == "mixer" {
@@ -75,16 +79,15 @@ func (a *accessLogs) check(infra *infra) error {
 				logs := util.FetchLogs(client, pod, infra.Namespace, container)
 
 				if strings.Contains(logs, "segmentation fault") {
-					glog.Errorf("segmentation fault %s", pod)
-					return failure
+					return fmt.Errorf("segmentation fault %s", pod)
 				}
 
 				if strings.Contains(logs, "assert failure") {
-					glog.Errorf("assert failure in %s", pod)
-					return failure
+					return fmt.Errorf("assert failure in %s", pod)
 				}
 
 				// find all ids and counts
+				// TODO: this can be optimized for many string submatching
 				counts := make(map[string]int)
 				for _, request := range a.logs[app] {
 					counts[request.id] = counts[request.id] + 1
@@ -93,11 +96,11 @@ func (a *accessLogs) check(infra *infra) error {
 					got := strings.Count(logs, id)
 					if got < want {
 						glog.Errorf("Got %d for %s in logs of %s, want %d", got, id, pod, want)
-						return again
+						return errAgain
 					}
 				}
 
-				return success
+				return nil
 			}
 		})(app)
 	}

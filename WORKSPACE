@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_manager")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "87cdda3fc0fd65c63ef0316533be03ea4956f809",  # April 7 2017 (0.4.2)
+    commit = "78d030fc16e7c6e0a188714980db0b04086c4a5e",  # April 12 2017 (0.4.3)
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -108,12 +108,6 @@ new_go_repository(
     name = "com_github_golang_groupcache",
     commit = "02826c3e79038b59d737d3b1c0a1d937f71a4433",
     importpath = "github.com/golang/groupcache",
-)
-
-new_go_repository(
-    name = "com_github_golang_protobuf",
-    commit = "8616e8ee5e20a1704615e6c8d7afcdac06087a67",
-    importpath = "github.com/golang/protobuf",
 )
 
 new_go_repository(
@@ -236,6 +230,18 @@ new_go_repository(
     importpath = "k8s.io/client-go",
 )
 
+new_go_repository(
+    name = "com_github_pkg_errors",
+    commit = "a22138067af1c4942683050411a841ade67fe1eb",
+    importpath = "github.com/pkg/errors",
+)
+
+new_go_repository(
+    name = "io_k8s_ingress",
+    commit = "7f3763590a681011eedc4b14a80a97240dea644c",
+    importpath = "k8s.io/ingress",
+)
+
 ##
 ## Go dependencies
 ##
@@ -256,6 +262,24 @@ new_go_repository(
     name = "com_github_spf13_cobra",
     commit = "9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744",
     importpath = "github.com/spf13/cobra",
+)
+
+new_go_repository(
+    name = "com_github_cpuguy83_go_md2man",
+    commit = "648eed146d3f3beacb64063cd0daae908015eebd",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/cpuguy83/go-md2man",
+)
+
+new_go_repository(
+    name = "com_github_russross_blackfriday",
+    commit = "35eb537633d9950afc8ae7bdf0edb6134584e9fc",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/russross/blackfriday",
+)
+
+new_go_repository(
+    name = "com_github_shurcooL_sanitized_anchor_name",
+    commit = "10ef21a441db47d8b13ebcc5fd2310f636973c77",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/shurcooL/sanitized_anchor_name",
 )
 
 new_go_repository(
@@ -330,9 +354,26 @@ http_file(
 ## Protobuf codegen rules
 ##
 
-load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_repositories")
+# Note: do not use go_proto_repositories since it has old versions of protobuf and grpc-go
 
-go_proto_repositories()
+new_go_repository(
+    name = "com_github_golang_protobuf",
+    commit = "8ee79997227bf9b34611aee7946ae64735e6fd93",
+    importpath = "github.com/golang/protobuf",
+)
+
+http_archive(
+    name = "com_github_google_protobuf",
+    sha256 = "2a25c2b71c707c5552ec9afdfb22532a93a339e1ca5d38f163fe4107af08c54c",
+    strip_prefix = "protobuf-3.2.0",
+    url = "https://github.com/google/protobuf/archive/v3.2.0.tar.gz",
+)
+
+new_go_repository(
+    name = "org_golang_google_grpc",
+    commit = "8050b9cbc271307e5a716a9d782803d09b0d6f2d",  # v1.2.1
+    importpath = "google.golang.org/grpc",
+)
 
 new_git_repository(
     name = "io_istio_api",
@@ -351,8 +392,37 @@ go_proto_library(
     ],
 )
     """,
-    commit = "14751404111d4dbcb196a9faf8cb96594ed7ba28",  # Apr 14 2017
+    commit = "2c39ed85f3627d2167c95b905e823f7affa420af",  # Apr 26 2017
     remote = "https://github.com/istio/api.git",
+)
+
+GOOGLEAPIS_BUILD_FILE = """
+package(default_visibility = ["//visibility:public"])
+
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
+go_prefix("github.com/googleapis/googleapis/google/rpc")
+
+go_proto_library(
+    name = "go_default_library",
+    srcs = [
+        "google/rpc/code.proto",
+        "google/rpc/error_details.proto",
+        "google/rpc/status.proto",
+    ],
+    deps = [
+        "@com_github_golang_protobuf//ptypes/any:go_default_library",
+        "@com_github_golang_protobuf//ptypes/duration:go_default_library",
+        "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
+    ],
+)
+"""
+
+new_git_repository(
+    name = "com_github_googleapis_googleapis",
+    build_file_content = GOOGLEAPIS_BUILD_FILE,
+    commit = "13ac2436c5e3d568bd0e938f6ed58b77a48aba15",  # Oct 21, 2016 (only release pre-dates sha)
+    remote = "https://github.com/googleapis/googleapis.git",
 )
 
 ##
@@ -370,7 +440,7 @@ new_go_repository(
 ##
 
 git_repository(
-    name = "istio_toolbox",
-    commit = "55ee1cfbb22863051a45f084404fdf9a77046fc4",
-    remote = "https://github.com/istio/toolbox.git",
+    name = "istio_test_infra",
+    commit = "983183f98b79f8b67fe380fef4cdd21481830fd7",
+    remote = "https://github.com/istio/test-infra.git",
 )

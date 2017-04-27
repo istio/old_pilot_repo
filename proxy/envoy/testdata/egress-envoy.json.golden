@@ -9,22 +9,10 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
-            "route_config": {
-              "virtual_hosts": [
-                {
-                  "name": "httpbin.org|80",
-                  "domains": [
-                    "httpbin.default.svc.cluster.local"
-                  ],
-                  "routes": [
-                    {
-                      "prefix": "/",
-                      "cluster": "httpbin.org|80",
-                      "auto_host_rewrite": true
-                    }
-                  ]
-                }
-              ]
+            "rds": {
+              "cluster": "rds",
+              "route_config_name": "8888",
+              "refresh_delay_ms": 10
             },
             "filters": [
               {
@@ -51,16 +39,44 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "httpbin.org|80",
+        "name": "rds",
         "connect_timeout_ms": 1000,
         "type": "strict_dns",
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://httpbin.org:80"
+            "url": "tcp://localhost:8080"
           }
         ]
       }
-    ]
+    ],
+    "sds": {
+      "cluster": {
+        "name": "sds",
+        "connect_timeout_ms": 1000,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://localhost:8080"
+          }
+        ]
+      },
+      "refresh_delay_ms": 10
+    },
+    "cds": {
+      "cluster": {
+        "name": "cds",
+        "connect_timeout_ms": 1000,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://localhost:8080"
+          }
+        ]
+      },
+      "refresh_delay_ms": 10
+    }
   }
 }

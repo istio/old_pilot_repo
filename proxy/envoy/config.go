@@ -87,7 +87,11 @@ func Generate(context *proxy.Context) *Config {
 		Filters:        make([]*NetworkFilter, 0),
 	})
 
-	clusters = append(clusters, buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout))
+	return buildConfig(listeners, clusters, mesh)
+}
+
+// buildConfig creates a proxy config with discovery services and admin port
+func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -95,7 +99,8 @@ func Generate(context *proxy.Context) *Config {
 			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
-			Clusters: clusters,
+			Clusters: append(clusters,
+				buildDiscoveryCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout)),
 			SDS: &SDS{
 				Cluster:        buildDiscoveryCluster(mesh.DiscoveryAddress, "sds", mesh.ConnectTimeout),
 				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
@@ -158,7 +163,7 @@ func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
 func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds bool, inbound bool) *Listener {
+	ip string, port int, rds bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -190,25 +195,23 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 		config.RouteConfig = routeConfig
 	}
 
-	listener := &Listener{
-		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+	return &Listener{
+		BindToPort: true,
+		Address:    fmt.Sprintf("tcp://%s:%d", ip, port),
 		Filters: []*NetworkFilter{{
 			Type:   "read",
 			Name:   HTTPConnectionManager,
 			Config: config,
 		}},
 	}
+}
 
-	if inbound {
-		switch mesh.AuthPolicy {
-		case proxyconfig.ProxyMeshConfig_NONE:
-		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-			listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
-		default:
-			glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
-		}
+func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) *Listener {
+	switch mesh.AuthPolicy {
+	case proxyconfig.ProxyMeshConfig_NONE:
+	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+		listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
 	}
-
 	return listener
 }
 
@@ -234,7 +237,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
+		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true))
 	}
 	return listeners, clusters
 }
@@ -294,18 +297,11 @@ func buildOutboundHTTPRoutes(
 					routes = append(routes, buildDefaultRoute(cluster))
 				}
 
-				if service.ExternalName != "" {
+				if service.External() {
 					for _, route := range routes {
 						route.HostRewrite = service.Hostname
 						for _, cluster := range route.clusters {
-							cluster.ServiceName = ""
-							cluster.Type = ClusterTypeStrictDNS
-							cluster.Hosts = []Host{
-								{
-									URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
-								},
-							}
-
+							useEgressCluster(mesh, cluster)
 						}
 					}
 				}
@@ -315,7 +311,25 @@ func buildOutboundHTTPRoutes(
 				http.VirtualHosts = append(http.VirtualHosts, host)
 				clusters = append(clusters, host.clusters()...)
 
-			case model.ProtocolTCP, model.ProtocolHTTPS:
+			case model.ProtocolHTTPS:
+				if service.External() {
+					routes := make([]*HTTPRoute, 0)
+
+					cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+					useEgressCluster(mesh, cluster)
+
+					route := buildDefaultRoute(cluster)
+					route.HostRewrite = service.Hostname
+
+					routes = append(routes, route)
+
+					host := buildVirtualHost(service, servicePort, suffix, routes)
+					http := httpConfigs.EnsurePort(servicePort.Port)
+					http.VirtualHosts = append(http.VirtualHosts, host)
+					clusters = append(clusters, host.clusters()...)
+				}
+
+			case model.ProtocolTCP:
 				// handled by buildOutboundTCPListeners
 
 			default:
@@ -324,23 +338,20 @@ func buildOutboundHTTPRoutes(
 		}
 
 		clusters.setTimeout(mesh.ConnectTimeout)
-
-		// apply SSL context to outbound clusters for authentication policy
-		switch mesh.AuthPolicy {
-		case proxyconfig.ProxyMeshConfig_NONE:
-		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-			serviceAccounts := accounts.GetIstioServiceAccounts(service.Hostname, service.Ports.GetNames())
-			sslContext := buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
-			for _, cluster := range clusters {
-				cluster.SSLContext = sslContext
-			}
-		default:
-			glog.Warningf("Unknown auth policy: %v", mesh.AuthPolicy)
-		}
 	}
 
 	httpConfigs.normalize()
 	return httpConfigs
+}
+
+func useEgressCluster(mesh *proxyconfig.ProxyMeshConfig, cluster *Cluster) {
+	cluster.ServiceName = ""
+	cluster.Type = ClusterTypeStrictDNS
+	cluster.Hosts = []Host{
+		{
+			URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
+		},
+	}
 }
 
 // buildOutboundTCPListeners lists listeners and referenced clusters for TCP
@@ -359,8 +370,8 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 	for _, service := range services {
-		if service.ExternalName != "" {
-			continue // TODO TCP and HTTPS external services not currently supported
+		if service.External() {
+			continue // TODO TCP external services not currently supported
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
@@ -430,7 +441,7 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, true))
+				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false), mesh))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{

@@ -29,7 +29,7 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
-	"istio.io/manager/proxy/envoy"
+	"istio.io/manager/proxy"
 )
 
 const (
@@ -54,9 +54,13 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
 	}
 
-	mesh := envoy.DefaultMeshConfig
+	mesh := proxy.DefaultMeshConfig()
 	if err = model.ApplyYAML(yaml, &mesh); err != nil {
 		return nil, multierror.Prefix(err, "failed to convert to proto.")
+	}
+
+	if err = model.ValidateProxyMeshConfig(&mesh); err != nil {
+		return nil, err
 	}
 
 	return &mesh, nil
