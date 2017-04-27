@@ -51,18 +51,37 @@ var (
 var (
 	injectCmd = &cobra.Command{
 		Use:   "kube-inject",
-		Short: "Inject istio sidecar proxy into kubernetes resources",
+		Short: "Inject Istio sidecar proxy into kubernetes pod resources",
 		Long: `
-Use kube-inject to manually inject istio sidecar proxy into kubernetes
-resource files. Unsupported resources are left unmodified so it is
-safe to run kube-inject over a single file that contains multiple
-Service, ConfigMap, Deployment, etc. definitions for a complex
-application. Its best to do this when the resource is initially
-created.
 
-Example usage:
+Automatic proxy injection via k8s admission controller is not ready
+yet. Instead, use kube-inject to manually inject istio sidecar proxy
+into kubernetes resource files. Unsupported resources are left
+unmodified so it is safe to run kube-inject over a single file that
+contains multiple Service, ConfigMap, Deployment, etc. definitions for
+a complex application. Its best to do this when the resource is
+initially created.
 
+k8s.io/docs/concepts/workloads/pods/pod-overview/#pod-templates is
+updated for Job, DaemonSet, ReplicaSet, and Deployment YAML resource
+documents. Support for additional pod-based resource types can be
+added as necessary.
+
+The Istio project is continually evolving so the low-level proxy
+configuration may change unannounced. When in doubt re-run istioctl
+kube-inject on deployments to get the most up-to-date changes.
+
+Example usages:
+	# Update resources on the fly before applying.
 	kubectl apply -f <(istioctl kube-inject -f <resource.yaml>)
+
+	# Create a persistent version of the deployment with Istio sidecar
+	# injected. This is particularly useful to understand what is
+	# being injected before committing to kubernetes API server.
+	istioctl kube-inject -f deployment.yaml -o deployment-with-istio.yaml
+
+	# Update an existing deployment
+	kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 `,
 		RunE: func(_ *cobra.Command, _ []string) (err error) {
 			if inFilename == "" {
