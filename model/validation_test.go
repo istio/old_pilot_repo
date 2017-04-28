@@ -657,10 +657,64 @@ func TestValidateDuration(t *testing.T) {
 		{Seconds: 1}:              true,
 		{Seconds: 1, Nanos: -1}:   false,
 		{Seconds: -11, Nanos: -1}: false,
+		{Nanos: 1}:                false,
+		{Seconds: 1, Nanos: 1}:    false,
 	}
 	for duration, valid := range durations {
 		if got := validateDuration(&duration); (got == nil) != valid {
 			t.Errorf("Failed: got valid=%t but wanted valid=%t: %v for %v", got == nil, valid, got, duration)
+		}
+	}
+}
+
+func TestValidateParentAndDrain(t *testing.T) {
+	type ParentDrainTime struct {
+		Parent duration.Duration
+		Drain  duration.Duration
+		Valid  bool
+	}
+
+	combinations := []ParentDrainTime{
+		{
+			Parent: duration.Duration{Seconds: 2},
+			Drain:  duration.Duration{Seconds: 1},
+			Valid:  true,
+		},
+		{
+			Parent: duration.Duration{Seconds: 1},
+			Drain:  duration.Duration{Seconds: 1},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 1},
+			Drain:  duration.Duration{Seconds: 2},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 2},
+			Drain:  duration.Duration{Seconds: 1, Nanos: 1},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 2, Nanos: 1},
+			Drain:  duration.Duration{Seconds: 1},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: -2},
+			Drain:  duration.Duration{Seconds: 1},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 2},
+			Drain:  duration.Duration{Seconds: -1},
+			Valid:  false,
+		},
+	}
+	for _, combo := range combinations {
+		if got := validateParentAndDrain(&combo.Drain, &combo.Parent); (got == nil) != combo.Valid {
+			t.Errorf("Failed: got valid=%t but wanted valid=%t: %v for Parent:%v Drain:%v",
+				got == nil, combo.Valid, got, combo.Parent, combo.Drain)
 		}
 	}
 }
