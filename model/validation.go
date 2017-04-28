@@ -310,17 +310,16 @@ func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) (errs error) {
 }
 
 // ValidateHTTPTimeout validates HTTP Timeout
-func ValidateHTTPTimeout(timeout *proxyconfig.HTTPTimeout) error {
+func ValidateHTTPTimeout(timeout *proxyconfig.HTTPTimeout) (errs error) {
 	if simple := timeout.GetSimpleTimeout(); simple != nil {
-		err := validateDuration(simple.Timeout)
-		if err != nil {
-			return fmt.Errorf("timeout must be in range [0..]")
+		if err := validateDuration(simple.Timeout); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "httpTimeout invalid: "))
 		}
 
 		// TODO validate override_header_name?
 	}
 
-	return nil
+	return
 }
 
 // ValidateHTTPRetries validates HTTP Retries
@@ -330,9 +329,8 @@ func ValidateHTTPRetries(retry *proxyconfig.HTTPRetry) (errs error) {
 			errs = multierror.Append(errs, fmt.Errorf("attempts must be in range [0..]"))
 		}
 
-		err := validateDuration(simple.PerTryTimeout)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("per_try_timeout must be >0 seconds"))
+		if err := validateDuration(simple.PerTryTimeout); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "perTryTimeout invalid: "))
 		}
 		// We ignore override_header_name
 	}
@@ -431,17 +429,15 @@ func validateIPv4Address(addr string) error {
 
 func validateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) (errs error) {
 	errs = validateFloatPercent(errs, delay.Percent, "delay")
-	err := validateDuration(delay.GetFixedDelay())
-	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("delay fixed_delay invalid"))
+	if err := validateDuration(delay.GetFixedDelay()); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "fixedDelay invalid:"))
 	}
 
 	if delay.GetExponentialDelay() != nil {
-		err = validateDuration(delay.GetExponentialDelay())
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("delay exponential_delay invalid"))
+		if err := validateDuration(delay.GetExponentialDelay()); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "exponentialDelay invalid: "))
 		}
-		errs = multierror.Append(errs, fmt.Errorf("Istio does not support exponential_delay yet"))
+		errs = multierror.Append(errs, fmt.Errorf("Istio does not support exponentialDelay yet"))
 	}
 
 	return
@@ -484,20 +480,20 @@ func validateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) (errs err
 	errs = validateFloatPercent(errs, throttle.Percent, "throttle")
 
 	if throttle.DownstreamLimitBps < 0 {
-		errs = multierror.Append(errs, fmt.Errorf("downstream_limit_bps invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("downstreamLimitBps invalid"))
 	}
 
 	if throttle.UpstreamLimitBps < 0 {
-		errs = multierror.Append(errs, fmt.Errorf("upstream_limit_bps invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("upstreamLimitBps invalid"))
 	}
 
 	err := validateDuration(throttle.GetThrottleAfterPeriod())
 	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("throttle_after_period invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("throttleAfterPeriod invalid"))
 	}
 
 	if throttle.GetThrottleAfterBytes() < 0 {
-		errs = multierror.Append(errs, fmt.Errorf("throttle_after_bytes invalid"))
+		errs = multierror.Append(errs, fmt.Errorf("throttleAfterBytes invalid"))
 	}
 
 	// TODO Check DoubleValue throttle.GetThrottleForSeconds()
@@ -516,39 +512,39 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 	if simple := cb.GetSimpleCb(); simple != nil {
 		if simple.MaxConnections < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker max_connections must be in range [0..]"))
+				fmt.Errorf("circuitBreak maxConnections must be in range [0..]"))
 		}
 		if simple.HttpMaxPendingRequests < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker max_pending_requests must be in range [0..]"))
+				fmt.Errorf("circuitBreaker maxPendingRequests must be in range [0..]"))
 		}
 		if simple.HttpMaxRequests < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker max_requests must be in range [0..]"))
+				fmt.Errorf("circuitBreaker maxRequests must be in range [0..]"))
 		}
 
 		err := validateDuration(simple.SleepWindow)
 		if err != nil {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker sleep_window must be in range [0..]"))
+				fmt.Errorf("circuitBreaker sleepWindow must be in range [0..]"))
 		}
 
 		if simple.HttpConsecutiveErrors < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker http_consecutive_errors must be in range [0..]"))
+				fmt.Errorf("circuitBreaker httpConsecutiveErrors must be in range [0..]"))
 		}
 
 		err = validateDuration(simple.HttpDetectionInterval)
 		if err != nil {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker http_detection_interval must be in range [0..]"))
+				fmt.Errorf("circuitBreaker httpDetectionInterval must be in range [0..]"))
 		}
 
 		if simple.HttpMaxRequestsPerConnection < 0 {
 			errs = multierror.Append(errs,
-				fmt.Errorf("circuit_breaker http_max_requests_per_connection must be in range [0..]"))
+				fmt.Errorf("circuitBreaker httpMaxRequestsPerConnection must be in range [0..]"))
 		}
-		errs = validatePercent(errs, simple.HttpMaxEjectionPercent, "circuit_breaker http_max_ejection_percent")
+		errs = validatePercent(errs, simple.HttpMaxEjectionPercent, "circuitBreaker httpMaxEjectionPercent")
 	}
 
 	return

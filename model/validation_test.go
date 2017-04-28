@@ -423,7 +423,8 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpReqTimeout: &proxyconfig.HTTPTimeout{
 				TimeoutPolicy: &proxyconfig.HTTPTimeout_SimpleTimeout{
-					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{Timeout: &duration.Duration{Seconds: -1}},
+					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{
+						Timeout: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -432,7 +433,8 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpReqRetries: &proxyconfig.HTTPRetry{
 				RetryPolicy: &proxyconfig.HTTPRetry_SimpleRetry{
-					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{Attempts: -1, PerTryTimeout: &duration.Duration{Seconds: 0}},
+					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{
+						Attempts: -1, PerTryTimeout: &duration.Duration{Seconds: 0}},
 				},
 			},
 		},
@@ -441,8 +443,9 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
-					Percent:       -1,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{FixedDelay: &duration.Duration{Seconds: 3}},
+					Percent: -1,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{
+						FixedDelay: &duration.Duration{Seconds: 3}},
 				},
 			},
 		},
@@ -451,8 +454,9 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
-					Percent:       100,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{FixedDelay: &duration.Duration{Seconds: -1}},
+					Percent: 100,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_FixedDelay{
+						FixedDelay: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -481,8 +485,9 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			Destination: "host.default.svc.cluster.local",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
-					Percent:       101,
-					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_ExponentialDelay{ExponentialDelay: &duration.Duration{Seconds: -1}},
+					Percent: 101,
+					HttpDelayType: &proxyconfig.HTTPFaultInjection_Delay_ExponentialDelay{
+						ExponentialDelay: &duration.Duration{Seconds: -1}},
 				},
 			},
 		},
@@ -494,7 +499,8 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 					Percent:            101,
 					DownstreamLimitBps: -1,
 					UpstreamLimitBps:   -1,
-					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterPeriod{ThrottleAfterPeriod: &duration.Duration{Seconds: -1}},
+					ThrottleAfter: &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterPeriod{
+						ThrottleAfterPeriod: &duration.Duration{Seconds: -1}},
 				},
 				Terminate: &proxyconfig.L4FaultInjection_Terminate{
 					Percent:              101,
@@ -510,7 +516,8 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 					Percent:            101,
 					DownstreamLimitBps: -1,
 					UpstreamLimitBps:   -1,
-					ThrottleAfter:      &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterBytes{ThrottleAfterBytes: -1},
+					ThrottleAfter: &proxyconfig.L4FaultInjection_Throttle_ThrottleAfterBytes{
+						ThrottleAfterBytes: -1},
 				},
 			},
 		},
@@ -552,10 +559,12 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := ValidateRouteRule(c.in); (got == nil) != c.valid {
-			t.Errorf("ValidateRouteRule failed on %v: got valid=%v but wanted valid=%v: %v", c.name, got == nil, c.valid, got)
+			t.Errorf("ValidateRouteRule failed on %v: got valid=%v but wanted valid=%v: %v",
+				c.name, got == nil, c.valid, got)
 		}
 		if got := ValidateIngressRule(c.in); (got == nil) != c.valid {
-			t.Errorf("ValidateIngressRule failed on %v: got valid=%v but wanted valid=%v: %v", c.name, got == nil, c.valid, got)
+			t.Errorf("ValidateIngressRule failed on %v: got valid=%v but wanted valid=%v: %v",
+				c.name, got == nil, c.valid, got)
 		}
 	}
 }
