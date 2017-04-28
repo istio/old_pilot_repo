@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strings"
 
+	"time"
+
 	"github.com/golang/protobuf/ptypes/duration"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -127,7 +129,7 @@ func protoDurationToMS(dur *duration.Duration) int {
 		return 0
 	}
 
-	seconds := int(dur.Seconds * 1000)
-	ns := int(dur.Nanos / 1000000)
-	return seconds + ns
+	d := convertDuration(dur)
+
+	return int(d / time.Millisecond)
 }
