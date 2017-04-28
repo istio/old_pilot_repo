@@ -66,7 +66,7 @@ https://istio.io/docs/reference/routing-and-traffic-management.html
 for an overview of the routing and traffic DSL.
 
 More information on the mixer API configuration can be found under the
-istiocl mixer command documentation.
+istioctl mixer command documentation.
 `, model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
 			if kubeconfig == "" {
@@ -96,12 +96,8 @@ istiocl mixer command documentation.
 
 	postCmd = &cobra.Command{
 		Use:   "create",
-		Short: "Create policies and rules from a file",
+		Short: "Create policies and rules",
 		Long: `
-
-
-
-
 Example usage:
 	# Create a rule using the definition in example-routing.yaml.
 	$ istioctl create -f example-routing.yaml
@@ -138,7 +134,7 @@ Example usage:
 
 	putCmd = &cobra.Command{
 		Use:   "replace",
-		Short: "Replace existing policies and rules with another from a file",
+		Short: "Replace existing policies and rules",
 		Long: `
 Example usage:
 	# Create a rule using the definition in example-routing.yaml.
@@ -175,8 +171,8 @@ Example usage:
 	}
 
 	getCmd = &cobra.Command{
-		Use:   "List one or more policies or rules in YAML format",
-		Short: "Retrieve a policy or rule",
+		Use:   "get",
+		Short: "Retrieve policies and rules",
 		Long: `
 Example usage:
 	# List all route rules
@@ -238,7 +234,7 @@ Example usage:
 	}
 
 	deleteCmd = &cobra.Command{
-		Use:   "Delete a policy or rule",
+		Use:   "delete",
 		Short: "Delete policies or rules",
 		Long: `
 Example usage:

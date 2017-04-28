@@ -51,12 +51,12 @@ var (
 var (
 	injectCmd = &cobra.Command{
 		Use:   "kube-inject",
-		Short: "Inject Istio sidecar proxy into kubernetes pod resources",
+		Short: "Inject Envoy sidecar into Kubernetes pod resources",
 		Long: `
 
-Automatic proxy injection via k8s admission controller is not ready
-yet. Instead, use kube-inject to manually inject istio sidecar proxy
-into kubernetes resource files. Unsupported resources are left
+Automatic Envoy sidecar injection via k8s admission controller is not
+ready yet. Instead, use kube-inject to manually inject Envoy sidecar
+into Kubernetes resource files. Unsupported resources are left
 unmodified so it is safe to run kube-inject over a single file that
 contains multiple Service, ConfigMap, Deployment, etc. definitions for
 a complex application. Its best to do this when the resource is
@@ -67,7 +67,7 @@ updated for Job, DaemonSet, ReplicaSet, and Deployment YAML resource
 documents. Support for additional pod-based resource types can be
 added as necessary.
 
-The Istio project is continually evolving so the low-level proxy
+The Istio project is continually evolving so the Istio sidecar
 configuration may change unannounced. When in doubt re-run istioctl
 kube-inject on deployments to get the most up-to-date changes.
 
@@ -75,12 +75,12 @@ Example usages:
 	# Update resources on the fly before applying.
 	kubectl apply -f <(istioctl kube-inject -f <resource.yaml>)
 
-	# Create a persistent version of the deployment with Istio sidecar
+	# Create a persistent version of the deployment with Envoy sidecar
 	# injected. This is particularly useful to understand what is
-	# being injected before committing to kubernetes API server.
+	# being injected before committing to Kubernetes API server.
 	istioctl kube-inject -f deployment.yaml -o deployment-with-istio.yaml
 
-	# Update an existing deployment
+	# Update an existing deployment.
 	kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 `,
 		RunE: func(_ *cobra.Command, _ []string) (err error) {
@@ -148,13 +148,13 @@ func init() {
 	injectCmd.PersistentFlags().StringVar(&tag, "tag",
 		os.Getenv(DefaultTagEnvVar), "Docker tag")
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
-		"", "Input kubernetes resource filename")
+		"", "Input Kubernetes resource filename")
 	injectCmd.PersistentFlags().StringVarP(&outFilename, "output", "o",
-		"", "Modified output kubernetes resource filename")
+		"", "Modified output Kubernetes resource filename")
 	injectCmd.PersistentFlags().IntVar(&verbosity, "verbosity",
 		inject.DefaultVerbosity, "Runtime verbosity")
 	injectCmd.PersistentFlags().Int64Var(&sidecarProxyUID, "sidecarProxyUID",
-		inject.DefaultSidecarProxyUID, "Sidecar proxy UID")
+		inject.DefaultSidecarProxyUID, "Envoy sidecar UID")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
 	injectCmd.PersistentFlags().StringVar(&meshConfig, "meshConfig", cmd.DefaultConfigMapName,
@@ -165,7 +165,7 @@ func init() {
 	// require privileges. This option should only be used by the cluster
 	// admin (see https://kubernetes.io/docs/concepts/cluster-administration/sysctl-cluster/)
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
-		true, "Enable/Disable core dumps in injected proxy (--coreDump=true affects "+
+		true, "Enable/Disable core dumps in injected Envoy sidecar (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
 	injectCmd.PersistentFlags().StringVar(&includeIPRanges, "includeIPRanges", "",
 		"Comma separated list of IP ranges in CIDR form. If set, only redirect outbound "+
