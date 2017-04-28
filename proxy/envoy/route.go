@@ -18,6 +18,7 @@
 package envoy
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"sort"
 	"strings"
@@ -83,8 +84,9 @@ func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Du
 func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tags)
+	// cluster name must be below 60 characters
 	cluster := &Cluster{
-		Name:        OutboundClusterPrefix + key,
+		Name:        OutboundClusterPrefix + fmt.Sprintf("%x", sha1.Sum([]byte(key))),
 		ServiceName: key,
 		Type:        "sds",
 		LbType:      DefaultLbType,
@@ -110,9 +112,9 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	// setup timeouts for the route
 	if rule.HttpReqTimeout != nil &&
 		rule.HttpReqTimeout.GetSimpleTimeout() != nil &&
-		rule.HttpReqTimeout.GetSimpleTimeout().TimeoutSeconds > 0 {
+		protoDurationToMS(rule.HttpReqTimeout.GetSimpleTimeout().Timeout) > 0 {
 		// convert from float sec to ms
-		route.TimeoutMS = int(rule.HttpReqTimeout.GetSimpleTimeout().TimeoutSeconds * 1000)
+		route.TimeoutMS = protoDurationToMS(rule.HttpReqTimeout.GetSimpleTimeout().Timeout)
 	}
 
 	// setup retries
@@ -124,8 +126,8 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 			// These are the safest retry policies as per envoy docs
 			Policy: "5xx,connect-failure,refused-stream",
 		}
-		if rule.HttpReqRetries.GetSimpleRetry().PerTryTimeoutSeconds > 0 {
-			route.RetryPolicy.PerTryTimeoutMS = int(rule.HttpReqRetries.GetSimpleRetry().PerTryTimeoutSeconds * 1000)
+		if protoDurationToMS(rule.HttpReqRetries.GetSimpleRetry().PerTryTimeout) > 0 {
+			route.RetryPolicy.PerTryTimeoutMS = protoDurationToMS(rule.HttpReqRetries.GetSimpleRetry().PerTryTimeout)
 		}
 	}
 
