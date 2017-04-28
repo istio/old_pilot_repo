@@ -265,6 +265,24 @@ new_go_repository(
 )
 
 new_go_repository(
+    name = "com_github_cpuguy83_go_md2man",
+    commit = "648eed146d3f3beacb64063cd0daae908015eebd",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/cpuguy83/go-md2man",
+)
+
+new_go_repository(
+    name = "com_github_russross_blackfriday",
+    commit = "35eb537633d9950afc8ae7bdf0edb6134584e9fc",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/russross/blackfriday",
+)
+
+new_go_repository(
+    name = "com_github_shurcooL_sanitized_anchor_name",
+    commit = "10ef21a441db47d8b13ebcc5fd2310f636973c77",  # Mar 19, 2017 (no releases)
+    importpath = "github.com/shurcooL/sanitized_anchor_name",
+)
+
+new_go_repository(
     name = "com_github_golang_sync",
     commit = "450f422ab23cf9881c94e2db30cac0eb1b7cf80c",
     importpath = "github.com/golang/sync",
@@ -274,7 +292,7 @@ new_go_repository(
 ## Proxy build rules
 ##
 
-PROXY = "5e601ca3646135d3027568a2c8927e8f291628fc"  # Mar 23, 2017
+PROXY = "33d357e35a95c92f46012bb16396f949c240fd47"  # Apr 26, 2017
 
 http_file(
     name = "istio_proxy",
@@ -374,7 +392,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "c6c48baa88b3116fa2930b8b468fdd2493dc683a",  # Apr 19 2017
+    commit = "2c39ed85f3627d2167c95b905e823f7affa420af",  # Apr 26 2017
     remote = "https://github.com/istio/api.git",
 )
 
@@ -426,4 +444,3 @@ git_repository(
     commit = "983183f98b79f8b67fe380fef4cdd21481830fd7",
     remote = "https://github.com/istio/test-infra.git",
 )
-
