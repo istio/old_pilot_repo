@@ -219,7 +219,7 @@ func TestExceedBudget(t *testing.T) {
 	}
 	retryDelay := testRetry
 	retryDelay.MaxRetries = 1
-	a := NewAgent(Proxy{start, cleanup, func() { close(stop) }}, retryDelay)
+	a := NewAgent(Proxy{start, cleanup, func(_ interface{}) { close(stop) }}, retryDelay)
 	go a.Run(stop)
 	a.ScheduleConfigUpdate("test")
 	<-stop

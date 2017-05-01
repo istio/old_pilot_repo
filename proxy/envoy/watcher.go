@@ -176,7 +176,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 				glog.Warningf("Failed to delete config file %s for %d, %v", path, epoch, err)
 			}
 		},
-		Panic: func() {
+		Panic: func(_ interface{}) {
 			glog.Fatal("cannot start the proxy with the desired configuration")
 		},
 	}

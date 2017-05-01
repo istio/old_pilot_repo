@@ -125,9 +125,9 @@ type Proxy struct {
 	// Cleanup command for an epoch
 	Cleanup func(int)
 
-	// Panic command is invoked when all retries to start the proxy fail
-	// just before the agent terminating
-	Panic func()
+	// Panic command is invoked with the desired config when all retries to
+	// start the proxy fail just before the agent terminating
+	Panic func(interface{})
 }
 
 type agent struct {
@@ -215,7 +215,7 @@ func (a *agent) Run(stop <-chan struct{}) {
 				} else {
 					glog.Error("Permanent error: budget exhausted trying to fulfill the desired configuration")
 					if a.proxy.Panic != nil {
-						a.proxy.Panic()
+						a.proxy.Panic(a.desiredConfig)
 					}
 					return
 				}
