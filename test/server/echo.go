@@ -26,6 +26,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	flag "github.com/spf13/pflag"
@@ -39,6 +40,9 @@ var (
 	ports     []int
 	grpcPorts []int
 	version   string
+
+	// Record how many attempts have been made using a particular sequence of codes
+	state = make(map[string]int)
 )
 
 func init() {
@@ -53,6 +57,16 @@ type handler struct {
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body := bytes.Buffer{}
+
+	if err := r.ParseForm(); err != nil {
+		body.WriteString("ParseForm() error: " + err.Error() + "\n")
+	}
+
+	// If the request has form ?codes=int[,int]* return those codes, in sequence, rather than 200
+	if err := setResponseFromCodes(r, w); err != nil {
+		body.WriteString("codes error: " + err.Error() + "\n")
+	}
+
 	body.WriteString("ServiceVersion=" + version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Method=" + r.Method + "\n")
@@ -60,13 +74,18 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body.WriteString("Proto=" + r.Proto + "\n")
 	body.WriteString("RemoteAddr=" + r.RemoteAddr + "\n")
 	body.WriteString("Host=" + r.Host + "\n")
+
 	for name, headers := range r.Header {
 		for _, h := range headers {
 			body.WriteString(fmt.Sprintf("%v=%v\n", name, h))
 		}
 	}
+
+	if hostname, err := os.Hostname(); err == nil {
+		body.WriteString(fmt.Sprintf("Hostname=%v\n", hostname))
+	}
+
 	w.Header().Set("Content-Type", "application/text")
-	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(body.Bytes()); err != nil {
 		log.Println(err.Error())
 	}
@@ -119,4 +138,65 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
+}
+
+func setResponseFromCodes(request *http.Request, response http.ResponseWriter) error {
+	responseCodes := request.FormValue("codes")
+
+	codes, err := validateCodes(responseCodes)
+	if err != nil {
+		return err
+	}
+
+	// Keep a cursor for each sequence of response codes
+	var mutex = &sync.Mutex{}
+	mutex.Lock()
+	position, ok := state[request.URL.String()]
+	if !ok {
+		state[request.URL.String()] = 0
+	}
+	if len(codes) > 0 {
+		state[request.URL.String()] = (position + 1) % len(codes)
+	}
+	responseCode := codes[position]
+	mutex.Unlock()
+
+	response.WriteHeader(responseCode)
+	return nil
+}
+
+// codes must be comma-separated HTTP response codes
+func validateCodes(codestrings string) ([]int, error) {
+
+	if codestrings == "" {
+		// Consider no codes to be a repeating sequence of 200,
+		codestrings = strconv.Itoa(http.StatusOK)
+	}
+
+	aCodestrings := strings.Split(codestrings, ",")
+	codes := make([]int, len(aCodestrings))
+
+	for i, codestring := range aCodestrings {
+		code, err := validateCode(codestring)
+		if err != nil {
+			return []int{http.StatusBadRequest}, err
+		}
+		codes[i] = code
+	}
+
+	return codes, nil
+}
+
+// code must be HTTP response code
+func validateCode(code string) (int, error) {
+	n, err := strconv.Atoi(code)
+	if err != nil {
+		return n, err
+	}
+
+	if n < http.StatusOK || n >= 600 {
+		return http.StatusBadRequest, fmt.Errorf("invalid HTTP response code %v", n)
+	}
+
+	return n, nil
 }
