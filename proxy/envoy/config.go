@@ -27,8 +27,6 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/proxy"
-	//"net/url"
-	//"strconv"
 )
 
 // Config generation main functions.
@@ -101,7 +99,7 @@ func buildZipkinCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
 	return &Cluster{
 		Name:             ZipkinCollectorCluster,
 		Type:             ClusterTypeStrictDNS,
-		ConnectTimeoutMs: int(convertDuration(mesh.ConnectTimeout) / time.Millisecond), // TODO: func?
+		ConnectTimeoutMs: int(convertDuration(mesh.ConnectTimeout) / time.Millisecond),
 		LbType:           DefaultLbType,
 		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%v", ZipkinCollectorAddress)}},
 	}
@@ -207,11 +205,15 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
 		}},
-		GenerateRequestID: true,
-		Tracing: &HTTPFilterTraceConfig{
-			OperationName: IngressTraceOperation,
-		},
 		Filters: filters,
+	}
+
+	// TODO: replace with mesh.ZipkinAddress
+	if ZipkinCollectorAddress != "" {
+		config.GenerateRequestID = true
+		config.Tracing = &HTTPFilterTraceConfig{
+			OperationName: IngressTraceOperation,
+		}
 	}
 
 	if rds {
