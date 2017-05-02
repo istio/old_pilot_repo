@@ -27,6 +27,8 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
 	"istio.io/manager/proxy"
+	//"net/url"
+	//"strconv"
 )
 
 // Config generation main functions.
@@ -90,8 +92,45 @@ func Generate(context *proxy.Context) *Config {
 	return buildConfig(listeners, clusters, mesh)
 }
 
+func buildZipkinCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
+	// TODO: replace with mesh.ZipkinAddress
+	if ZipkinCollectorAddress == "" {
+		return nil
+	}
+
+	return &Cluster{
+		Name:             ZipkinCollectorCluster,
+		Type:             ClusterTypeStrictDNS,
+		ConnectTimeoutMs: int(convertDuration(mesh.ConnectTimeout) / time.Millisecond), // TODO: func?
+		LbType:           DefaultLbType,
+		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%v", ZipkinCollectorAddress)}},
+	}
+}
+
+func buildZipkinTracing(mesh *proxyconfig.ProxyMeshConfig) *Tracing {
+	// TODO: replace with mesh.ZipkinAddress
+	if ZipkinCollectorAddress == "" {
+		return nil
+	}
+
+	return &Tracing{
+		HTTPTracer: HTTPTracer{
+			HTTPTraceDriver: HTTPTraceDriver{
+				HTTPTraceDriverType: ZipkinTraceDriverType,
+				HTTPTraceDriverConfig: HTTPTraceDriverConfig{
+					CollectorCluster:  ZipkinCollectorCluster,
+					CollectorEndpoint: ZipkinCollectorEndpoint,
+				},
+			},
+		},
+	}
+}
+
 // buildConfig creates a proxy config with discovery services and admin port
 func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {
+	if cluster := buildZipkinCluster(mesh); cluster != nil {
+		clusters = append(clusters, cluster)
+	}
 	return &Config{
 		Listeners: listeners,
 		Admin: Admin{
@@ -110,17 +149,7 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 				RefreshDelayMs: int(convertDuration(mesh.DiscoveryRefreshDelay) / time.Millisecond),
 			},
 		},
-		Tracing: &Tracing{
-			HTTPTracer: HTTPTracer{
-				HTTPTraceDriver: HTTPTraceDriver{
-					HTTPTraceDriverType: ZipkinTraceDriverType,
-					HTTPTraceDriverConfig: HTTPTraceDriverConfig{
-						CollectorCluster:  ZipkinCollectorCluster,
-						CollectorEndpoint: ZipkinCollectorEndpoint,
-					},
-				},
-			},
-		},
+		Tracing: buildZipkinTracing(mesh),
 	}
 }
 
@@ -347,11 +376,7 @@ func buildOutboundHTTPRoutes(
 func useEgressCluster(mesh *proxyconfig.ProxyMeshConfig, cluster *Cluster) {
 	cluster.ServiceName = ""
 	cluster.Type = ClusterTypeStrictDNS
-	cluster.Hosts = []Host{
-		{
-			URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress),
-		},
-	}
+	cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 }
 
 // buildOutboundTCPListeners lists listeners and referenced clusters for TCP
