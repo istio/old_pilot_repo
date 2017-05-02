@@ -65,7 +65,7 @@ type handler struct {
 // The chance of a particular flavor is ( slices / sum of slices ).
 type codeAndSlices struct {
 	httpResponseCode int
-	slices int
+	slices           int
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -169,12 +169,12 @@ func setResponseFromCodes(request *http.Request, response http.ResponseWriter) e
 	}
 	slice := rand.Intn(totalSlices)
 
-    // What flavor is that slice?
-	responseCode := codes[len(codes)-1].httpResponseCode   // Assume the last slice
-    position := 0
+	// What flavor is that slice?
+	responseCode := codes[len(codes)-1].httpResponseCode // Assume the last slice
+	position := 0
 	for n, flavor := range codes {
 		if position > slice {
-			responseCode = codes[n-1].httpResponseCode    // No, use an earlier slice
+			responseCode = codes[n-1].httpResponseCode // No, use an earlier slice
 			break
 		}
 		position += flavor.slices
@@ -198,7 +198,7 @@ func validateCodes(codestrings string) ([]codeAndSlices, error) {
 	for i, codestring := range aCodestrings {
 		codeAndSlice, err := validateCodeAndSlices(codestring)
 		if err != nil {
-			return []codeAndSlices{ codeAndSlices { http.StatusBadRequest, 1 } }, err
+			return []codeAndSlices{{http.StatusBadRequest, 1}}, err
 		}
 		codes[i] = codeAndSlice
 	}
@@ -213,28 +213,28 @@ func validateCodeAndSlices(codecount string) (codeAndSlices, error) {
 
 	// Demand code or code:number
 	if len(flavor) == 0 || len(flavor) > 2 {
-		return codeAndSlices { http.StatusBadRequest, 9999 }, fmt.Errorf("invalid %q (want code or code:count)", codecount)
+		return codeAndSlices{http.StatusBadRequest, 9999}, fmt.Errorf("invalid %q (want code or code:count)", codecount)
 	}
 
 	n, err := strconv.Atoi(flavor[0])
 	if err != nil {
-		return codeAndSlices { http.StatusBadRequest, 9999 }, err
+		return codeAndSlices{http.StatusBadRequest, 9999}, err
 	}
 
 	if n < http.StatusOK || n >= 600 {
-		return codeAndSlices { http.StatusBadRequest, 9999 }, fmt.Errorf("invalid HTTP response code %v", n)
+		return codeAndSlices{http.StatusBadRequest, 9999}, fmt.Errorf("invalid HTTP response code %v", n)
 	}
 
 	count := 1
 	if len(flavor) > 1 {
 		count, err = strconv.Atoi(flavor[1])
 		if err != nil {
-			return codeAndSlices { http.StatusBadRequest, 9999 }, err
+			return codeAndSlices{http.StatusBadRequest, 9999}, err
 		}
 		if count < 0 {
-			return codeAndSlices { http.StatusBadRequest, 9999 }, fmt.Errorf("invalid count %v", count)
+			return codeAndSlices{http.StatusBadRequest, 9999}, fmt.Errorf("invalid count %v", count)
 		}
 	}
 
-	return codeAndSlices { n, count }, nil
+	return codeAndSlices{n, count}, nil
 }
