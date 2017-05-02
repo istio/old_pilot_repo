@@ -18,6 +18,7 @@ import (
 	"time"
 	"istio.io/manager/test/util"
 	"fmt"
+	"github.com/satori/go.uuid"
 )
 
 type zipkin struct {
@@ -33,16 +34,22 @@ func (t *zipkin) setup() error {
 }
 
 func (t *zipkin) run() error {
-	for i := 0; i<120; i++ {
-		request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url http://%s",
-			t.apps["a"][0], t.Namespace, "b"))
+
+	for i := 0; i<5; i++ {
+		id := uuid.NewV4()
+		request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url http://%s -key %v -val %v",
+			t.apps["a"][0], t.Namespace, "b", "x-client-trace-id", id))
 		if err != nil {
 			return err
 		}
-		fmt.Println(request)
+		fmt.Println(request) // TODO: remove me
 		time.Sleep(1 * time.Second)
 	}
-	time.Sleep(1 * time.Hour)
+
+	// TODO: verify that the traces are reaching Zipkin
+	// To verify:
+	// curl http://192.168.99.100:30703/api/v1/traces
+
 	return nil
 }
 

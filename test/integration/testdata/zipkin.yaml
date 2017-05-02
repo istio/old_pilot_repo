@@ -9,7 +9,6 @@ spec:
   ports:
   - port: 9411
     name: zipkin
-    nodePort: 30011
   selector:
     infra: zipkin
 ---

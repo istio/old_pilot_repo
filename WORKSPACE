@@ -247,6 +247,12 @@ new_go_repository(
 ##
 
 new_go_repository(
+    name = "com_github_satori_go_uuid",
+    commit = "5bf94b69c6b68ee1b541973bb8e1144db23a194b",
+    importpath = "github.com/satori/go.uuid",
+)
+
+new_go_repository(
     name = "com_github_hashicorp_errwrap",
     commit = "7554cd9344cec97297fa6649b055a8c98c2a1e55",
     importpath = "github.com/hashicorp/errwrap",
