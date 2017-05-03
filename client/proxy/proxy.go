@@ -45,14 +45,14 @@ func NewManagerClient(base url.URL, apiVersion string, client *http.Client) *Man
 
 func (m *ManagerClient) toCurl(request *http.Request, body string) string {
 
-	headers := ""
+	var headers string
 	for key, values := range request.Header {
 		for _, value := range values {
 			headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
 		}
 	}
 
-	bodyOption := ""
+	var bodyOption string
 	if body != "" {
 		bodyOption = fmt.Sprintf("--data '%s'", strings.Replace(body, "'", "\\'", -1))
 	}
@@ -185,10 +185,7 @@ func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte
 		return nil, err
 	}
 
-	response, err := m.do(request)
-
 	// Log after the call to m.do() so that the full hostname is present
-	glog.V(2).Infof("%s", m.toCurl(request, string(inBody)))
-
-	return response, err
+	defer glog.V(2).Infof("%s", m.toCurl(request, string(inBody)))
+	return m.do(request)
 }
