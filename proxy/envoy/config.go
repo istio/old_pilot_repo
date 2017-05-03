@@ -91,8 +91,7 @@ func Generate(context *proxy.Context) *Config {
 }
 
 func buildZipkinCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
-	// TODO: replace with mesh.ZipkinAddress
-	if ZipkinCollectorAddress == "" {
+	if mesh.ZipkinAddress == "" {
 		return nil
 	}
 
@@ -101,13 +100,12 @@ func buildZipkinCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
 		Type:             ClusterTypeStrictDNS,
 		ConnectTimeoutMs: int(convertDuration(mesh.ConnectTimeout) / time.Millisecond),
 		LbType:           DefaultLbType,
-		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%v", ZipkinCollectorAddress)}},
+		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%v", mesh.ZipkinAddress)}},
 	}
 }
 
 func buildZipkinTracing(mesh *proxyconfig.ProxyMeshConfig) *Tracing {
-	// TODO: replace with mesh.ZipkinAddress
-	if ZipkinCollectorAddress == "" {
+	if mesh.ZipkinAddress == "" {
 		return nil
 	}
 
@@ -208,8 +206,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 		Filters: filters,
 	}
 
-	// TODO: replace with mesh.ZipkinAddress
-	if ZipkinCollectorAddress != "" {
+	if mesh.ZipkinAddress != "" {
 		config.GenerateRequestID = true
 		config.Tracing = &HTTPFilterTraceConfig{
 			OperationName: IngressTraceOperation,
