@@ -307,7 +307,7 @@ http_file(
 
 http_file(
     name = "istio_proxy_debug",
-    url = "https://storage.googleapis.com/istio-build/proxy/envoy-debug-" + PROXY + ".tar.gz"
+    url = "https://storage.googleapis.com/istio-build/proxy/envoy-debug-" + PROXY + ".tar.gz",
 )
 
 ##
