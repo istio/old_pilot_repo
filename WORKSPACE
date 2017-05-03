@@ -303,13 +303,11 @@ PROXY = "67a24c284d9e75ae957833b1c33548f94a28f647"  # May 1, 2017
 http_file(
     name = "istio_proxy",
     url = "https://storage.googleapis.com/istio-build/proxy/envoy-alpha-" + PROXY + ".tar.gz",
-    #url = "https://github.com/amalgam8/envoy/raw/envoy-bin/envoy-binary/envoy-alpha-5.tar.gz",
 )
 
 http_file(
     name = "istio_proxy_debug",
     url = "https://storage.googleapis.com/istio-build/proxy/envoy-debug-" + PROXY + ".tar.gz"
-    #url = "https://github.com/amalgam8/envoy/raw/envoy-bin/envoy-binary/envoy-debug-5.tar.gz",
 )
 
 ##
