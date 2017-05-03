@@ -593,6 +593,19 @@ func ValidateRouteRule(msg proto.Message) error {
 		}
 	}
 
+	if value.HttpRewrite != nil {
+		errs = multierror.Append(errs, errors.New("Istio does not currently support HTTP rewrites"))
+	}
+
+	if value.HttpRedirect != nil {
+		if len(value.Route) > 0 {
+			errs = multierror.Append(errs, errors.New("rule cannot contain both route and redirect"))
+		}
+		if value.HttpRedirect.GetAuthority() == "" && value.HttpRedirect.GetUri() == "" {
+			errs = multierror.Append(errs, errors.New("redirect must specify path, host, or both"))
+		}
+	}
+
 	if value.Route != nil {
 		for _, destWeight := range value.Route {
 			if err := ValidateDestinationWeight(destWeight); err != nil {
