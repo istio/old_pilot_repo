@@ -15,14 +15,23 @@
 package main
 
 import (
-	"time"
-	"istio.io/manager/test/util"
 	"fmt"
+
+	"strings"
+	"sync"
+
 	"github.com/satori/go.uuid"
+)
+
+const (
+	traceHeader = "X-Client-Trace-Id"
+	numTraces   = 5
 )
 
 type zipkin struct {
 	*infra
+	mutex  sync.Mutex
+	traces []string
 }
 
 func (t *zipkin) String() string {
@@ -30,27 +39,60 @@ func (t *zipkin) String() string {
 }
 
 func (t *zipkin) setup() error {
+	t.traces = make([]string, 0, numTraces)
 	return nil
 }
 
+// ensure that requests are picked up by Zipkin
 func (t *zipkin) run() error {
-
-	for i := 0; i<5; i++ {
-		id := uuid.NewV4()
-		request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url http://%s -key %v -val %v",
-			t.apps["a"][0], t.Namespace, "b", "x-client-trace-id", id))
-		if err != nil {
-			return err
-		}
-		fmt.Println(request) // TODO: remove me
-		time.Sleep(1 * time.Second)
+	if err := t.makeRequests(); err != nil {
+		return err
 	}
 
-	// TODO: verify that the traces are reaching Zipkin
-	// To verify:
-	// curl http://192.168.99.100:30703/api/v1/traces
+	return t.verifyTraces()
+}
 
-	return nil
+// make requests for Zipkin to pick up
+func (t *zipkin) makeRequests() error {
+	funcs := make(map[string]func() status)
+	for i := 0; i < numTraces; i++ {
+		funcs[fmt.Sprintf("Zipkin trace request %d", i)] = func() status {
+			id := uuid.NewV4()
+			response := t.infra.clientRequest("a", "http://b", 1,
+				fmt.Sprintf("-key %v -val %v", traceHeader, id))
+			if len(response.code) > 0 && response.code[0] == "200" {
+				t.mutex.Lock()
+				t.traces = append(t.traces, id.String())
+				t.mutex.Unlock()
+				return nil
+			}
+			return errAgain
+		}
+	}
+	return parallel(funcs)
+}
+
+// verify that the traces were picked up by Zipkin
+func (t *zipkin) verifyTraces() error {
+	f := func() status {
+		response := t.infra.clientRequest("t", "http://zipkin:9411/api/v1/traces", 1, "")
+		if len(response.code) == 0 || response.code[0] != "200" {
+			return errAgain
+		}
+
+		// ensure that sent trace IDs are a subset of the trace IDs in Zipkin.
+		// this is inefficient, but the alternatives are ugly regexps or extensive JSON parsing.
+		for _, id := range t.traces {
+			if !strings.Contains(response.body, id) {
+				return errAgain
+			}
+		}
+		return nil
+	}
+
+	return parallel(map[string]func() status{
+		"Ensure traces are picked up by Zipkin": f,
+	})
 }
 
 func (t *zipkin) teardown() {
