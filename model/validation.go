@@ -593,20 +593,26 @@ func ValidateRouteRule(msg proto.Message) error {
 		}
 	}
 
-	if value.HttpRewrite != nil {
-		errs = multierror.Append(errs, errors.New("Istio does not currently support HTTP rewrites"))
+	if value.Rewrite != nil {
+		if value.Rewrite.GetUri() == "" && value.Rewrite.GetAuthority() == "" {
+			errs = multierror.Append(errs, errors.New("rewrite must specify path, host, or both"))
+		}
 	}
 
-	if value.HttpRedirect != nil {
+	if value.Redirect != nil {
 		if len(value.Route) > 0 {
 			errs = multierror.Append(errs, errors.New("rule cannot contain both route and redirect"))
 		}
 
 		// TODO can user still specify faults in the same rule?
 
-		if value.HttpRedirect.GetAuthority() == "" && value.HttpRedirect.GetUri() == "" {
+		if value.Redirect.GetAuthority() == "" && value.Redirect.GetUri() == "" {
 			errs = multierror.Append(errs, errors.New("redirect must specify path, host, or both"))
 		}
+	}
+
+	if value.Redirect != nil && value.Rewrite != nil {
+		errs = multierror.Append(errs, errors.New("rule cannot contain both rewrite and redirect"))
 	}
 
 	if value.Route != nil {
