@@ -157,13 +157,13 @@ func runTests(envs ...infra) {
 		istio.apps, errs = util.GetAppPods(client, istio.Namespace)
 
 		tests := []test{
-			&zipkin{infra: &istio},
 			&http{infra: &istio},
 			&grpc{infra: &istio},
 			&tcp{infra: &istio},
 			&ingress{infra: &istio},
 			&egress{infra: &istio},
 			&routing{infra: &istio},
+			//&zipkin{infra: &istio}, // TODO: re-enable after Zipkin support is merged
 		}
 
 		for _, test := range tests {
