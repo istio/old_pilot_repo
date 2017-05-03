@@ -608,8 +608,8 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 
 		// apply auth policies
 		switch ds.MeshConfig.AuthPolicy {
-		case config.ProxyMeshConfig_NONE:
-		case config.ProxyMeshConfig_MUTUAL_TLS:
+		case proxyconfig.ProxyMeshConfig_NONE:
+		case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
 			// apply SSL context to enable mutual TLS between Envoy proxies
 			for _, cluster := range clusters {
 				ports := model.PortList{cluster.port}.GetNames()
