@@ -450,14 +450,9 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 // ListAllRoutes responds to RDS requests that are not limited by a route-config, service-cluster, nor service-node
 func (ds *DiscoveryService) ListAllRoutes(request *restful.Request, response *restful.Response) {
 	allRoutes := make([]routeConfigAndMetadata, 0)
-	endpoints := ds.allServiceNodes()
 
-	for _, ip := range endpoints {
-		instances := ds.Discovery.HostInstances(map[string]bool{ip: true})
-		services := ds.Discovery.Services()
-		httpRouteConfigs := buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
-
-		for port, httpRouteConfig := range httpRouteConfigs {
+	for _, ip := range ds.allServiceNodes() {
+		for port, httpRouteConfig := range ds.getRouteConfigs(ip) {
 			allRoutes = append(allRoutes, routeConfigAndMetadata{
 				RouteConfigName: strconv.Itoa(port),
 				ServiceCluster:  ds.MeshConfig.IstioServiceCluster,
@@ -508,17 +503,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
-		var httpRouteConfigs HTTPRouteConfigs
-		switch node {
-		case ingressNode:
-			httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""))
-		case egressNode:
-			httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
-		default:
-			instances := ds.Discovery.HostInstances(map[string]bool{node: true})
-			services := ds.Discovery.Services()
-			httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
-		}
+		httpRouteConfigs := ds.getRouteConfigs(node)
 
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
@@ -635,4 +620,20 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 	}
 
 	return clusters
+}
+
+func (ds *DiscoveryService) getRouteConfigs(node string) (httpRouteConfigs HTTPRouteConfigs) {
+
+	switch node {
+	case ingressNode:
+		httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""))
+	case egressNode:
+		httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
+	default:
+		instances := ds.Discovery.HostInstances(map[string]bool{node: true})
+		services := ds.Discovery.Services()
+		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+	}
+
+	return
 }
