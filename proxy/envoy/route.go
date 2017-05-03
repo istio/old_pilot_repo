@@ -188,6 +188,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 	if rule.HttpRedirect != nil {
 		route.HostRedirect = rule.HttpRedirect.GetAuthority()
 		route.PathRedirect = rule.HttpRedirect.GetUri()
+		route.Cluster = ""
 	}
 
 	// Add the fault filters, one per cluster defined in weighted cluster or cluster

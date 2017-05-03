@@ -159,7 +159,7 @@ type HTTPRoute struct {
 	PathRedirect string `json:"path_redirect,omitempty"`
 	HostRedirect string `json:"host_redirect,omitempty"`
 
-	Cluster          string           `json:"cluster"`
+	Cluster          string           `json:"cluster,omitempty"`
 	WeightedClusters *WeightedCluster `json:"weighted_clusters,omitempty"`
 
 	Headers      Headers           `json:"headers,omitempty"`

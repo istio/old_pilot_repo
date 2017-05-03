@@ -229,6 +229,7 @@ const (
 	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
 	faultRouteRule    = "testdata/fault-route.yaml.golden"
+	redirectRouteRule = "testdata/redirect-route.yaml.golden"
 )
 
 func testConfig(r *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
@@ -275,6 +276,19 @@ func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
 	if err = r.Post(model.Key{
 		Kind: model.DestinationPolicy,
 		Name: "circuit-breaker"},
+		msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addRedirect(r *model.IstioRegistry, t *testing.T) {
+	msg, err := configObjectFromYAML(model.RouteRule, redirectRouteRule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{
+		Kind: model.RouteRule,
+		Name: "http-redirect"},
 		msg); err != nil {
 		t.Fatal(err)
 	}
@@ -346,6 +360,14 @@ func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := makeMeshConfig()
 	addCircuitBreaker(r, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+}
+
+func TestHTTPRedirect(t *testing.T) {
+	r := mock.MakeRegistry()
+	mesh := makeMeshConfig()
+	addRedirect(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
