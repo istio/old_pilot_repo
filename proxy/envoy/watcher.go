@@ -15,15 +15,12 @@
 package envoy
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
-	"github.com/howeyc/fsnotify"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -90,41 +87,10 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 func (w *watcher) Run(stop <-chan struct{}) {
 	// must start consumer before producer
 	go w.agent.Run(stop)
-	if w.context.MeshConfig.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go w.watchCerts(stop)
+	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go watchCerts(mesh.AuthCertsPath, stop, func() { w.reload() })
 	}
 	w.ctl.Run(stop)
-}
-
-func (w *watcher) watchCerts(stop <-chan struct{}) {
-	fw, err := fsnotify.NewWatcher()
-	if err != nil {
-		glog.Warning("failed to create a watcher for certificate files")
-		return
-	}
-	defer func() {
-		if err := fw.Close(); err != nil {
-			glog.Warningf("closing watcher encounters an error %v", err)
-		}
-	}()
-
-	certsDir := w.context.MeshConfig.GetAuthCertsPath()
-	if err := fw.Watch(certsDir); err != nil {
-		glog.Warningf("watching %s encounters an error %v", certsDir, err)
-		return
-	}
-
-	for {
-		select {
-		case <-fw.Event:
-			glog.V(2).Infof("Change to %q is detected, reload the proxy if necessary", certsDir)
-			w.reload()
-
-		case <-stop:
-			glog.V(2).Info("Certificate watcher is terminated")
-			return
-		}
-	}
 }
 
 func (w *watcher) reload() {
@@ -219,22 +185,4 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			glog.Fatal("cannot start the proxy with the desired configuration")
 		},
 	}
-}
-
-func generateCertHash(certsDir string) []byte {
-	h := sha256.New()
-
-	for _, file := range []string{"cert-chain.pem", "key.pem", "root-cert.pem"} {
-		filename := fmt.Sprintf("%s/%s", certsDir, file)
-		bs, err := ioutil.ReadFile(filename)
-		if err != nil {
-			glog.Warningf("failed to read file %q", filename)
-			continue
-		}
-		if _, err := h.Write(bs); err != nil {
-			glog.Warning(err)
-		}
-	}
-
-	return h.Sum(nil)
 }
