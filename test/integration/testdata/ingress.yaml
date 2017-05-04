@@ -36,3 +36,8 @@ spec:
         backend:
           serviceName: b
           servicePort: 80
+      - path: /c
+        backend:
+          serviceName: c
+          servicePort: http
+
