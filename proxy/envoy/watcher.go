@@ -231,7 +231,7 @@ func generateCertHash(certsDir string) []byte {
 			glog.Warningf("failed to read file %q", filename)
 			continue
 		}
-		if err := h.Write(bs); err != nil {
+		if _, err := h.Write(bs); err != nil {
 			glog.Warning(err)
 		}
 	}
