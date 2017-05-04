@@ -13,7 +13,7 @@ spec:
       - path: /
         backend:
           serviceName: a
-          servicePort: 80
+          servicePort: http
       - path: /pasta
         backend:
           serviceName: b

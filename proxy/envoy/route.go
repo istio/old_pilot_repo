@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes/duration"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -103,10 +102,9 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 
 // buildHTTPRoute translates a route rule to an Envoy route
 func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
-	route := &HTTPRoute{
-		Path:   "",
-		Prefix: "/",
-	}
+	route := &HTTPRoute{}
+	route.Headers = buildHeaders(rule.Match)
+	route.Path, route.Prefix = buildURIPathPrefix(rule.Match)
 
 	// setup timeouts for the route
 	if rule.HttpReqTimeout != nil &&
@@ -126,23 +124,6 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 		}
 		if protoDurationToMS(rule.HttpReqRetries.GetSimpleRetry().PerTryTimeout) > 0 {
 			route.RetryPolicy.PerTryTimeoutMS = protoDurationToMS(rule.HttpReqRetries.GetSimpleRetry().PerTryTimeout)
-		}
-	}
-
-	if rule.Match != nil {
-		route.Headers = buildHeaders(rule.Match.HttpHeaders)
-
-		if uri, ok := rule.Match.HttpHeaders[model.HeaderURI]; ok {
-			switch m := uri.MatchType.(type) {
-			case *proxyconfig.StringMatch_Exact:
-				route.Path = m.Exact
-				route.Prefix = ""
-			case *proxyconfig.StringMatch_Prefix:
-				route.Path = ""
-				route.Prefix = m.Prefix
-			case *proxyconfig.StringMatch_Regex:
-				glog.Warningf("Unsupported route match condition: regex")
-			}
 		}
 	}
 

@@ -162,14 +162,19 @@ func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	return nil
 }
 
-func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule, discovery model.ServiceDiscovery) (HTTPRouteConfigs, string) {
+func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule,
+	discovery model.ServiceDiscovery,
+	config *model.IstioRegistry) (HTTPRouteConfigs, string) {
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
 	vhostsTLS := make(map[string][]*HTTPRoute)
 	tlsAll := ""
 
+	// skip over source-matched route rules
+	rules := config.RouteRulesBySource("", nil)
+
 	for _, rule := range ingressRules {
-		route, tls, err := buildIngressRoute(rule, discovery)
+		routes, tls, err := buildIngressRoute(rule, discovery, rules)
 		if err != nil {
 			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
 			continue
@@ -188,7 +193,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule, disco
 			}
 		}
 		if tls != "" {
-			vhostsTLS[host] = append(vhostsTLS[host], route)
+			vhostsTLS[host] = append(vhostsTLS[host], routes...)
 			if tlsAll == "" {
 				tlsAll = tls
 			} else if tlsAll != tls {
@@ -198,7 +203,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule, disco
 				}
 			}
 		} else {
-			vhosts[host] = append(vhosts[host], route)
+			vhosts[host] = append(vhosts[host], routes...)
 		}
 	}
 
@@ -229,50 +234,38 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule, disco
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(rule *proxyconfig.RouteRule, discovery model.ServiceDiscovery) (*HTTPRoute, string, error) {
-	route := &HTTPRoute{
-		Path:   "",
-		Prefix: "/",
-	}
-
-	if rule.Match != nil && rule.Match.HttpHeaders != nil {
-		if uri, ok := rule.Match.HttpHeaders[model.HeaderURI]; ok {
-			switch m := uri.MatchType.(type) {
-			case *proxyconfig.StringMatch_Exact:
-				route.Path = m.Exact
-				route.Prefix = ""
-			case *proxyconfig.StringMatch_Prefix:
-				route.Path = ""
-				route.Prefix = m.Prefix
-			case *proxyconfig.StringMatch_Regex:
-				return nil, "", fmt.Errorf("unsupported route match condition: regex")
-			}
-		}
-	}
-
+func buildIngressRoute(ingress *proxyconfig.RouteRule,
+	discovery model.ServiceDiscovery,
+	rules []*proxyconfig.RouteRule) ([]*HTTPRoute, string, error) {
 	// TODO: we would need to rebalance weights with more than one destination weight
-	if len(rule.Route) != 1 {
+	// as another temporary resolution, we assume there is only one route in the ingress rule.
+	if len(ingress.Route) != 1 {
 		return nil, "", errors.New("expect exactly one route in the ingress rule")
 	}
-	dst := rule.Route[0]
-
-	svc, exists := discovery.GetService(rule.Destination)
+	service, exists := discovery.GetService(ingress.Destination)
 	if !exists {
-		return nil, "", fmt.Errorf("cannot find service %q", rule.Destination)
+		return nil, "", fmt.Errorf("cannot find service %q", ingress.Destination)
 	}
-
-	port, tags, tls, err := extractPortAndTags(svc, dst)
+	servicePort, _, tls, err := extractPortAndTags(service, ingress.Route[0])
 	if err != nil {
 		return nil, "", err
 	}
-	cluster := buildOutboundCluster(rule.Destination, port, tags)
-	route.clusters = append(route.clusters, cluster)
-	route.Cluster = cluster.Name
 
-	// Rewrite the host header so that inbound proxies can match incoming traffic
-	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, port.Port)
+	// unfold the rules for the destination port
+	routes := buildDestinationHTTPRoutes(service, servicePort, rules)
 
-	return route, tls, nil
+	// filter by path, prefix from the ingress
+	path, prefix := buildURIPathPrefix(ingress.Match)
+	out := make([]*HTTPRoute, 0)
+	for _, route := range routes {
+		if applied := route.CombinePathPrefix(path, prefix); applied != nil {
+			// rewrite the host header so that inbound proxies can match incoming traffic
+			applied.HostRewrite = fmt.Sprintf("%s:%d", service.Hostname, servicePort.Port)
+			out = append(out, applied)
+		}
+	}
+
+	return out, tls, nil
 }
 
 // extractPortAndTags extracts the destination service port from the given destination,
@@ -281,6 +274,8 @@ func buildIngressRoute(rule *proxyconfig.RouteRule, discovery model.ServiceDisco
 // to the proxy configuration generator. This can be improved by using
 // a dedicated model object for IngressRule (instead of reusing RouteRule),
 // which exposes the necessary target port field within the "Route" field.
+// Note that tags are currently ignored since we need to combine them with the other route
+// destination tags which may be incompatible.
 func extractPortAndTags(svc *model.Service, dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
 	portNum, exists := dst.Tags[model.IngressPortNum]
 	var port *model.Port

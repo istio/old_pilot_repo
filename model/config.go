@@ -173,6 +173,8 @@ type routeRuleConfig struct {
 }
 
 // RouteRulesBySource selects routing rules by source service instances.
+// A rule must match at least one of the input service instances since the proxy
+// does not distinguish between source instances in the request.
 // The rules are sorted by precedence (high first) in a stable manner.
 func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*ServiceInstance) []*proxyconfig.RouteRule {
 	rules := make([]*routeRuleConfig, 0)
@@ -181,9 +183,11 @@ func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*Servic
 		if rule.Match != nil {
 			found := false
 			for _, instance := range instances {
+				// must match the source field if it is set
 				if rule.Match.Source != "" && rule.Match.Source != instance.Service.Hostname {
 					continue
 				}
+				// must match the tags field - the rule tags are a subset of the instance tags
 				var tags Tags = rule.Match.SourceTags
 				if tags.SubsetOf(instance.Tags) {
 					found = true
