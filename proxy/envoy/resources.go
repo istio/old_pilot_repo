@@ -35,6 +35,12 @@ const (
 	// RDSName is the name of RDS cluster
 	RDSName = "rds"
 
+	// SDSName is the name of SDS cluster
+	SDSName = "sds"
+
+	// CDSName is the name of CDS cluster
+	CDSName = "cds"
+
 	// ClusterTypeStrictDNS name for clusters of type 'strict_dns'
 	ClusterTypeStrictDNS = "strict_dns"
 
@@ -58,9 +64,13 @@ const (
 func convertDuration(d *duration.Duration) time.Duration {
 	dur, err := ptypes.Duration(d)
 	if err != nil {
-		glog.Warningf("error converting duration %#v: %v", d, err)
+		glog.Warningf("error converting duration %#v, using 0: %v", d, err)
 	}
 	return dur
+}
+
+func protoDurationToMS(dur *duration.Duration) int64 {
+	return int64(convertDuration(dur) / time.Millisecond)
 }
 
 // Config defines the schema for Envoy JSON configuration format
@@ -91,7 +101,7 @@ type AbortFilter struct {
 type DelayFilter struct {
 	Type     string `json:"type,omitempty"`
 	Percent  int    `json:"fixed_delay_percent,omitempty"`
-	Duration int    `json:"fixed_duration_ms,omitempty"`
+	Duration int64  `json:"fixed_duration_ms,omitempty"`
 }
 
 // Header definition
@@ -156,11 +166,12 @@ type HTTPRoute struct {
 	PrefixRewrite string `json:"prefix_rewrite,omitempty"`
 	HostRewrite   string `json:"host_rewrite,omitempty"`
 
-	Cluster          string           `json:"cluster"`
+	// Cluster, WeightedClusters: one must be specified for non-redirect case
+	Cluster          string           `json:"cluster,omitempty"`
 	WeightedClusters *WeightedCluster `json:"weighted_clusters,omitempty"`
 
 	Headers      Headers           `json:"headers,omitempty"`
-	TimeoutMS    int               `json:"timeout_ms,omitempty"`
+	TimeoutMS    int64             `json:"timeout_ms,omitempty"`
 	RetryPolicy  *RetryPolicy      `json:"retry_policy,omitempty"`
 	OpaqueConfig map[string]string `json:"opaque_config,omitempty"`
 
@@ -175,12 +186,17 @@ type HTTPRoute struct {
 	faults []*HTTPFilter
 }
 
+// CatchAll returns true if the route matches all requests
+func (route *HTTPRoute) CatchAll() bool {
+	return len(route.Headers) == 0 && route.Path == "" && route.Prefix == "/"
+}
+
 // RetryPolicy definition
 // See: https://lyft.github.io/envoy/docs/configuration/http_conn_man/route_config/route.html#retry-policy
 type RetryPolicy struct {
 	Policy          string `json:"retry_on"` //if unset, set to 5xx,connect-failure,refused-stream
 	NumRetries      int    `json:"num_retries,omitempty"`
-	PerTryTimeoutMS int    `json:"per_try_timeout_ms,omitempty"`
+	PerTryTimeoutMS int64  `json:"per_try_timeout_ms,omitempty"`
 }
 
 // WeightedCluster definition
@@ -426,7 +442,7 @@ type Host struct {
 type Cluster struct {
 	Name                     string            `json:"name"`
 	ServiceName              string            `json:"service_name,omitempty"`
-	ConnectTimeoutMs         int               `json:"connect_timeout_ms"`
+	ConnectTimeoutMs         int64             `json:"connect_timeout_ms"`
 	Type                     string            `json:"type"`
 	LbType                   string            `json:"lb_type"`
 	MaxRequestsPerConnection int               `json:"max_requests_per_connection,omitempty"`
@@ -459,10 +475,10 @@ type DefaultCBPriority struct {
 // OutlierDetection definition
 // See: https://lyft.github.io/envoy/docs/configuration/cluster_manager/cluster_runtime.html#outlier-detection
 type OutlierDetection struct {
-	ConsecutiveErrors  int `json:"consecutive_5xx,omitempty"`
-	IntervalMS         int `json:"interval_ms,omitempty"`
-	BaseEjectionTimeMS int `json:"base_ejection_time_ms,omitempty"`
-	MaxEjectionPercent int `json:"max_ejection_percent,omitempty"`
+	ConsecutiveErrors  int   `json:"consecutive_5xx,omitempty"`
+	IntervalMS         int64 `json:"interval_ms,omitempty"`
+	BaseEjectionTimeMS int64 `json:"base_ejection_time_ms,omitempty"`
+	MaxEjectionPercent int   `json:"max_ejection_percent,omitempty"`
 }
 
 // Clusters is a collection of clusters
@@ -483,7 +499,7 @@ func (clusters Clusters) normalize() Clusters {
 }
 
 func (clusters Clusters) setTimeout(timeout *duration.Duration) {
-	duration := int(convertDuration(timeout) / time.Millisecond)
+	duration := protoDurationToMS(timeout)
 	for _, cluster := range clusters {
 		cluster.ConnectTimeoutMs = duration
 	}
@@ -545,28 +561,22 @@ func (s Headers) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
 
-// SDS is a service discovery service definition
-type SDS struct {
+// DiscoveryCluster is a service discovery service definition
+type DiscoveryCluster struct {
 	Cluster        *Cluster `json:"cluster"`
-	RefreshDelayMs int      `json:"refresh_delay_ms"`
-}
-
-// CDS is a service discovery service definition
-type CDS struct {
-	Cluster        *Cluster `json:"cluster"`
-	RefreshDelayMs int      `json:"refresh_delay_ms"`
+	RefreshDelayMs int64    `json:"refresh_delay_ms"`
 }
 
 // RDS definition
 type RDS struct {
 	Cluster         string `json:"cluster"`
 	RouteConfigName string `json:"route_config_name"`
-	RefreshDelayMs  int    `json:"refresh_delay_ms"`
+	RefreshDelayMs  int64  `json:"refresh_delay_ms"`
 }
 
 // ClusterManager definition
 type ClusterManager struct {
-	Clusters Clusters `json:"clusters"`
-	SDS      *SDS     `json:"sds,omitempty"`
-	CDS      *CDS     `json:"cds,omitempty"`
+	Clusters Clusters          `json:"clusters"`
+	SDS      *DiscoveryCluster `json:"sds,omitempty"`
+	CDS      *DiscoveryCluster `json:"cds,omitempty"`
 }

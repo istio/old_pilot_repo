@@ -64,7 +64,6 @@
     "routes": [
      {
       "prefix": "/",
-      "cluster": "",
       "weighted_clusters": {
        "clusters": [
         {

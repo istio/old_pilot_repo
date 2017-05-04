@@ -20,9 +20,6 @@ package envoy
 import (
 	"sort"
 	"strings"
-	"time"
-
-	"github.com/golang/protobuf/ptypes/duration"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -126,14 +123,4 @@ func insertDestinationPolicy(config *model.IstioRegistry, cluster *Cluster) {
 			cluster.OutlierDetection.MaxEjectionPercent = int(cbconfig.HttpMaxEjectionPercent)
 		}
 	}
-}
-
-func protoDurationToMS(dur *duration.Duration) int {
-	if dur == nil {
-		return 0
-	}
-
-	d := convertDuration(dur)
-
-	return int(d / time.Millisecond)
 }

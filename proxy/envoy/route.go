@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -71,7 +70,7 @@ func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Du
 	cluster := &Cluster{
 		Name:             fmt.Sprintf("%s%d", InboundClusterPrefix, port),
 		Type:             "static",
-		ConnectTimeoutMs: int(convertDuration(timeout) / time.Millisecond),
+		ConnectTimeoutMs: protoDurationToMS(timeout),
 		LbType:           DefaultLbType,
 		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%s:%d", "127.0.0.1", port)}},
 	}
@@ -84,16 +83,18 @@ func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Du
 func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tags)
+
 	// cluster name must be below 60 characters
 	cluster := &Cluster{
 		Name:        OutboundClusterPrefix + fmt.Sprintf("%x", sha1.Sum([]byte(key))),
 		ServiceName: key,
-		Type:        "sds",
+		Type:        SDSName,
 		LbType:      DefaultLbType,
 		hostname:    hostname,
 		port:        port,
 		tags:        tags,
 	}
+
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
 		cluster.Features = "http2"
 	}
@@ -101,19 +102,16 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 }
 
 // buildHTTPRoute translates a route rule to an Envoy route
-func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, bool) {
+func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",
 	}
 
-	catchAll := true
-
 	// setup timeouts for the route
 	if rule.HttpReqTimeout != nil &&
 		rule.HttpReqTimeout.GetSimpleTimeout() != nil &&
 		protoDurationToMS(rule.HttpReqTimeout.GetSimpleTimeout().Timeout) > 0 {
-		// convert from float sec to ms
 		route.TimeoutMS = protoDurationToMS(rule.HttpReqTimeout.GetSimpleTimeout().Timeout)
 	}
 
@@ -145,10 +143,6 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 			case *proxyconfig.StringMatch_Regex:
 				glog.Warningf("Unsupported route match condition: regex")
 			}
-		}
-
-		if len(route.Headers) > 0 || route.Path != "" || route.Prefix != "/" {
-			catchAll = false
 		}
 	}
 
@@ -193,14 +187,14 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) (*HTTPRoute, 
 		}
 	}
 
-	return route, catchAll
+	return route
 }
 
 func buildDiscoveryCluster(address, name string, timeout *duration.Duration) *Cluster {
 	return &Cluster{
 		Name:             name,
 		Type:             ClusterTypeStrictDNS,
-		ConnectTimeoutMs: int(convertDuration(timeout) / time.Millisecond),
+		ConnectTimeoutMs: protoDurationToMS(timeout),
 		LbType:           DefaultLbType,
 		Hosts: []Host{
 			{
