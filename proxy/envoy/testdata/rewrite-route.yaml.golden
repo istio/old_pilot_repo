@@ -1,0 +1,5 @@
+destination: world.default.svc.cluster.local
+rewrite:
+  uri: "/new/path"
+  authority: "foo.bar.com"
+

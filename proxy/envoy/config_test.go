@@ -230,6 +230,7 @@ const (
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
 	faultRouteRule    = "testdata/fault-route.yaml.golden"
 	redirectRouteRule = "testdata/redirect-route.yaml.golden"
+	rewriteRouteRule = "testdata/rewrite-route.yaml.golden"
 )
 
 func testConfig(r *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
@@ -276,6 +277,19 @@ func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
 	if err = r.Post(model.Key{
 		Kind: model.DestinationPolicy,
 		Name: "circuit-breaker"},
+		msg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addRewrite(r *model.IstioRegistry, t *testing.T) {
+	msg, err := configObjectFromYAML(model.RouteRule, rewriteRouteRule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Post(model.Key{
+		Kind: model.RouteRule,
+		Name: "http-rewrite"},
 		msg); err != nil {
 		t.Fatal(err)
 	}
@@ -368,6 +382,14 @@ func TestHTTPRedirect(t *testing.T) {
 	r := mock.MakeRegistry()
 	mesh := makeMeshConfig()
 	addRedirect(r, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+}
+
+func TestHTTPRewrite(t *testing.T) {
+	r := mock.MakeRegistry()
+	mesh := makeMeshConfig()
+	addRewrite(r, t)
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
 	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
 }
