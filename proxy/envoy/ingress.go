@@ -276,7 +276,8 @@ func buildIngressRoute(ingress *proxyconfig.RouteRule,
 // which exposes the necessary target port field within the "Route" field.
 // Note that tags are currently ignored since we need to combine them with the other route
 // destination tags which may be incompatible.
-func extractPortAndTags(svc *model.Service, dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
+func extractPortAndTags(svc *model.Service,
+	dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
 	portNum, exists := dst.Tags[model.IngressPortNum]
 	var port *model.Port
 	if exists {
