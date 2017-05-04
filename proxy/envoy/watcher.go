@@ -100,6 +100,7 @@ func (w *watcher) watchCerts(stop <-chan struct{}) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Warning("failed to create a watcher for certificate files")
+		return
 	}
 	defer func() {
 		if err := fw.Close(); err != nil {
@@ -110,6 +111,7 @@ func (w *watcher) watchCerts(stop <-chan struct{}) {
 	certsDir := w.context.MeshConfig.GetAuthCertsPath()
 	if err := fw.Watch(certsDir); err != nil {
 		glog.Warningf("watching %s encounters an error %v", certsDir, err)
+		return
 	}
 
 	for {
