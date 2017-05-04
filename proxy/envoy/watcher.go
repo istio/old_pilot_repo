@@ -15,12 +15,15 @@
 package envoy
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"github.com/howeyc/fsnotify"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -87,7 +90,34 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 func (w *watcher) Run(stop <-chan struct{}) {
 	// must start consumer before producer
 	go w.agent.Run(stop)
+	if w.context.MeshConfig.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go w.watchCerts(stop)
+	}
 	w.ctl.Run(stop)
+}
+
+func (w *watcher) watchCerts(stop <-chan struct{}) {
+	fw, err := fsnotify.NewWatcher()
+	if err != nil {
+		glog.Warning("failed to create a watcher for certificate files")
+	}
+	defer fw.Close()
+
+	certsDir := w.context.MeshConfig.GetAuthCertsPath()
+	fw.Watch(certsDir)
+
+	go func() {
+		for {
+			<-fw.Event
+
+			glog.V(2).Infof("Change to %q is detected, reload the proxy if necessary", certsDir)
+
+			w.reload()
+		}
+	}()
+
+	<-stop
+	glog.V(2).Info("Certificate watcher is terminated")
 }
 
 func (w *watcher) reload() {
@@ -95,6 +125,9 @@ func (w *watcher) reload() {
 	// even though the function is called on every modification event,
 	// the actual config is generated from the latest cache view
 	config := Generate(w.context)
+	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		config.Hash = generateCertHash(mesh.AuthCertsPath)
+	}
 	w.agent.ScheduleConfigUpdate(config)
 }
 
@@ -179,4 +212,20 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			glog.Fatal("cannot start the proxy with the desired configuration")
 		},
 	}
+}
+
+func generateCertHash(certsDir string) []byte {
+	h := sha256.New()
+
+	for _, file := range []string{"cert-chain.pem", "key.pem", "root-cert.pem"} {
+		filename := fmt.Sprintf("%s/%s", certsDir, file)
+		bs, err := ioutil.ReadFile(filename)
+		if err != nil {
+			glog.Warningf("failed to read file %q", filename)
+			continue
+		}
+		h.Write(bs)
+	}
+
+	return h.Sum(nil)
 }
