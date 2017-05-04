@@ -53,11 +53,12 @@ const (
 	// TCPProxyFilter is the name of the TCP Proxy network filter.
 	TCPProxyFilter = "tcp_proxy"
 
-	// HeaderURI is URI HTTP header
-	HeaderURI = "uri"
-
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
+
+	router  = "router"
+	auto    = "auto"
+	decoder = "decoder"
 )
 
 // convertDuration converts to golang duration and logs errors

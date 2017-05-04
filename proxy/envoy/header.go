@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/manager/model"
 )
 
 // TODO: test sorting, translation
@@ -31,7 +32,7 @@ import (
 func buildHeaders(matches map[string]*proxyconfig.StringMatch) []Header {
 	headers := make([]Header, 0, len(matches))
 	for name, match := range matches {
-		if name != HeaderURI {
+		if name != model.HeaderURI {
 			headers = append(headers, buildHeader(name, match))
 		}
 	}

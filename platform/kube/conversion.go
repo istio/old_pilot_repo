@@ -200,8 +200,7 @@ func convertIngress(ingress v1beta1.Ingress, getService serviceGetter) map[model
 func createIngressRule(host string, path string, namespace string,
 	backend v1beta1.IngressBackend, tlsSecret string, getService serviceGetter) proto.Message {
 	destination := serviceHostname(backend.ServiceName, namespace)
-	port := convertPort(resolveServicePort(namespace, backend, getService))
-
+	portName := resolveServicePort(namespace, backend, getService)
 	rule := &proxyconfig.RouteRule{
 		Destination: destination,
 		Match: &proxyconfig.MatchCondition{
@@ -209,26 +208,16 @@ func createIngressRule(host string, path string, namespace string,
 		},
 		Route: []*proxyconfig.DestinationWeight{
 			{
-				Destination: destination,
-				Weight:      100,
-
-				// A temporary measure to communicate the destination service's port
-				// to the proxy configuration generator. This can be improved by using
-				// a dedicated model object for IngressRule (instead of reusing RouteRule),
-				// which exposes the necessary target port field within the "Route" field.
-				// This also carries TLS secret name.
 				Tags: map[string]string{
-					"servicePort.port":     strconv.Itoa(port.Port),
-					"servicePort.name":     port.Name,
-					"servicePort.protocol": string(port.Protocol),
-					"tlsSecret":            tlsSecret,
+					model.IngressPortName:  portName,
+					model.IngressTLSSecret: tlsSecret,
 				},
 			},
 		},
 	}
 
 	if host != "" {
-		rule.Match.HttpHeaders["authority"] = &proxyconfig.StringMatch{
+		rule.Match.HttpHeaders[model.HeaderAuthority] = &proxyconfig.StringMatch{
 			MatchType: &proxyconfig.StringMatch_Exact{Exact: host},
 		}
 	}
@@ -236,16 +225,16 @@ func createIngressRule(host string, path string, namespace string,
 	if path != "" {
 		if isRegularExpression(path) {
 			if strings.HasSuffix(path, ".*") && !isRegularExpression(strings.TrimSuffix(path, ".*")) {
-				rule.Match.HttpHeaders["uri"] = &proxyconfig.StringMatch{
+				rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
 					MatchType: &proxyconfig.StringMatch_Prefix{Prefix: strings.TrimSuffix(path, ".*")},
 				}
 			} else {
-				rule.Match.HttpHeaders["uri"] = &proxyconfig.StringMatch{
+				rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
 					MatchType: &proxyconfig.StringMatch_Regex{Regex: path},
 				}
 			}
 		} else {
-			rule.Match.HttpHeaders["uri"] = &proxyconfig.StringMatch{
+			rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
 				MatchType: &proxyconfig.StringMatch_Exact{Exact: path},
 			}
 		}
@@ -254,35 +243,29 @@ func createIngressRule(host string, path string, namespace string,
 	return rule
 }
 
-// resolveServicePort returns the service port referenced in the given ingress backend
-func resolveServicePort(namespace string, backend v1beta1.IngressBackend, getService serviceGetter) v1.ServicePort {
+// resolveServicePort returns the service port name referenced in the given ingress backend
+func resolveServicePort(namespace string, backend v1beta1.IngressBackend, getService serviceGetter) string {
 	portNum := int32(backend.ServicePort.IntValue())
 	portName := backend.ServicePort.String()
-	fallbackPort := v1.ServicePort{
-		Port:     portNum,
-		Name:     "",
-		Protocol: v1.ProtocolTCP,
-	}
-
 	service, ok := getService(backend.ServiceName, namespace)
 	if !ok {
 		glog.Warningf("Failed to resolve service port %s of service %s.%s: service does not exist",
 			backend.ServicePort.String(), backend.ServiceName, namespace)
-		return fallbackPort
+		return ""
 	}
 
 	for _, servicePort := range service.Spec.Ports {
 		if backend.ServicePort.Type == intstr.Int && portNum == servicePort.Port {
-			return servicePort
+			return servicePort.Name
 		}
 		if backend.ServicePort.Type == intstr.String && portName == servicePort.Name {
-			return servicePort
+			return servicePort.Name
 		}
 	}
 
 	glog.Warningf("Failed to resolve service port %s of service %s.%s: port does not exist",
 		backend.ServicePort.String(), backend.ServiceName, namespace)
-	return fallbackPort
+	return ""
 }
 
 // encodeIngressRuleName encodes an ingress rule name for a given ingress resource name,

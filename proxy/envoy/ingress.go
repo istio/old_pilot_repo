@@ -17,11 +17,11 @@ package envoy
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -161,14 +161,14 @@ func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	return nil
 }
 
-func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTPRouteConfigs, string) {
+func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule, discovery model.ServiceDiscovery) (HTTPRouteConfigs, string) {
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
 	vhostsTLS := make(map[string][]*HTTPRoute)
 	tlsAll := ""
 
 	for _, rule := range ingressRules {
-		route, tls, err := buildIngressRoute(rule)
+		route, tls, err := buildIngressRoute(rule, discovery)
 		if err != nil {
 			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
 			continue
@@ -176,7 +176,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 
 		host := "*"
 		if rule.Match != nil {
-			if authority, ok := rule.Match.HttpHeaders["authority"]; ok {
+			if authority, ok := rule.Match.HttpHeaders[model.HeaderAuthority]; ok {
 				switch match := authority.GetMatchType().(type) {
 				case *proxyconfig.StringMatch_Exact:
 					host = match.Exact
@@ -228,14 +228,14 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule) (HTTP
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(rule *proxyconfig.RouteRule) (*HTTPRoute, string, error) {
+func buildIngressRoute(rule *proxyconfig.RouteRule, discovery model.ServiceDiscovery) (*HTTPRoute, string, error) {
 	route := &HTTPRoute{
 		Path:   "",
 		Prefix: "/",
 	}
 
 	if rule.Match != nil && rule.Match.HttpHeaders != nil {
-		if uri, ok := rule.Match.HttpHeaders[HeaderURI]; ok {
+		if uri, ok := rule.Match.HttpHeaders[model.HeaderURI]; ok {
 			switch m := uri.MatchType.(type) {
 			case *proxyconfig.StringMatch_Exact:
 				route.Path = m.Exact
@@ -249,61 +249,30 @@ func buildIngressRoute(rule *proxyconfig.RouteRule) (*HTTPRoute, string, error) 
 		}
 	}
 
-	clusters := make([]*WeightedClusterEntry, 0)
-	tlsAll := ""
-	for _, dst := range rule.Route {
-		// fetch route destination, or fallback to rule destination
-		destination := dst.Destination
-		if destination == "" {
-			destination = rule.Destination
-		}
-
-		port, tags, tls, err := extractPortAndTags(dst)
-		if err != nil {
-			return nil, "", multierror.Prefix(err, "failed to extract routing rule destination port")
-		}
-
-		if tls != "" {
-			if tlsAll == "" {
-				tlsAll = tls
-			} else {
-				return nil, "", fmt.Errorf("multiple TLS secrets detected %q and %q", tlsAll, tls)
-			}
-		}
-
-		cluster := buildOutboundCluster(destination, port, tags)
-		clusters = append(clusters, &WeightedClusterEntry{
-			Name:   cluster.Name,
-			Weight: int(dst.Weight),
-		})
-		route.clusters = append(route.clusters, cluster)
+	// TODO: we would need to rebalance weights with more than one destination weight
+	if len(rule.Route) != 1 {
+		return nil, "", errors.New("expect exactly one route in the ingress rule")
 	}
-	route.WeightedClusters = &WeightedCluster{Clusters: clusters}
+	dst := rule.Route[0]
 
-	// rewrite to a single cluster if it's one weighted cluster
-	if len(rule.Route) == 1 {
-		route.Cluster = route.WeightedClusters.Clusters[0].Name
-		route.WeightedClusters = nil
+	svc, exists := discovery.GetService(rule.Destination)
+	if !exists {
+		return nil, "", fmt.Errorf("cannot find service %q", rule.Destination)
 	}
 
-	// Ensure all destination clusters have the same port number.
-	//
-	// This is currently required for doing host header rewrite (host:port),
-	// which is scoped to the entire route.
-	// This restriction can be relaxed by constructing multiple envoy.Route objects
-	// per config.RouteRule, and doing weighted load balancing using Runtime.
-	portSet := make(map[int]struct{}, 1)
-	for _, cluster := range route.clusters {
-		portSet[cluster.port.Port] = struct{}{}
+	portName, tags, tls := extractPortAndTags(dst)
+	port, exists := svc.Ports.Get(portName)
+	if !exists {
+		return nil, "", fmt.Errorf("service %q does not have port %q", svc.Hostname, portName)
 	}
-	if len(portSet) > 1 {
-		return nil, "", fmt.Errorf("unsupported multiple destination ports per ingress route rule")
-	}
+	cluster := buildOutboundCluster(rule.Destination, port, tags)
+	route.clusters = append(route.clusters, cluster)
+	route.Cluster = cluster.Name
 
 	// Rewrite the host header so that inbound proxies can match incoming traffic
 	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, route.clusters[0].port.Port)
 
-	return route, tlsAll, nil
+	return route, tls, nil
 }
 
 // extractPortAndTags extracts the destination service port from the given destination,
@@ -312,38 +281,17 @@ func buildIngressRoute(rule *proxyconfig.RouteRule) (*HTTPRoute, string, error) 
 // to the proxy configuration generator. This can be improved by using
 // a dedicated model object for IngressRule (instead of reusing RouteRule),
 // which exposes the necessary target port field within the "Route" field.
-func extractPortAndTags(dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
-	portNum, err := strconv.Atoi(dst.Tags["servicePort.port"])
-	if err != nil {
-		return nil, nil, "", err
+func extractPortAndTags(dst *proxyconfig.DestinationWeight) (string, model.Tags, string) {
+	portName := dst.Tags[model.IngressPortName]
+	tls := dst.Tags[model.IngressTLSSecret]
+	tags := make(model.Tags)
+	for k, v := range dst.Tags {
+		tags[k] = v
 	}
-	portName, ok := dst.Tags["servicePort.name"]
-	if !ok {
-		return nil, nil, "", fmt.Errorf("no name specified for service port %d", portNum)
+	delete(tags, model.IngressPortName)
+	delete(tags, model.IngressTLSSecret)
+	if len(tags) == 0 {
+		tags = nil
 	}
-	portProto, ok := dst.Tags["servicePort.protocol"]
-	if !ok {
-		return nil, nil, "", fmt.Errorf("no protocol specified for service port %d", portNum)
-	}
-	tls := dst.Tags["tlsSecret"]
-
-	port := &model.Port{
-		Port:     portNum,
-		Name:     portName,
-		Protocol: model.Protocol(portProto),
-	}
-
-	var tags model.Tags
-	if len(dst.Tags) > 4 {
-		tags = make(model.Tags, len(dst.Tags)-4)
-		for k, v := range dst.Tags {
-			tags[k] = v
-		}
-		delete(tags, "servicePort.port")
-		delete(tags, "servicePort.name")
-		delete(tags, "servicePort.protocol")
-		delete(tags, "tlsSecret")
-	}
-
-	return port, tags, tls, nil
+	return portName, tags, tls
 }

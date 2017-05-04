@@ -120,6 +120,12 @@ const (
 	DestinationPolicy = "destination-policy"
 	// DestinationPolicyProto message name
 	DestinationPolicyProto = "istio.proxy.v1.config.DestinationPolicy"
+
+	// HeaderURI is URI HTTP header
+	HeaderURI = "uri"
+
+	// HeaderAuthority is authority HTTP header
+	HeaderAuthority = "authority"
 )
 
 var (
@@ -203,6 +209,16 @@ func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*Servic
 	}
 	return out
 }
+
+// A temporary measure to communicate the destination service's port
+// to the proxy configuration generator. This can be improved by using
+// a dedicated model object for IngressRule (instead of reusing RouteRule),
+// which exposes the necessary target port field within the "Route" field.
+// This also carries TLS secret name.
+const (
+	IngressPortName  = "servicePortName"
+	IngressTLSSecret = "tlsSecret"
+)
 
 // IngressRules lists all ingress rules in a namespace (or all rules if namespace is "")
 func (i *IstioRegistry) IngressRules(namespace string) map[Key]*proxyconfig.RouteRule {

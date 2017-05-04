@@ -132,7 +132,7 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 	if rule.Match != nil {
 		route.Headers = buildHeaders(rule.Match.HttpHeaders)
 
-		if uri, ok := rule.Match.HttpHeaders[HeaderURI]; ok {
+		if uri, ok := rule.Match.HttpHeaders[model.HeaderURI]; ok {
 			switch m := uri.MatchType.(type) {
 			case *proxyconfig.StringMatch_Exact:
 				route.Path = m.Exact

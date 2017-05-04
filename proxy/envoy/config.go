@@ -155,13 +155,13 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
-		Type:   "decoder",
-		Name:   "router",
+		Type:   decoder,
+		Name:   router,
 		Config: FilterRouterConfig{},
 	})
 
 	config := &HTTPFilterConfig{
-		CodecType:  "auto",
+		CodecType:  auto,
 		StatPrefix: "http",
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
@@ -257,7 +257,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 		}
 
 		if useDefaultRoute {
-			// default route for the destination
+			// default route for the destination is always the lowest priority route
 			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 			routes = append(routes, buildDefaultRoute(cluster))
 		}
@@ -301,6 +301,11 @@ func buildOutboundHTTPRoutes(
 	// map for each service port to define filters
 	for _, service := range services {
 		for _, servicePort := range service.Ports {
+			// skip external services if the egress proxy is undefined
+			if service.External() && mesh.EgressProxyAddress == "" {
+				continue
+			}
+
 			routes := buildDestinationHTTPRoutes(service, servicePort, rules)
 
 			if len(routes) > 0 {
