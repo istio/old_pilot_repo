@@ -5,6 +5,6 @@ match:
       prefix: "/bar"
 route:
   - tags:
-       servicePortName: http-status
+       servicePortNum: "81"
        tlsSecret: my-secret.default
     weight: 100

@@ -22,10 +22,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/hashicorp/go-multierror"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/manager/model"
@@ -260,17 +261,16 @@ func buildIngressRoute(rule *proxyconfig.RouteRule, discovery model.ServiceDisco
 		return nil, "", fmt.Errorf("cannot find service %q", rule.Destination)
 	}
 
-	portName, tags, tls := extractPortAndTags(dst)
-	port, exists := svc.Ports.Get(portName)
-	if !exists {
-		return nil, "", fmt.Errorf("service %q does not have port %q", svc.Hostname, portName)
+	port, tags, tls, err := extractPortAndTags(svc, dst)
+	if err != nil {
+		return nil, "", err
 	}
 	cluster := buildOutboundCluster(rule.Destination, port, tags)
 	route.clusters = append(route.clusters, cluster)
 	route.Cluster = cluster.Name
 
 	// Rewrite the host header so that inbound proxies can match incoming traffic
-	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, route.clusters[0].port.Port)
+	route.HostRewrite = fmt.Sprintf("%s:%d", rule.Destination, port.Port)
 
 	return route, tls, nil
 }
@@ -281,17 +281,35 @@ func buildIngressRoute(rule *proxyconfig.RouteRule, discovery model.ServiceDisco
 // to the proxy configuration generator. This can be improved by using
 // a dedicated model object for IngressRule (instead of reusing RouteRule),
 // which exposes the necessary target port field within the "Route" field.
-func extractPortAndTags(dst *proxyconfig.DestinationWeight) (string, model.Tags, string) {
-	portName := dst.Tags[model.IngressPortName]
+func extractPortAndTags(svc *model.Service, dst *proxyconfig.DestinationWeight) (*model.Port, model.Tags, string, error) {
+	portNum, exists := dst.Tags[model.IngressPortNum]
+	var port *model.Port
+	if exists {
+		num, err := strconv.Atoi(portNum)
+		if err != nil {
+			return nil, nil, "", multierror.Prefix(err, fmt.Sprintf("cannot find port %s in %q: ", portNum, svc.Hostname))
+		}
+		port, exists = svc.Ports.GetByPort(num)
+		if !exists {
+			return nil, nil, "", fmt.Errorf("cannot find port %d in %q", num, svc.Hostname)
+		}
+	} else {
+		portName := dst.Tags[model.IngressPortName]
+		port, exists = svc.Ports.Get(portName)
+		if !exists {
+			return nil, nil, "", fmt.Errorf("cannot find port %q in %q", portName, svc.Hostname)
+		}
+	}
 	tls := dst.Tags[model.IngressTLSSecret]
 	tags := make(model.Tags)
 	for k, v := range dst.Tags {
 		tags[k] = v
 	}
 	delete(tags, model.IngressPortName)
+	delete(tags, model.IngressPortNum)
 	delete(tags, model.IngressTLSSecret)
 	if len(tags) == 0 {
 		tags = nil
 	}
-	return portName, tags, tls
+	return port, tags, tls, nil
 }

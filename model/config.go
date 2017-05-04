@@ -217,6 +217,7 @@ func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*Servic
 // This also carries TLS secret name.
 const (
 	IngressPortName  = "servicePortName"
+	IngressPortNum   = "servicePortNum"
 	IngressTLSSecret = "tlsSecret"
 )
 
