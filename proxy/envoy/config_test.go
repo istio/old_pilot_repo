@@ -230,7 +230,7 @@ const (
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
 	faultRouteRule    = "testdata/fault-route.yaml.golden"
 	redirectRouteRule = "testdata/redirect-route.yaml.golden"
-	rewriteRouteRule = "testdata/rewrite-route.yaml.golden"
+	rewriteRouteRule  = "testdata/rewrite-route.yaml.golden"
 )
 
 func testConfig(r *model.IstioRegistry, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
