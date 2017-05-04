@@ -587,6 +587,15 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			},
 		},
 			valid: true},
+		{name: "route rule match valid redirect", in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Redirect: &proxyconfig.HTTPRedirect{
+				Uri:       "/new/path",
+				Authority: "foo.bar.com",
+			},
+			HttpFault: &proxyconfig.HTTPFaultInjection{},
+		},
+			valid: false},
 		{name: "route rule match invalid redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
 			Redirect: &proxyconfig.HTTPRedirect{

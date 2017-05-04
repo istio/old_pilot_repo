@@ -604,7 +604,9 @@ func ValidateRouteRule(msg proto.Message) error {
 			errs = multierror.Append(errs, errors.New("rule cannot contain both route and redirect"))
 		}
 
-		// TODO can user still specify faults in the same rule?
+		if value.HttpFault != nil {
+			errs = multierror.Append(errs, errors.New("rule cannot contain both fault and redirect"))
+		}
 
 		if value.Redirect.GetAuthority() == "" && value.Redirect.GetUri() == "" {
 			errs = multierror.Append(errs, errors.New("redirect must specify path, host, or both"))
