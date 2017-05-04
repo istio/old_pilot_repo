@@ -106,18 +106,17 @@ func (w *watcher) watchCerts(stop <-chan struct{}) {
 	certsDir := w.context.MeshConfig.GetAuthCertsPath()
 	fw.Watch(certsDir)
 
-	go func() {
-		for {
-			<-fw.Event
-
+	for {
+		select {
+		case <-fw.Event:
 			glog.V(2).Infof("Change to %q is detected, reload the proxy if necessary", certsDir)
-
 			w.reload()
-		}
-	}()
 
-	<-stop
-	glog.V(2).Info("Certificate watcher is terminated")
+		case <-stop:
+			glog.V(2).Info("Certificate watcher is terminated")
+			return
+		}
+	}
 }
 
 func (w *watcher) reload() {
