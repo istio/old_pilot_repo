@@ -195,8 +195,10 @@ func (route *HTTPRoute) CatchAll() bool {
 
 // CombinePathPrefix checks that the route applies for a given path and prefix
 // match and updates the path and the prefix in the route. If the route is
-// incompatible with the path or the prefix, returns nil.
-// Either path or prefix must be set but not both.
+// incompatible with the path or the prefix, returns nil.  Either path or
+// prefix must be set but not both.  The resulting route must match exactly the
+// requests that match both the original route and the supplied path and
+// prefix.
 func (route *HTTPRoute) CombinePathPrefix(path, prefix string) *HTTPRoute {
 	switch {
 	case path == "" && route.Path == "" && strings.HasPrefix(route.Prefix, prefix):
