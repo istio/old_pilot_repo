@@ -101,10 +101,16 @@ func (w *watcher) watchCerts(stop <-chan struct{}) {
 	if err != nil {
 		glog.Warning("failed to create a watcher for certificate files")
 	}
-	defer fw.Close()
+	defer func() {
+		if err := fw.Close(); err != nil {
+			glog.Warningf("closing watcher encounters an error %v", err)
+		}
+	}()
 
 	certsDir := w.context.MeshConfig.GetAuthCertsPath()
-	fw.Watch(certsDir)
+	if err := fw.Watch(certsDir); err != nil {
+		glog.Warningf("watching %s encounters an error %v", certsDir, err)
+	}
 
 	for {
 		select {
@@ -223,7 +229,9 @@ func generateCertHash(certsDir string) []byte {
 			glog.Warningf("failed to read file %q", filename)
 			continue
 		}
-		h.Write(bs)
+		if err := h.Write(bs); err != nil {
+			glog.Warning(err)
+		}
 	}
 
 	return h.Sum(nil)
