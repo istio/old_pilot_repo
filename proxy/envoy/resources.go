@@ -168,7 +168,6 @@ type HTTPRoute struct {
 	PrefixRewrite string `json:"prefix_rewrite,omitempty"`
 	HostRewrite   string `json:"host_rewrite,omitempty"`
 
-
 	PathRedirect string `json:"path_redirect,omitempty"`
 	HostRedirect string `json:"host_redirect,omitempty"`
 
