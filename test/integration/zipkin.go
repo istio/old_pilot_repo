@@ -39,12 +39,20 @@ func (t *zipkin) String() string {
 }
 
 func (t *zipkin) setup() error {
+	if !t.Zipkin {
+		return nil
+	}
+
 	t.traces = make([]string, 0, numTraces)
 	return nil
 }
 
 // ensure that requests are picked up by Zipkin
 func (t *zipkin) run() error {
+	if !t.Zipkin {
+		return nil
+	}
+
 	if err := t.makeRequests(); err != nil {
 		return err
 	}
@@ -60,7 +68,7 @@ func (t *zipkin) makeRequests() error {
 			id := uuid.NewV4()
 			response := t.infra.clientRequest("a", "http://b", 1,
 				fmt.Sprintf("-key %v -val %v", traceHeader, id))
-			if len(response.code) > 0 && response.code[0] == "200" {
+			if len(response.code) > 0 && response.code[0] == httpOk {
 				t.mutex.Lock()
 				t.traces = append(t.traces, id.String())
 				t.mutex.Unlock()
@@ -76,7 +84,7 @@ func (t *zipkin) makeRequests() error {
 func (t *zipkin) verifyTraces() error {
 	f := func() status {
 		response := t.infra.clientRequest("t", "http://zipkin:9411/api/v1/traces", 1, "")
-		if len(response.code) == 0 || response.code[0] != "200" {
+		if len(response.code) == 0 || response.code[0] != httpOk {
 			return errAgain
 		}
 
