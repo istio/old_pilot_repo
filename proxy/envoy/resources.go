@@ -168,7 +168,10 @@ type HTTPRoute struct {
 	PrefixRewrite string `json:"prefix_rewrite,omitempty"`
 	HostRewrite   string `json:"host_rewrite,omitempty"`
 
-	// Cluster, WeightedClusters: one must be specified for non-redirect case
+
+	PathRedirect string `json:"path_redirect,omitempty"`
+	HostRedirect string `json:"host_redirect,omitempty"`
+
 	Cluster          string           `json:"cluster,omitempty"`
 	WeightedClusters *WeightedCluster `json:"weighted_clusters,omitempty"`
 
