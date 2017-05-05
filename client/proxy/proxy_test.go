@@ -1,9 +1,7 @@
 package proxy
 
 import (
-	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -33,37 +31,6 @@ func (f *FakeHandler) HandlerFunc(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(k, v[0])
 	}
 	_, _ = w.Write([]byte(f.wantResponse))
-}
-
-type fakeRequester struct {
-	baseURL string
-	client  *http.Client
-}
-
-func (f *fakeRequester) Request(method, path string, inBody []byte) ([]byte, error) {
-	request, err := http.NewRequest(method, f.baseURL+"/"+path, bytes.NewBuffer(inBody))
-	if err != nil {
-		return nil, err
-	}
-	if request.Method == "POST" || request.Method == "PUT" {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	response, err := f.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = response.Body.Close() }() // #nosec
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		if len(body) == 0 {
-			return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
-		}
-		return nil, fmt.Errorf("received non-success status code %v with message %v", response.StatusCode, string(body))
-	}
-	return body, nil
 }
 
 func TestGetAddUpdateDeleteListConfig(t *testing.T) {
@@ -272,9 +239,9 @@ func TestGetAddUpdateDeleteListConfig(t *testing.T) {
 		var config *apiserver.Config
 		var configSlice []apiserver.Config
 		var err error
-		client := NewManagerClient(&fakeRequester{
-			baseURL: ts.URL,
-			client:  &http.Client{Timeout: 1 * time.Second},
+		client := NewManagerClient(&BasicHTTPRequester{
+			BaseURL: ts.URL,
+			Client:  &http.Client{Timeout: 1 * time.Second},
 		})
 		switch c.function {
 		case "get":

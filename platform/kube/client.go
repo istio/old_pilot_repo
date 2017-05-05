@@ -155,10 +155,6 @@ func (cl *Client) GetKubernetesClient() kubernetes.Interface {
 	return cl.client
 }
 
-func (cl *Client) GetKubernetesRestInterface() rest.Interface {
-	return cl.dyn
-}
-
 // RegisterResources creates third party resources
 func (cl *Client) RegisterResources() error {
 	var out error
@@ -409,4 +405,30 @@ func (cl *Client) GetTLSSecret(uri string) (*model.TLSSecret, error) {
 		Certificate: cert,
 		PrivateKey:  key,
 	}, nil
+}
+
+// Request sends requests through the Kubernetes apiserver proxy to
+// the a Kubernetes service.
+// (see https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#discovering-builtin-services)
+func (cl *Client) Request(namespace, service, method, path string, inBody []byte) ([]byte, error) {
+	absPath := fmt.Sprintf("api/v1/namespaces/%s/services/%s/proxy/%s/%s",
+		namespace, service, IstioResourceVersion, path)
+	var status int
+	outBody, err := cl.dyn.Verb(method).
+		AbsPath(absPath).
+		SetHeader("Content-Type", "application/json").
+		Body(inBody).
+		Do().
+		StatusCode(&status).
+		Raw()
+	switch {
+	case err != nil:
+		return nil, err
+	case status < 200 || status >= 300:
+		if len(outBody) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", status)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", status, string(outBody))
+	}
+	return outBody, err
 }

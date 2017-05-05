@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"istio.io/manager/apiserver"
@@ -15,6 +17,41 @@ import (
 // more difficult fake mock for unit-test, e.g. rest.Request.
 type RESTRequester interface {
 	Request(method, path string, inBody []byte) ([]byte, error)
+}
+
+// BasicHTTPRequester is a platform neutral requester.
+type BasicHTTPRequester struct {
+	BaseURL string
+	Client  *http.Client
+	Version string
+}
+
+// Request sends basic HTTP requests. It does not handle authentication.
+func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) ([]byte, error) {
+	absPath := fmt.Sprintf("%s/%s/%s", f.BaseURL, f.Version, path)
+	request, err := http.NewRequest(method, absPath, bytes.NewBuffer(inBody))
+	if err != nil {
+		return nil, err
+	}
+	if request.Method == "POST" || request.Method == "PUT" {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := f.Client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }() // #nosec
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if len(body) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", response.StatusCode, string(body))
+	}
+	return body, nil
 }
 
 // ManagerClient is a client wrapper that contains the base URL and API version

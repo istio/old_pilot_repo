@@ -19,8 +19,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -28,7 +30,6 @@ import (
 	"github.com/spf13/cobra"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/rest"
 
 	"istio.io/manager/apiserver"
 	"istio.io/manager/client/proxy"
@@ -43,46 +44,22 @@ const (
 )
 
 type k8sRESTRequester struct {
-	ri        rest.Interface
 	namespace string
-	version   string
-	port      int
+	service   string
+	client    *kube.Client
 }
 
-// Construct service proxy path
-// (see https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#discovering-builtin-services)
-func (r *k8sRESTRequester) absPath(string path) string {
-	return fmt.Sprintf("api/v1/namespaces/%s/services/istio-manager:%d/proxy/%s/%s",
-		r.namespace, r.port, r.version, path)
-}
-
-// Request sends requests through the Kubernetes apiserver proxy to the istio-manager API server
-func (r *k8sRESTRequester) Request(method, path string, inBody []byte) ([]byte, error) {
-	var status int
-	outBody, err := r.ri.Verb(method).
-		AbsPath(r.absPath(path)),
-		SetHeader("Content-Type", "application/json").
-			Body(inBody).
-			Do().
-			StatusCode(&status).
-			Raw()
-	switch {
-	case err != nil:
-		return nil, err
-	case status < 200 || status >= 300:
-		if len(outBody) == 0 {
-			return nil, fmt.Errorf("received non-success status code %v", status)
-		}
-		return nil, fmt.Errorf("received non-success status code %v with message %v", status, string(outBody))
-	}
-	return outBody, err
+func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) ([]byte, error) {
+	return client.Request(rr.namespace, rr.service, method, path, inBody)
 }
 
 var (
-	namespace      string
-	istioNamespace string
-	apiClient      proxy.Client
-	apiServerPort  int
+	namespace           string
+	istioNamespace      string
+	apiClient           proxy.Client
+	apiServerPort       int
+	istioManagerService string
+	useKubeRequester    bool
 
 	// input file name
 	file string
@@ -131,12 +108,18 @@ istioctl mixer command documentation.
 				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
 
-			apiClient = proxy.NewManagerClient(&k8sRESTRequester{
-				ri:        client.GetKubernetesRestInterface(),
-				namespace: istioNamespace,
-				version:   kube.IstioResourceVersion,
-				port:      apiServerPort,
-			})
+			if useKubeRequester {
+				apiClient = proxy.NewManagerClient(&k8sRESTRequester{
+					namespace: istioNamespace,
+					service:   istioManagerService,
+				})
+			} else {
+				apiClient = proxy.NewManagerClient(&proxy.BasicHTTPRequester{
+					BaseURL: istioManagerService,
+					Client:  &http.Client{Timeout: 60 * time.Second},
+					Version: kube.IstioResourceVersion,
+				})
+			}
 
 			config = client
 
@@ -350,8 +333,10 @@ func init() {
 		"Select a Kubernetes namespace")
 	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
 		"Namespace where Istio system resides")
-	rootCmd.PersistentFlags().IntVar(&apiServerPort, "port", 8081,
-		"Manager API server port")
+	rootCmd.PersistentFlags().StringVar(&istioManagerService, "managerAPIService", "istio-manager:8081",
+		"Name of istio-manager service")
+	rootCmd.PersistentFlags().BoolVar(&useKubeRequester, "kube", true,
+		"Use Kubernetes client to send API requests to manager service")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
