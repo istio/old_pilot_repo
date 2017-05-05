@@ -48,61 +48,51 @@ type httpRequest struct {
 	expectedBody         interface{}
 }
 
-const (
-//	routeRule = `{"type":"route-rule","name":"reviews-default","spec":{"destination":"reviews.default.svc.cluster.local",` +
-//		`"precedence":1,"route":[{"tags":{"version":"v1"},"weight":100}]}}`
-//	routeRule2 = `{"type":"route-rule","name":"reviews-default","spec":{"destination":"reviews.default.svc.cluster.local",` +
-//		`"precedence":1,"route":[{"tags":{"version":"v2"},"weight":100}]}}`
-//	invalidRule = `{"type":"route-rule","name":"reviews-invalid","spec":{"destination":"reviews.default.svc.cluster.local",` +
-//		`"precedence":1,"route":[{"tags":{"version":"v1"},"weight":999}]}}`
-)
-
 var (
-	jsonRule = map[string]interface{} {
+	jsonRule = map[string]interface{}{
 		"type": "route-rule",
 		"name": "reviews-default",
-		"spec": map[string]interface{} {
+		"spec": map[string]interface{}{
 			"destination": "reviews.default.svc.cluster.local",
-			"precedence": float64(1),
-			"route": []interface{} { map[string]interface{} {
-				"tags": map[string]interface{} {
+			"precedence":  float64(1),
+			"route": []interface{}{map[string]interface{}{
+				"tags": map[string]interface{}{
 					"version": "v1",
 				},
 				"weight": float64(100),
-			} },
+			}},
 		},
 	}
 
-	jsonRule2 = map[string]interface{} {
+	jsonRule2 = map[string]interface{}{
 		"type": "route-rule",
 		"name": "reviews-default",
-		"spec": map[string]interface{} {
+		"spec": map[string]interface{}{
 			"destination": "reviews.default.svc.cluster.local",
-			"precedence": float64(1),
-			"route": []interface{} { map[string]interface{} {
-				"tags": map[string]interface{} {
+			"precedence":  float64(1),
+			"route": []interface{}{map[string]interface{}{
+				"tags": map[string]interface{}{
 					"version": "v2",
 				},
 				"weight": float64(100),
-			} },
+			}},
 		},
 	}
 
-	jsonInvalidRule = map[string]interface{} {
+	jsonInvalidRule = map[string]interface{}{
 		"type": "route-rule",
 		"name": "reviews-default",
-		"spec": map[string]interface{} {
+		"spec": map[string]interface{}{
 			"destination": "reviews.default.svc.cluster.local",
-			"precedence": float64(1),
-			"route": []interface{} { map[string]interface{} {
-				"tags": map[string]interface{} {
+			"precedence":  float64(1),
+			"route": []interface{}{map[string]interface{}{
+				"tags": map[string]interface{}{
 					"version": "v1",
 				},
 				"weight": float64(999),
-			} },
+			}},
 		},
 	}
-
 )
 
 func (r *apiServerTest) String() string {
@@ -117,8 +107,8 @@ func (r *apiServerTest) setup() error {
 	// receive mesh configuration
 	mesh, err := cmd.GetMeshConfig(istioClient.GetKubernetesClient(), r.Namespace, "istio")
 	if err != nil {
-		return fmt.Errorf("failed to retrieve mesh configuration.")
-		return multierror.Append(err, fmt.Errorf("failed to retrieve mesh configuration."))
+		return fmt.Errorf("failed to retrieve mesh configuration")
+		return multierror.Append(err, fmt.Errorf("failed to retrieve mesh configuration"))
 	}
 
 	controllerOptions := kube.ControllerOptions{}
@@ -151,10 +141,7 @@ func (r *apiServerTest) teardown() {
 }
 
 func (r *apiServerTest) run() error {
-	if err := r.routeRuleCRUD(); err != nil {
-		return err
-	}
-	return nil
+	return r.routeRuleCRUD()
 }
 
 // routeRuleCRUD attempts to talk to the apiserver to Create, Retrieve, Update, and Delete a rule
@@ -231,13 +218,14 @@ func (r *apiServerTest) routeRuleCRUD() error {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }() // #nosec
 		if resp.StatusCode != hreq.expectedResponseCode {
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("%v to %q expected %v but got %v %q", hreq.method, hreq.url, hreq.expectedResponseCode, resp.StatusCode, body)
+			return fmt.Errorf("%v to %q expected %v but got %v %q", hreq.method, hreq.url,
+				hreq.expectedResponseCode, resp.StatusCode, body)
 		}
 		if hreq.expectedBody != nil {
 			body, err := ioutil.ReadAll(resp.Body)
@@ -246,18 +234,20 @@ func (r *apiServerTest) routeRuleCRUD() error {
 			}
 
 			var jsonBody interface{}
-    		if err = json.Unmarshal([]byte(body), &jsonBody); err == nil {
+			if err = json.Unmarshal(body, &jsonBody); err == nil {
 				if !reflect.DeepEqual(jsonBody, hreq.expectedBody) {
 					serializedExpectedBody, _ := json.Marshal(hreq.expectedBody)
 					if err != nil {
 						return err
 					}
-					return fmt.Errorf("%v to %q expected JSON body %v but got %v", hreq.method, hreq.url, string(serializedExpectedBody), string(body))
+					return fmt.Errorf("%v to %q expected JSON body %v but got %v", hreq.method, hreq.url,
+						string(serializedExpectedBody), string(body))
 				}
-    		} else {
+			} else {
 				// The returned data was not JSON, compare anyway
 				if !reflect.DeepEqual(body, hreq.expectedBody) {
-					return fmt.Errorf("%v to %q expected body %v but got %q", hreq.method, hreq.url, hreq.expectedBody, body)
+					return fmt.Errorf("%v to %q expected body %v but got %q", hreq.method, hreq.url, 
+						hreq.expectedBody, body)
 				}
 			}
 		}
@@ -265,4 +255,3 @@ func (r *apiServerTest) routeRuleCRUD() error {
 
 	return nil
 }
-
