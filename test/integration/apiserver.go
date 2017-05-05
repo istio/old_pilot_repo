@@ -107,7 +107,6 @@ func (r *apiServerTest) setup() error {
 	// receive mesh configuration
 	mesh, err := cmd.GetMeshConfig(istioClient.GetKubernetesClient(), r.Namespace, "istio")
 	if err != nil {
-		return fmt.Errorf("failed to retrieve mesh configuration")
 		return multierror.Append(err, fmt.Errorf("failed to retrieve mesh configuration"))
 	}
 
@@ -246,7 +245,7 @@ func (r *apiServerTest) routeRuleCRUD() error {
 			} else {
 				// The returned data was not JSON, compare anyway
 				if !reflect.DeepEqual(body, hreq.expectedBody) {
-					return fmt.Errorf("%v to %q expected body %v but got %q", hreq.method, hreq.url, 
+					return fmt.Errorf("%v to %q expected body %v but got %q", hreq.method, hreq.url,
 						hreq.expectedBody, body)
 				}
 			}
