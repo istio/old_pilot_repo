@@ -38,6 +38,21 @@ func (c *Config) ParseSpec() error {
 		return fmt.Errorf("cannot parse proto message: %v", err)
 	}
 	c.ParsedSpec = message
+
+	switch c.Type {
+	case "route-rule":
+		if err := model.ValidateRouteRule(c.ParsedSpec); err != nil {
+			return fmt.Errorf("route-rule validation failed: %v", err)
+		}
+	case "ingress-rule":
+		if err := model.ValidateIngressRule(c.ParsedSpec); err != nil {
+			return fmt.Errorf("ingress-rule validation failed: %v", err)
+		}
+	case "destination-policy":
+		if err := model.ValidateDestinationPolicy(c.ParsedSpec); err != nil {
+			return fmt.Errorf("destination-policy validation failed: %v", err)
+		}
+	}
 	glog.V(2).Infof("Parsed %v %v into %v %v", c.Type, c.Name, schema.MessageName, message)
 	return nil
 }
