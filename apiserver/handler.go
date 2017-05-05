@@ -165,7 +165,7 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 		return
 	}
 
-	glog.V(2).Infof("Getting configs if kind %s in namespace %s", kind, namespace)
+	glog.V(2).Infof("Getting configs of kind %s in namespace %s", kind, namespace)
 	result, err := api.registry.List(kind, namespace)
 	if err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
