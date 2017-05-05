@@ -25,7 +25,6 @@ go_library(
         "@com_github_spf13_cobra//doc:go_default_library",
         "@io_k8s_apimachinery//pkg/util/yaml:go_default_library",
         "@io_k8s_client_go//pkg/api:go_default_library",
-        "@io_k8s_client_go//rest:go_default_library",
     ],
 )
 

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
+
+	"github.com/golang/glog"
 
 	"istio.io/manager/apiserver"
 	"istio.io/manager/model"
@@ -26,6 +29,20 @@ type BasicHTTPRequester struct {
 	Version string
 }
 
+func toCurl(request *http.Request, body string) string {
+	var headers string
+	for key, values := range request.Header {
+		for _, value := range values {
+			headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
+		}
+	}
+	var bodyOption string
+	if body != "" {
+		bodyOption = fmt.Sprintf("--data '%s'", strings.Replace(body, "'", "\\'", -1))
+	}
+	return fmt.Sprintf("curl -X %v %v %q %s", request.Method, headers, request.URL, bodyOption)
+}
+
 // Request sends basic HTTP requests. It does not handle authentication.
 func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) ([]byte, error) {
 	absPath := fmt.Sprintf("%s/%s/%s", f.BaseURL, f.Version, path)
@@ -36,6 +53,10 @@ func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) ([]byte
 	if request.Method == "POST" || request.Method == "PUT" {
 		request.Header.Set("Content-Type", "application/json")
 	}
+
+	// Log after the call to m.do() so that the full hostname is present
+	defer glog.V(2).Infof("%s", toCurl(request, string(inBody)))
+
 	response, err := f.Client.Do(request)
 	if err != nil {
 		return nil, err
