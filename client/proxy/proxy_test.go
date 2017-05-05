@@ -1,12 +1,14 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"fmt"
 
@@ -33,51 +35,35 @@ func (f *FakeHandler) HandlerFunc(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(f.wantResponse))
 }
 
-func TestNewManagerClient(t *testing.T) {
-	cases := []struct {
-		name           string
-		baseURL        string
-		wantBaseURL    string
-		apiVersion     string
-		wantAPIVersion string
-	}{
-		{
-			name:        "TestBaseURL",
-			baseURL:     "http://host:port",
-			wantBaseURL: "http://host:port",
-		},
-		{
-			name:        "TestBaseURLTrailingSlash",
-			baseURL:     "http://host:port/",
-			wantBaseURL: "http://host:port",
-		},
-		{
-			name:           "TestAPIVersion",
-			apiVersion:     "test",
-			wantAPIVersion: "test",
-		},
-		{
-			name:           "TestAPIVersionTrailingSlash",
-			apiVersion:     "test/",
-			wantAPIVersion: "test",
-		},
-		{
-			name:           "TestAPIVersionLeadingSlash",
-			apiVersion:     "/test",
-			wantAPIVersion: "test",
-		},
-	}
+type fakeRequester struct {
+	baseURL string
+	client  *http.Client
+}
 
-	for _, c := range cases {
-		url, _ := url.Parse(c.baseURL)
-		client := NewManagerClient(*url, c.apiVersion, nil)
-		if c.baseURL != "" && client.base.String() != c.wantBaseURL {
-			t.Errorf("%s: got baseURL %v, want %v", c.name, client.base.String(), c.wantBaseURL)
-		}
-		if c.apiVersion != "" && client.versionedAPIPath != c.wantAPIVersion {
-			t.Errorf("%s: got apiVersion %v, want %v", c.name, client.versionedAPIPath, c.wantAPIVersion)
-		}
+func (f *fakeRequester) Request(method, path string, inBody []byte) ([]byte, error) {
+	request, err := http.NewRequest(method, f.baseURL+"/"+path, bytes.NewBuffer(inBody))
+	if err != nil {
+		return nil, err
 	}
+	if request.Method == "POST" || request.Method == "PUT" {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := f.client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }() // #nosec
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if len(body) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", response.StatusCode, string(body))
+	}
+	return body, nil
 }
 
 func TestGetAddUpdateDeleteListConfig(t *testing.T) {
@@ -281,13 +267,15 @@ func TestGetAddUpdateDeleteListConfig(t *testing.T) {
 		}
 		ts := httptest.NewServer(http.HandlerFunc(fh.HandlerFunc))
 		defer ts.Close()
-		tsURL, _ := url.Parse(ts.URL)
 
 		// Setup Client
 		var config *apiserver.Config
 		var configSlice []apiserver.Config
 		var err error
-		client := NewManagerClient(*tsURL, "test", &http.Client{})
+		client := NewManagerClient(&fakeRequester{
+			baseURL: ts.URL,
+			client:  &http.Client{Timeout: 1 * time.Second},
+		})
 		switch c.function {
 		case "get":
 			config, err = client.GetConfig(c.key)

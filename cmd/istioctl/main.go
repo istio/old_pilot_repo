@@ -28,9 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
-
-	"net/http"
-	"net/url"
+	"k8s.io/client-go/rest"
 
 	"istio.io/manager/apiserver"
 	"istio.io/manager/client/proxy"
@@ -40,10 +38,51 @@ import (
 	"istio.io/manager/platform/kube"
 )
 
+const (
+	defaultIstioNamespace = "default" // istio-system?
+)
+
+type k8sRESTRequester struct {
+	ri        rest.Interface
+	namespace string
+	version   string
+	port      int
+}
+
+// Construct service proxy path
+// (see https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#discovering-builtin-services)
+func (r *k8sRESTRequester) absPath(string path) string {
+	return fmt.Sprintf("api/v1/namespaces/%s/services/istio-manager:%d/proxy/%s/%s",
+		r.namespace, r.port, r.version, path)
+}
+
+// Request sends requests through the Kubernetes apiserver proxy to the istio-manager API server
+func (r *k8sRESTRequester) Request(method, path string, inBody []byte) ([]byte, error) {
+	var status int
+	outBody, err := r.ri.Verb(method).
+		AbsPath(r.absPath(path)),
+		SetHeader("Content-Type", "application/json").
+			Body(inBody).
+			Do().
+			StatusCode(&status).
+			Raw()
+	switch {
+	case err != nil:
+		return nil, err
+	case status < 200 || status >= 300:
+		if len(outBody) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", status)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", status, string(outBody))
+	}
+	return outBody, err
+}
+
 var (
-	namespace   string
-	apiClient   proxy.Client
-	managerAddr string
+	namespace      string
+	istioNamespace string
+	apiClient      proxy.Client
+	apiServerPort  int
 
 	// input file name
 	file string
@@ -72,25 +111,6 @@ More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
 `, model.IstioConfig.Kinds()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			// Get manager address
-			if managerAddr == "" {
-				if a := os.Getenv("ISTIO_MANAGER_ADDRESS"); a != "" {
-					glog.V(2).Infof("Setting manager address from ISTIO_MANAGER_ADDRESS environment variable")
-					managerAddr = a
-				} else {
-					return errors.New("manager address environment variable is not set, " +
-						"please set ISTIO_MANAGER_ADDRESS to the location and port of your Istio manager")
-				}
-
-			}
-			managerURL, err := url.Parse(managerAddr)
-			if err != nil {
-				return err
-			}
-			// Setup manager client
-			apiClient = proxy.NewManagerClient(*managerURL, kube.IstioResourceVersion, &http.Client{})
-
-			// Kube-inject, can be removed when inject.go is removed
 			if kubeconfig == "" {
 				if v := os.Getenv("KUBECONFIG"); v != "" {
 					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
@@ -111,7 +131,15 @@ istioctl mixer command documentation.
 				return multierror.Prefix(err, "failed to register Third-Party Resources.")
 			}
 
+			apiClient = proxy.NewManagerClient(&k8sRESTRequester{
+				ri:        client.GetKubernetesRestInterface(),
+				namespace: istioNamespace,
+				version:   kube.IstioResourceVersion,
+				port:      apiServerPort,
+			})
+
 			config = client
+
 			return
 		},
 	}
@@ -318,10 +346,12 @@ Example usage:
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVarP(&managerAddr, "managerAddr", "m", "",
-		"Set your Istio manager address")
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
+	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
+		"Namespace where Istio system resides")
+	rootCmd.PersistentFlags().IntVar(&apiServerPort, "port", 8081,
+		"Manager API server port")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")

@@ -155,6 +155,10 @@ func (cl *Client) GetKubernetesClient() kubernetes.Interface {
 	return cl.client
 }
 
+func (cl *Client) GetKubernetesRestInterface() rest.Interface {
+	return cl.dyn
+}
+
 // RegisterResources creates third party resources
 func (cl *Client) RegisterResources() error {
 	var out error
