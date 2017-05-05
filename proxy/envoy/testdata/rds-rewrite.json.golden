@@ -63,24 +63,10 @@
     ],
     "routes": [
      {
-      "prefix": "/",
-      "cluster": "out.66fcc955b8875b19844f9eaf6cfda47c778c609e",
-      "headers": [
-       {
-        "name": "animal",
-        "value": "^dog\\.cat.*",
-        "regex": true
-       },
-       {
-        "name": "name",
-        "value": "sco+do+",
-        "regex": true
-       },
-       {
-        "name": "scooby",
-        "value": "doo"
-       }
-      ]
+      "prefix": "/old/path",
+      "prefix_rewrite": "/new/path",
+      "host_rewrite": "foo.bar.com",
+      "cluster": "out.a2263b90cd24e500e9ed95f79ae47eabdc77dc74"
      },
      {
       "prefix": "/",

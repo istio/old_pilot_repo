@@ -64,11 +64,12 @@
     "routes": [
      {
       "prefix": "/",
-      "cluster": "out.66fcc955b8875b19844f9eaf6cfda47c778c609e",
+      "path_redirect": "/new/path",
+      "host_redirect": "foo.bar.com",
       "headers": [
        {
         "name": "animal",
-        "value": "^dog\\.cat.*",
+        "value": "^dog.*",
         "regex": true
        },
        {
