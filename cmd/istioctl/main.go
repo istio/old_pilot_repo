@@ -49,8 +49,10 @@ type k8sRESTRequester struct {
 	client    *kube.Client
 }
 
+// Request wraps Kubernetes specific requester to provide the proper
+// namespace and service names.a
 func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) ([]byte, error) {
-	return client.Request(rr.namespace, rr.service, method, path, inBody)
+	return rr.client.Request(rr.namespace, rr.service, method, path, inBody)
 }
 
 var (
@@ -110,6 +112,7 @@ istioctl mixer command documentation.
 
 			if useKubeRequester {
 				apiClient = proxy.NewManagerClient(&k8sRESTRequester{
+					client:    client,
 					namespace: istioNamespace,
 					service:   istioManagerService,
 				})
