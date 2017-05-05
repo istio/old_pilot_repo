@@ -58,6 +58,13 @@ var (
 		Short: "Istio Manager",
 		Long:  "Istio Manager provides management plane functionality to the Istio service mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
+			if flags.kubeconfig == "" {
+				if v := os.Getenv("KUBECONFIG"); v != "" {
+					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
+					flags.kubeconfig = v
+				}
+			}
+
 			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
@@ -75,6 +82,9 @@ var (
 			}
 			if flags.controllerOptions.Namespace == "" {
 				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
+				if flags.controllerOptions.Namespace == "" {
+					return fmt.Errorf("export POD_NAMESPACE or supply --namespace flag")
+				}
 			}
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
