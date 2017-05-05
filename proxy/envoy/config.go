@@ -89,38 +89,6 @@ func Generate(context *proxy.Context) *Config {
 	return buildConfig(listeners, clusters, mesh)
 }
 
-func buildZipkinCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
-	if mesh.ZipkinAddress == "" {
-		return nil
-	}
-
-	return &Cluster{
-		Name:             ZipkinCollectorCluster,
-		Type:             ClusterTypeStrictDNS,
-		ConnectTimeoutMs: protoDurationToMS(mesh.ConnectTimeout),
-		LbType:           DefaultLbType,
-		Hosts:            []Host{{URL: fmt.Sprintf("tcp://%v", mesh.ZipkinAddress)}},
-	}
-}
-
-func buildZipkinTracing(mesh *proxyconfig.ProxyMeshConfig) *Tracing {
-	if mesh.ZipkinAddress == "" {
-		return nil
-	}
-
-	return &Tracing{
-		HTTPTracer: HTTPTracer{
-			HTTPTraceDriver: HTTPTraceDriver{
-				HTTPTraceDriverType: ZipkinTraceDriverType,
-				HTTPTraceDriverConfig: HTTPTraceDriverConfig{
-					CollectorCluster:  ZipkinCollectorCluster,
-					CollectorEndpoint: ZipkinCollectorEndpoint,
-				},
-			},
-		},
-	}
-}
-
 // buildConfig creates a proxy config with discovery services and admin port
 func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {
 	if cluster := buildZipkinCluster(mesh); cluster != nil {
