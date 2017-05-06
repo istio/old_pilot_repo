@@ -59,7 +59,6 @@ var (
 	namespace           string
 	istioNamespace      string
 	apiClient           proxy.Client
-	apiServerPort       int
 	istioManagerService string
 	useKubeRequester    bool
 
@@ -337,7 +336,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
 		"Namespace where Istio system resides")
 	rootCmd.PersistentFlags().StringVar(&istioManagerService, "managerAPIService", "istio-manager:8081",
-		"Name of istio-manager service")
+		"Name of istio-manager service. When --kube=false this sets the address of the manager service")
 	rootCmd.PersistentFlags().BoolVar(&useKubeRequester, "kube", true,
 		"Use Kubernetes client to send API requests to manager service")
 
