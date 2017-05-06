@@ -158,9 +158,11 @@ func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, 
 	if err != nil {
 		return nil, err
 	}
+
 	var config []apiserver.Config
 	if err := json.Unmarshal(body, &config); err != nil {
 		return nil, err
 	}
+	glog.V(2).Infof("Response Body:  %v", string(body))
 	return config, nil
 }
