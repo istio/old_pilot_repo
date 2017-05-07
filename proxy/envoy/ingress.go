@@ -278,10 +278,13 @@ func buildIngressRoute(ingress *proxyconfig.RouteRule,
 	routes := buildDestinationHTTPRoutes(service, servicePort, rules)
 
 	// filter by path, prefix from the ingress
-	path, prefix := buildURIPathPrefix(ingress.Match)
+	ingressRoute := buildHTTPRouteMatch(ingress.Match)
+
+	// TODO: not handling header match in ingress apart from uri and authority
+
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
-		if applied := route.CombinePathPrefix(path, prefix); applied != nil {
+		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {
 			// rewrite the host header so that inbound proxies can match incoming traffic
 			applied.HostRewrite = fmt.Sprintf("%s:%d", service.Hostname, servicePort.Port)
 			out = append(out, applied)
