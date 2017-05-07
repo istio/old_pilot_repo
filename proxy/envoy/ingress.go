@@ -280,7 +280,12 @@ func buildIngressRoute(ingress *proxyconfig.RouteRule,
 	// filter by path, prefix from the ingress
 	ingressRoute := buildHTTPRouteMatch(ingress.Match)
 
-	// TODO: not handling header match in ingress apart from uri and authority
+	// TODO: not handling header match in ingress apart from uri and authority (uri must not be regex)
+	if len(ingressRoute.Headers) > 0 {
+		if len(ingressRoute.Headers) > 1 || ingressRoute.Headers[0].Name != model.HeaderAuthority {
+			return nil, "", errors.New("header matches in ingress rule not supported")
+		}
+	}
 
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
