@@ -34,7 +34,7 @@ func TestHTTPMatch(t *testing.T) {
 		{
 			in: &proxyconfig.MatchCondition{
 				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Exact{Exact: "/path"}},
+					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Exact{Exact: "/path"}},
 				},
 			},
 			want: &HTTPRoute{Path: "/path", Prefix: ""},
@@ -42,7 +42,7 @@ func TestHTTPMatch(t *testing.T) {
 		{
 			in: &proxyconfig.MatchCondition{
 				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "/prefix"}},
+					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "/prefix"}},
 				},
 			},
 			want: &HTTPRoute{Path: "", Prefix: "/prefix"},
@@ -50,7 +50,7 @@ func TestHTTPMatch(t *testing.T) {
 		{
 			in: &proxyconfig.MatchCondition{
 				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
+					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
 				},
 			},
 			want: &HTTPRoute{Path: "", Prefix: "/", Headers: Headers{
@@ -60,9 +60,9 @@ func TestHTTPMatch(t *testing.T) {
 		{
 			in: &proxyconfig.MatchCondition{
 				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
-					"cookie":        &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "user=jason?"}},
-					"test":          &proxyconfig.StringMatch{MatchType: &proxyconfig.StringMatch_Exact{Exact: "value"}},
+					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
+					"cookie":        {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "user=jason?"}},
+					"test":          {MatchType: &proxyconfig.StringMatch_Exact{Exact: "value"}},
 				},
 			},
 			want: &HTTPRoute{Path: "", Prefix: "/", Headers: Headers{
