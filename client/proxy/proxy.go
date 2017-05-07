@@ -19,7 +19,7 @@ import (
 // used instead, but that returns not-interface types which makes it
 // more difficult fake mock for unit-test, e.g. rest.Request.
 type RESTRequester interface {
-	Request(method, path string, inBody []byte) ([]byte, error)
+	Request(method, path string, inBody []byte) (int, []byte, error)
 }
 
 // BasicHTTPRequester is a platform neutral requester.
@@ -44,11 +44,15 @@ func toCurl(request *http.Request, body string) string {
 }
 
 // Request sends basic HTTP requests. It does not handle authentication.
-func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) ([]byte, error) {
-	absPath := fmt.Sprintf("%s/%s/%s", f.BaseURL, f.Version, path)
+func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) (int, []byte, error) {
+	host := f.BaseURL
+	if !strings.HasPrefix(host, "http://") {
+		host = "http://" + host
+	}
+	absPath := fmt.Sprintf("%s/%s", host, path)
 	request, err := http.NewRequest(method, absPath, bytes.NewBuffer(inBody))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if request.Method == "POST" || request.Method == "PUT" {
 		request.Header.Set("Content-Type", "application/json")
@@ -59,20 +63,14 @@ func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) ([]byte
 
 	response, err := f.Client.Do(request)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer func() { _ = response.Body.Close() }() // #nosec
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		if len(body) == 0 {
-			return nil, fmt.Errorf("received non-success status code %v", response.StatusCode)
-		}
-		return nil, fmt.Errorf("received non-success status code %v with message %v", response.StatusCode, string(body))
-	}
-	return body, nil
+	return response.StatusCode, body, nil
 }
 
 // ManagerClient is a client wrapper that contains the base URL and API version
@@ -95,14 +93,14 @@ func NewManagerClient(rr RESTRequester) *ManagerClient {
 	return &ManagerClient{rr: rr}
 }
 
-func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) ([]byte, error) {
+func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) (int, []byte, error) {
 	uriSuffix := fmt.Sprintf("config/%v/%v/%v", key.Kind, key.Namespace, key.Name)
 	return m.rr.Request(method, uriSuffix, inBody)
 }
 
 // GetConfig retrieves the configuration resource for the passed key
 func (m *ManagerClient) GetConfig(key model.Key) (*apiserver.Config, error) {
-	body, err := m.doConfigCRUD(key, http.MethodGet, nil)
+	_, body, err := m.doConfigCRUD(key, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +118,7 @@ func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error 
 	if err != nil {
 		return err
 	}
-	if _, err = m.doConfigCRUD(key, http.MethodPost, bodyIn); err != nil {
+	if _, _, err = m.doConfigCRUD(key, http.MethodPost, bodyIn); err != nil {
 		return err
 	}
 	return nil
@@ -133,7 +131,7 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 	if err != nil {
 		return err
 	}
-	if _, err = m.doConfigCRUD(key, http.MethodPut, bodyIn); err != nil {
+	if _, _, err = m.doConfigCRUD(key, http.MethodPut, bodyIn); err != nil {
 		return err
 	}
 	return nil
@@ -141,7 +139,7 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 
 // DeleteConfig deletes the configuration resource for the passed key
 func (m *ManagerClient) DeleteConfig(key model.Key) error {
-	_, err := m.doConfigCRUD(key, http.MethodDelete, nil)
+	_, _, err := m.doConfigCRUD(key, http.MethodDelete, nil)
 	return err
 }
 
@@ -154,7 +152,7 @@ func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, 
 	} else {
 		reqURL = fmt.Sprintf("config/%v", kind)
 	}
-	body, err := m.rr.Request(http.MethodGet, reqURL, nil)
+	_, body, err := m.rr.Request(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}

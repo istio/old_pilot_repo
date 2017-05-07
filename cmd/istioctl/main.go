@@ -40,7 +40,10 @@ import (
 )
 
 const (
-	defaultIstioNamespace = "default" // istio-system?
+	// TODO istio/istio e2e integration test needs to be updated to
+	// use --istioNamespace. Temporarily default to empty string so we
+	// can detect and use --namespace.
+	defaultIstioNamespace = "" // istio-system?
 )
 
 type k8sRESTRequester struct {
@@ -51,16 +54,36 @@ type k8sRESTRequester struct {
 
 // Request wraps Kubernetes specific requester to provide the proper
 // namespace and service names.a
-func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) ([]byte, error) {
+func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) (int, []byte, error) {
 	return rr.client.Request(rr.namespace, rr.service, method, path, inBody)
 }
 
+func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
+	if kubeconfig == "" {
+		if v := os.Getenv("KUBECONFIG"); v != "" {
+			glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
+			kubeconfig = v
+		}
+	}
+
+	client, err := kube.NewClient(kubeconfig, model.IstioConfig)
+	if err != nil && kubeconfig == "" {
+		// If no configuration was specified, and the platform
+		// client failed, try again using ~/.kube/config
+		client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
+	}
+	if err != nil {
+		return nil, multierror.Prefix(err, "failed to connect to Kubernetes API.")
+	}
+	return client, nil
+}
+
 var (
-	namespace           string
-	istioNamespace      string
-	apiClient           proxy.Client
-	istioManagerService string
-	useKubeRequester    bool
+	namespace              string
+	istioNamespace         string
+	apiClient              proxy.Client
+	istioManagerAPIService string
+	useKubeRequester       bool
 
 	// input file name
 	file string
@@ -88,36 +111,28 @@ for an overview of the routing and traffic DSL.
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
 `, model.IstioConfig.Kinds()),
-		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			if kubeconfig == "" {
-				if v := os.Getenv("KUBECONFIG"); v != "" {
-					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
-					kubeconfig = v
-				}
-			}
-
-			client, err = kube.NewClient(kubeconfig, model.IstioConfig)
-			if err != nil && kubeconfig == "" {
-				// If no configuration was specified, and the platform client failed, try again using ~/.kube/config
-				client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
-			}
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			var err error
+			client, err = kubeClientFromConfig(kubeconfig)
 			if err != nil {
-				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
-			}
-
-			if err = client.RegisterResources(); err != nil {
-				return multierror.Prefix(err, "failed to register Third-Party Resources.")
+				return err
 			}
 
 			if useKubeRequester {
+				// TODO temporarily use --namespace instead of
+				// --istioNamespace for RESTRequester namespace until
+				// istio/istio e2e tests are updated.
+				if istioNamespace == "" {
+					istioNamespace = namespace
+				}
 				apiClient = proxy.NewManagerClient(&k8sRESTRequester{
 					client:    client,
 					namespace: istioNamespace,
-					service:   istioManagerService,
+					service:   istioManagerAPIService,
 				})
 			} else {
 				apiClient = proxy.NewManagerClient(&proxy.BasicHTTPRequester{
-					BaseURL: istioManagerService,
+					BaseURL: istioManagerAPIService,
 					Client:  &http.Client{Timeout: 60 * time.Second},
 					Version: kube.IstioResourceVersion,
 				})
@@ -125,7 +140,7 @@ istioctl mixer command documentation.
 
 			config = client
 
-			return
+			return err
 		},
 	}
 
@@ -335,7 +350,8 @@ func init() {
 		"Select a Kubernetes namespace")
 	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
 		"Namespace where Istio system resides")
-	rootCmd.PersistentFlags().StringVar(&istioManagerService, "managerAPIService", "istio-manager:8081",
+	rootCmd.PersistentFlags().StringVar(&istioManagerAPIService,
+		"managerAPIService", "istio-manager:8081",
 		"Name of istio-manager service. When --kube=false this sets the address of the manager service")
 	rootCmd.PersistentFlags().BoolVar(&useKubeRequester, "kube", true,
 		"Use Kubernetes client to send API requests to manager service")
