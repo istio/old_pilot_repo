@@ -66,16 +66,16 @@ func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
 		}
 	}
 
-	client, err := kube.NewClient(kubeconfig, model.IstioConfig)
+	c, err := kube.NewClient(kubeconfig, model.IstioConfig)
 	if err != nil && kubeconfig == "" {
 		// If no configuration was specified, and the platform
 		// client failed, try again using ~/.kube/config
-		client, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
+		c, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
 	}
 	if err != nil {
 		return nil, multierror.Prefix(err, "failed to connect to Kubernetes API.")
 	}
-	return client, nil
+	return c, nil
 }
 
 var (

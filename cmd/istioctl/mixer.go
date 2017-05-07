@@ -81,7 +81,7 @@ for a description of Mixer configuration's scope, subject, and rules.
 			} else {
 				mixerRESTRequester = &proxy.BasicHTTPRequester{
 					BaseURL: istioMixerAPIService,
-					Client:  &http.Client{Timeout: 60 * time.Second},
+					Client:  &http.Client{Timeout: requestTimeout},
 					Version: kube.IstioResourceVersion,
 				}
 			}
@@ -156,7 +156,7 @@ func mixerRuleCreate(scope, subject string, rule []byte) error {
 	if status != http.StatusOK {
 		var response mixerAPIResponse
 		message := "unknown"
-		if err := json.Unmarshal(body, &response); err == nil {
+		if err = json.Unmarshal(body, &response); err == nil {
 			message = response.Status.Message
 		}
 		return fmt.Errorf("failed rule creation with status %q: %q", status, message)
