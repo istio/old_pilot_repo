@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-func TestWathCerts(t *testing.T) {
+func TestWatchCerts(t *testing.T) {
 	name, err := ioutil.TempDir("testdata", "certs")
 	if err != nil {
 		t.Errorf("failed to create a temp dir: %v", err)

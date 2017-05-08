@@ -89,7 +89,7 @@ func (w *watcher) Run(stop <-chan struct{}) {
 	// must start consumer before producer
 	go w.agent.Run(stop)
 	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go watchCerts(mesh.AuthCertsPath, stop, func() { w.reload() })
+		go watchCerts(mesh.AuthCertsPath, stop, w.reload)
 	}
 	w.ctl.Run(stop)
 }
