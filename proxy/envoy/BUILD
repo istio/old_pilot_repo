@@ -34,6 +34,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
+        "cert_test.go",
         "config_test.go",
         "discovery_test.go",
         "egress_test.go",
