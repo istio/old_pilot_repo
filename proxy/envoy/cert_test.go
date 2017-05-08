@@ -15,6 +15,8 @@
 package envoy
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -49,5 +51,30 @@ func TestWathCerts(t *testing.T) {
 		// expected
 	case <-time.After(time.Second):
 		t.Errorf("The callback is not called within time limit " + time.Now().String())
+	}
+}
+
+func TestGenerateCertHash(t *testing.T) {
+	name, err := ioutil.TempDir("testdata", "certs")
+	if err != nil {
+		t.Errorf("failed to create a temp dir: %v", err)
+	}
+	defer os.RemoveAll(name)
+
+	h := sha256.New()
+
+	for _, file := range []string{"cert-chain.pem", "key.pem", "root-cert.pem"} {
+		content := []byte(file)
+		if err := ioutil.WriteFile(name+"/"+file, content, 0644); err != nil {
+			t.Errorf("failed to write file %s (error %v)", file, err)
+		}
+		if _, err := h.Write(content); err != nil {
+			t.Errorf("failed to write hash (error %v)", err)
+		}
+	}
+	expectedHash := h.Sum(nil)
+	actualHash := generateCertHash(name)
+	if !bytes.Equal(actualHash, expectedHash) {
+		t.Errorf("Actual hash value (%v) is different than the expected hash value (%v)", actualHash, expectedHash)
 	}
 }
