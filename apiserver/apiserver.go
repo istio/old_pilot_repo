@@ -102,6 +102,6 @@ func (api *API) Run() {
 // Shutdown calls `Shutdown(nil)` on the API server
 func (api *API) Shutdown(ctx context.Context) {
 	if api != nil && api.server != nil {
-		api.server.Shutdown(ctx)
+		api.server.Shutdown(ctx) // #nosec
 	}
 }

@@ -259,12 +259,12 @@ func (r *apiServerTest) routeRuleCRUD() error {
 
 	err := verifySequence("CRUD", httpSequence)
 
-	// On error, clean up any rule we created that didn't get deleted by the final requests
+	// On error, clean up any rule we created that didn't get deleted by the final requests (in case count>1)
 	if err != nil {
 		// Attempt to delete rule, in case we created this and left it around due to a failure.
 		client := &net_http.Client{}
 		if req, err2 := net_http.NewRequest("DELETE", testURL, nil); err2 != nil {
-			client.Do(req) // #nosec
+			client.Do(req) /* #nosec */
 		}
 	}
 
@@ -360,7 +360,8 @@ func verifyRequest(hreq httpRequest, bytesToSend []byte, maxRetries int, rulenum
 				return nil
 			}
 
-			glog.V(2).Infof("Request for %v %v got expected status code but body did not match: %s\n", hreq.method, hreq.url, body)
+			glog.V(2).Infof("Request for %v %v got expected status code but body did not match: %s\n",
+				hreq.method, hreq.url, body)
 
 			serializedExpectedBody, err := json.Marshal(hreq.expectedBody)
 			if err != nil {
