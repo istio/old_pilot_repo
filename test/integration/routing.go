@@ -201,15 +201,10 @@ func (t *routing) verifyRedirect(src, dst, targetHost, targetPath, headerKey, he
 
 	resp := t.clientRequest(src, url, 1, fmt.Sprintf("-key %s -val %s", headerKey, headerVal))
 
-	statusCode := ""
-	if len(resp.code) > 0 {
-		statusCode = resp.code[0]
-	}
-
-	if strconv.Itoa(respCode) != statusCode {
+	if len(resp.code) == 0 || resp.code[0] != fmt.Sprintf(respCode) {
 		return fmt.Errorf("redirect verification failed: "+
 			"response status code: %v, expected %v",
-			statusCode, respCode)
+			resp.code, respCode)
 	}
 
 	exp := regexp.MustCompile("(?i)Host=(.*)")
@@ -220,8 +215,8 @@ func (t *routing) verifyRedirect(src, dst, targetHost, targetPath, headerKey, he
 	}
 	if host != targetHost {
 		return fmt.Errorf("redirect verification failed: "+
-			"response body contains Hostname=%v, expected Hostname=%v",
-			hosts[0], targetHost)
+			"response body contains Host=%v, expected Host=%v",
+			host, targetHost)
 	}
 
 	exp = regexp.MustCompile("(?i)URL=(.*)")
