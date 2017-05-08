@@ -93,14 +93,24 @@ func NewManagerClient(rr RESTRequester) *ManagerClient {
 	return &ManagerClient{rr: rr}
 }
 
-func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) (int, []byte, error) {
+func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) ([]byte, error) {
 	uriSuffix := fmt.Sprintf("config/%v/%v/%v", key.Kind, key.Namespace, key.Name)
-	return m.rr.Request(method, uriSuffix, inBody)
+	status, body, err := m.rr.Request(method, uriSuffix, inBody)
+	if err != nil {
+		return nil, err
+	}
+	if status < 200 || status >= 300 {
+		if len(body) == 0 {
+			return nil, fmt.Errorf("received non-success status code %v", status)
+		}
+		return nil, fmt.Errorf("received non-success status code %v with message %v", status, string(body))
+	}
+	return body, nil
 }
 
 // GetConfig retrieves the configuration resource for the passed key
 func (m *ManagerClient) GetConfig(key model.Key) (*apiserver.Config, error) {
-	_, body, err := m.doConfigCRUD(key, http.MethodGet, nil)
+	body, err := m.doConfigCRUD(key, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +128,7 @@ func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error 
 	if err != nil {
 		return err
 	}
-	if _, _, err = m.doConfigCRUD(key, http.MethodPost, bodyIn); err != nil {
+	if _, err = m.doConfigCRUD(key, http.MethodPost, bodyIn); err != nil {
 		return err
 	}
 	return nil
@@ -131,7 +141,7 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 	if err != nil {
 		return err
 	}
-	if _, _, err = m.doConfigCRUD(key, http.MethodPut, bodyIn); err != nil {
+	if _, err = m.doConfigCRUD(key, http.MethodPut, bodyIn); err != nil {
 		return err
 	}
 	return nil
@@ -139,7 +149,7 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 
 // DeleteConfig deletes the configuration resource for the passed key
 func (m *ManagerClient) DeleteConfig(key model.Key) error {
-	_, _, err := m.doConfigCRUD(key, http.MethodDelete, nil)
+	_, err := m.doConfigCRUD(key, http.MethodDelete, nil)
 	return err
 }
 
