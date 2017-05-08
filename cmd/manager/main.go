@@ -82,9 +82,6 @@ var (
 			}
 			if flags.controllerOptions.Namespace == "" {
 				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-				if flags.controllerOptions.Namespace == "" {
-					return fmt.Errorf("export POD_NAMESPACE or supply --namespace flag")
-				}
 			}
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
