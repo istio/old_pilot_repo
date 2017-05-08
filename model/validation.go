@@ -49,7 +49,7 @@ func IsDNS1123Label(value string) bool {
 	return len(value) <= dns1123LabelMaxLength && dns1123LabelRex.MatchString(value)
 }
 
-// ValidatePort ...
+// ValidatePort checks that the network port is in range
 func ValidatePort(port int) error {
 	if 1 <= port && port <= 65535 {
 		return nil
@@ -215,7 +215,7 @@ func (t Tags) Validate() error {
 	return errs
 }
 
-// ValidateFQDN ...
+// ValidateFQDN checks a fully-qualified domain name
 func ValidateFQDN(fqdn string) error {
 	if len(fqdn) > 255 {
 		return fmt.Errorf("domain name %q too long (max 255)", fqdn)
@@ -326,7 +326,7 @@ func ValidateL4MatchAttributes(ma *proxyconfig.L4MatchAttributes) (errs error) {
 	return
 }
 
-// ValidatePercent ...
+// ValidatePercent checks that percent is in range
 func ValidatePercent(val int32) error {
 	if val < 0 || val > 100 {
 		return fmt.Errorf("must be in range 0..100")
@@ -334,7 +334,7 @@ func ValidatePercent(val int32) error {
 	return nil
 }
 
-// ValidateFloatPercent ...
+// ValidateFloatPercent checks that percent is in range
 func ValidateFloatPercent(val float32) error {
 	if val < 0.0 || val > 100.0 {
 		return fmt.Errorf("must be in range 0..100")
@@ -425,7 +425,7 @@ func ValidateL4Fault(fault *proxyconfig.L4FaultInjection) (errs error) {
 	return
 }
 
-// ValidateSubnet ...
+// ValidateSubnet checks that IPv4 subnet form
 func ValidateSubnet(subnet string) error {
 	// The current implementation only supports IP v4 addresses
 	return ValidateIPv4Subnet(subnet)
@@ -480,7 +480,7 @@ func ValidateIPv4Address(addr string) error {
 	return nil
 }
 
-// ValidateDelay ...
+// ValidateDelay checks that fault injection delay is well-formed
 func ValidateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) (errs error) {
 	if err := ValidateFloatPercent(delay.Percent); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "percent invalid: "))
@@ -499,7 +499,7 @@ func ValidateDelay(delay *proxyconfig.HTTPFaultInjection_Delay) (errs error) {
 	return
 }
 
-// ValidateAbortHTTPStatus ...
+// ValidateAbortHTTPStatus checks that fault injection abort HTTP status is valid
 func ValidateAbortHTTPStatus(httpStatus *proxyconfig.HTTPFaultInjection_Abort_HttpStatus) (errs error) {
 	if httpStatus.HttpStatus < 0 || httpStatus.HttpStatus > 600 {
 		errs = multierror.Append(errs, fmt.Errorf("invalid abort http status %v", httpStatus.HttpStatus))
@@ -508,7 +508,7 @@ func ValidateAbortHTTPStatus(httpStatus *proxyconfig.HTTPFaultInjection_Abort_Ht
 	return
 }
 
-// ValidateAbort ...
+// ValidateAbort checks that fault injection abort is well-formed
 func ValidateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) (errs error) {
 	if err := ValidateFloatPercent(abort.Percent); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "percent invalid: "))
@@ -531,7 +531,7 @@ func ValidateAbort(abort *proxyconfig.HTTPFaultInjection_Abort) (errs error) {
 	return
 }
 
-// ValidateTerminate ...
+// ValidateTerminate checks that fault injection terminate is well-formed
 func ValidateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) (errs error) {
 	if err := ValidateFloatPercent(terminate.Percent); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "terminate percent invalid: "))
@@ -539,7 +539,7 @@ func ValidateTerminate(terminate *proxyconfig.L4FaultInjection_Terminate) (errs 
 	return
 }
 
-// ValidateThrottle ...
+// ValidateThrottle checks that fault injections throttle is well-formed
 func ValidateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) (errs error) {
 	if err := ValidateFloatPercent(throttle.Percent); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "throttle percent invalid: "))
@@ -618,7 +618,7 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 	return
 }
 
-// ValidateWeights ...
+// ValidateWeights checks that destination weights sum to 100
 func ValidateWeights(routes []*proxyconfig.DestinationWeight, defaultDestination string) (errs error) {
 	// Sum weights
 	sum := 0
@@ -770,7 +770,7 @@ func ValidateDestinationPolicy(msg proto.Message) error {
 	return errs
 }
 
-// ValidateProxyAddress ...
+// ValidateProxyAddress checks that a network address is well-formed
 func ValidateProxyAddress(hostAddr string) error {
 	colon := strings.Index(hostAddr, ":")
 	if colon < 0 {
@@ -794,7 +794,7 @@ func ValidateProxyAddress(hostAddr string) error {
 	return nil
 }
 
-// ValidateDuration ...
+// ValidateDuration checks that a proto duration is well-formed
 func ValidateDuration(pd *duration.Duration) error {
 	dur, err := ptypes.Duration(pd)
 	if err != nil {
@@ -809,7 +809,7 @@ func ValidateDuration(pd *duration.Duration) error {
 	return nil
 }
 
-// ValidateParentAndDrain ...
+// ValidateParentAndDrain checks that parent and drain durations are valid
 func ValidateParentAndDrain(drainTime, parentShutdown *duration.Duration) (errs error) {
 	if err := ValidateDuration(drainTime); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid drain duration:"))
@@ -841,7 +841,7 @@ func ValidateParentAndDrain(drainTime, parentShutdown *duration.Duration) (errs 
 	return
 }
 
-// ValidateProxyMeshConfig ...
+// ValidateProxyMeshConfig checks that the mesh config is well-formed
 func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
