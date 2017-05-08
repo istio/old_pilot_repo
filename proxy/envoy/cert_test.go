@@ -28,7 +28,11 @@ func TestWathCerts(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to create a temp dir: %v", err)
 	}
-	defer os.RemoveAll(name)
+	defer func() {
+		if err := os.RemoveAll(name); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
 
 	called := make(chan bool)
 	callbackFunc := func() {
@@ -59,7 +63,11 @@ func TestGenerateCertHash(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to create a temp dir: %v", err)
 	}
-	defer os.RemoveAll(name)
+	defer func() {
+		if err := os.RemoveAll(name); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
 
 	h := sha256.New()
 
