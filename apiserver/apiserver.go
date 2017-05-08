@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -95,5 +96,12 @@ func (api *API) Run() {
 	glog.Infof("Starting api at %v", api.server.Addr)
 	if err := api.server.ListenAndServe(); err != nil {
 		glog.Warning(err)
+	}
+}
+
+// Shutdown calls `Shutdown(nil)` on the API server
+func (api *API) Shutdown(ctx context.Context) {
+	if api != nil && api.server != nil {
+		api.server.Shutdown(ctx)
 	}
 }
