@@ -264,7 +264,10 @@ func (r *apiServerTest) routeRuleCRUD() error {
 		// Attempt to delete rule, in case we created this and left it around due to a failure.
 		client := &net_http.Client{}
 		if req, err2 := net_http.NewRequest("DELETE", testURL, nil); err2 != nil {
-			client.Do(req) /* #nosec */
+			glog.V(2).Infof("Could not create request to clean up")
+		}
+		if _, err2 := client.Do(req); err2 != nil {
+			glog.V(2).Infof("Could not DELETE possible leftover Istio rule")
 		}
 	}
 
