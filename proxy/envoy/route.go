@@ -40,9 +40,9 @@ const (
 // buildListenerSSLContext returns an SSLContext struct.
 func buildListenerSSLContext(certsDir string) *SSLContext {
 	return &SSLContext{
-		CertChainFile:  certsDir + "/cert-chain.pem",
-		PrivateKeyFile: certsDir + "/key.pem",
-		CaCertFile:     certsDir + "/root-cert.pem",
+		CertChainFile:  certsDir + "/" + certChainFilename,
+		PrivateKeyFile: certsDir + "/" + keyFilename,
+		CaCertFile:     certsDir + "/" + rootCertFilename,
 	}
 }
 
@@ -50,9 +50,9 @@ func buildListenerSSLContext(certsDir string) *SSLContext {
 // The list of service accounts may be empty but not nil.
 func buildClusterSSLContext(certsDir string, serviceAccounts []string) *SSLContextWithSAN {
 	return &SSLContextWithSAN{
-		CertChainFile:        certsDir + "/cert-chain.pem",
-		PrivateKeyFile:       certsDir + "/key.pem",
-		CaCertFile:           certsDir + "/root-cert.pem",
+		CertChainFile:        certsDir + "/" + certChainFilename,
+		PrivateKeyFile:       certsDir + "/" + keyFilename,
+		CaCertFile:           certsDir + "/" + rootCertFilename,
 		VerifySubjectAltName: serviceAccounts,
 	}
 }
@@ -102,9 +102,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 
 // buildHTTPRoute translates a route rule to an Envoy route
 func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
-	route := &HTTPRoute{}
-	route.Headers = buildHeaders(rule.Match)
-	route.Path, route.Prefix = buildURIPathPrefix(rule.Match)
+	route := buildHTTPRouteMatch(rule.Match)
 
 	// setup timeouts for the route
 	if rule.HttpReqTimeout != nil &&
