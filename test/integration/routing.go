@@ -201,7 +201,7 @@ func (t *routing) verifyRedirect(src, dst, targetHost, targetPath, headerKey, he
 
 	resp := t.clientRequest(src, url, 1, fmt.Sprintf("-key %s -val %s", headerKey, headerVal))
 
-	if len(resp.code) == 0 || resp.code[0] != fmt.Sprintf(respCode) {
+	if len(resp.code) == 0 || resp.code[0] != fmt.Sprint(respCode) {
 		return fmt.Errorf("redirect verification failed: "+
 			"response status code: %v, expected %v",
 			resp.code, respCode)
