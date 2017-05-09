@@ -109,8 +109,11 @@ Available routing and traffic management configuration types:
 
 	%v
 
-See https://istio.io/docs/reference/routing-and-traffic-management.html
-for an overview of the routing and traffic DSL.
+See
+https://istio.io/docs/reference/api/traffic-rules/routing-rules.html
+and
+https://istio.io/docs/reference/api/traffic-rules/destination-policies.html
+for an overview of routing rules and destination policies.
 
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
