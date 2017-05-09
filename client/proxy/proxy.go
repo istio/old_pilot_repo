@@ -17,7 +17,7 @@ import (
 // RESTRequester is yet another client wrapper for making REST
 // calls. Ideally rest.Interface from "k8s.io/client-go/rest" would be
 // used, but that returns not-interface types making it more difficult
-// mock for unit-test, e.g. rest.Request.
+// to mock for unit-test, e.g. rest.Request.
 type RESTRequester interface {
 	Request(method, path string, inBody []byte) (int, []byte, error)
 }
