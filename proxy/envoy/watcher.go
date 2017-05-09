@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -87,6 +88,9 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 func (w *watcher) Run(stop <-chan struct{}) {
 	// must start consumer before producer
 	go w.agent.Run(stop)
+	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go watchCerts(mesh.AuthCertsPath, stop, w.reload)
+	}
 	w.ctl.Run(stop)
 }
 
@@ -95,6 +99,9 @@ func (w *watcher) reload() {
 	// even though the function is called on every modification event,
 	// the actual config is generated from the latest cache view
 	config := Generate(w.context)
+	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		config.Hash = generateCertHash(mesh.AuthCertsPath)
+	}
 	w.agent.ScheduleConfigUpdate(config)
 }
 
@@ -130,8 +137,8 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			// spin up a new Envoy process
 			args := []string{"-c", fname,
 				"--restart-epoch", fmt.Sprint(epoch),
-				"--drain-time-s", fmt.Sprint(protoDurationToMS(mesh.DrainDuration)),
-				"--parent-shutdown-time-s", fmt.Sprint(protoDurationToMS(mesh.ParentShutdownDuration)),
+				"--drain-time-s", fmt.Sprint(int(convertDuration(mesh.DrainDuration) / 1 * time.Second)),
+				"--parent-shutdown-time-s", fmt.Sprint(int(convertDuration(mesh.ParentShutdownDuration) / 1 * time.Second)),
 				"--service-cluster", mesh.IstioServiceCluster,
 				"--service-node", node,
 			}

@@ -43,6 +43,7 @@ type ingressWatcher struct {
 	agent   proxy.Agent
 	secrets model.SecretRegistry
 	mesh    *proxyconfig.ProxyMeshConfig
+	tls     *model.TLSSecret
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
@@ -71,11 +72,20 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 
 	config := generateIngress(w.mesh, nil, certFile, keyFile)
 	w.agent.ScheduleConfigUpdate(config)
+
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go watchCerts(w.mesh.AuthCertsPath, stop, func() {
+			c := generateIngress(w.mesh, w.tls, certFile, keyFile)
+			w.agent.ScheduleConfigUpdate(c)
+		})
+	}
+
 	for {
 		tls, err := fetchSecret(ctx, client, url, w.secrets)
 		if err != nil {
 			glog.Warning(err)
 		} else {
+			w.tls = tls
 			config = generateIngress(w.mesh, tls, certFile, keyFile)
 			w.agent.ScheduleConfigUpdate(config)
 		}
@@ -137,14 +147,27 @@ func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, ce
 	}
 
 	config := buildConfig(listeners, nil, mesh)
+
+	h := sha256.New()
+	hashed := false
 	if tls != nil {
-		h := sha256.New()
+		hashed = true
 		if _, err := h.Write(tls.Certificate); err != nil {
 			glog.Warning(err)
 		}
 		if _, err := h.Write(tls.PrivateKey); err != nil {
 			glog.Warning(err)
 		}
+	}
+
+	if mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		hashed = true
+		if _, err := h.Write(generateCertHash(mesh.AuthCertsPath)); err != nil {
+			glog.Warning(err)
+		}
+	}
+
+	if hashed {
 		config.Hash = h.Sum(nil)
 	}
 
@@ -255,10 +278,18 @@ func buildIngressRoute(ingress *proxyconfig.RouteRule,
 	routes := buildDestinationHTTPRoutes(service, servicePort, rules)
 
 	// filter by path, prefix from the ingress
-	path, prefix := buildURIPathPrefix(ingress.Match)
+	ingressRoute := buildHTTPRouteMatch(ingress.Match)
+
+	// TODO: not handling header match in ingress apart from uri and authority (uri must not be regex)
+	if len(ingressRoute.Headers) > 0 {
+		if len(ingressRoute.Headers) > 1 || ingressRoute.Headers[0].Name != model.HeaderAuthority {
+			return nil, "", errors.New("header matches in ingress rule not supported")
+		}
+	}
+
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
-		if applied := route.CombinePathPrefix(path, prefix); applied != nil {
+		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {
 			// rewrite the host header so that inbound proxies can match incoming traffic
 			applied.HostRewrite = fmt.Sprintf("%s:%d", service.Hostname, servicePort.Port)
 			out = append(out, applied)
