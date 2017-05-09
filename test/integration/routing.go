@@ -200,18 +200,15 @@ func (t *routing) verifyRedirect(src, dst, targetHost, targetPath, headerKey, he
 	glog.Infof("Making 1 request (%s) from %s...\n", url, src)
 
 	resp := t.clientRequest(src, url, 1, fmt.Sprintf("-key %s -val %s", headerKey, headerVal))
-
 	if len(resp.code) == 0 || resp.code[0] != fmt.Sprint(respCode) {
 		return fmt.Errorf("redirect verification failed: "+
 			"response status code: %v, expected %v",
 			resp.code, respCode)
 	}
 
-	exp := regexp.MustCompile("(?i)Host=(.*)")
-	hosts := exp.FindAllStringSubmatch(resp.body, -1)
-	host := ""
-	if len(hosts) > 0 {
-		host = hosts[0][1]
+	var host string
+	if matches := regexp.MustCompile("(?i)Host=(.*)").FindStringSubmatch(resp.body); len(matches) >= 2 {
+		host = matches[1]
 	}
 	if host != targetHost {
 		return fmt.Errorf("redirect verification failed: "+
@@ -219,16 +216,16 @@ func (t *routing) verifyRedirect(src, dst, targetHost, targetPath, headerKey, he
 			host, targetHost)
 	}
 
-	exp = regexp.MustCompile("(?i)URL=(.*)")
+	exp := regexp.MustCompile("(?i)URL=(.*)")
 	paths := exp.FindAllStringSubmatch(resp.body, -1)
-	path := ""
+	var path string
 	if len(paths) > 1 {
 		path = paths[1][1]
 	}
 	if path != targetPath {
 		return fmt.Errorf("redirect verification failed: "+
 			"response body contains URL=%v, expected URL=%v",
-			paths[0], targetPath)
+			path, targetPath)
 	}
 
 	return nil
