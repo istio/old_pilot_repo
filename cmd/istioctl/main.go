@@ -109,11 +109,8 @@ Available routing and traffic management configuration types:
 
 	%v
 
-See
-https://istio.io/docs/reference/api/traffic-rules/routing-rules.html
-and
-https://istio.io/docs/reference/api/traffic-rules/destination-policies.html
-for an overview of routing rules and destination policies.
+See http://istio.io/docs/reference for an overview of routing rules
+and destination policies.
 
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
@@ -346,8 +343,13 @@ func init() {
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
+
 	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
 		"Namespace where Istio system resides")
+	// TODO hide istioNamespace until Istio can be installed in a
+	// separate namespace from that which it manages.
+	rootCmd.PersistentFlags().MarkHidden("istioNamespace")
+
 	rootCmd.PersistentFlags().StringVar(&istioManagerAPIService,
 		"managerAPIService", "istio-manager:8081",
 		"Name of istio-manager service. When --kube=false this sets the address of the manager service")
