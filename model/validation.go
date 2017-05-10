@@ -838,6 +838,55 @@ func ValidateParentAndDrain(drainTime, parentShutdown *duration.Duration) (errs 
 				parentShutdownDuration.Seconds(), drainDuration.Seconds()))
 	}
 
+	if drainDuration > (time.Hour * 1) {
+		errs = multierror.Append(errs,
+			fmt.Errorf("Istio drain time %v must be less than 1 hour", drainDuration.Minutes()))
+	}
+
+	if parentShutdownDuration > (time.Hour * 1) {
+		errs = multierror.Append(errs,
+			fmt.Errorf("Istio parent shutdown time %v must be less than 1 hour",
+				parentShutdownDuration.Minutes()))
+	}
+
+	return
+}
+
+// ValidateRefreshDelay validates the discovery refresh delay time
+func ValidateRefreshDelay(refresh *duration.Duration) (errs error) {
+	if err := ValidateDuration(refresh); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	if errs != nil {
+		return
+	}
+
+	refreshDuration, _ := ptypes.Duration(refresh)
+	if refreshDuration > (time.Minute*10) || refreshDuration < time.Second {
+		errs = multierror.Append(errs,
+			fmt.Errorf("Istio discoveryRefreshDelay time %v must be >1 second and <10 minutes",
+				refreshDuration.Minutes()))
+	}
+
+	return
+}
+
+// ValidateConnectTimeout validates the envoy conncection timeout
+func ValidateConnectTimeout(timeout *duration.Duration) (errs error) {
+	if err := ValidateDuration(timeout); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	if errs != nil {
+		return
+	}
+
+	timeoutDuration, _ := ptypes.Duration(timeout)
+	if timeoutDuration > (time.Second*30) || timeoutDuration <= (time.Millisecond) {
+		errs = multierror.Append(errs,
+			fmt.Errorf("Istio discovery connectTimeout %v must be less than 30 seconds",
+				timeoutDuration.Seconds()))
+	}
+
 	return
 }
 
@@ -880,11 +929,11 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
 	}
 
-	if err := ValidateDuration(mesh.DiscoveryRefreshDelay); err != nil {
+	if err := ValidateRefreshDelay(mesh.DiscoveryRefreshDelay); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
 	}
 
-	if err := ValidateDuration(mesh.ConnectTimeout); err != nil {
+	if err := ValidateConnectTimeout(mesh.ConnectTimeout); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid connect timeout:"))
 	}
 
