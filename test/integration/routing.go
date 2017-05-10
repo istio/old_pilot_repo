@@ -47,10 +47,10 @@ func (t *routing) setup() error {
 	return nil
 }
 
+// TODO: test negatives
 func (t *routing) run() error {
 	// First test default routing
-	// Create a bytes buffer to hold the YAML form of rules
-	glog.Info("Routing all traffic to c-v1 and verifying..")
+	glog.Info("Routing all traffic to c-v1 and verifying...")
 	if err := t.applyConfig("rule-default-route.yaml.tmpl", map[string]string{
 		"Destination": "c",
 		"Namespace":   t.Namespace,
@@ -66,7 +66,7 @@ func (t *routing) run() error {
 	}
 	glog.Info("Success!")
 
-	glog.Info("Routing 75 percent to c-v1, 25 percent to c-v2 and verifying..")
+	glog.Info("Routing 75 percent to c-v1, 25 percent to c-v2 and verifying...")
 	if err := t.applyConfig("rule-weighted-route.yaml.tmpl", map[string]string{
 		"Destination": "c",
 		"Namespace":   t.Namespace,
@@ -82,7 +82,7 @@ func (t *routing) run() error {
 	}
 	glog.Info("Success!")
 
-	glog.Info("Routing 100 percent to c-v2 using header based routing and verifying..")
+	glog.Info("Routing 100 percent to c-v2 using header based routing and verifying...")
 	if err := t.applyConfig("rule-content-route.yaml.tmpl", map[string]string{
 		"Source":      "a",
 		"Destination": "c",
@@ -91,6 +91,23 @@ func (t *routing) run() error {
 		return err
 	}
 	if err := t.verifyRouting("a", "c", "version", "v2",
+		100, map[string]int{
+			"v1": 0,
+			"v2": 100,
+		}); err != nil {
+		return err
+	}
+	glog.Info("Success!")
+
+	glog.Info("Routing 100 percent to c-v2 using regex header based routing and verifying...")
+	if err := t.applyConfig("rule-regex-route.yaml.tmpl", map[string]string{
+		"Source":      "a",
+		"Destination": "c",
+		"Namespace":   t.Namespace,
+	}, model.RouteRule, contentRoute); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("a", "c", "foo", "bar",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
