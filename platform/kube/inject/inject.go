@@ -60,12 +60,12 @@ const (
 )
 
 // InitImageName returns the fully qualified image name for the istio
-// init image given a docker hub and tag.
+// init image given a docker hub and tag
 func InitImageName(hub, tag string) string { return hub + "/init:" + tag }
 
 // ProxyImageName returns the fully qualified image name for the istio
 // proxy image given a docker hub and tag.
-func ProxyImageName(hub, tag string) string { return hub + "/proxy:" + tag }
+func ProxyImageName(hub, tag string) string { return hub + "/proxy_debug:" + tag }
 
 // Params describes configurable parameters for injecting istio proxy
 // into kubernetes resource.
@@ -262,7 +262,7 @@ func healthPorts(t *v1.PodTemplateSpec) ([]int, error) {
 		}
 	}
 
-	out := make([]int, 0)
+	out := make([]int, 0, len(set))
 	for port := range set {
 		out = append(out, port)
 	}
