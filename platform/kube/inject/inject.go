@@ -60,7 +60,7 @@ const (
 )
 
 // InitImageName returns the fully qualified image name for the istio
-// init image given a docker hub and tag.
+// init image given a docker hub and tag
 func InitImageName(hub, tag string) string { return hub + "/init:" + tag }
 
 // ProxyImageName returns the fully qualified image name for the istio
