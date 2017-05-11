@@ -38,6 +38,18 @@ const (
 	qualifiedNameFmt string = "[-A-Za-z0-9_./]*"
 )
 
+// Constants for duration fields
+const (
+	discoveryRefreshDelayMax = time.Minute * 10
+	discoveryRefreshDelayMin = time.Second
+
+	connectTimeoutMax = time.Second * 30
+	connectTimeoutMin = time.Millisecond
+
+	drainTimeMax          = time.Hour
+	parentShutdownTimeMax = time.Hour
+)
+
 var (
 	dns1123LabelRex = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 	tagRegexp       = regexp.MustCompile("^" + qualifiedNameFmt + "$")
@@ -809,6 +821,14 @@ func ValidateDuration(pd *duration.Duration) error {
 	return nil
 }
 
+func ValidateDurationRange(dur, min, max time.Duration) error {
+	if dur > max || dur < min {
+		return fmt.Errorf("time %v must be >%v and <%v", dur.String(), min.String(), max.String())
+	}
+
+	return nil
+}
+
 // ValidateParentAndDrain checks that parent and drain durations are valid
 func ValidateParentAndDrain(drainTime, parentShutdown *duration.Duration) (errs error) {
 	if err := ValidateDuration(drainTime); err != nil {
@@ -835,59 +855,49 @@ func ValidateParentAndDrain(drainTime, parentShutdown *duration.Duration) (errs 
 	if parentShutdownDuration <= drainDuration {
 		errs = multierror.Append(errs,
 			fmt.Errorf("Istio parent shutdown time %v must be greater than drain time %v",
-				parentShutdownDuration.Seconds(), drainDuration.Seconds()))
+				parentShutdownDuration.String(), drainDuration.String()))
 	}
 
-	if drainDuration > (time.Hour * 1) {
+	if drainDuration > drainTimeMax {
 		errs = multierror.Append(errs,
-			fmt.Errorf("Istio drain time %v must be less than 1 hour", drainDuration.Minutes()))
+			fmt.Errorf("Istio drain time %v must be <%v", drainDuration.String(), drainTimeMax.String()))
 	}
 
-	if parentShutdownDuration > (time.Hour * 1) {
+	if parentShutdownDuration > parentShutdownTimeMax {
 		errs = multierror.Append(errs,
-			fmt.Errorf("Istio parent shutdown time %v must be less than 1 hour",
-				parentShutdownDuration.Minutes()))
+			fmt.Errorf("Istio parent shutdown time %v must be <%v",
+				parentShutdownDuration.String(), parentShutdownTimeMax.String()))
 	}
 
 	return
 }
 
 // ValidateRefreshDelay validates the discovery refresh delay time
-func ValidateRefreshDelay(refresh *duration.Duration) (errs error) {
+func ValidateRefreshDelay(refresh *duration.Duration) error {
 	if err := ValidateDuration(refresh); err != nil {
-		errs = multierror.Append(errs, err)
-	}
-	if errs != nil {
-		return
+		return err
 	}
 
 	refreshDuration, _ := ptypes.Duration(refresh)
-	if refreshDuration > (time.Minute*10) || refreshDuration < time.Second {
-		errs = multierror.Append(errs,
-			fmt.Errorf("Istio discoveryRefreshDelay time %v must be >1 second and <10 minutes",
-				refreshDuration.Minutes()))
+	if err := ValidateDurationRange(refreshDuration, discoveryRefreshDelayMin, discoveryRefreshDelayMax); err != nil {
+		return err
 	}
 
-	return
+	return nil
 }
 
 // ValidateConnectTimeout validates the envoy conncection timeout
-func ValidateConnectTimeout(timeout *duration.Duration) (errs error) {
+func ValidateConnectTimeout(timeout *duration.Duration) error {
 	if err := ValidateDuration(timeout); err != nil {
-		errs = multierror.Append(errs, err)
-	}
-	if errs != nil {
-		return
+		return err
 	}
 
 	timeoutDuration, _ := ptypes.Duration(timeout)
-	if timeoutDuration > (time.Second*30) || timeoutDuration <= (time.Millisecond) {
-		errs = multierror.Append(errs,
-			fmt.Errorf("Istio discovery connectTimeout %v must be less than 30 seconds",
-				timeoutDuration.Seconds()))
+	if err := ValidateDurationRange(timeoutDuration, connectTimeoutMin, connectTimeoutMax); err != nil {
+		return err
 	}
 
-	return
+	return nil
 }
 
 // ValidateProxyMeshConfig checks that the mesh config is well-formed
