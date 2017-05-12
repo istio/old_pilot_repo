@@ -251,7 +251,7 @@ func TestInvalidExternalServiceConversion(t *testing.T) {
 					Protocol: v1.ProtocolTCP,
 				},
 			},
-			Type:         v1.ServiceTypeExternalName,
+			Type: v1.ServiceTypeExternalName,
 		},
 	}
 
