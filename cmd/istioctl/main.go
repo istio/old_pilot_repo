@@ -109,8 +109,8 @@ Available routing and traffic management configuration types:
 
 	%v
 
-See https://istio.io/docs/reference/routing-and-traffic-management.html
-for an overview of the routing and traffic DSL.
+See http://istio.io/docs/reference for an overview of routing rules
+and destination policies.
 
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
@@ -215,7 +215,7 @@ istioctl replace -f example-routing.yaml
 	}
 
 	getCmd = &cobra.Command{
-		Use:   "get",
+		Use:   "get <type> [<name>]",
 		Short: "Retrieve policies and rules",
 		Example: `
 # List all route rules
@@ -229,6 +229,7 @@ istioctl get route-rule productpage-default
 `,
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) < 1 {
+				c.Println(c.UsageString())
 				return fmt.Errorf("specify the type of resource to get. Types are %v",
 					strings.Join(model.IstioConfig.Kinds(), ", "))
 			}
@@ -282,7 +283,7 @@ istioctl get route-rule productpage-default
 	}
 
 	deleteCmd = &cobra.Command{
-		Use:   "delete",
+		Use:   "delete <type> <name> [<name2> ... <nameN>]",
 		Short: "Delete policies or rules",
 		Example: `
 # Delete a rule using the definition in example-routing.yaml.
@@ -343,8 +344,13 @@ func init() {
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
 		"Select a Kubernetes namespace")
+
 	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
 		"Namespace where Istio system resides")
+	// TODO hide istioNamespace until Istio can be installed in a
+	// separate namespace from that which it manages.
+	rootCmd.PersistentFlags().MarkHidden("istioNamespace") // nolint: errcheck
+
 	rootCmd.PersistentFlags().StringVar(&istioManagerAPIService,
 		"managerAPIService", "istio-manager:8081",
 		"Name of istio-manager service. When --kube=false this sets the address of the manager service")
