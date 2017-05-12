@@ -153,7 +153,7 @@ func mixerRuleCreate(scope, subject string, rule []byte) error {
 	if body != nil {
 		var response mixerAPIResponse
 		message := "unknown"
-		if err = json.Unmarshal(body, &response); err == nil {
+		if errJSON := json.Unmarshal(body, &response); errJSON == nil {
 			message = response.Status.Message
 		}
 
