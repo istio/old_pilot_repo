@@ -821,6 +821,7 @@ func ValidateDuration(pd *duration.Duration) error {
 	return nil
 }
 
+// ValidateDurationRange verifies range is in specified duration
 func ValidateDurationRange(dur, min, max time.Duration) error {
 	if dur > max || dur < min {
 		return fmt.Errorf("time %v must be >%v and <%v", dur.String(), min.String(), max.String())
@@ -879,11 +880,8 @@ func ValidateRefreshDelay(refresh *duration.Duration) error {
 	}
 
 	refreshDuration, _ := ptypes.Duration(refresh)
-	if err := ValidateDurationRange(refreshDuration, discoveryRefreshDelayMin, discoveryRefreshDelayMax); err != nil {
-		return err
-	}
-
-	return nil
+	err := ValidateDurationRange(refreshDuration, discoveryRefreshDelayMin, discoveryRefreshDelayMax)
+	return err
 }
 
 // ValidateConnectTimeout validates the envoy conncection timeout
@@ -893,11 +891,8 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 	}
 
 	timeoutDuration, _ := ptypes.Duration(timeout)
-	if err := ValidateDurationRange(timeoutDuration, connectTimeoutMin, connectTimeoutMax); err != nil {
-		return err
-	}
-
-	return nil
+	err := ValidateDurationRange(timeoutDuration, connectTimeoutMin, connectTimeoutMax)
+	return err
 }
 
 // ValidateProxyMeshConfig checks that the mesh config is well-formed
