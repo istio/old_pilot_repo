@@ -188,6 +188,9 @@ func TestExternalServiceConversion(t *testing.T) {
 	}
 
 	service := convertService(extSvc)
+	if service == nil {
+		t.Errorf("could not convert external service")
+	}
 
 	if len(service.Ports) != len(extSvc.Spec.Ports) {
 		t.Errorf("incorrect number of ports => %v, want %v",
