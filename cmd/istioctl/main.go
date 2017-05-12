@@ -348,7 +348,7 @@ func init() {
 		"Namespace where Istio system resides")
 	// TODO hide istioNamespace until Istio can be installed in a
 	// separate namespace from that which it manages.
-	rootCmd.PersistentFlags().MarkHidden("istioNamespace")
+	rootCmd.PersistentFlags().MarkHidden("istioNamespace") // nolint: errcheck
 
 	rootCmd.PersistentFlags().StringVar(&istioManagerAPIService,
 		"managerAPIService", "istio-manager:8081",
