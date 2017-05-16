@@ -3,5 +3,5 @@
 # github.com/bazelbuild/bazel/blob/master/tools/buildstamp/ for
 # details on the expected format and usage.
 
-echo KubeInjectHub docker.io
+echo KubeInjectHub docker.io/istio
 echo KubeInjectTag 0.1.3
