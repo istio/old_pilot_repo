@@ -16,9 +16,9 @@ ISTIO_VERSION_URL = 'https://github.com/istio/istio/blob/master/istio.VERSION'
 
 mainFlow(utils) {
   node {
+    env.ISTIO_VERSION = sh(returnStdout: true, script: "curl ${ISTIO_VERSION_URL}").trim()
     gitUtils.initialize()
     bazel.setVars()
-    env.ISTIO_VERSION = sh(returnStdout: true, script: "curl ${ISTIO_VERSION_URL}").trim()
   }
   // PR on master branch
   if (utils.runStage('PRESUBMIT')) {
