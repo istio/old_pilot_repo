@@ -18,7 +18,7 @@ mainFlow(utils) {
   node {
     gitUtils.initialize()
     bazel.setVars()
-    env.ISTIO_VERSION = readTrusted(ISTIO_VERSION_URL).trim()
+    env.ISTIO_VERSION = sh(returnStdout: true, script: "curl ${ISTIO_VERSION_URL}").trim()
   }
   // PR on master branch
   if (utils.runStage('PRESUBMIT')) {
