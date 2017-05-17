@@ -167,7 +167,7 @@ func (a *agent) Run(stop <-chan struct{}) {
 		// maximum duration or duration till next restart
 		var delay time.Duration = 1<<63 - 1
 		if a.retry.restart != nil {
-			delay = time.Until(a.retry.restart)
+			delay = time.Until(*a.retry.restart)
 		}
 
 		select {
