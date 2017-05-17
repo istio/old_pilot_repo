@@ -221,7 +221,6 @@ func (a *agent) Run(stop <-chan struct{}) {
 			}
 
 		case <-time.After(delay):
-			glog.V(2).Infof("Reconciling after delay %v (budget %d)", delay, a.retry.budget)
 			a.reconcile()
 
 		case _, more := <-stop:
@@ -238,13 +237,13 @@ func (a *agent) reconcile() {
 	// cancel any scheduled restart
 	a.retry.restart = nil
 
+	glog.V(2).Info("Reconciling configuration (budget %d)", a.retry.budget)
+
 	// check that the config is current
 	if reflect.DeepEqual(a.desiredConfig, a.currentConfig) {
 		glog.V(2).Info("Desired configuration is already applied, resetting delay")
 		return
 	}
-
-	glog.V(2).Info("Reconciling configuration")
 
 	// discover and increment the latest running epoch
 	epoch := a.latestEpoch() + 1
