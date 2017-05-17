@@ -302,7 +302,7 @@ istioctl delete route-rule productpage-default
 				var errs error
 				for i := 1; i < len(args); i++ {
 					if err := setup(args[0], args[i]); err != nil {
-						// If the user specified an invalid argument on the CLI,
+						// If the user specified an invalid rule kind on the CLI,
 						// don't keep processing -- it's probably a typo.
 						return err
 					}
