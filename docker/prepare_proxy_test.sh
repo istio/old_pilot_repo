@@ -66,6 +66,11 @@ function k8sClusterAndServiceIPRange() {
 	               grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
 	               cut -f2 -d' ' | paste -sd ","
             ;;
+	bluemix)
+	    # cluster cidr = 172.30.0.0/16
+	    # service cidr = 172.20.0.0/16
+            echo "172.30.0.0/16,172.20.0.0/16"
+	    ;;
         *)
             echo ""
     esac
