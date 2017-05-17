@@ -237,7 +237,7 @@ func (a *agent) reconcile() {
 	// cancel any scheduled restart
 	a.retry.restart = nil
 
-	glog.V(2).Info("Reconciling configuration (budget %d)", a.retry.budget)
+	glog.V(2).Infof("Reconciling configuration (budget %d)", a.retry.budget)
 
 	// check that the config is current
 	if reflect.DeepEqual(a.desiredConfig, a.currentConfig) {
