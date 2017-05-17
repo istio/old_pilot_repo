@@ -77,7 +77,7 @@ func init() {
 
 	VersionCmd.PersistentFlags().BoolVar(&showKubeInjectInfo, "kube-inject", false,
 		"Show kube-inject docker hub and tag info")
-	VersionCmd.PersistentFlags().MarkHidden("kube-inject") // nolint: errcheck
+	VersionCmd.PersistentFlags().MarkHidden("kube-inject") // nolint: errcheck, gas
 }
 
 // Line combines version information into a single line
