@@ -305,13 +305,12 @@ istioctl delete route-rule productpage-default
 						// If the user specified an invalid argument on the CLI,
 						// don't keep processing -- it's probably a typo.
 						return err
+					}
+					if err := apiClient.DeleteConfig(key); err != nil {
+						errs = multierror.Append(errs,
+							fmt.Errorf("cannot delete %s: %v", args[i], err))
 					} else {
-						if err := apiClient.DeleteConfig(key); err != nil {
-							errs = multierror.Append(errs,
-								fmt.Errorf("cannot delete %s: %v", args[i], err))
-						} else {
-							fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
-						}
+						fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
 					}
 				}
 				return errs
