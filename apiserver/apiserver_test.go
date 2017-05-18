@@ -273,7 +273,7 @@ func TestVersion(t *testing.T) {
 	status, body := makeAPIRequest(api, "GET", url, nil, t)
 	compareStatus(status, http.StatusOK, t)
 	compareObjectHasKeys(body, []string{
-		"gitVersion", "gitCommit", "gitTreeState", "goVersion"}, t)
+		"version", "revision", "branch", "golang_version"}, t)
 }
 
 func compareObjectHasKeys(body []byte, expectedKeys []string, t *testing.T) {

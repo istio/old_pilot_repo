@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"runtime"
 
+	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 
 	restful "github.com/emicklei/go-restful"
@@ -222,25 +222,8 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 
 // Version returns the version information of apiserver
 func (api *API) Version(request *restful.Request, response *restful.Response) {
-	version := struct {
-		// TODO apiserver lacks major, minor
-		Version       string `json:"gitVersion"`
-		GitRevision   string `json:"gitCommit"`
-		GitBranch     string `json:"gitTreeState"`
-		User          string `json:"user"`
-		Host          string `json:"host"`
-		GolangVersion string `json:"goVersion"`
-	}{
-		Version:       buildAppVersion,
-		GitRevision:   buildGitRevision,
-		GitBranch:     buildGitBranch,
-		User:          buildUser,
-		Host:          buildHost,
-		GolangVersion: runtime.Version(),
-	}
-
 	glog.V(2).Infof("Returning version information")
-	if err := response.WriteHeaderAndEntity(http.StatusOK, version); err != nil {
+	if err := response.WriteHeaderAndEntity(http.StatusOK, version.Info); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 	}
 }
