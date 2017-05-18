@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"istio.io/manager/cmd/version"
 	"istio.io/manager/model"
 
 	restful "github.com/emicklei/go-restful"
@@ -97,7 +98,8 @@ func (api *API) Register(container *restful.Container) {
 	ws.Route(ws.
 		GET("/version").
 		To(api.Version).
-		Doc("Returns version information"))
+		Doc("Returns version information").
+		Writes(version.BuildInfo{}))
 
 	container.Add(ws)
 }
