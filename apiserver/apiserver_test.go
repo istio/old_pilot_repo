@@ -266,6 +266,29 @@ func TestConfigErrors(t *testing.T) {
 	}
 }
 
+// TestVersion verifies that the server responds to /version
+func TestVersion(t *testing.T) {
+	api := makeAPIServer(nil)
+	url := "/test/version"
+	status, body := makeAPIRequest(api, "GET", url, nil, t)
+	compareStatus(status, http.StatusOK, t)
+	compareObjectHasKeys(body, []string{
+		"gitVersion", "gitCommit", "gitTreeState", "goVersion"}, t)
+}
+
+func compareObjectHasKeys(body []byte, expectedKeys []string, t *testing.T) {
+	version := make(map[string]interface{})
+	if err := json.Unmarshal(body, &version); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, expectedKey := range expectedKeys {
+		if _, ok := version[expectedKey]; !ok {
+			t.Errorf("/version did not include %q: %v", expectedKey, string(body))
+		}
+	}
+}
+
 func compareListCount(body []byte, expected int, t *testing.T) {
 	configSlice := []Config{}
 	if err := json.Unmarshal(body, &configSlice); err != nil {

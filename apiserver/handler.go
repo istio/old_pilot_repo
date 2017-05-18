@@ -4,11 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 
 	"istio.io/manager/model"
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+)
+
+// The following fields are populated at buildtime with bazel's linkstamp
+// feature. This is equivalent to using golang directly with -ldflags -X.
+// Note that DATE is omitted as bazel aims for reproducible builds and
+// seems to strip date information from the build process.
+var (
+	buildAppVersion  string
+	buildGitRevision string
+	buildGitBranch   string
+	buildUser        string
+	buildHost        string
 )
 
 // Status returns 200 to indicate healthy
@@ -203,6 +216,31 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 		out = append(out, config)
 	}
 	if err = response.WriteHeaderAndEntity(http.StatusOK, out); err != nil {
+		api.writeError(http.StatusInternalServerError, err.Error(), response)
+	}
+}
+
+// Version returns the version information of apiserver
+func (api *API) Version(request *restful.Request, response *restful.Response) {
+	version := struct {
+		// TODO apiserver lacks major, minor
+		Version       string `json:"gitVersion"`
+		GitRevision   string `json:"gitCommit"`
+		GitBranch     string `json:"gitTreeState"`
+		User          string `json:"user"`
+		Host          string `json:"host"`
+		GolangVersion string `json:"goVersion"`
+	}{
+		Version:       buildAppVersion,
+		GitRevision:   buildGitRevision,
+		GitBranch:     buildGitBranch,
+		User:          buildUser,
+		Host:          buildHost,
+		GolangVersion: runtime.Version(),
+	}
+
+	glog.V(2).Infof("Returning version information")
+	if err := response.WriteHeaderAndEntity(http.StatusOK, version); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 	}
 }

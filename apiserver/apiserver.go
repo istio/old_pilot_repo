@@ -93,6 +93,12 @@ func (api *API) Register(container *restful.Container) {
 		To(api.Status).
 		Doc("Returns 200 when the container is up"))
 
+	// Return information about the version of API server running
+	ws.Route(ws.
+		GET("/version").
+		To(api.Version).
+		Doc("Returns version information"))
+
 	container.Add(ws)
 }
 
