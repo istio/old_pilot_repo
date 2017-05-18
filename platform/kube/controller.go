@@ -579,10 +579,10 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 }
 
 const (
-	// IstioServiceAccountPrefix is always the prefix for Istio service accounts.
-	IstioServiceAccountPrefix = "istio:"
-	// LocalDomain is the domain name Istio service account uses for internal traffic.
-	LocalDomain = "cluster.local"
+	// the URI scheme used to encode a Kubernetes service account
+	uriScheme = "spiffe"
+	// the domain name Istio service account uses for internal traffic
+	localDomain = "cluster.local"
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
@@ -604,7 +604,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 		}
 
 		pod, _ := item.(*v1.Pod)
-		sa := makeIstioServiceAccount(pod.Spec.ServiceAccountName, pod.GetNamespace(), LocalDomain)
+		sa := generateServiceAccountID(pod.Spec.ServiceAccountName, pod.GetNamespace(), localDomain)
 		saSet[sa] = true
 	}
 
@@ -616,8 +616,8 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 	return saArray
 }
 
-func makeIstioServiceAccount(sa string, ns string, domain string) string {
-	return IstioServiceAccountPrefix + sa + "." + ns + "." + domain
+func generateServiceAccountID(sa string, ns string, domain string) string {
+	return fmt.Sprintf("%v://%v/ns/%v/sa/%v", uriScheme, domain, ns, sa)
 }
 
 // AppendServiceHandler implements a service catalog operation
