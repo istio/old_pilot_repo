@@ -585,8 +585,10 @@ const (
 	localDomain = "cluster.local"
 )
 
-// GetIstioServiceAccounts returns the Istio service accounts running a serivce hostname.
-// An empty array is always returned if an error occurs.
+// GetIstioServiceAccounts returns the Istio service accounts running a serivce
+// hostname. Each service account is encoded according to the SPIFFE VSID spec.
+// For example, a service account named "bar" in namespace "foo" is encoded as
+// "spiffe://cluster.local/ns/foo/sa/bar".
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
 	saSet := make(map[string]bool)
 	for _, si := range c.Instances(hostname, ports, model.TagsList{}) {
