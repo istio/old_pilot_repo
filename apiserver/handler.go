@@ -12,18 +12,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// The following fields are populated at buildtime with bazel's linkstamp
-// feature. This is equivalent to using golang directly with -ldflags -X.
-// Note that DATE is omitted as bazel aims for reproducible builds and
-// seems to strip date information from the build process.
-var (
-	buildAppVersion  string
-	buildGitRevision string
-	buildGitBranch   string
-	buildUser        string
-	buildHost        string
-)
-
 // Status returns 200 to indicate healthy
 // Could be expanded later to identify the health of downstream dependencies such as kube, etc.
 func (api *API) Status(request *restful.Request, response *restful.Response) {
