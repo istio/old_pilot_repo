@@ -349,11 +349,11 @@ istioctl delete route-rule productpage-default
 		Use:   "version",
 		Short: "Display version information",
 		RunE: func(c *cobra.Command, args []string) error {
-			fmt.Println("istioctl version:\n")
+			fmt.Printf("istioctl version:\n\n")
 			printInfo(version.Info, true)
-			fmt.Println("\n")
+			fmt.Printf("\n\n")
 
-			fmt.Println("apiserver version:\n")
+			fmt.Printf("apiserver version:\n\n")
 			apiserverVersion, err := apiClient.Version()
 			if err != nil {
 				return err
