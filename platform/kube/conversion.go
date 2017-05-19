@@ -185,7 +185,8 @@ func convertIngress(ingress v1beta1.Ingress, domainSuffix string) map[model.Key]
 
 	for i, rule := range ingress.Spec.Rules {
 		for j, path := range rule.HTTP.Paths {
-			messages[keyOf(i+1, j+1)] = createIngressRule(rule.Host, path.Path, ingress.Namespace, domainSuffix, path.Backend, tls)
+			messages[keyOf(i+1, j+1)] = createIngressRule(rule.Host, path.Path, ingress.Namespace,
+				domainSuffix, path.Backend, tls)
 		}
 	}
 
