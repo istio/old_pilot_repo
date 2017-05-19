@@ -560,10 +560,14 @@ func TestServices(t *testing.T) {
 	defer close(stop)
 
 	mesh := proxy.DefaultMeshConfig()
-	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
+	ctl := NewController(cl, &mesh, ControllerOptions{
+		Namespace:    ns,
+		ResyncPeriod: resync,
+		DomainSuffix: domainSuffix,
+	})
 	go ctl.Run(stop)
 
-	hostname := fmt.Sprintf("%s.%s.%s", testService, ns, ServiceSuffix)
+	hostname := serviceHostname(testService, ns, domainSuffix)
 
 	var sds model.ServiceDiscovery = ctl
 	makeService(testService, ns, cl.client, t)
@@ -584,7 +588,7 @@ func TestServices(t *testing.T) {
 		t.Errorf("GetService(%q) => %q", hostname, svc.Hostname)
 	}
 
-	missing := fmt.Sprintf("does-not-exist.%s.%s", ns, ServiceSuffix)
+	missing := serviceHostname("does-not-exist", ns, domainSuffix)
 	_, exists = sds.GetService(missing)
 	if exists {
 		t.Errorf("GetService(%q) => %t, want false", missing, exists)
@@ -637,7 +641,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	portNames := []string{"test-port"}
 	createEndpoints(controller, "svc1", "nsA", portNames, svc1Ips, t)
 
-	hostname := serviceHostname("svc1", "nsA")
+	hostname := serviceHostname("svc1", "nsA", domainSuffix)
 	sa := controller.GetIstioServiceAccounts(hostname, []string{"test-port"})
 	sort.Sort(sort.StringSlice(sa))
 	expected := []string{"spiffe://cluster.local/ns/nsA/sa/acct1", "spiffe://cluster.local/ns/nsA/sa/acct2"}
@@ -645,7 +649,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
 	}
 
-	hostname = serviceHostname("svc2", "nsA")
+	hostname = serviceHostname("svc2", "nsA", domainSuffix)
 	sa = controller.GetIstioServiceAccounts(hostname, []string{})
 	if len(sa) != 0 {
 		t.Error("Failure: Expected to resolve 0 service accounts, but got: ", sa)
