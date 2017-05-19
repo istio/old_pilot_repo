@@ -619,6 +619,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	controller := NewController(&Client{client: clientSet}, &mesh, ControllerOptions{
 		Namespace:    "default",
 		ResyncPeriod: resync,
+		DomainSuffix: domainSuffix,
 	})
 
 	createPod(controller, map[string]string{"app": "test-app"}, "pod1", "nsA", "acct1", t)
@@ -644,7 +645,10 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	hostname := serviceHostname("svc1", "nsA", domainSuffix)
 	sa := controller.GetIstioServiceAccounts(hostname, []string{"test-port"})
 	sort.Sort(sort.StringSlice(sa))
-	expected := []string{"spiffe://cluster.local/ns/nsA/sa/acct1", "spiffe://cluster.local/ns/nsA/sa/acct2"}
+	expected := []string{
+		"spiffe://company.com/ns/nsA/sa/acct1",
+		"spiffe://company.com/ns/nsA/sa/acct2",
+	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
 	}

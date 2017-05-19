@@ -584,8 +584,6 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 const (
 	// the URI scheme used to encode a Kubernetes service account
 	uriScheme = "spiffe"
-	// the domain name Istio service account uses for internal traffic
-	localDomain = "cluster.local"
 )
 
 // GetIstioServiceAccounts returns the Istio service accounts running a serivce
@@ -609,7 +607,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 		}
 
 		pod, _ := item.(*v1.Pod)
-		sa := generateServiceAccountID(pod.Spec.ServiceAccountName, pod.GetNamespace(), localDomain)
+		sa := generateServiceAccountID(pod.Spec.ServiceAccountName, pod.GetNamespace(), c.domainSuffix)
 		saSet[sa] = true
 	}
 
