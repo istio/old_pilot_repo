@@ -136,11 +136,11 @@ func TestMixerRuleDelete(t *testing.T) {
 			wantErr := c.errorCode != http.StatusOK
 			if wantErr {
 				if err == nil {
-					t.Errorf("%s expected error", c.errorCode)
+					t.Errorf("%v expected error", c.errorCode)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("%s unexpected error", err.Error())
+					t.Errorf("%v unexpected error", err.Error())
 				}
 			}
 		})
