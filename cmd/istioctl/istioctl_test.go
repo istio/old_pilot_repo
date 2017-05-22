@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 	"text/template"
 
@@ -453,7 +452,7 @@ func TestEnvInterpolation(t *testing.T) {
 		interpolateRule(c.rule)
 		popEnv(origEnv, created, t)
 		for k, v := range c.expects {
-			ev := testPathEvaluate(reflect.ValueOf(c.rule), k, t)
+			ev := testPathEvaluate(c.rule, k, t)
 			if v != ev {
 				t.Errorf("Case %d: After interpolation expected %s to be %q but got %q", i, k, v, ev)
 			}
@@ -463,7 +462,9 @@ func TestEnvInterpolation(t *testing.T) {
 
 // pushEnv sets all of the additions to os.Environ.  Any old values are returned
 // in `originals`.  If any vars were created their names are returned in `created`.
-func pushEnv(additions map[string]string, t *testing.T) (originals map[string]string, created []string) {
+func pushEnv(additions map[string]string, t *testing.T) (map[string]string, []string) {
+	originals := make(map[string]string)
+	var created []string
 	for addition, value := range additions {
 		oldVal, existed := os.LookupEnv(addition)
 		if existed {
@@ -476,7 +477,7 @@ func pushEnv(additions map[string]string, t *testing.T) (originals map[string]st
 		}
 	}
 
-	return
+	return originals, created
 }
 
 // popEnv can restore env variables set by pushEnv()
@@ -597,7 +598,7 @@ func TestCreateInterpolation(t *testing.T) {
 	}
 
 	for k, v := range expect {
-		ev := testPathEvaluate(reflect.ValueOf(stubClient.KeyConfigMap[testkey]), k, t)
+		ev := testPathEvaluate(stubClient.KeyConfigMap[testkey], k, t)
 		if v != ev {
 			t.Errorf("After interpolation expected %s to be %q but got %q", k, v, ev)
 		}
