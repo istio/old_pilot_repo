@@ -1,0 +1,15 @@
+type: route-rule
+name: interpolate1
+spec:
+  destination: ${env1}.default.svc.cluster.local
+  precedence: 2
+  match:
+    source: somehost.${env2}
+    source_tags:
+      version: v1
+    httpHeaders:
+      version:
+        exact: v2
+  route:
+    - tags:
+         version: v2

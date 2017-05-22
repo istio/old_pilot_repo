@@ -468,6 +468,10 @@ func readInputs() ([]apiserver.Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
+
+		// Replace ${env} with env variables in source/destination fields
+		interpolateRule(v)
+
 		varr = append(varr, v)
 	}
 
@@ -526,5 +530,41 @@ func printInfo(info version.BuildInfo, showKubeInjectInfo bool) {
 	if showKubeInjectInfo {
 		fmt.Printf("KubeInjectHub: %v\n", version.KubeInjectHub)
 		fmt.Printf("KubeInjectTag: %v\n", version.KubeInjectTag)
+	}
+}
+
+// Replace all "${env}" in source/destination with the value of that environment variable
+// following the rules of os.ExpandEnv()
+func interpolateRule(config apiserver.Config) {
+	if config.Spec != nil {
+		if spec, ok := config.Spec.(map[string]interface{}); ok {
+			visitFields(spec,
+				map[string]bool{"source": true, "destination": true},
+				func(m map[string]interface{}, key string) {
+					m[key] = os.ExpandEnv(m[key].(string))
+				})
+		}
+	}
+}
+
+// visitFields deeply visits maps and replaces fields.
+// `m` is required to contain no cycles.
+func visitFields(m map[string]interface{}, fieldsToInterpolate map[string]bool,
+	f func(m map[string]interface{}, key string)) {
+	if m == nil {
+		return
+	}
+
+	for k, v := range m {
+		if _, ok := fieldsToInterpolate[k]; ok {
+			if _, ok := m[k].(string); ok {
+				f(m, k)
+			}
+		}
+
+		child, ok := v.(map[string]interface{})
+		if ok {
+			visitFields(child, fieldsToInterpolate, f)
+		}
 	}
 }

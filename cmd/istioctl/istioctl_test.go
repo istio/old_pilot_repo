@@ -15,9 +15,13 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
 	"testing"
+	"text/template"
 
 	"strings"
 
@@ -383,5 +387,219 @@ func TestVersions(t *testing.T) {
 
 	if err := apiVersionCmd.RunE(apiVersionCmd, []string{}); err != nil {
 		t.Errorf("istioctl version failed: %v", err)
+	}
+}
+
+func TestEnvInterpolation(t *testing.T) {
+
+	testEnv := map[string]string{"foo": "bar", "baz": "banana.com"}
+
+	cases := []struct {
+		rule    apiserver.Config
+		env     map[string]string
+		expects map[string]string
+	}{
+		{
+			rule: apiserver.Config{
+				Type: "route-rule",
+				Name: "rr",
+				Spec: map[string]interface{}{
+					"destination": "${foo}.example.com",
+					"precedence":  1,
+				},
+			},
+			env: testEnv,
+			expects: map[string]string{
+				"{{ .Spec.destination }}": "bar.example.com",
+			},
+		},
+		{
+			rule: apiserver.Config{
+				Type: "route-rule",
+				Name: "rr2",
+				Spec: map[string]interface{}{
+					"destination": "notinterpolated.example.com",
+					"precedence":  3,
+					"match": map[string]interface{}{
+						"source": "myhost.${baz}",
+					},
+				},
+			},
+			env: testEnv,
+			expects: map[string]string{
+				"{{ .Spec.match.source }}": "myhost.banana.com",
+				"{{ .Spec.destination }}":  "notinterpolated.example.com",
+			},
+		},
+		{
+			rule: apiserver.Config{Type: "desination-policy",
+				Name: "dp",
+				Spec: map[string]interface{}{
+					"destination": "${foo}.example.com",
+					"policy": []map[string]interface{}{
+						{"tags": map[string]string{"a": "b"}},
+					},
+				},
+			},
+			env: testEnv,
+			expects: map[string]string{
+				"{{ .Spec.destination }}": "bar.example.com",
+			},
+		},
+	}
+
+	for i, c := range cases {
+		origEnv, created := pushEnv(c.env, t)
+		interpolateRule(c.rule)
+		popEnv(origEnv, created, t)
+		for k, v := range c.expects {
+			ev := testPathEvaluate(reflect.ValueOf(c.rule), k, t)
+			if v != ev {
+				t.Errorf("Case %d: After interpolation expected %s to be %q but got %q", i, k, v, ev)
+			}
+		}
+	}
+}
+
+// pushEnv sets all of the additions to os.Environ.  Any old values are returned
+// in `originals`.  If any vars were created their names are returned in `created`.
+func pushEnv(additions map[string]string, t *testing.T) (originals map[string]string, created []string) {
+	for addition, value := range additions {
+		oldVal, existed := os.LookupEnv(addition)
+		if existed {
+			originals[addition] = oldVal
+		} else {
+			created = append(created, addition)
+		}
+		if err := os.Setenv(addition, value); err != nil {
+			t.Error(err)
+		}
+	}
+
+	return
+}
+
+// popEnv can restore env variables set by pushEnv()
+func popEnv(originals map[string]string, created []string, t *testing.T) {
+	for original, value := range originals {
+		if err := os.Setenv(original, value); err != nil {
+			t.Error(err)
+		}
+	}
+	for _, cr := range created {
+		if err := os.Unsetenv(cr); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func testPathEvaluate(v interface{}, path string, t *testing.T) string {
+	buf := new(bytes.Buffer)
+	tpl, err := template.New("test").Parse(path)
+	if err != nil {
+		t.Fatal(fmt.Errorf("could not parse template %q: %v", path, err))
+	}
+	if err = tpl.Execute(buf, v); err != nil {
+		t.Fatal(fmt.Errorf("could not execute template %q: %v", path, err))
+	}
+	return buf.String()
+}
+
+type SimplerStubClient struct {
+	KeyConfigMap map[model.Key]apiserver.Config
+}
+
+func NewSimplerStubClient() *SimplerStubClient {
+	return &SimplerStubClient{KeyConfigMap: make(map[model.Key]apiserver.Config)}
+}
+
+func (ssc *SimplerStubClient) AddConfig(key model.Key, config apiserver.Config) error {
+	if _, ok := ssc.KeyConfigMap[key]; ok {
+		return fmt.Errorf("key %#v already present", key)
+	}
+	ssc.KeyConfigMap[key] = config
+	return nil
+}
+
+func (ssc *SimplerStubClient) DeleteConfig(key model.Key) error {
+	if _, ok := ssc.KeyConfigMap[key]; !ok {
+		return fmt.Errorf("key %#v not present", key)
+	}
+	delete(ssc.KeyConfigMap, key)
+	return nil
+}
+
+func (ssc *SimplerStubClient) GetConfig(model.Key) (*apiserver.Config, error) {
+	config, ok := ssc.KeyConfigMap[key]
+	if !ok {
+		return nil, fmt.Errorf("key %#v not present", key)
+	}
+	return &config, nil
+}
+
+func (ssc *SimplerStubClient) ListConfig(string, string) ([]apiserver.Config, error) {
+	retval := make([]apiserver.Config, len(ssc.KeyConfigMap))
+	idx := 0
+	for _, value := range ssc.KeyConfigMap {
+		retval[idx] = value
+		idx++
+	}
+	return retval, nil
+}
+
+func (ssc *SimplerStubClient) UpdateConfig(key model.Key, config apiserver.Config) error {
+	if _, ok := ssc.KeyConfigMap[key]; !ok {
+		return fmt.Errorf("key %#v not present", key)
+	}
+	ssc.KeyConfigMap[key] = config
+	return nil
+}
+
+func (*SimplerStubClient) Version() (*version.BuildInfo, error) {
+	return &version.BuildInfo{
+		Version:       "SimplerStubClient version",
+		GitRevision:   "SimplerStubClient git revision",
+		GitBranch:     "SimplerStubClient branch",
+		User:          "SimplerStubClient-user",
+		Host:          "SimplerStubClient-host",
+		GolangVersion: "SimplerStubClient golang version",
+	}, nil
+}
+
+func TestCreateInterpolation(t *testing.T) {
+	// Set env vars for test
+	testEnv := map[string]string{"env1": "myapp", "env2": "banana.com"}
+	origEnv, created := pushEnv(testEnv, t)
+
+	stubClient := NewSimplerStubClient()
+	file = "testdata/interpolated-rule.yaml"
+	apiClient = stubClient
+	err := postCmd.RunE(postCmd, []string{})
+	if err != nil {
+		t.Errorf("create failed: %v", err)
+	}
+
+	// Restore env vars
+	popEnv(origEnv, created, t)
+
+	testkey := model.Key{
+		Name:      "interpolate1",
+		Namespace: "default",
+		Kind:      "route-rule",
+	}
+	if _, ok := stubClient.KeyConfigMap[testkey]; !ok {
+		t.Fatalf("No key %v present in %v", testkey, stubClient.KeyConfigMap)
+	}
+
+	expect := map[string]string{
+		"{{ .Spec.match.source }}": "somehost.banana.com",
+		"{{ .Spec.destination }}":  "myapp.default.svc.cluster.local",
+	}
+
+	for k, v := range expect {
+		ev := testPathEvaluate(reflect.ValueOf(stubClient.KeyConfigMap[testkey]), k, t)
+		if v != ev {
+			t.Errorf("After interpolation expected %s to be %q but got %q", k, v, ev)
+		}
 	}
 }
