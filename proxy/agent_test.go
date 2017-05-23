@@ -323,9 +323,9 @@ func TestCascadingAbort(t *testing.T) {
 			<-time.After(100 * time.Millisecond)
 			return errors.New("planned crash for 1")
 		} else if config == 0 {
-			err := <-abort
 			// abort, a bit later
 			<-time.After(300 * time.Millisecond)
+			err := <-abort
 			close(stop)
 			return err
 		}
