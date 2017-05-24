@@ -12,7 +12,7 @@ def utils = new Utilities()
 def bazel = new Bazel()
 
 // This should be updated for a release branch.
-ISTIO_VERSION_URL = 'https://raw.githubusercontent.com/istio/istio/master/istio.RELEASE'
+ISTIO_VERSION_URL = 'https://raw.githubusercontent.com/istio/istio/release-0.1/istio.RELEASE'
 
 
 def setVersions() {
