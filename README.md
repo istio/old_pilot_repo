@@ -1,4 +1,6 @@
 # Istio Manager #
+
+[![Join the chat at https://gitter.im/istio/manager](https://badges.gitter.im/istio/manager.svg)](https://gitter.im/istio/manager?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://testing.istio.io/buildStatus/icon?job=manager/postsubmit)](https://testing.istio.io/job/manager/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/istio/manager)](https://goreportcard.com/report/github.com/istio/manager)
 [![GoDoc](https://godoc.org/github.com/istio/manager?status.svg)](https://godoc.org/github.com/istio/manager)
