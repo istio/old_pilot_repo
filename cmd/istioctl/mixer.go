@@ -177,7 +177,7 @@ istioctl mixer rule delete global myservice.ns.svc.cluster.local
 		Short: "Create Istio Mixer adapters",
 		Example: `
 # Create new Mixer adapter configs for the given scope.
-istioctl mixer adapter create global -f mixer-rule.yml
+istioctl mixer adapter create global -f adapters.yml
 `,
 		RunE: mixerAdapterOrDescriptorCreateRunE,
 	}
@@ -204,7 +204,7 @@ istioctl mixer adapter get global
 		Short: "Create Istio Mixer descriptors",
 		Example: `
 # Create new Mixer descriptor configs for the given scope.
-istioctl mixer descriptor create global -f mixer-rule.yml
+istioctl mixer descriptor create global -f adapters.yml
 `,
 		RunE: mixerAdapterOrDescriptorCreateRunE,
 	}
@@ -252,7 +252,7 @@ func mixerRequest(method, path string, reqBody []byte) error {
 		}
 
 		if status != http.StatusOK {
-			return fmt.Errorf("failed rule creation with status %v: %s", status, message)
+			return fmt.Errorf("failed to %s %s with status %v: %s", method, path, status, message)
 		}
 
 		fmt.Printf("%s\n", message)
@@ -311,10 +311,12 @@ func mixerAdapterOrDescriptorGetRunE(c *cobra.Command, args []string) error {
 }
 
 func init() {
-	for _, cmd := range []*cobra.Command{mixerRuleCreateCmd, mixerAdapterCreateCmd, mixerDescriptorCreateCmd} {
-		cmd.PersistentFlags().StringVarP(&mixerFile, "file", "f", "",
-			"Input file with contents of the Mixer rule")
-	}
+	mixerRuleCreateCmd.PersistentFlags().StringVarP(&mixerFile, "file", "f", "",
+		"Input file with contents of the Mixer rule")
+	mixerAdapterCreateCmd.PersistentFlags().StringVarP(&mixerFile, "file", "f", "",
+		"Input file with contents of the adapters config")
+	mixerDescriptorCmd.PersistentFlags().StringVarP(&mixerFile, "file", "f", "",
+		"Input file with contents of the descriptors config")
 	mixerCmd.PersistentFlags().StringVar(&istioMixerAPIService,
 		"mixerAPIService", "istio-mixer:9094",
 		"Name of istio-mixer service. When --kube=false this sets the address of the mixer service")
