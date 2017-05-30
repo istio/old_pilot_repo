@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -40,6 +41,7 @@ type mixerAPIResponse struct {
 
 const (
 	requestTimeout = 60 * time.Second
+	scopesPath     = "api/v1/scopes/"
 )
 
 var (
@@ -262,7 +264,7 @@ func mixerRequest(method, path string, reqBody []byte) error {
 }
 
 func mixerRulePath(scope, subject string) string {
-	return fmt.Sprintf("api/v1/scopes/%s/subjects/%s/rules", scope, subject)
+	return scopesPath + fmt.Sprintf("%s/subjects/%s/rules", url.PathEscape(scope), url.PathEscape(subject))
 }
 
 func mixerRuleCreate(scope, subject string, rule []byte) error {
@@ -278,7 +280,7 @@ func mixerRuleDelete(scope, subject string) error {
 }
 
 func mixerAdapterOrDescriptorPath(scope, name string) string {
-	return fmt.Sprintf("api/v1/scopes/%s/%s", scope, name)
+	return scopesPath + fmt.Sprintf("%s/%s", url.PathEscape(scope), url.PathEscape(name))
 }
 
 func mixerAdapterOrDescriptorCreate(scope, name string, config []byte) error {

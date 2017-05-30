@@ -88,6 +88,14 @@ func TestMixerRuleCreate(t *testing.T) {
 			rule:      "- bad",
 			wantError: true,
 		},
+		{
+			name:      "illformed",
+			url:       ts.URL,
+			scope:     "good/subjects/good/rules?with=query",
+			subject:   "bad",
+			rule:      "- bad",
+			wantError: true,
+		},
 	}
 
 	for _, c := range cases {
@@ -267,6 +275,12 @@ func TestMixerAdapterOrDescriptorCreate(t *testing.T) {
 		{
 			name:      "bad request",
 			scope:     "bad",
+			rule:      "- bad",
+			wantError: true,
+		},
+		{
+			name:      "illformed",
+			scope:     "good/adapters?with=query",
 			rule:      "- bad",
 			wantError: true,
 		},
