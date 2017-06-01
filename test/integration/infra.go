@@ -28,10 +28,10 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/cmd"
-	"istio.io/manager/model"
-	"istio.io/manager/platform/kube/inject"
-	"istio.io/manager/test/util"
+	"istio.io/pilot/cmd"
+	"istio.io/pilot/model"
+	"istio.io/pilot/platform/kube/inject"
+	"istio.io/pilot/test/util"
 )
 
 type infra struct {

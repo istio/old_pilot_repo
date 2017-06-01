@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/model"
+	"istio.io/pilot/model"
 )
 
 // Context defines local proxy context information about the global service mesh

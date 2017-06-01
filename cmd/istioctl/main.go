@@ -31,12 +31,12 @@ import (
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
-	"istio.io/manager/apiserver"
-	"istio.io/manager/client/proxy"
-	"istio.io/manager/cmd"
-	"istio.io/manager/cmd/version"
-	"istio.io/manager/model"
-	"istio.io/manager/platform/kube"
+	"istio.io/pilot/apiserver"
+	"istio.io/pilot/client/proxy"
+	"istio.io/pilot/cmd"
+	"istio.io/pilot/cmd/version"
+	"istio.io/pilot/model"
+	"istio.io/pilot/platform/kube"
 )
 
 const (

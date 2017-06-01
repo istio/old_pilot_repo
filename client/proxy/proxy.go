@@ -10,9 +10,9 @@ import (
 
 	"github.com/golang/glog"
 
-	"istio.io/manager/apiserver"
-	"istio.io/manager/cmd/version"
-	"istio.io/manager/model"
+	"istio.io/pilot/apiserver"
+	"istio.io/pilot/cmd/version"
+	"istio.io/pilot/model"
 )
 
 // RESTRequester is yet another client wrapper for making REST

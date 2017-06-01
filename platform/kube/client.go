@@ -41,7 +41,7 @@ import (
 
 	"crypto/tls"
 
-	"istio.io/manager/model"
+	"istio.io/pilot/model"
 )
 
 const (

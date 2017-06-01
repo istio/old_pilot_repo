@@ -10,8 +10,8 @@ import (
 
 	"fmt"
 
-	"istio.io/manager/apiserver"
-	"istio.io/manager/model"
+	"istio.io/pilot/apiserver"
+	"istio.io/pilot/model"
 )
 
 type FakeHandler struct {

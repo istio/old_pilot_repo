@@ -25,13 +25,13 @@ import (
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/apiserver"
-	"istio.io/manager/cmd"
-	"istio.io/manager/cmd/version"
-	"istio.io/manager/model"
-	"istio.io/manager/platform/kube"
-	"istio.io/manager/proxy"
-	"istio.io/manager/proxy/envoy"
+	"istio.io/pilot/apiserver"
+	"istio.io/pilot/cmd"
+	"istio.io/pilot/cmd/version"
+	"istio.io/pilot/model"
+	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/proxy"
+	"istio.io/pilot/proxy/envoy"
 )
 
 type args struct {
