@@ -41,7 +41,7 @@ type APIServiceOptions struct {
 	Registry *model.IstioRegistry
 }
 
-// API is the server wrapper that listens for incoming requests to the manager and processes them
+// API is the server wrapper that listens for incoming requests to the config and processes them
 type API struct {
 	server   *http.Server
 	version  string

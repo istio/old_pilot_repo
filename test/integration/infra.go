@@ -87,7 +87,7 @@ func (infra *infra) setup() error {
 	if err := deploy("config.yaml.tmpl"); err != nil {
 		return err
 	}
-	if err := deploy("manager.yaml.tmpl"); err != nil {
+	if err := deploy("pilot.yaml.tmpl"); err != nil {
 		return err
 	}
 	if err := deploy("mixer.yaml.tmpl"); err != nil {
@@ -170,7 +170,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 			Verbosity:       infra.Verbosity,
 			SidecarProxyUID: inject.DefaultSidecarProxyUID,
 			EnableCoreDump:  true,
-			Version:         "manager-integration-test",
+			Version:         "integration-test",
 			Mesh:            mesh,
 		}
 		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {

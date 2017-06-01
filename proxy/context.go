@@ -62,7 +62,7 @@ type Context struct {
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 	return proxyconfig.ProxyMeshConfig{
-		DiscoveryAddress:   "istio-manager:8080",
+		DiscoveryAddress:   "istio-pilot:8080",
 		EgressProxyAddress: "istio-egress:80",
 
 		ProxyListenPort:        15001,
