@@ -74,8 +74,8 @@ func (f *BasicHTTPRequester) Request(method, path string, inBody []byte) (int, [
 	return response.StatusCode, body, nil
 }
 
-// ManagerClient is a client wrapper that contains the base URL and API version
-type ManagerClient struct {
+// ConfigClient is a client wrapper that contains the base URL and API version
+type ConfigClient struct {
 	rr RESTRequester
 }
 
@@ -89,13 +89,13 @@ type Client interface {
 	Version() (*version.BuildInfo, error)
 }
 
-// NewManagerClient creates a new ManagerClient instance. It trims the apiVersion of leading and trailing slashes
+// NewConfigClient creates a new ConfigClient instance. It trims the apiVersion of leading and trailing slashes
 // and the base path of trailing slashes to ensure consistency
-func NewManagerClient(rr RESTRequester) *ManagerClient {
-	return &ManagerClient{rr: rr}
+func NewConfigClient(rr RESTRequester) *ConfigClient {
+	return &ConfigClient{rr: rr}
 }
 
-func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte) ([]byte, error) {
+func (m *ConfigClient) doConfigCRUD(key model.Key, method string, inBody []byte) ([]byte, error) {
 	uriSuffix := fmt.Sprintf("config/%v/%v/%v", key.Kind, key.Namespace, key.Name)
 	status, body, err := m.rr.Request(method, uriSuffix, inBody)
 	if err != nil {
@@ -111,7 +111,7 @@ func (m *ManagerClient) doConfigCRUD(key model.Key, method string, inBody []byte
 }
 
 // GetConfig retrieves the configuration resource for the passed key
-func (m *ManagerClient) GetConfig(key model.Key) (*apiserver.Config, error) {
+func (m *ConfigClient) GetConfig(key model.Key) (*apiserver.Config, error) {
 	body, err := m.doConfigCRUD(key, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (m *ManagerClient) GetConfig(key model.Key) (*apiserver.Config, error) {
 
 // AddConfig creates a configuration resources for the passed key using the passed configuration
 // It is idempotent
-func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error {
+func (m *ConfigClient) AddConfig(key model.Key, config apiserver.Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -138,7 +138,7 @@ func (m *ManagerClient) AddConfig(key model.Key, config apiserver.Config) error 
 
 // UpdateConfig updates the configuration resource for the passed key using the passed configuration
 // It is idempotent
-func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) error {
+func (m *ConfigClient) UpdateConfig(key model.Key, config apiserver.Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -150,14 +150,14 @@ func (m *ManagerClient) UpdateConfig(key model.Key, config apiserver.Config) err
 }
 
 // DeleteConfig deletes the configuration resource for the passed key
-func (m *ManagerClient) DeleteConfig(key model.Key) error {
+func (m *ConfigClient) DeleteConfig(key model.Key) error {
 	_, err := m.doConfigCRUD(key, http.MethodDelete, nil)
 	return err
 }
 
 // ListConfig retrieves all configuration resources of the passed kind in the given namespace
 // If namespace is an empty string it retrieves all configs of the passed kind across all namespaces
-func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, error) {
+func (m *ConfigClient) ListConfig(kind, namespace string) ([]apiserver.Config, error) {
 	var reqURL string
 	if namespace != "" {
 		reqURL = fmt.Sprintf("config/%v/%v", kind, namespace)
@@ -178,7 +178,7 @@ func (m *ManagerClient) ListConfig(kind, namespace string) ([]apiserver.Config, 
 }
 
 // Version returns the apiserver version.
-func (m *ManagerClient) Version() (*version.BuildInfo, error) {
+func (m *ConfigClient) Version() (*version.BuildInfo, error) {
 	status, body, err := m.rr.Request(http.MethodGet, "version", nil)
 	if err != nil {
 		return nil, err
