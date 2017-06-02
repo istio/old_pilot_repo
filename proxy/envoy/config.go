@@ -354,7 +354,9 @@ func buildOutboundHTTPRoutes(
 				// there should be at most one occurrence of the service for the same
 				// port since service port values are distinct; that means the virtual
 				// host domains, which include the sole domain name for the service, do
-				// not overlap for the same route config
+				// not overlap for the same route config.
+				// for example, a service "a" with two ports 80 and 8080, would have virtual
+				// hosts on 80 and 8080 listeners that contain domain "a".
 				http.VirtualHosts = append(http.VirtualHosts, host)
 			}
 		}
