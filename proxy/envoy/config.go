@@ -350,6 +350,11 @@ func buildOutboundHTTPRoutes(
 
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
+
+				// there should be at most one occurrence of the service for the same
+				// port since service port values are distinct; that means the virtual
+				// host domains, which include the sole domain name for the service, do
+				// not overlap for the same route config
 				http.VirtualHosts = append(http.VirtualHosts, host)
 			}
 		}
