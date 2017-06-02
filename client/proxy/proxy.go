@@ -79,7 +79,7 @@ type ConfigClient struct {
 	rr RESTRequester
 }
 
-// Client defines the interface for the proxy specific functionality of the manager client
+// Client defines the interface for the proxy specific functionality of the config client
 type Client interface {
 	GetConfig(model.Key) (*apiserver.Config, error)
 	AddConfig(model.Key, apiserver.Config) error
