@@ -63,10 +63,10 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 	if mesh.MixerAddress != "" && mesh.StatsdUdpAddress == "" {
 		colon := strings.Index(mesh.MixerAddress, ":")
 		mixerAddr := mesh.MixerAddress[:colon]
-		if err := model.ValidateIPv4Address(mixerAddr); err == nil {
+		if ipErr := model.ValidateIPv4Address(mixerAddr); ipErr == nil {
 			mesh.StatsdUdpAddress = mesh.MixerAddress
 		} else {
-			if mixerSvc, err := kube.CoreV1().Services(namespace).Get(mixerAddr, v1.GetOptions{}); err == nil {
+			if mixerSvc, kubeErr := kube.CoreV1().Services(namespace).Get(mixerAddr, v1.GetOptions{}); kubeErr == nil {
 				port := int32(9125)
 				for _, sp := range mixerSvc.Spec.Ports {
 					if sp.Protocol == "UDP" && strings.Contains(sp.Name, "statsd") {
