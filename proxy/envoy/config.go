@@ -111,6 +111,10 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 		},
 	}
 
+	if mesh.StatsdUdpAddress != "" {
+		out.StatsdUDPIPAddress = mesh.StatsdUdpAddress
+	}
+
 	if mesh.ZipkinAddress != "" {
 		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
 			buildCluster(mesh.ZipkinAddress, ZipkinCollectorCluster, mesh.ConnectTimeout))

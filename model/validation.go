@@ -806,6 +806,28 @@ func ValidateProxyAddress(hostAddr string) error {
 	return nil
 }
 
+// ValidateIPv4AddressAndPort checks that a network address is well-formed.
+// This works just like ValidateProxyAddress, but without support for FQDNs.
+func ValidateIPv4AddressAndPort(hostAddr string) error {
+	colon := strings.Index(hostAddr, ":")
+	if colon < 0 {
+		return fmt.Errorf("':' separator not found in %q, host address must be of the form of <IP>:<port>",
+			hostAddr)
+	}
+	port, err := strconv.Atoi(hostAddr[colon+1:])
+	if err != nil {
+		return err
+	}
+	if err = ValidatePort(port); err != nil {
+		return err
+	}
+	host := hostAddr[:colon]
+	if err = ValidateIPv4Address(host); err != nil {
+		return fmt.Errorf("%q is not a valid IPv4 address", host)
+	}
+	return nil
+}
+
 // ValidateDuration checks that a proto duration is well-formed
 func ValidateDuration(pd *duration.Duration) error {
 	dur, err := ptypes.Duration(pd)
@@ -915,6 +937,12 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 	if mesh.MixerAddress != "" {
 		if err := ValidateProxyAddress(mesh.MixerAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid Mixer address:"))
+		}
+	}
+
+	if mesh.StatsdUdpAddress != "" {
+		if err := ValidateIPv4AddressAndPort(mesh.StatsdUdpAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid statsd udp address:"))
 		}
 	}
 
