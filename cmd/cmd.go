@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -58,24 +57,6 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 	mesh := proxy.DefaultMeshConfig()
 	if err = model.ApplyYAML(yaml, &mesh); err != nil {
 		return nil, multierror.Prefix(err, "failed to convert to proto.")
-	}
-
-	if mesh.MixerAddress != "" && mesh.StatsdUdpAddress == "" {
-		colon := strings.Index(mesh.MixerAddress, ":")
-		mixerAddr := mesh.MixerAddress[:colon]
-		if ipErr := model.ValidateIPv4Address(mixerAddr); ipErr == nil {
-			mesh.StatsdUdpAddress = mesh.MixerAddress
-		} else {
-			if mixerSvc, kubeErr := kube.CoreV1().Services(namespace).Get(mixerAddr, v1.GetOptions{}); kubeErr == nil {
-				port := int32(9125)
-				for _, sp := range mixerSvc.Spec.Ports {
-					if sp.Protocol == "UDP" && strings.Contains(sp.Name, "statsd") {
-						port = sp.Port
-					}
-				}
-				mesh.StatsdUdpAddress = fmt.Sprintf("%s:%d", mixerSvc.Spec.ClusterIP, port)
-			}
-		}
 	}
 
 	if err = model.ValidateProxyMeshConfig(&mesh); err != nil {
