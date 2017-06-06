@@ -63,7 +63,7 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 		return nil, err
 	}
 
-	handler := func(model.Key, proto.Message, model.Event) { out.reload() }
+	handler := func(string, proto.Message, model.Event) { out.reload() }
 
 	if err := ctl.AppendConfigHandler(model.RouteRule, handler); err != nil {
 		return nil, err

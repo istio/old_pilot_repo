@@ -37,7 +37,7 @@ type mockController struct {
 	handlers int
 }
 
-func (ctl *mockController) AppendConfigHandler(_ string, _ func(model.Key, proto.Message, model.Event)) error {
+func (ctl *mockController) AppendConfigHandler(_ string, _ func(string, proto.Message, model.Event)) error {
 	ctl.handlers++
 	return nil
 }

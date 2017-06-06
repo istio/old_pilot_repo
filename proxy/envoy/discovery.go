@@ -221,7 +221,7 @@ func NewDiscoveryService(ctl model.Controller, context *proxy.Context,
 	if err := ctl.AppendInstanceHandler(instanceHandler); err != nil {
 		return nil, err
 	}
-	configHandler := func(k model.Key, m proto.Message, e model.Event) { out.clearCache() }
+	configHandler := func(k string, m proto.Message, e model.Event) { out.clearCache() }
 	if err := ctl.AppendConfigHandler(model.RouteRule, configHandler); err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 		return
 	}
 
-	_, secret := buildIngressRoutes(ds.Config.IngressRules(""), ds.Discovery, ds.Config)
+	_, secret := buildIngressRoutes(ds.Config.IngressRules(), ds.Discovery, ds.Config)
 	writeResponse(response, []byte(secret))
 }
 
@@ -585,7 +585,7 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 	var httpRouteConfigs HTTPRouteConfigs
 	switch node {
 	case ingressNode:
-		httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""), ds.Discovery, ds.Config)
+		httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(), ds.Discovery, ds.Config)
 	case egressNode:
 		httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
 	default:
@@ -627,7 +627,7 @@ func (ds *DiscoveryService) getRouteConfigs(node string) (httpRouteConfigs HTTPR
 
 	switch node {
 	case ingressNode:
-		httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(""), ds.Discovery, ds.Config)
+		httpRouteConfigs, _ = buildIngressRoutes(ds.Config.IngressRules(), ds.Discovery, ds.Config)
 	case egressNode:
 		httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
 	default:
