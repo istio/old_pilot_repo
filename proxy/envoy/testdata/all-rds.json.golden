@@ -8,15 +8,10 @@
      "name": "httpsbin.default.svc.cluster.local|https",
      "domains": [
       "httpsbin:443",
-      "httpsbin",
       "httpsbin.default:443",
-      "httpsbin.default",
       "httpsbin.default.svc:443",
-      "httpsbin.default.svc",
       "httpsbin.default.svc.cluster:443",
-      "httpsbin.default.svc.cluster",
-      "httpsbin.default.svc.cluster.local:443",
-      "httpsbin.default.svc.cluster.local"
+      "httpsbin.default.svc.cluster.local:443"
      ],
      "routes": [
       {
@@ -37,15 +32,10 @@
      "name": "httpsbin.default.svc.cluster.local|https",
      "domains": [
       "httpsbin:443",
-      "httpsbin",
       "httpsbin.default:443",
-      "httpsbin.default",
       "httpsbin.default.svc:443",
-      "httpsbin.default.svc",
       "httpsbin.default.svc.cluster:443",
-      "httpsbin.default.svc.cluster",
-      "httpsbin.default.svc.cluster.local:443",
-      "httpsbin.default.svc.cluster.local"
+      "httpsbin.default.svc.cluster.local:443"
      ],
      "routes": [
       {
@@ -66,15 +56,10 @@
      "name": "httpsbin.default.svc.cluster.local|https",
      "domains": [
       "httpsbin:443",
-      "httpsbin",
       "httpsbin.default:443",
-      "httpsbin.default",
       "httpsbin.default.svc:443",
-      "httpsbin.default.svc",
       "httpsbin.default.svc.cluster:443",
-      "httpsbin.default.svc.cluster",
-      "httpsbin.default.svc.cluster.local:443",
-      "httpsbin.default.svc.cluster.local"
+      "httpsbin.default.svc.cluster.local:443"
      ],
      "routes": [
       {
@@ -95,15 +80,10 @@
      "name": "httpsbin.default.svc.cluster.local|https",
      "domains": [
       "httpsbin:443",
-      "httpsbin",
       "httpsbin.default:443",
-      "httpsbin.default",
       "httpsbin.default.svc:443",
-      "httpsbin.default.svc",
       "httpsbin.default.svc.cluster:443",
-      "httpsbin.default.svc.cluster",
-      "httpsbin.default.svc.cluster.local:443",
-      "httpsbin.default.svc.cluster.local"
+      "httpsbin.default.svc.cluster.local:443"
      ],
      "routes": [
       {
@@ -424,17 +404,11 @@
      "name": "hello.default.svc.cluster.local|http-status",
      "domains": [
       "hello:81",
-      "hello",
       "hello.default:81",
-      "hello.default",
       "hello.default.svc:81",
-      "hello.default.svc",
       "hello.default.svc.cluster:81",
-      "hello.default.svc.cluster",
       "hello.default.svc.cluster.local:81",
-      "hello.default.svc.cluster.local",
-      "10.1.0.0:81",
-      "10.1.0.0"
+      "10.1.0.0:81"
      ],
      "routes": [
       {
@@ -447,17 +421,11 @@
      "name": "world.default.svc.cluster.local|http-status",
      "domains": [
       "world:81",
-      "world",
       "world.default:81",
-      "world.default",
       "world.default.svc:81",
-      "world.default.svc",
       "world.default.svc.cluster:81",
-      "world.default.svc.cluster",
       "world.default.svc.cluster.local:81",
-      "world.default.svc.cluster.local",
-      "10.2.0.0:81",
-      "10.2.0.0"
+      "10.2.0.0:81"
      ],
      "routes": [
       {
@@ -477,17 +445,11 @@
      "name": "hello.default.svc.cluster.local|http-status",
      "domains": [
       "hello:81",
-      "hello",
       "hello.default:81",
-      "hello.default",
       "hello.default.svc:81",
-      "hello.default.svc",
       "hello.default.svc.cluster:81",
-      "hello.default.svc.cluster",
       "hello.default.svc.cluster.local:81",
-      "hello.default.svc.cluster.local",
-      "10.1.0.0:81",
-      "10.1.0.0"
+      "10.1.0.0:81"
      ],
      "routes": [
       {
@@ -500,17 +462,11 @@
      "name": "world.default.svc.cluster.local|http-status",
      "domains": [
       "world:81",
-      "world",
       "world.default:81",
-      "world.default",
       "world.default.svc:81",
-      "world.default.svc",
       "world.default.svc.cluster:81",
-      "world.default.svc.cluster",
       "world.default.svc.cluster.local:81",
-      "world.default.svc.cluster.local",
-      "10.2.0.0:81",
-      "10.2.0.0"
+      "10.2.0.0:81"
      ],
      "routes": [
       {
@@ -530,17 +486,11 @@
      "name": "hello.default.svc.cluster.local|http-status",
      "domains": [
       "hello:81",
-      "hello",
       "hello.default:81",
-      "hello.default",
       "hello.default.svc:81",
-      "hello.default.svc",
       "hello.default.svc.cluster:81",
-      "hello.default.svc.cluster",
       "hello.default.svc.cluster.local:81",
-      "hello.default.svc.cluster.local",
-      "10.1.0.0:81",
-      "10.1.0.0"
+      "10.1.0.0:81"
      ],
      "routes": [
       {
@@ -553,17 +503,11 @@
      "name": "world.default.svc.cluster.local|http-status",
      "domains": [
       "world:81",
-      "world",
       "world.default:81",
-      "world.default",
       "world.default.svc:81",
-      "world.default.svc",
       "world.default.svc.cluster:81",
-      "world.default.svc.cluster",
       "world.default.svc.cluster.local:81",
-      "world.default.svc.cluster.local",
-      "10.2.0.0:81",
-      "10.2.0.0"
+      "10.2.0.0:81"
      ],
      "routes": [
       {
@@ -583,17 +527,11 @@
      "name": "hello.default.svc.cluster.local|http-status",
      "domains": [
       "hello:81",
-      "hello",
       "hello.default:81",
-      "hello.default",
       "hello.default.svc:81",
-      "hello.default.svc",
       "hello.default.svc.cluster:81",
-      "hello.default.svc.cluster",
       "hello.default.svc.cluster.local:81",
-      "hello.default.svc.cluster.local",
-      "10.1.0.0:81",
-      "10.1.0.0"
+      "10.1.0.0:81"
      ],
      "routes": [
       {
@@ -606,17 +544,11 @@
      "name": "world.default.svc.cluster.local|http-status",
      "domains": [
       "world:81",
-      "world",
       "world.default:81",
-      "world.default",
       "world.default.svc:81",
-      "world.default.svc",
       "world.default.svc.cluster:81",
-      "world.default.svc.cluster",
       "world.default.svc.cluster.local:81",
-      "world.default.svc.cluster.local",
-      "10.2.0.0:81",
-      "10.2.0.0"
+      "10.2.0.0:81"
      ],
      "routes": [
       {
