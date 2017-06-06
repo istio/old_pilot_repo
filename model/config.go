@@ -15,7 +15,6 @@
 package model
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -24,30 +23,14 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-// Config Registry describes a set of platform agnostic APIs that must be
+// ConfigRegistry describes a set of platform agnostic APIs that must be
 // supported by the underlying platform to store and retrieve Istio configuration.
 //
 // The storage registry presented here assumes that the underlying storage
 // layer supports GET (list), PUT (add), PATCH (edit) and DELETE semantics
 // but does not guarantee any transactional semantics.
-
-// Key is the registry configuration key
-type Key struct {
-	// Kind specifies the type of configuration
-	Kind string
-	// Name specifies the unique name per namespace
-	Name string
-	// Namespace qualifies names
-	Namespace string
-}
-
-// String returns a human-readable textual representation of a key
-func (k Key) String() string {
-	return fmt.Sprintf("%s/%s-%s", k.Namespace, k.Kind, k.Name)
-}
-
-// ConfigRegistry defines the basic API for retrieving and storing
-// configuration artifacts.
+//
+// The configuration objects can be listed by the configuration type.
 //
 // "Put", "Post", and "Delete" are mutator operations. These operations are
 // asynchronous, and you might not see the effect immediately (e.g. "Get" might
@@ -62,22 +45,21 @@ func (k Key) String() string {
 // treated as read-only. Modifying them violates thread-safety.
 type ConfigRegistry interface {
 	// Get retrieves a configuration element, bool indicates existence
-	Get(key Key) (proto.Message, bool)
+	Get(kind, key string) (proto.Message, bool)
 
-	// List returns objects for a kind in a namespace.
-	// Use namespace "" to list resources across namespaces
-	List(kind string, namespace string) (map[Key]proto.Message, error)
+	// List returns objects by type indexed by the key
+	List(kind string) (map[string]proto.Message, error)
 
 	// Post creates a configuration object. If an object with the same
 	// key already exists, the operation fails with no side effects.
-	Post(key Key, v proto.Message) error
+	Post(kind string, v proto.Message) error
 
 	// Put updates a configuration object in the distributed store.
 	// Put requires that the object has been created.
-	Put(key Key, v proto.Message) error
+	Put(king string, v proto.Message) error
 
 	// Delete removes an object from the distributed store by key.
-	Delete(key Key) error
+	Delete(kind, key string) error
 }
 
 // KindMap defines bijection between Kind name and proto message name
@@ -87,8 +69,13 @@ type KindMap map[string]ProtoSchema
 type ProtoSchema struct {
 	// MessageName refers to the protobuf message type name
 	MessageName string
+
 	// Validate configuration as a protobuf message
 	Validate func(o proto.Message) error
+
+	// Key function derives the unique key from the configuration content
+	Key func(o proto.Message) string
+
 	// Internal flag indicates that the configuration type is derived
 	// from other configuration sources. This prohibits direct updates
 	// but allows listing and watching.
@@ -147,15 +134,37 @@ var (
 	}
 )
 
-// IstioRegistry provides a simple adapter for Istio configuration kinds
-type IstioRegistry struct {
+// IstioRegistry is an interface to access config registry using Istio
+// configuration types
+type IstioRegistry interface {
+	// RouteRules lists all routing rules
+	RouteRules() map[string]*proxyconfig.RouteRule
+
+	// RouteRulesBySource selects routing rules by source service instances.
+	// A rule must match at least one of the input service instances since the proxy
+	// does not distinguish between source instances in the request.
+	// The rules are sorted by precedence (high first) in a stable manner.
+	RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule
+
+	// IngressRules lists all ingress rules
+	IngressRules() map[string]*proxyconfig.RouteRule
+
+	// DestinationRules lists all destination rules
+	DestinationRules() []*proxyconfig.DestinationPolicy
+
+	// DestinationPolicy returns a policy for a service version.
+	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
+}
+
+// IstioConfigRegistry provides a simple adapter for Istio configuration kinds
+// from the generic config registry
+type IstioConfigRegistry struct {
 	ConfigRegistry
 }
 
-// RouteRules lists all routing rules in a namespace (or all rules if namespace is "")
-func (i *IstioRegistry) RouteRules(namespace string) map[Key]*proxyconfig.RouteRule {
-	out := make(map[Key]*proxyconfig.RouteRule)
-	rs, err := i.List(RouteRule, namespace)
+func (i IstioConfigRegistry) RouteRules() map[string]*proxyconfig.RouteRule {
+	out := make(map[string]*proxyconfig.RouteRule)
+	rs, err := i.List(RouteRule)
 	if err != nil {
 		glog.V(2).Infof("RouteRules => %v", err)
 	}
@@ -168,17 +177,13 @@ func (i *IstioRegistry) RouteRules(namespace string) map[Key]*proxyconfig.RouteR
 }
 
 type routeRuleConfig struct {
-	Key
+	key  string
 	rule *proxyconfig.RouteRule
 }
 
-// RouteRulesBySource selects routing rules by source service instances.
-// A rule must match at least one of the input service instances since the proxy
-// does not distinguish between source instances in the request.
-// The rules are sorted by precedence (high first) in a stable manner.
-func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*ServiceInstance) []*proxyconfig.RouteRule {
+func (i *IstioConfigRegistry) RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule {
 	rules := make([]*routeRuleConfig, 0)
-	for key, rule := range i.RouteRules(namespace) {
+	for key, rule := range i.RouteRules() {
 		// validate that rule match predicate applies to source service instances
 		if rule.Match != nil {
 			found := false
@@ -198,12 +203,12 @@ func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*Servic
 				continue
 			}
 		}
-		rules = append(rules, &routeRuleConfig{Key: key, rule: rule})
+		rules = append(rules, &routeRuleConfig{key: key, rule: rule})
 	}
 	// sort by high precedence first, key string second (keys are unique)
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].rule.Precedence > rules[j].rule.Precedence ||
-			(rules[i].rule.Precedence == rules[j].rule.Precedence && rules[i].Key.String() < rules[j].Key.String())
+			(rules[i].rule.Precedence == rules[j].rule.Precedence && rules[i].key < rules[j].key)
 	})
 
 	// project to rules
@@ -225,10 +230,9 @@ const (
 	IngressTLSSecret = "tlsSecret"
 )
 
-// IngressRules lists all ingress rules in a namespace (or all rules if namespace is "")
-func (i *IstioRegistry) IngressRules(namespace string) map[Key]*proxyconfig.RouteRule {
-	out := make(map[Key]*proxyconfig.RouteRule)
-	rs, err := i.List(IngressRule, namespace)
+func (i *IstioConfigRegistry) IngressRules() map[string]*proxyconfig.RouteRule {
+	out := make(map[string]*proxyconfig.RouteRule)
+	rs, err := i.List(IngressRule)
 	if err != nil {
 		glog.V(2).Infof("IngressRules => %v", err)
 	}
@@ -240,10 +244,9 @@ func (i *IstioRegistry) IngressRules(namespace string) map[Key]*proxyconfig.Rout
 	return out
 }
 
-// PoliciesByNamespace lists all destination policies in a namespace (or all if namespace is "")
-func (i *IstioRegistry) PoliciesByNamespace(namespace string) []*proxyconfig.DestinationPolicy {
+func (i *IstioConfigRegistry) DestinationRules() []*proxyconfig.DestinationPolicy {
 	out := make([]*proxyconfig.DestinationPolicy, 0)
-	rs, err := i.List(DestinationPolicy, namespace)
+	rs, err := i.List(DestinationPolicy)
 	if err != nil {
 		glog.V(2).Infof("DestinationPolicies => %v", err)
 	}
@@ -255,9 +258,9 @@ func (i *IstioRegistry) PoliciesByNamespace(namespace string) []*proxyconfig.Des
 	return out
 }
 
-// DestinationPolicy returns a policy for a service version.
-func (i *IstioRegistry) DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy {
-	for _, value := range i.PoliciesByNamespace("") {
+func (i *IstioConfigRegistry) DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy {
+	// TODO: optimize destination policy retrieval
+	for _, value := range i.DestinationRules() {
 		if value.Destination == destination {
 			for _, policy := range value.Policy {
 				if tags.Equals(policy.Tags) {
