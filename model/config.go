@@ -44,23 +44,53 @@ import (
 // Object references supplied and returned from this interface should be
 // treated as read-only. Modifying them violates thread-safety.
 type ConfigRegistry interface {
-	// Get retrieves a configuration element, bool indicates existence
-	Get(kind, key string) (proto.Message, bool)
+	// Get retrieves a configuration element.
+	Get(kind, key string) (config proto.Message, exists bool, revision Revision)
 
 	// List returns objects by type indexed by the key
 	List(kind string) (map[string]proto.Message, error)
 
 	// Post creates a configuration object. If an object with the same
 	// key already exists, the operation fails with no side effects.
-	Post(kind string, v proto.Message) error
+	Post(kind string, v proto.Message) (Revision, error)
 
 	// Put updates a configuration object in the distributed store.
 	// Put requires that the object has been created.
-	Put(king string, v proto.Message) error
+	// Revision prevents overriding a value that has been changed
+	// between prior _Get_ and _Put_ operation to achieve optimistic concurrency.
+	Put(kind string, v proto.Message, revision Revision) (Revision, error)
 
 	// Delete removes an object from the distributed store by key.
 	Delete(kind, key string) error
 }
+
+// IstioRegistry is an interface to access config registry using Istio
+// configuration types
+type IstioRegistry interface {
+	// RouteRules lists all routing rules indexed by keys
+	RouteRules() map[string]*proxyconfig.RouteRule
+
+	// RouteRulesBySource selects routing rules by source service instances.
+	// A rule must match at least one of the input service instances since the proxy
+	// does not distinguish between source instances in the request.
+	// The rules are sorted by precedence (high first) in a stable manner.
+	RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule
+
+	// IngressRules lists all ingress rules
+	IngressRules() map[string]*proxyconfig.RouteRule
+
+	// DestinationRules lists all destination rules
+	DestinationRules() []*proxyconfig.DestinationPolicy
+
+	// DestinationPolicy returns a policy for a service version.
+	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
+}
+
+// Revision is an opaque identifier for auditing updates to the config registry.
+// The implementation may use a change index or a commit log for the revision.
+// The config client should not make any assumptions about revisions and rely only on
+// exact equality to implement optimistic concurrency of read-write operations.
+type Revision string
 
 // KindMap defines bijection between Kind name and proto message name
 type KindMap map[string]ProtoSchema
@@ -133,28 +163,6 @@ var (
 		},
 	}
 )
-
-// IstioRegistry is an interface to access config registry using Istio
-// configuration types
-type IstioRegistry interface {
-	// RouteRules lists all routing rules
-	RouteRules() map[string]*proxyconfig.RouteRule
-
-	// RouteRulesBySource selects routing rules by source service instances.
-	// A rule must match at least one of the input service instances since the proxy
-	// does not distinguish between source instances in the request.
-	// The rules are sorted by precedence (high first) in a stable manner.
-	RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule
-
-	// IngressRules lists all ingress rules
-	IngressRules() map[string]*proxyconfig.RouteRule
-
-	// DestinationRules lists all destination rules
-	DestinationRules() []*proxyconfig.DestinationPolicy
-
-	// DestinationPolicy returns a policy for a service version.
-	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
-}
 
 // IstioConfigRegistry provides a simple adapter for Istio configuration kinds
 // from the generic config registry
