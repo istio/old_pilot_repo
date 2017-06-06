@@ -121,7 +121,8 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 		statsdPort := mesh.StatsdUdpAddress[colon:]
 		glog.Infof("Attempting to lookup statsd address: %s", statsdAddr)
 		// lookup the statsd udp address with a timeout of 5 seconds.
-		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		if addrs, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, statsdAddr); lookupErr == nil {
 			out.StatsdUDPIPAddress = fmt.Sprintf("%s%s", addrs[0].IP, statsdPort)
 			glog.Infof("Statsd Addr: %s", out.StatsdUDPIPAddress)
