@@ -15,14 +15,10 @@
 package envoy
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -113,21 +109,7 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 				RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
 			},
 		},
-	}
-
-	if mesh.StatsdUdpAddress != "" {
-		colon := strings.Index(mesh.StatsdUdpAddress, ":")
-		statsdAddr := mesh.StatsdUdpAddress[:colon]
-		statsdPort := mesh.StatsdUdpAddress[colon:]
-		glog.Infof("Attempting to lookup statsd address: %s", statsdAddr)
-		// lookup the statsd udp address with a timeout of 5 seconds.
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if addrs, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, statsdAddr); lookupErr == nil {
-			out.StatsdUDPIPAddress = fmt.Sprintf("%s%s", addrs[0].IP, statsdPort)
-			glog.Infof("Statsd Addr: %s", out.StatsdUDPIPAddress)
-		}
-		glog.Infof("Finished lookup of statsd address: %s", statsdAddr)
+		StatsdUDPIPAddress: mesh.StatsdUdpAddress,
 	}
 
 	if mesh.ZipkinAddress != "" {
