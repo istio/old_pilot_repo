@@ -27,33 +27,6 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-var (
-	validKeys = []Key{
-		{Kind: "my-config", Name: "example-config-name", Namespace: "default"},
-		{Kind: "my-config", Name: "x", Namespace: "default"},
-		{Kind: "some-kind", Name: "x", Namespace: "default"},
-	}
-	invalidKeys = []Key{
-		{Kind: "my-config", Name: "exampleConfigName", Namespace: "default"},
-		{Name: "x"},
-		{Kind: "my-config", Name: "x"},
-		{Kind: "ExampleKind", Name: "x", Namespace: "default"},
-	}
-)
-
-func TestKeyValidate(t *testing.T) {
-	for _, valid := range validKeys {
-		if err := valid.Validate(); err != nil {
-			t.Errorf("Valid config failed validation: %#v", valid)
-		}
-	}
-	for _, invalid := range invalidKeys {
-		if err := invalid.Validate(); err == nil {
-			t.Errorf("Invalid config passed validation: %#v", invalid)
-		}
-	}
-}
-
 func TestKindMapValidate(t *testing.T) {
 	badLabel := strings.Repeat("a", dns1123LabelMaxLength+1)
 	goodLabel := strings.Repeat("a", dns1123LabelMaxLength-1)
@@ -83,115 +56,48 @@ func TestKindMapValidate(t *testing.T) {
 	}
 }
 
-func TestKindMapValidKey(t *testing.T) {
-	cases := []struct {
-		name    string
-		key     Key
-		kindMap KindMap
-		wantErr bool
-	}{
-		{
-			name:    "Valid key that exists in KindMap",
-			key:     validKeys[0],
-			kindMap: KindMap{validKeys[0].Kind: ProtoSchema{}},
-			wantErr: false,
-		},
-		{
-			name:    "Valid key that doesn't exists in KindMap",
-			key:     validKeys[0],
-			kindMap: KindMap{},
-			wantErr: true,
-		},
-		{
-			name:    "InvValid key that exists in KindMap",
-			key:     invalidKeys[0],
-			kindMap: KindMap{validKeys[0].Kind: ProtoSchema{}},
-			wantErr: true,
-		},
-		{
-			name:    "Invalid key that doesn't exists in KindMap",
-			key:     invalidKeys[0],
-			kindMap: KindMap{},
-			wantErr: true,
-		},
-	}
-	for _, c := range cases {
-		if err := c.kindMap.ValidateKey(&c.key); (err != nil) != c.wantErr {
-			t.Errorf("%v  failed got error=%v but wantErr=%v", c.name, err, c.wantErr)
-		}
-	}
-}
-
 func TestKindMapValidateConfig(t *testing.T) {
 	cases := []struct {
 		name    string
-		key     *Key
+		kind    string
 		config  interface{}
 		wantErr bool
 	}{
 		{
-			name:    "bad key",
-			key:     nil,
-			config:  &proxyconfig.RouteRule{},
-			wantErr: true,
-		},
-		{
 			name:    "bad configuration object",
-			key:     &validKeys[0],
+			kind:    RouteRule,
 			config:  nil,
 			wantErr: true,
 		},
 		{
-			name:    "invalid key",
-			key:     &invalidKeys[0],
-			config:  &proxyconfig.RouteRule{},
-			wantErr: true,
-		},
-		{
 			name:    "undeclared kind",
-			key:     &validKeys[0],
+			kind:    "missing-kind",
 			config:  &proxyconfig.RouteRule{},
 			wantErr: true,
 		},
 		{
-			name: "non-proto object configuration",
-			key: &Key{
-				Kind:      RouteRule,
-				Name:      "foo",
-				Namespace: "bar",
-			},
+			name:    "non-proto object configuration",
+			kind:    RouteRule,
 			config:  "non-proto objection configuration",
 			wantErr: true,
 		},
 		{
 			name: "message type and kind mismatch",
-			key: &Key{
-				Kind:      RouteRule,
-				Name:      "foo",
-				Namespace: "bar",
-			},
+			kind: RouteRule,
 			config: &proxyconfig.DestinationPolicy{
 				Destination: "foo",
 			},
 			wantErr: true,
 		},
 		{
-			name: "ProtoSchema validation1",
-			key: &Key{
-				Kind:      RouteRule,
-				Name:      "foo",
-				Namespace: "bar",
-			},
+			name:    "ProtoSchema validation1",
+			kind:    RouteRule,
 			config:  &proxyconfig.RouteRule{},
 			wantErr: true,
 		},
 		{
 			name: "ProtoSchema validation2",
-			key: &Key{
-				Kind:      RouteRule,
-				Name:      "foo",
-				Namespace: "bar",
-			},
+			kind: RouteRule,
 			config: &proxyconfig.RouteRule{
 				Destination: "foo",
 			},
@@ -200,7 +106,7 @@ func TestKindMapValidateConfig(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if err := IstioConfig.ValidateConfig(c.key, c.config); (err != nil) != c.wantErr {
+		if err := IstioConfig.ValidateConfig(c.kind, c.config); (err != nil) != c.wantErr {
 			t.Errorf("%v failed: got error=%v but wantErr=%v", c.name, err, c.wantErr)
 		}
 	}

@@ -185,7 +185,7 @@ func writeTLS(certFile, keyFile string, tls *model.TLSSecret) error {
 	return nil
 }
 
-func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule,
+func buildIngressRoutes(ingressRules map[string]*proxyconfig.RouteRule,
 	discovery model.ServiceDiscovery,
 	config *model.IstioRegistry) (HTTPRouteConfigs, string) {
 	// build vhosts
@@ -194,7 +194,7 @@ func buildIngressRoutes(ingressRules map[model.Key]*proxyconfig.RouteRule,
 	tlsAll := ""
 
 	// skip over source-matched route rules
-	rules := config.RouteRulesBySource("", nil)
+	rules := config.RouteRulesBySource(nil)
 
 	for _, rule := range ingressRules {
 		routes, tls, err := buildIngressRoute(rule, discovery, rules)

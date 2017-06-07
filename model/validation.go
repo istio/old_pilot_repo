@@ -69,21 +69,6 @@ func ValidatePort(port int) error {
 	return fmt.Errorf("port number %d must be in the range 1..65535", port)
 }
 
-// Validate confirms that the names in the configuration key are appropriate
-func (k *Key) Validate() error {
-	var errs error
-	if !IsDNS1123Label(k.Kind) {
-		errs = multierror.Append(errs, fmt.Errorf("invalid kind: %q", k.Kind))
-	}
-	if !IsDNS1123Label(k.Name) {
-		errs = multierror.Append(errs, fmt.Errorf("invalid name: %q", k.Name))
-	}
-	if !IsDNS1123Label(k.Namespace) {
-		errs = multierror.Append(errs, fmt.Errorf("invalid namespace: %q", k.Namespace))
-	}
-	return errs
-}
-
 // Validate checks that each name conforms to the spec and has a ProtoMessage
 func (km KindMap) Validate() error {
 	var errs error
@@ -98,29 +83,14 @@ func (km KindMap) Validate() error {
 	return errs
 }
 
-// ValidateKey ensures that the key is well-defined and kind is well-defined
-func (km KindMap) ValidateKey(k *Key) error {
-	if err := k.Validate(); err != nil {
-		return err
-	}
-	if _, ok := km[k.Kind]; !ok {
-		return fmt.Errorf("kind %q is not defined", k.Kind)
-	}
-	return nil
-}
-
 // ValidateConfig ensures that the config object is well-defined
-func (km KindMap) ValidateConfig(k *Key, obj interface{}) error {
-	if k == nil || obj == nil {
+func (km KindMap) ValidateConfig(kind string, obj interface{}) error {
+	if obj == nil {
 		return fmt.Errorf("invalid nil configuration object")
 	}
-
-	if err := k.Validate(); err != nil {
-		return err
-	}
-	t, ok := km[k.Kind]
+	t, ok := km[kind]
 	if !ok {
-		return fmt.Errorf("undeclared kind: %q", k.Kind)
+		return fmt.Errorf("undeclared kind: %q", kind)
 	}
 
 	v, ok := obj.(proto.Message)

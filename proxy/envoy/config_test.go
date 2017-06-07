@@ -274,10 +274,7 @@ func addCircuitBreaker(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{
-		Kind: model.DestinationPolicy,
-		Name: "circuit-breaker"},
-		msg); err != nil {
+	if err = r.Post(model.DestinationPolicy, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -287,10 +284,7 @@ func addRewrite(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{
-		Kind: model.RouteRule,
-		Name: "http-rewrite"},
-		msg); err != nil {
+	if err = r.Post(model.RouteRule, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -300,10 +294,7 @@ func addRedirect(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{
-		Kind: model.RouteRule,
-		Name: "http-redirect"},
-		msg); err != nil {
+	if err = r.Post(model.RouteRule, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -313,7 +304,7 @@ func addTimeout(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "timeouts"}, msg); err != nil {
+	if err = r.Post(model.RouteRule, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -323,7 +314,7 @@ func addWeightedRoute(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "weighted-route"}, msg); err != nil {
+	if err = r.Post(model.RouteRule, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -333,7 +324,7 @@ func addFaultRoute(r *model.IstioRegistry, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = r.Post(model.Key{Kind: model.RouteRule, Name: "fault-route"}, msg); err != nil {
+	if err = r.Post(model.RouteRule, msg); err != nil {
 		t.Fatal(err)
 	}
 }

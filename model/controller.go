@@ -32,7 +32,7 @@ import "github.com/golang/protobuf/proto"
 // that all handlers must be appended before starting the controller.
 type Controller interface {
 	// AppendConfigHandler appends a handler for a config resource.
-	AppendConfigHandler(kind string, f func(Key, proto.Message, Event)) error
+	AppendConfigHandler(kind string, f func(string, proto.Message, Event)) error
 
 	// AppendServiceHandler notifies about changes to the service catalog.
 	AppendServiceHandler(f func(*Service, Event)) error

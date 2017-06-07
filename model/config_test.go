@@ -50,7 +50,7 @@ func initTestRegistry(t *testing.T) *testRegistry {
 	mock := NewMockConfigRegistry(ctrl)
 	return &testRegistry{
 		mock: mock,
-		registry: IstioRegistry{
+		registry: &IstioConfigRegistry{
 			ConfigRegistry: mock,
 		},
 	}
@@ -171,36 +171,36 @@ func TestIstioRegistryRouteAndIngressRules(t *testing.T) {
 	cases := []struct {
 		name      string
 		mockError error
-		mockObjs  map[Key]proto.Message
-		want      map[Key]*proxyconfig.RouteRule
+		mockObjs  map[string]proto.Message
+		want      map[string]*proxyconfig.RouteRule
 	}{
 		{
 			name:      "Empty object map with error",
-			mockObjs:  map[Key]proto.Message{},
+			mockObjs:  map[string]proto.Message{},
 			mockError: errors.New("foobar"),
-			want:      map[Key]*proxyconfig.RouteRule{},
+			want:      map[string]*proxyconfig.RouteRule{},
 		},
 		{
 			name: "Slice of unsorted RouteRules",
-			mockObjs: map[Key]proto.Message{
-				{Name: "foo"}: routeRule1MatchNil,
-				{Name: "bar"}: routeRule3SourceMismatch,
-				{Name: "baz"}: routeRule2SourceEmpty,
+			mockObjs: map[string]proto.Message{
+				"foo": routeRule1MatchNil,
+				"bar": routeRule3SourceMismatch,
+				"baz": routeRule2SourceEmpty,
 			},
-			want: map[Key]*proxyconfig.RouteRule{
-				{Name: "foo"}: routeRule1MatchNil,
-				{Name: "bar"}: routeRule3SourceMismatch,
-				{Name: "baz"}: routeRule2SourceEmpty,
+			want: map[string]*proxyconfig.RouteRule{
+				"foo": routeRule1MatchNil,
+				"bar": routeRule3SourceMismatch,
+				"baz": routeRule2SourceEmpty,
 			},
 		},
 	}
 	for _, c := range cases {
-		r.mock.EXPECT().List(RouteRule, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.RouteRules(""); !reflect.DeepEqual(got, c.want) {
+		r.mock.EXPECT().List(RouteRule).Return(c.mockObjs, c.mockError)
+		if got := r.registry.RouteRules(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%v with RouteRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
-		r.mock.EXPECT().List(IngressRule, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.IngressRules(""); !reflect.DeepEqual(got, c.want) {
+		r.mock.EXPECT().List(IngressRule).Return(c.mockObjs, c.mockError)
+		if got := r.registry.IngressRules(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%v with IngressRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
 	}
@@ -212,13 +212,13 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 
 	instances := []*ServiceInstance{serviceInstance1, serviceInstance2}
 
-	mockObjs := map[Key]proto.Message{
-		{Name: "match-nil"}:              routeRule1MatchNil,
-		{Name: "source-empty"}:           routeRule2SourceEmpty,
-		{Name: "source-mismatch"}:        routeRule3SourceMismatch,
-		{Name: "source-match"}:           routeRule4SourceMatch,
-		{Name: "tag-subset-of-mismatch"}: routeRule5TagSubsetOfMismatch,
-		{Name: "tag-subset-of-match"}:    routeRule6TagSubsetOfMatch,
+	mockObjs := map[string]proto.Message{
+		"match-nil":              routeRule1MatchNil,
+		"source-empty":           routeRule2SourceEmpty,
+		"source-mismatch":        routeRule3SourceMismatch,
+		"source-match":           routeRule4SourceMatch,
+		"tag-subset-of-mismatch": routeRule5TagSubsetOfMismatch,
+		"tag-subset-of-match":    routeRule6TagSubsetOfMatch,
 	}
 	want := []*proxyconfig.RouteRule{
 		routeRule6TagSubsetOfMatch,
@@ -227,8 +227,8 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 		routeRule2SourceEmpty,
 	}
 
-	r.mock.EXPECT().List(RouteRule, "").Return(mockObjs, nil)
-	got := r.registry.RouteRulesBySource("", instances)
+	r.mock.EXPECT().List(RouteRule).Return(mockObjs, nil)
+	got := r.registry.RouteRulesBySource(instances)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
 	}
@@ -241,21 +241,21 @@ func TestIstioRegistryPoliciesByNamespace(t *testing.T) {
 	cases := []struct {
 		name      string
 		mockError error
-		mockObjs  map[Key]proto.Message
+		mockObjs  map[string]proto.Message
 		want      []*proxyconfig.DestinationPolicy
 	}{
 		{
 			name:      "Empty object map with error",
-			mockObjs:  map[Key]proto.Message{},
+			mockObjs:  map[string]proto.Message{},
 			mockError: errors.New("foobar"),
 			want:      []*proxyconfig.DestinationPolicy{},
 		},
 		{
 			name: "Slice of unsorted DestinationPolicy",
-			mockObjs: map[Key]proto.Message{
-				{Name: "foo"}: dstPolicy1,
-				{Name: "bar"}: dstPolicy2,
-				{Name: "baz"}: dstPolicy3,
+			mockObjs: map[string]proto.Message{
+				"foo": dstPolicy1,
+				"bar": dstPolicy2,
+				"baz": dstPolicy3,
 			},
 			want: []*proxyconfig.DestinationPolicy{
 				dstPolicy1, dstPolicy2, dstPolicy3,
@@ -271,8 +271,8 @@ func TestIstioRegistryPoliciesByNamespace(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r.mock.EXPECT().List(DestinationPolicy, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.PoliciesByNamespace(""); !reflect.DeepEqual(makeSet(got), makeSet(c.want)) {
+		r.mock.EXPECT().List(DestinationPolicy).Return(c.mockObjs, c.mockError)
+		if got := r.registry.DestinationRules(); !reflect.DeepEqual(makeSet(got), makeSet(c.want)) {
 			t.Errorf("%v failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
 	}
@@ -282,33 +282,17 @@ func TestIstioRegistryDestinationPolicies(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
 
-	mockObjs := map[Key]proto.Message{
-		{Name: "foo"}:  dstPolicy1,
-		{Name: "foo2"}: dstPolicy2,
-		{Name: "bar"}:  dstPolicy3,
-		{Name: "baz"}:  dstPolicy4,
+	mockObjs := map[string]proto.Message{
+		"foo":  dstPolicy1,
+		"foo2": dstPolicy2,
+		"bar":  dstPolicy3,
+		"baz":  dstPolicy4,
 	}
 
-	r.mock.EXPECT().List(DestinationPolicy, "").Return(mockObjs, nil)
+	r.mock.EXPECT().List(DestinationPolicy).Return(mockObjs, nil)
 	want := dstPolicy1.Policy[0]
 	if got := r.registry.DestinationPolicy(dstPolicy1.Destination, want.Tags); !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
-	}
-}
-
-func TestKeyString(t *testing.T) {
-	// TODO - Tests string formatting with blank name and namespace?
-	cases := []struct {
-		in   Key
-		want string
-	}{{
-		in:   Key{Kind: "example-kind", Name: "x", Namespace: "default"},
-		want: "default/example-kind-x",
-	}}
-	for _, c := range cases {
-		if c.in.String() != c.want {
-			t.Errorf("Bad human-readable string: got %v want %v", c.in.String(), c.want)
-		}
 	}
 }
 

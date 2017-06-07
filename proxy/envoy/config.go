@@ -323,7 +323,7 @@ func buildOutboundHTTPRoutes(
 	suffix := sharedInstanceHost(instances)
 
 	// get all the route rules applicable to the instances
-	rules := config.RouteRulesBySource("", instances)
+	rules := config.RouteRulesBySource(instances)
 
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
