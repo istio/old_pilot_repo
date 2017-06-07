@@ -23,93 +23,79 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-// ConfigRegistry describes a set of platform agnostic APIs that must be
-// supported by the underlying platform to store and retrieve Istio configuration.
+// ConfigStore describes a set of platform agnostic APIs that must be supported
+// by the underlying platform to store and retrieve Istio configuration.
 //
-// The storage registry presented here assumes that the underlying storage
-// layer supports GET (list), PUT (add), PATCH (edit) and DELETE semantics
-// but does not guarantee any transactional semantics.
+// The storage interface presented here assumes that the underlying storage
+// layer supports _GET_ (list), _PUT_ (update), _POST_ (create) and _DELETE_
+// semantics but does not guarantee any transactional semantics.
 //
-// The configuration objects can be listed by the configuration type.
+// Configuration objects possess a type property (also called kind throughout)
+// and a key property. The configuration key is derived from the content of the
+// config object and uniquely identifies objects for a particular kind. For
+// example, if the object schema contains metadata fields _name_ and
+// _namespace_, the configuration key may be defined as _namespace/name_.
+// Key definition is provided as part of the config kind definition.
 //
-// "Put", "Post", and "Delete" are mutator operations. These operations are
-// asynchronous, and you might not see the effect immediately (e.g. "Get" might
+// _PUT_, _POST_, and _DELETE_ are mutator operations. These operations are
+// asynchronous, and you might not see the effect immediately (e.g. _GET_ might
 // not return the object by key immediately after you mutate the store.)
 // Intermittent errors might occur even though the operation succeeds, so you
 // should always check if the object store has been modified even if the
-// mutating operation returns an error.
+// mutating operation returns an error.  Objects should be created with _POST_
+// operation and updated with _PUT_ operation.
 //
-// Objects should be created with "Post" operation and updated with "Put" operation.
+// Revisions record the last mutation operation on each object. If a mutation
+// is applied to a different revision of an object than what the underlying
+// storage expects as defined by pure equality, the operation is blocked.  The
+// client of this interface should not make assumptions about the structure or
+// ordering of the revision identifier.
 //
 // Object references supplied and returned from this interface should be
 // treated as read-only. Modifying them violates thread-safety.
-type ConfigRegistry interface {
-	// Get retrieves a configuration element.
+type ConfigStore interface {
+	// KindMap exposes the configuration type schema known by the config store.
+	// The type schema defines the bidrectional mapping between configuration
+	// types (also called kinds) and the protobuf message names.
+	KindMap() KindMap
+
+	// Get retrieves a configuration element by a kind and a key
 	Get(kind, key string) (config proto.Message, exists bool, revision Revision)
 
-	// List returns objects by type indexed by the key
-	List(kind string) (map[string]proto.Message, error)
+	// List returns objects by type
+	List(kind string) ([]Config, error)
 
-	// Post creates a configuration object. If an object with the same
-	// key already exists, the operation fails with no side effects.
-	Post(kind string, v proto.Message) (Revision, error)
+	// Post creates a configuration object. If an object with the same key for
+	// the kind already exists, the operation fails with no side effects.
+	Post(config proto.Message) (Revision, error)
 
-	// Put updates a configuration object in the distributed store.
-	// Put requires that the object has been created.
-	// Revision prevents overriding a value that has been changed
-	// between prior _Get_ and _Put_ operation to achieve optimistic concurrency.
-	Put(kind string, v proto.Message, revision Revision) (Revision, error)
+	// Put updates a configuration object in the store.  Put requires that the
+	// object has been created.  Revision prevents overriding a value that has
+	// been changed between prior _Get_ and _Put_ operation to achieve optimistic
+	// concurrency. This method returns a new revision if the operation succeeds.
+	Put(config proto.Message, revision Revision) (Revision, error)
 
-	// Delete removes an object from the distributed store by key.
+	// Delete removes an object from the store by key
 	Delete(kind, key string) error
 }
 
-// IstioRegistry is an interface to access config registry using Istio
-// configuration types
-type IstioRegistry interface {
-	// RouteRules lists all routing rules indexed by keys
-	RouteRules() map[string]*proxyconfig.RouteRule
-
-	// RouteRulesBySource selects routing rules by source service instances.
-	// A rule must match at least one of the input service instances since the proxy
-	// does not distinguish between source instances in the request.
-	// The rules are sorted by precedence (high first) in a stable manner.
-	RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule
-
-	// IngressRules lists all ingress rules
-	IngressRules() map[string]*proxyconfig.RouteRule
-
-	// DestinationRules lists all destination rules
-	DestinationRules() []*proxyconfig.DestinationPolicy
-
-	// DestinationPolicy returns a policy for a service version.
-	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
-}
-
-// Revision is an opaque identifier for auditing updates to the config registry.
-// The implementation may use a change index or a commit log for the revision.
-// The config client should not make any assumptions about revisions and rely only on
-// exact equality to implement optimistic concurrency of read-write operations.
-type Revision string
-
-// KindMap defines bijection between Kind name and proto message name
+// KindMap defines the bijection between the kind name and its fully qualified
+// protobuf message name
 type KindMap map[string]ProtoSchema
 
-// ProtoSchema provides custom validation checks
+// ProtoSchema provides description of the configuration schema and its key function
 type ProtoSchema struct {
-	// MessageName refers to the protobuf message type name
+	// MessageName refers to the protobuf message type name corresponding to the kind
 	MessageName string
 
 	// Validate configuration as a protobuf message
 	Validate func(o proto.Message) error
 
-	// Key function derives the unique key from the configuration content
+	// Key function derives the unique key from the configuration object metadata
+	// properties.  The object is not required to be complete or even valid to
+	// derive its key.  For example, if _name_ field is designated as the key,
+	// then the proto message must only possess _name_ property.
 	Key func(o proto.Message) string
-
-	// Internal flag indicates that the configuration type is derived
-	// from other configuration sources. This prohibits direct updates
-	// but allows listing and watching.
-	Internal bool
 }
 
 // Kinds lists all kinds in the kind schemas
@@ -122,6 +108,58 @@ func (km KindMap) Kinds() []string {
 	return kinds
 }
 
+// Config is a configuration unit that holds the object, its revision, as well
+// its type and type-dependent key.
+type Config struct {
+	// Kind is a short configuration type name that matches the content message
+	// type
+	Kind string
+
+	// Key is the type-dependent unique identifier for this config object, derived
+	// from its content
+	Key string
+
+	// Revision is the record of last mutation
+	Revision Revision
+
+	// Content holds the configuration object as a protobuf message
+	Content proto.Message
+}
+
+// Revision is an opaque identifier for tracking updates to the config registry.
+// The implementation may use a change index or a commit log for the revision.
+// The config client should not make any assumptions about revisions and rely only on
+// exact equality to implement optimistic concurrency of read-write operations.
+//
+// The lifetime of an object of a particular revision depends on the underlying data store.
+// The data store may compactify old revisions in the interest of storage optimization.
+//
+// An empty revision carries a special meaning that the associated object has
+// not been stored and assigned a revision.
+type Revision string
+
+// IstioConfigStore is a specialized interface to access config store using
+// Istio configuration types
+type IstioConfigStore interface {
+	// RouteRules lists all routing rules
+	RouteRules() []*proxyconfig.RouteRule
+
+	// IngressRules lists all ingress rules
+	IngressRules() []*proxyconfig.RouteRule
+
+	// DestinationPolicies lists all destination rules
+	DestinationPolicies() []*proxyconfig.DestinationPolicy
+
+	// RouteRulesBySource selects routing rules by source service instances.
+	// A rule must match at least one of the input service instances since the proxy
+	// does not distinguish between source instances in the request.
+	// The rules are sorted by precedence (high first) in a stable manner.
+	RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule
+
+	// DestinationPolicy returns a policy for a service version.
+	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
+}
+
 const (
 	// RouteRule defines the kind for the route rule configuration
 	RouteRule = "route-rule"
@@ -131,7 +169,7 @@ const (
 	// IngressRule kind
 	IngressRule = "ingress-rule"
 	// IngressRuleProto message name
-	IngressRuleProto = RouteRuleProto
+	IngressRuleProto = "istio.proxy.v1.config.IngressRule"
 
 	// DestinationPolicy defines the kind for the destination policy configuration
 	DestinationPolicy = "destination-policy"
@@ -167,7 +205,7 @@ var (
 // IstioConfigRegistry provides a simple adapter for Istio configuration kinds
 // from the generic config registry
 type IstioConfigRegistry struct {
-	ConfigRegistry
+	ConfigStore
 }
 
 func (i IstioConfigRegistry) RouteRules() map[string]*proxyconfig.RouteRule {
