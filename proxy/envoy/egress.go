@@ -45,7 +45,7 @@ func NewEgressWatcher(mesh *proxyconfig.ProxyMeshConfig) (Watcher, error) {
 		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
 			mesh.StatsdUdpAddress = addr
 		} else {
-			glog.V(2).Infof("Error resolving statsd address; clearing to prevent bad config: %v", err)
+			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
 			mesh.StatsdUdpAddress = ""
 		}
 	}

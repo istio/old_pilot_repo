@@ -47,7 +47,7 @@ func NewWatcher(ctl model.Controller, proxyCtx *proxy.Context) (Watcher, error) 
 		if addr, err := resolveStatsdAddr(proxyCtx.MeshConfig.StatsdUdpAddress); err == nil {
 			proxyCtx.MeshConfig.StatsdUdpAddress = addr
 		} else {
-			glog.V(2).Infof("Error resolving statsd address; clearing to prevent bad config: %v", err)
+			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
 			proxyCtx.MeshConfig.StatsdUdpAddress = ""
 		}
 	}
