@@ -9,6 +9,7 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
+            "generate_request_id": true,
             "rds": {
               "cluster": "rds",
               "route_config_name": "443",
@@ -57,6 +58,7 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
+            "generate_request_id": true,
             "rds": {
               "cluster": "rds",
               "route_config_name": "80",
@@ -105,6 +107,7 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
+            "generate_request_id": true,
             "rds": {
               "cluster": "rds",
               "route_config_name": "81",
@@ -176,6 +179,7 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
+            "generate_request_id": true,
             "route_config": {
               "virtual_hosts": [
                 {
@@ -285,6 +289,7 @@
           "config": {
             "codec_type": "auto",
             "stat_prefix": "http",
+            "generate_request_id": true,
             "route_config": {
               "virtual_hosts": [
                 {
