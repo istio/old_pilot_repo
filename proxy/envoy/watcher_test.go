@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"istio.io/pilot/adaptor/config/memory"
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/mock"

@@ -26,7 +26,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/adaptor/config/memory"
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/mock"

@@ -6,7 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"istio.io/mixer/bazel-mixer/external/com_github_davecgh_go_spew/spew"
+	"github.com/davecgh/go-spew/spew"
+
 	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"
 )
