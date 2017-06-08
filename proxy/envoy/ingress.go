@@ -48,6 +48,14 @@ type ingressWatcher struct {
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
 func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig, secrets model.SecretRegistry) (Watcher, error) {
+	if mesh.StatsdUdpAddress != "" {
+		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
+			mesh.StatsdUdpAddress = addr
+		} else {
+			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
+			mesh.StatsdUdpAddress = ""
+		}
+	}
 	agent := proxy.NewAgent(runEnvoy(mesh, ingressNode), proxy.DefaultRetry)
 	out := &ingressWatcher{
 		agent:   agent,
@@ -130,14 +138,14 @@ func fetchSecret(ctx context.Context, client *http.Client, url string,
 // generateIngress generates ingress proxy configuration
 func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
 	listeners := []*Listener{
-		buildHTTPListener(mesh, nil, WildcardAddress, 80, true),
+		buildHTTPListener(mesh, nil, WildcardAddress, 80, true, true),
 	}
 
 	if tls != nil {
 		if err := writeTLS(certFile, keyFile, tls); err != nil {
 			glog.Warning("Failed to write cert/key")
 		} else {
-			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true)
+			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true, true)
 			listener.SSLContext = &SSLContext{
 				CertChainFile:  certFile,
 				PrivateKeyFile: keyFile,

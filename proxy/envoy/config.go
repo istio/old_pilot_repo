@@ -109,6 +109,7 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 				RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
 			},
 		},
+		StatsdUDPIPAddress: mesh.StatsdUdpAddress,
 	}
 
 	if mesh.ZipkinAddress != "" {
@@ -171,7 +172,7 @@ func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
 func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds bool) *Listener {
+	ip string, port int, rds bool, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -183,6 +184,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 	config := &HTTPFilterConfig{
 		CodecType:         auto,
 		GenerateRequestID: true,
+		UseRemoteAddress:  useRemoteAddress,
 		StatPrefix:        "http",
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
@@ -248,7 +250,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true))
+		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
 	}
 	return listeners, clusters
 }
@@ -449,7 +451,7 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false), mesh))
+				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, false), mesh))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
