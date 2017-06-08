@@ -73,6 +73,9 @@ func ValidatePort(port int) error {
 func (descriptor ConfigDescriptor) Validate() error {
 	var errs error
 	for _, v := range descriptor {
+		if v.Key == nil {
+			errs = multierror.Append(errs, fmt.Errorf("missing key function for type: %q", v.Type))
+		}
 		if !IsDNS1123Label(v.Type) {
 			errs = multierror.Append(errs, fmt.Errorf("invalid type: %q", v.Type))
 		}
@@ -632,6 +635,9 @@ func ValidateRouteRule(msg proto.Message) error {
 	}
 
 	var errs error
+	if value.Name == "" {
+		errs = multierror.Append(errs, fmt.Errorf("route rule must have a name"))
+	}
 	if value.Destination == "" {
 		errs = multierror.Append(errs, fmt.Errorf("route rule must have a destination service"))
 	}

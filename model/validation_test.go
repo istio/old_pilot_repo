@@ -100,6 +100,7 @@ func TestConfigDescriptorValidateConfig(t *testing.T) {
 			typ:  RouteRule,
 			config: &proxyconfig.RouteRule{
 				Destination: "foo",
+				Name:        "test",
 			},
 			wantErr: false,
 		},
@@ -256,18 +257,21 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 	}{
 		{name: "empty destination policy", in: &proxyconfig.DestinationPolicy{}, valid: false},
 		{name: "empty route rule", in: &proxyconfig.RouteRule{}, valid: false},
-		{name: "route rule w destination", in: &proxyconfig.RouteRule{Destination: "foobar"}, valid: true},
+		{name: "route rule w destination", in: &proxyconfig.RouteRule{Destination: "foobar", Name: "test"}, valid: true},
 		{name: "route rule bad destination", in: &proxyconfig.RouteRule{
 			Destination: "badhost@.default.svc.cluster.local",
+			Name:        "test",
 		},
 			valid: false},
 		{name: "route rule bad match source", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost!.default.svc.cluster.local"},
 		},
 			valid: false},
 		{name: "route rule bad weight dest", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Destination: strings.Repeat(strings.Repeat("1234567890", 6)+".", 6)},
@@ -276,6 +280,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad weight", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Weight: -1},
@@ -284,6 +289,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule no weight", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Destination: "host2.default.svc.cluster.local"},
@@ -292,6 +298,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule two destinationweights", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Destination: "host2.default.svc.cluster.local", Weight: 50},
@@ -301,6 +308,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule two destinationweights", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Destination: "host.default.svc.cluster.local", Weight: 75, Tags: map[string]string{"version": "v1"}},
@@ -310,6 +318,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule two destinationweights 99", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Destination: "host.default.svc.cluster.local", Weight: 75, Tags: map[string]string{"version": "v1"}},
@@ -319,6 +328,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad route tags", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Route: []*proxyconfig.DestinationWeight{
 				{Tags: map[string]string{"@": "~"}},
@@ -327,6 +337,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad timeout", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpReqTimeout: &proxyconfig.HTTPTimeout{
 				TimeoutPolicy: &proxyconfig.HTTPTimeout_SimpleTimeout{
 					SimpleTimeout: &proxyconfig.HTTPTimeout_SimpleTimeoutPolicy{
@@ -337,6 +348,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad retry attempts", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpReqRetries: &proxyconfig.HTTPRetry{
 				RetryPolicy: &proxyconfig.HTTPRetry_SimpleRetry{
 					SimpleRetry: &proxyconfig.HTTPRetry_SimpleRetryPolicy{
@@ -347,6 +359,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad delay fixed seconds", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent: -1,
@@ -358,6 +371,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad delay fixed seconds", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent: 100,
@@ -369,6 +383,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad abort percent", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Abort: &proxyconfig.HTTPFaultInjection_Abort{
 					Percent:   -1,
@@ -379,6 +394,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad abort status", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Abort: &proxyconfig.HTTPFaultInjection_Abort{
 					Percent:   100,
@@ -389,6 +405,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad delay exp seconds", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			HttpFault: &proxyconfig.HTTPFaultInjection{
 				Delay: &proxyconfig.HTTPFaultInjection_Delay{
 					Percent: 101,
@@ -400,6 +417,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad throttle after seconds", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			L4Fault: &proxyconfig.L4FaultInjection{
 				Throttle: &proxyconfig.L4FaultInjection_Throttle{
 					Percent:            101,
@@ -417,6 +435,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad throttle after bytes", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			L4Fault: &proxyconfig.L4FaultInjection{
 				Throttle: &proxyconfig.L4FaultInjection_Throttle{
 					Percent:            101,
@@ -430,16 +449,19 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule bad match source tag label", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{SourceTags: map[string]string{"@": "0"}},
 		},
 			valid: false},
 		{name: "route rule bad match source tag value", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{SourceTags: map[string]string{"a": "~"}},
 		},
 			valid: false},
 		{name: "route rule match valid subnets", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match: &proxyconfig.MatchCondition{
 				Tcp: &proxyconfig.L4MatchAttributes{
 					SourceSubnet:      []string{"1.2.3.4"},
@@ -450,6 +472,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match invalid subnets", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match: &proxyconfig.MatchCondition{
 				Tcp: &proxyconfig.L4MatchAttributes{
 					SourceSubnet:      []string{"foo", "1.2.3.4/banana"},
@@ -464,6 +487,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule match invalid redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Redirect: &proxyconfig.HTTPRedirect{
 				Uri:       "",
 				Authority: "",
@@ -472,6 +496,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule match valid host redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Redirect: &proxyconfig.HTTPRedirect{
 				Authority: "foo.bar.com",
 			},
@@ -479,6 +504,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match valid path redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Redirect: &proxyconfig.HTTPRedirect{
 				Uri: "/new/path",
@@ -487,6 +513,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match valid redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Redirect: &proxyconfig.HTTPRedirect{
 				Uri:       "/new/path",
 				Authority: "foo.bar.com",
@@ -495,6 +522,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match valid redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Redirect: &proxyconfig.HTTPRedirect{
 				Uri:       "/new/path",
 				Authority: "foo.bar.com",
@@ -504,6 +532,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule match invalid redirect", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Redirect: &proxyconfig.HTTPRedirect{
 				Uri: "/new/path",
 			},
@@ -515,11 +544,13 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: false},
 		{name: "route rule match invalid rewrite", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Rewrite:     &proxyconfig.HTTPRewrite{},
 		},
 			valid: false},
 		{name: "route rule match valid host rewrite", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Rewrite: &proxyconfig.HTTPRewrite{
 				Authority: "foo.bar.com",
 			},
@@ -527,6 +558,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match valid prefix rewrite", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Match:       &proxyconfig.MatchCondition{Source: "somehost.default.svc.cluster.local"},
 			Rewrite: &proxyconfig.HTTPRewrite{
 				Uri: "/new/path",
@@ -535,6 +567,7 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			valid: true},
 		{name: "route rule match valid rewrite", in: &proxyconfig.RouteRule{
 			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
 			Rewrite: &proxyconfig.HTTPRewrite{
 				Authority: "foo.bar.com",
 				Uri:       "/new/path",

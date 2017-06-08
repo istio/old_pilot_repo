@@ -15,6 +15,7 @@
 package model
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -123,8 +124,9 @@ type ConfigStore interface {
 type ConfigStoreCache interface {
 	ConfigStore
 
-	// RegisterEventHandler adds a handler to receive config update events
-	RegisterEventHandler(handler func(Config, Event))
+	// RegisterEventHandler adds a handler to receive config update events for a
+	// configuration type
+	RegisterEventHandler(typ string, handler func(Config, Event))
 
 	// Run until a signal is received
 	Run(stop <-chan struct{})
@@ -235,16 +237,27 @@ var (
 			Type:        RouteRule,
 			MessageName: RouteRuleProto,
 			Validate:    ValidateRouteRule,
+			Key: func(config proto.Message) string {
+				rule := config.(*proxyconfig.RouteRule)
+				return fmt.Sprintf("%s", rule.Name)
+			},
 		},
 		ProtoSchema{
 			Type:        IngressRule,
 			MessageName: IngressRuleProto,
 			Validate:    ValidateIngressRule,
+			Key: func(config proto.Message) string {
+				rule := config.(*proxyconfig.RouteRule)
+				return fmt.Sprintf("%s", rule.Name)
+			},
 		},
 		ProtoSchema{
 			Type:        DestinationPolicy,
 			MessageName: DestinationPolicyProto,
 			Validate:    ValidateDestinationPolicy,
+			Key: func(config proto.Message) string {
+				return config.(*proxyconfig.DestinationPolicy).Destination
+			},
 		},
 	}
 )
@@ -253,6 +266,11 @@ var (
 // from the generic config registry
 type istioConfigStore struct {
 	ConfigStore
+}
+
+// MakeIstioStore creates a wrapper around a store
+func MakeIstioStore(store ConfigStore) IstioConfigStore {
+	return &istioConfigStore{store}
 }
 
 func (i istioConfigStore) RouteRules() map[string]*proxyconfig.RouteRule {

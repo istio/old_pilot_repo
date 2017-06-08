@@ -411,7 +411,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "94aa4ce91ada31c401f407324fec6cf1a6b52b02",  # June 2, 2017
+    commit = "5c9f6311c8f92bfc559c658267eecc46d0a4e755",  # June 7, 2017
     remote = "https://github.com/istio/api.git",
 )
 
