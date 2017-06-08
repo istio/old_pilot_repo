@@ -110,12 +110,24 @@ type ConfigStore interface {
 	Delete(typ, key string) error
 }
 
-// ConfigStoreCache ... TODO
+// ConfigStoreCache is a local fully-replicated cache of the config store.  The
+// cache actively synchronizes its local state with the remote store and
+// provides a notification mechanism to receive update events. As such, the
+// notification handlers must be registered prior to calling _Run_, and the
+// cache requires initial synchronization grace period after calling  _Run_.
+//
+// Update notifications require the following consistency guarantee: the view
+// in the cache must be AT LEAST as fresh as the moment notification arrives, but
+// MAY BE more fresh (e.g. if _Delete_ cancels an _Add_ event).
+//
+// Handlers execute on the single worker queue in the order they are appended.
+// Handlers receive the notification event and the associated object.  Note
+// that all handlers must be registered before starting the cache controller.
 type ConfigStoreCache interface {
 	ConfigStore
 
-	// RegisterEventHandler adds a handler to ... TODO
-	RegisterEventHandler(handler func(Config, Event)) error
+	// RegisterEventHandler adds a handler to receive config update events
+	RegisterEventHandler(handler func(Config, Event))
 
 	// Run until a signal is received
 	Run(stop <-chan struct{})
