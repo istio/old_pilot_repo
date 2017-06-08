@@ -25,10 +25,10 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/model"
-	"istio.io/manager/proxy"
-	"istio.io/manager/test/mock"
-	"istio.io/manager/test/util"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
+	"istio.io/pilot/test/mock"
+	"istio.io/pilot/test/util"
 )
 
 // Implement minimal methods to satisfy model.Controller interface for
@@ -205,13 +205,24 @@ func TestRouteDiscoveryAllRoutes(t *testing.T) {
 	compareResponse(response, "testdata/all-rds.json", t)
 }
 
-func TestRouteDiscovery(t *testing.T) {
+func TestRouteDiscoveryV0(t *testing.T) {
 	ds := makeDiscoveryService(t, mock.MakeRegistry())
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.MeshConfig.IstioServiceCluster, mock.HostInstanceV0)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-v0.json", t)
-	url = fmt.Sprintf("/v1/routes/80/%s/%s", ds.MeshConfig.IstioServiceCluster, mock.HostInstanceV1)
-	response = makeDiscoveryRequest(ds, "GET", url, t)
+}
+
+func TestRouteDiscoveryV0Status(t *testing.T) {
+	ds := makeDiscoveryService(t, mock.MakeRegistry())
+	url := fmt.Sprintf("/v1/routes/81/%s/%s", ds.MeshConfig.IstioServiceCluster, mock.HostInstanceV0)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-v0-status.json", t)
+}
+
+func TestRouteDiscoveryV1(t *testing.T) {
+	ds := makeDiscoveryService(t, mock.MakeRegistry())
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.MeshConfig.IstioServiceCluster, mock.HostInstanceV1)
+	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-v1.json", t)
 }
 

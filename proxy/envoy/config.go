@@ -24,8 +24,8 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/model"
-	"istio.io/manager/proxy"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // Config generation main functions.
@@ -155,7 +155,7 @@ func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 // Use "0.0.0.0" IP address to listen on all interfaces
 // RDS parameter controls whether to use RDS for the route updates.
 func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds bool) *Listener {
+	ip string, port int, rds bool, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -165,8 +165,10 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 	})
 
 	config := &HTTPFilterConfig{
-		CodecType:  auto,
-		StatPrefix: "http",
+		CodecType:         auto,
+		GenerateRequestID: true,
+		UseRemoteAddress:  useRemoteAddress,
+		StatPrefix:        "http",
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
 		}},
@@ -232,7 +234,7 @@ func buildOutboundListeners(instances []*model.ServiceInstance, services []*mode
 	listeners, clusters := buildOutboundTCPListeners(context.MeshConfig, services)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true))
+		listeners = append(listeners, buildHTTPListener(context.MeshConfig, routeConfig, WildcardAddress, port, true, false))
 	}
 	return listeners, clusters
 }
@@ -334,6 +336,13 @@ func buildOutboundHTTPRoutes(
 
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
+
+				// there should be at most one occurrence of the service for the same
+				// port since service port values are distinct; that means the virtual
+				// host domains, which include the sole domain name for the service, do
+				// not overlap for the same route config.
+				// for example, a service "a" with two ports 80 and 8080, would have virtual
+				// hosts on 80 and 8080 listeners that contain domain "a".
 				http.VirtualHosts = append(http.VirtualHosts, host)
 			}
 		}
@@ -346,7 +355,7 @@ func buildOutboundHTTPRoutes(
 // buildOutboundTCPListeners lists listeners and referenced clusters for TCP
 // protocols (including HTTPS)
 //
-// TODO(github.com/istio/manager/issues/237)
+// TODO(github.com/istio/pilot/issues/237)
 //
 // Sharing tcp_proxy and http_connection_manager filters on the same port for
 // different destination services doesn't work with Envoy (yet). When the
@@ -385,16 +394,14 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 // configuration and do not utilize CDS.
 func buildInboundListeners(instances []*model.ServiceInstance,
 	mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
-	// used for shortcut domain names for hostnames
-	suffix := sharedInstanceHost(instances)
 	listeners := make(Listeners, 0, len(instances))
 	clusters := make(Clusters, 0, len(instances))
 
 	// inbound connections/requests are redirected to the endpoint address but appear to be sent
 	// to the service address
 	// assumes that endpoint addresses/ports are unique in the instance set
+	// TODO: validate that duplicated endpoints for services can be handled (e.g. above assumption)
 	for _, instance := range instances {
-		service := instance.Service
 		endpoint := instance.Endpoint
 		servicePort := endpoint.ServicePort
 		protocol := servicePort.Protocol
@@ -420,17 +427,15 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 				}
 			}
 
-			host := buildVirtualHost(service, servicePort, suffix, []*HTTPRoute{route})
-
-			// insert explicit instance (pod) ip:port as a hostname field
-			host.Domains = append(host.Domains, fmt.Sprintf("%s:%d", endpoint.Address, endpoint.Port))
-			if endpoint.Port == 80 {
-				host.Domains = append(host.Domains, endpoint.Address)
+			host := &VirtualHost{
+				Name:    fmt.Sprintf("inbound|%d", endpoint.Port),
+				Domains: []string{"*"},
+				Routes:  []*HTTPRoute{route},
 			}
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false), mesh))
+				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, false), mesh))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{

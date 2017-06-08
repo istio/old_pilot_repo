@@ -29,8 +29,8 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/manager/model"
-	"istio.io/manager/proxy"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 const (
@@ -130,14 +130,14 @@ func fetchSecret(ctx context.Context, client *http.Client, url string,
 // generateIngress generates ingress proxy configuration
 func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
 	listeners := []*Listener{
-		buildHTTPListener(mesh, nil, WildcardAddress, 80, true),
+		buildHTTPListener(mesh, nil, WildcardAddress, 80, true, true),
 	}
 
 	if tls != nil {
 		if err := writeTLS(certFile, keyFile, tls); err != nil {
 			glog.Warning("Failed to write cert/key")
 		} else {
-			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true)
+			listener := buildHTTPListener(mesh, nil, WildcardAddress, 443, true, true)
 			listener.SSLContext = &SSLContext{
 				CertChainFile:  certFile,
 				PrivateKeyFile: keyFile,
@@ -290,8 +290,6 @@ func buildIngressRoute(ingress *proxyconfig.RouteRule,
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
 		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {
-			// rewrite the host header so that inbound proxies can match incoming traffic
-			applied.HostRewrite = fmt.Sprintf("%s:%d", service.Hostname, servicePort.Port)
 			out = append(out, applied)
 		}
 	}
