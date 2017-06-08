@@ -27,9 +27,9 @@ import (
 
 func TestKindMapKinds(t *testing.T) {
 	km := ConfigDescriptor{
-		"b": ProtoSchema{},
-		"a": ProtoSchema{},
-		"c": ProtoSchema{},
+		ProtoSchema{Type: "a"},
+		ProtoSchema{Type: "b"},
+		ProtoSchema{Type: "c"},
 	}
 	want := []string{"a", "b", "c"}
 	got := km.Types()

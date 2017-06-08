@@ -35,24 +35,21 @@ type Config struct {
 	// from its content
 	Key string
 
-	// Revision is the record of last mutation
-	Revision Revision
+	// Revision is an opaque identifier for tracking updates to the config registry.
+	// The implementation may use a change index or a commit log for the revision.
+	// The config client should not make any assumptions about revisions and rely only on
+	// exact equality to implement optimistic concurrency of read-write operations.
+	//
+	// The lifetime of an object of a particular revision depends on the underlying data store.
+	// The data store may compactify old revisions in the interest of storage optimization.
+	//
+	// An empty revision carries a special meaning that the associated object has
+	// not been stored and assigned a revision.
+	Revision string
 
 	// Content holds the configuration object as a protobuf message
 	Content proto.Message
 }
-
-// Revision is an opaque identifier for tracking updates to the config registry.
-// The implementation may use a change index or a commit log for the revision.
-// The config client should not make any assumptions about revisions and rely only on
-// exact equality to implement optimistic concurrency of read-write operations.
-//
-// The lifetime of an object of a particular revision depends on the underlying data store.
-// The data store may compactify old revisions in the interest of storage optimization.
-//
-// An empty revision carries a special meaning that the associated object has
-// not been stored and assigned a revision.
-type Revision string
 
 // ConfigStore describes a set of platform agnostic APIs that must be supported
 // by the underlying platform to store and retrieve Istio configuration.
@@ -91,20 +88,20 @@ type ConfigStore interface {
 	ConfigDescriptor() ConfigDescriptor
 
 	// Get retrieves a configuration element by a type and a key
-	Get(typ, key string) (config proto.Message, exists bool, revision Revision)
+	Get(typ, key string) (config proto.Message, exists bool, revision string)
 
 	// List returns objects by type
 	List(typ string) ([]Config, error)
 
 	// Post creates a configuration object. If an object with the same key for
 	// the type already exists, the operation fails with no side effects.
-	Post(config proto.Message) (Revision, error)
+	Post(config proto.Message) (revision string, err error)
 
 	// Put updates a configuration object in the store.  Put requires that the
 	// object has been created.  Revision prevents overriding a value that has
 	// been changed between prior _Get_ and _Put_ operation to achieve optimistic
 	// concurrency. This method returns a new revision if the operation succeeds.
-	Put(config proto.Message, revision Revision) (Revision, error)
+	Put(config proto.Message, oldRevision string) (newRevision string, err error)
 
 	// Delete removes an object from the store by key
 	Delete(typ, key string) error
@@ -135,31 +132,55 @@ type ConfigStoreCache interface {
 
 // ConfigDescriptor defines the bijection between the short type name and its
 // fully qualified protobuf message name
-type ConfigDescriptor map[string]ProtoSchema
+type ConfigDescriptor []ProtoSchema
 
 // ProtoSchema provides description of the configuration schema and its key function
 type ProtoSchema struct {
+	// Type refers to the short configuration type name
+	Type string
+
 	// MessageName refers to the protobuf message type name corresponding to the type
 	MessageName string
 
-	// Validate configuration as a protobuf message
-	Validate func(o proto.Message) error
+	// Validate configuration as a protobuf message assuming the object is an
+	// instance of the expected message type
+	Validate func(config proto.Message) error
 
 	// Key function derives the unique key from the configuration object metadata
-	// properties.  The object is not required to be complete or even valid to
-	// derive its key.  For example, if _name_ field is designated as the key,
-	// then the proto message must only possess _name_ property.
-	Key func(o proto.Message) string
+	// properties. The object is not required to be complete or even valid to
+	// derive its key, but must be an instance of the expected message type. For
+	// example, if _name_ field is designated as the key, then the proto message
+	// must only possess _name_ property.
+	Key func(config proto.Message) string
 }
 
 // Types lists all known types in the config schema
 func (descriptor ConfigDescriptor) Types() []string {
 	types := make([]string, 0, len(descriptor))
-	for t := range descriptor {
-		types = append(types, t)
+	for _, t := range descriptor {
+		types = append(types, t.Type)
 	}
-	sort.Strings(types)
 	return types
+}
+
+// GetByMessageName finds a schema by message name if it is available
+func (descriptor ConfigDescriptor) GetByMessageName(name string) (ProtoSchema, bool) {
+	for _, schema := range descriptor {
+		if schema.MessageName == name {
+			return schema, true
+		}
+	}
+	return ProtoSchema{}, false
+}
+
+// GetByType finds a schema by type if it is available
+func (descriptor ConfigDescriptor) GetByType(name string) (ProtoSchema, bool) {
+	for _, schema := range descriptor {
+		if schema.Type == name {
+			return schema, true
+		}
+	}
+	return ProtoSchema{}, false
 }
 
 // IstioConfigStore is a specialized interface to access config store using
@@ -210,15 +231,18 @@ const (
 var (
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
-		RouteRule: ProtoSchema{
+		ProtoSchema{
+			Type:        RouteRule,
 			MessageName: RouteRuleProto,
 			Validate:    ValidateRouteRule,
 		},
-		IngressRule: ProtoSchema{
+		ProtoSchema{
+			Type:        IngressRule,
 			MessageName: IngressRuleProto,
 			Validate:    ValidateIngressRule,
 		},
-		DestinationPolicy: ProtoSchema{
+		ProtoSchema{
+			Type:        DestinationPolicy,
 			MessageName: DestinationPolicyProto,
 			Validate:    ValidateDestinationPolicy,
 		},

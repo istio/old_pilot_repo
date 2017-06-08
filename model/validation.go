@@ -72,9 +72,9 @@ func ValidatePort(port int) error {
 // Validate checks that each name conforms to the spec and has a ProtoMessage
 func (descriptor ConfigDescriptor) Validate() error {
 	var errs error
-	for k, v := range descriptor {
-		if !IsDNS1123Label(k) {
-			errs = multierror.Append(errs, fmt.Errorf("invalid type: %q", k))
+	for _, v := range descriptor {
+		if !IsDNS1123Label(v.Type) {
+			errs = multierror.Append(errs, fmt.Errorf("invalid type: %q", v.Type))
 		}
 		if proto.MessageType(v.MessageName) == nil {
 			errs = multierror.Append(errs, fmt.Errorf("cannot find proto message type: %q", v.MessageName))
@@ -89,7 +89,7 @@ func (descriptor ConfigDescriptor) ValidateConfig(typ string, obj interface{}) e
 		return fmt.Errorf("invalid nil configuration object")
 	}
 
-	t, ok := descriptor[typ]
+	t, ok := descriptor.GetByType(typ)
 	if !ok {
 		return fmt.Errorf("undeclared type: %q", typ)
 	}

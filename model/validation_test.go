@@ -41,11 +41,11 @@ func TestKindMapValidate(t *testing.T) {
 		wantErr: false,
 	}, {
 		name:    "Invalid DNS11234Label in ConfigDescriptor",
-		kindMap: ConfigDescriptor{badLabel: ProtoSchema{}},
+		kindMap: ConfigDescriptor{ProtoSchema{Type: badLabel}},
 		wantErr: true,
 	}, {
 		name:    "Bad MessageName in ProtoMessage",
-		kindMap: ConfigDescriptor{goodLabel: ProtoSchema{}},
+		kindMap: ConfigDescriptor{ProtoSchema{Type: goodLabel}},
 		wantErr: true,
 	}}
 
