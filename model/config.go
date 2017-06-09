@@ -24,7 +24,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-// Config is a configuration unit consisting ot the type of configuration, the
+// Config is a configuration unit consisting of the type of configuration, the
 // key identifier that is unique per type, and the content represented as a
 // protobuf message.  The revision is optional, and if provided, identifies the
 // last update operation on the object.
