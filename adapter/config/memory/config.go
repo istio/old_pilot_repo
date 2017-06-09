@@ -64,7 +64,7 @@ func (cr *store) List(typ string) ([]model.Config, error) {
 	if !ok {
 		return nil, nil
 	}
-	out := make([]model.Config, 0)
+	out := make([]model.Config, 0, len(cr.data[typ]))
 	for key, elt := range cr.data[typ] {
 		out = append(out, model.Config{
 			Type:     typ,
