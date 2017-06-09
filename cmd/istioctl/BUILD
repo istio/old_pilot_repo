@@ -50,7 +50,6 @@ go_test(
         "//apiserver:go_default_library",
         "//client/proxy:go_default_library",
         "//cmd/version:go_default_library",
-        "//model:go_default_library",
         "//platform/kube:go_default_library",
         "//test/util:go_default_library",
         "@com_github_ghodss_yaml//:go_default_library",
