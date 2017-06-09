@@ -61,7 +61,7 @@ const (
 // - dynamic REST client is configured to use third-party resources
 // - static client exposes Kubernetes API
 type Client struct {
-	mapping model.KindMap
+	mapping model.ConfigDescriptor
 	client  kubernetes.Interface
 	dyn     *rest.RESTClient
 }
@@ -115,7 +115,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // NewClient creates a client to Kubernetes API using a kubeconfig file.
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
-func NewClient(kubeconfig string, km model.KindMap) (*Client, error) {
+func NewClient(kubeconfig string, km model.ConfigDescriptor) (*Client, error) {
 	if kubeconfig != "" {
 		info, exists := os.Stat(kubeconfig)
 		if exists != nil {

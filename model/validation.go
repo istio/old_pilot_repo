@@ -718,8 +718,24 @@ func ValidateRouteRule(msg proto.Message) error {
 
 // ValidateIngressRule checks ingress rules
 func ValidateIngressRule(msg proto.Message) error {
-	// TODO: Add ingress-only validation checks, if any?
-	return ValidateRouteRule(msg)
+	value, ok := msg.(*proxyconfig.IngressRule)
+	if !ok {
+		return fmt.Errorf("cannot cast to ingress rule")
+	}
+
+	var errs error
+	if value.Name == "" {
+		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a name"))
+	}
+	if value.Destination == "" {
+		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a destination service"))
+	}
+	if err := ValidateFQDN(value.Destination); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	// TODO: complete validation for ingress
+	return errs
 }
 
 // ValidateDestinationPolicy checks proxy policies

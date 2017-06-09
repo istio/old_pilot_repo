@@ -192,7 +192,7 @@ type IstioConfigStore interface {
 	RouteRules() map[string]*proxyconfig.RouteRule
 
 	// IngressRules lists all ingress rules
-	IngressRules() map[string]*proxyconfig.RouteRule
+	IngressRules() map[string]*proxyconfig.IngressRule
 
 	// DestinationPolicies lists all destination rules
 	DestinationPolicies() []*proxyconfig.DestinationPolicy
@@ -216,7 +216,7 @@ const (
 	// IngressRule type
 	IngressRule = "ingress-rule"
 	// IngressRuleProto message name
-	IngressRuleProto = "istio.proxy.v1.config.RouteRule"
+	IngressRuleProto = "istio.proxy.v1.config.IngressRule"
 
 	// DestinationPolicy defines the type for the destination policy configuration
 	DestinationPolicy = "destination-policy"
@@ -247,7 +247,7 @@ var (
 			MessageName: IngressRuleProto,
 			Validate:    ValidateIngressRule,
 			Key: func(config proto.Message) string {
-				rule := config.(*proxyconfig.RouteRule)
+				rule := config.(*proxyconfig.IngressRule)
 				return fmt.Sprintf("%s", rule.Name)
 			},
 		},
@@ -330,25 +330,14 @@ func (i *istioConfigStore) RouteRulesBySource(instances []*ServiceInstance) []*p
 	return out
 }
 
-// A temporary measure to communicate the destination service's port
-// to the proxy configuration generator. This can be improved by using
-// a dedicated model object for IngressRule (instead of reusing RouteRule),
-// which exposes the necessary target port field within the "Route" field.
-// This also carries TLS secret name.
-const (
-	IngressPortName  = "servicePortName"
-	IngressPortNum   = "servicePortNum"
-	IngressTLSSecret = "tlsSecret"
-)
-
-func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.RouteRule {
-	out := make(map[string]*proxyconfig.RouteRule)
+func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.IngressRule {
+	out := make(map[string]*proxyconfig.IngressRule)
 	rs, err := i.List(IngressRule)
 	if err != nil {
 		glog.V(2).Infof("IngressRules => %v", err)
 	}
 	for _, r := range rs {
-		if rule, ok := r.Content.(*proxyconfig.RouteRule); ok {
+		if rule, ok := r.Content.(*proxyconfig.IngressRule); ok {
 			out[r.Key] = rule
 		}
 	}

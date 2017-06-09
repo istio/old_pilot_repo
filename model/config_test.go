@@ -198,10 +198,6 @@ func TestIstioRegistryRouteAndIngressRules(t *testing.T) {
 		if got := r.registry.RouteRules(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%v with RouteRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
-		r.mock.EXPECT().List(IngressRule).Return(c.mockObjs, c.mockError)
-		if got := r.registry.IngressRules(); !reflect.DeepEqual(got, c.want) {
-			t.Errorf("%v with IngressRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
-		}
 	}
 }
 

@@ -580,10 +580,6 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			t.Errorf("ValidateRouteRule failed on %v: got valid=%v but wanted valid=%v: %v",
 				c.name, got == nil, c.valid, got)
 		}
-		if got := ValidateIngressRule(c.in); (got == nil) != c.valid {
-			t.Errorf("ValidateIngressRule failed on %v: got valid=%v but wanted valid=%v: %v",
-				c.name, got == nil, c.valid, got)
-		}
 	}
 }
 
