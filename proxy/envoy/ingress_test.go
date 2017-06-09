@@ -18,7 +18,6 @@ const (
 	ingressRouteRule2  = "testdata/ingress-route-foo.yaml.golden"
 	ingressCertFile    = "testdata/tls.crt"
 	ingressKeyFile     = "testdata/tls.key"
-	ingressNamespace   = "default"
 )
 
 var (

@@ -265,7 +265,10 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 	if !ok {
 		return fmt.Errorf("Invalid type %s", typ)
 	}
-	v, err := schema.FromYAML(string(config))
+	v, err := schema.FromYAML(config)
+	if err != nil {
+		return err
+	}
 
 	istioClient, err := kube.NewClient(kubeconfig, model.IstioConfigTypes, infra.Namespace)
 	if err != nil {
@@ -274,9 +277,12 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 
 	_, exists, rev := istioClient.Get(typ, schema.Key(v))
 	if exists {
-		istioClient.Put(v, rev)
+		_, err = istioClient.Put(v, rev)
 	} else {
-		istioClient.Post(v)
+		_, err = istioClient.Post(v)
+	}
+	if err != nil {
+		return err
 	}
 
 	glog.Info("Sleeping for the config to propagate")
