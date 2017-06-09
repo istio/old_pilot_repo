@@ -1,4 +1,21 @@
-package proxy
+// Copyright 2017 Istio Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package server is an HTTP server that exposes a config store via a REST
+// interface. The server wraps a config store, and the client communicates
+// with the server to expose a config store interface on the client side.
+package server
 
 import (
 	"bytes"
@@ -10,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"istio.io/pilot/apiserver"
 	"istio.io/pilot/cmd/version"
 )
 
@@ -88,11 +104,11 @@ type Key struct {
 
 // Client defines the interface for the proxy specific functionality of the config client
 type Client interface {
-	GetConfig(Key) (*apiserver.Config, error)
-	AddConfig(Key, apiserver.Config) error
-	UpdateConfig(Key, apiserver.Config) error
+	GetConfig(Key) (*Config, error)
+	AddConfig(Key, Config) error
+	UpdateConfig(Key, Config) error
 	DeleteConfig(Key) error
-	ListConfig(string, string) ([]apiserver.Config, error)
+	ListConfig(string, string) ([]Config, error)
 	Version() (*version.BuildInfo, error)
 }
 
@@ -118,12 +134,12 @@ func (m *ConfigClient) doConfigCRUD(key Key, method string, inBody []byte) ([]by
 }
 
 // GetConfig retrieves the configuration resource for the passed key
-func (m *ConfigClient) GetConfig(key Key) (*apiserver.Config, error) {
+func (m *ConfigClient) GetConfig(key Key) (*Config, error) {
 	body, err := m.doConfigCRUD(key, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
-	config := &apiserver.Config{}
+	config := &Config{}
 	if err := json.Unmarshal(body, config); err != nil {
 		return nil, err
 	}
@@ -132,7 +148,7 @@ func (m *ConfigClient) GetConfig(key Key) (*apiserver.Config, error) {
 
 // AddConfig creates a configuration resources for the passed key using the passed configuration
 // It is idempotent
-func (m *ConfigClient) AddConfig(key Key, config apiserver.Config) error {
+func (m *ConfigClient) AddConfig(key Key, config Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -145,7 +161,7 @@ func (m *ConfigClient) AddConfig(key Key, config apiserver.Config) error {
 
 // UpdateConfig updates the configuration resource for the passed key using the passed configuration
 // It is idempotent
-func (m *ConfigClient) UpdateConfig(key Key, config apiserver.Config) error {
+func (m *ConfigClient) UpdateConfig(key Key, config Config) error {
 	bodyIn, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -164,7 +180,7 @@ func (m *ConfigClient) DeleteConfig(key Key) error {
 
 // ListConfig retrieves all configuration resources of the passed kind in the given namespace
 // If namespace is an empty string it retrieves all configs of the passed kind across all namespaces
-func (m *ConfigClient) ListConfig(kind, namespace string) ([]apiserver.Config, error) {
+func (m *ConfigClient) ListConfig(kind, namespace string) ([]Config, error) {
 	var reqURL string
 	if namespace != "" {
 		reqURL = fmt.Sprintf("config/%v/%v", kind, namespace)
@@ -176,7 +192,7 @@ func (m *ConfigClient) ListConfig(kind, namespace string) ([]apiserver.Config, e
 		return nil, err
 	}
 
-	var config []apiserver.Config
+	var config []Config
 	if err := json.Unmarshal(body, &config); err != nil {
 		return nil, err
 	}

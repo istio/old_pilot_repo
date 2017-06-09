@@ -31,8 +31,7 @@ import (
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
-	"istio.io/pilot/apiserver"
-	"istio.io/pilot/client/proxy"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
@@ -81,7 +80,7 @@ func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
 var (
 	namespace             string
 	istioNamespace        string
-	apiClient             proxy.Client
+	apiClient             server.Client
 	istioConfigAPIService string
 	useKubeRequester      bool
 
@@ -91,7 +90,7 @@ var (
 	// output format (yaml or short)
 	outputFormat string
 
-	key    proxy.Key
+	key    server.Key
 	schema model.ProtoSchema
 
 	rootCmd = &cobra.Command{
@@ -129,13 +128,13 @@ istioctl mixer command documentation.
 				if istioNamespace == "" {
 					istioNamespace = namespace
 				}
-				apiClient = proxy.NewConfigClient(&k8sRESTRequester{
+				apiClient = server.NewConfigClient(&k8sRESTRequester{
 					client:    client,
 					namespace: istioNamespace,
 					service:   istioConfigAPIService,
 				})
 			} else {
-				apiClient = proxy.NewConfigClient(&proxy.BasicHTTPRequester{
+				apiClient = server.NewConfigClient(&server.BasicHTTPRequester{
 					BaseURL: istioConfigAPIService,
 					Client:  &http.Client{Timeout: 60 * time.Second},
 					Version: kube.IstioResourceVersion,
@@ -167,14 +166,14 @@ istioctl create -f example-routing.yaml
 				return errors.New("nothing to create")
 			}
 			for _, config := range varr {
-				if err = setup(config.Type, config.Name); err != nil {
+				if err = setup(config.Type, config.Key); err != nil {
 					return err
 				}
 				err = apiClient.AddConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Created config: %v %v\n", config.Type, config.Name)
+				fmt.Printf("Created config: %v %v\n", config.Type, config.Key)
 			}
 
 			return nil
@@ -200,14 +199,14 @@ istioctl replace -f example-routing.yaml
 				return errors.New("nothing to replace")
 			}
 			for _, config := range varr {
-				if err = setup(config.Type, config.Name); err != nil {
+				if err = setup(config.Type, config.Key); err != nil {
 					return err
 				}
 				err = apiClient.UpdateConfig(key, config)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Updated config: %v %v\n", config.Type, config.Name)
+				fmt.Printf("Updated config: %v %v\n", config.Type, config.Key)
 			}
 
 			return nil
@@ -244,7 +243,7 @@ istioctl get route-rule productpage-default
 				if err != nil {
 					return err
 				}
-				cSpecBytes, err := json.Marshal(config.Spec)
+				cSpecBytes, err := json.Marshal(config.Content)
 				if err != nil {
 					return err
 				}
@@ -268,7 +267,7 @@ istioctl get route-rule productpage-default
 					return nil
 				}
 
-				var outputters = map[string](func([]apiserver.Config) error){
+				var outputters = map[string](func([]server.Config) error){
 					"yaml":  printYamlOutput,
 					"short": printShortOutput,
 				}
@@ -334,13 +333,13 @@ istioctl delete route-rule productpage-default
 			}
 			var errs error
 			for _, v := range varr {
-				if err = setup(v.Type, v.Name); err != nil {
+				if err = setup(v.Type, v.Key); err != nil {
 					errs = multierror.Append(errs, err)
 				} else {
 					if err = apiClient.DeleteConfig(key); err != nil {
-						errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", v.Name, err))
+						errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", v.Key, err))
 					} else {
-						fmt.Printf("Deleted config: %v %v\n", v.Type, v.Name)
+						fmt.Printf("Deleted config: %v %v\n", v.Type, v.Key)
 					}
 				}
 			}
@@ -431,7 +430,7 @@ func setup(kind, name string) error {
 	}
 
 	// set the config key
-	key = proxy.Key{
+	key = server.Key{
 		Kind:      kind,
 		Name:      name,
 		Namespace: namespace,
@@ -441,7 +440,7 @@ func setup(kind, name string) error {
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
-func readInputs() ([]apiserver.Config, error) {
+func readInputs() ([]server.Config, error) {
 
 	var reader io.Reader
 	var err error
@@ -455,12 +454,12 @@ func readInputs() ([]apiserver.Config, error) {
 		}
 	}
 
-	var varr []apiserver.Config
+	var varr []server.Config
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
-		v := apiserver.Config{}
+		v := server.Config{}
 		err = yamlDecoder.Decode(&v)
 		if err == io.EOF {
 			break
@@ -475,20 +474,20 @@ func readInputs() ([]apiserver.Config, error) {
 }
 
 // Print a simple list of names
-func printShortOutput(configList []apiserver.Config) error {
+func printShortOutput(configList []server.Config) error {
 	for _, c := range configList {
-		fmt.Printf("%v\n", c.Name)
+		fmt.Printf("%v\n", c.Key)
 	}
 
 	return nil
 }
 
 // Print as YAML
-func printYamlOutput(configList []apiserver.Config) error {
+func printYamlOutput(configList []server.Config) error {
 	var retVal error
 
 	for _, c := range configList {
-		cSpecBytes, err := json.Marshal(c.Spec)
+		cSpecBytes, err := json.Marshal(c.Content)
 		if err != nil {
 			retVal = multierror.Append(retVal, err)
 		}
@@ -500,7 +499,7 @@ func printYamlOutput(configList []apiserver.Config) error {
 			retVal = multierror.Append(retVal, err)
 		} else {
 			fmt.Printf("type: %s\n", c.Type)
-			fmt.Printf("name: %s\n", c.Name)
+			fmt.Printf("name: %s\n", c.Key)
 			fmt.Printf("namespace: %s\n", namespace)
 			fmt.Println("spec:")
 			lines := strings.Split(string(out), "\n")

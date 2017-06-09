@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/apiserver"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
@@ -124,7 +124,7 @@ var (
 		Short: "Start Istio config API service",
 		Run: func(*cobra.Command, []string) {
 			controller := kube.NewController(client, mesh, flags.controllerOptions)
-			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
+			apiserver := server.NewAPI(server.APIServiceOptions{
 				Version:  kube.IstioResourceVersion,
 				Port:     flags.apiserverPort,
 				Registry: controller,

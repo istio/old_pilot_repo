@@ -1,0 +1,12 @@
+{
+ "destination": "service.namespace.svc.cluster.local",
+ "precedence": 1,
+ "name": "name",
+ "route": [
+  {
+   "tags": {
+    "version": "v1"
+   },
+   "weight": 25
+  }
+}

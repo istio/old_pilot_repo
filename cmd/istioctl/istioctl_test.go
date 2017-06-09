@@ -21,19 +21,18 @@ import (
 
 	"strings"
 
-	"istio.io/pilot/apiserver"
-	"istio.io/pilot/client/proxy"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/cmd/version"
 )
 
 type StubClient struct {
 	AddConfigCalled bool
-	KeyConfigMap    map[proxy.Key]apiserver.Config
-	WantKeys        map[proxy.Key]struct{}
+	KeyConfigMap    map[server.Key]server.Config
+	WantKeys        map[server.Key]struct{}
 	Error           error
 }
 
-func (st *StubClient) GetConfig(proxy.Key) (*apiserver.Config, error) {
+func (st *StubClient) GetConfig(server.Key) (*server.Config, error) {
 	if st.Error != nil {
 		return nil, st.Error
 	}
@@ -41,13 +40,15 @@ func (st *StubClient) GetConfig(proxy.Key) (*apiserver.Config, error) {
 	if !ok {
 		return nil, fmt.Errorf("received unexpected key: %v", key)
 	}
-	if err := config.ParseSpec(); err != nil {
-		return nil, err
-	}
+	/*
+		if err := config.ParseSpec(); err != nil {
+			return nil, err
+		}
+	*/
 	return &config, nil
 }
 
-func (st *StubClient) AddConfig(key proxy.Key, config apiserver.Config) error {
+func (st *StubClient) AddConfig(key server.Key, config server.Config) error {
 	st.AddConfigCalled = true
 	if st.Error != nil {
 		return st.Error
@@ -55,14 +56,14 @@ func (st *StubClient) AddConfig(key proxy.Key, config apiserver.Config) error {
 	return st.verifyKeyConfig(key, config)
 }
 
-func (st *StubClient) UpdateConfig(key proxy.Key, config apiserver.Config) error {
+func (st *StubClient) UpdateConfig(key server.Key, config server.Config) error {
 	if st.Error != nil {
 		return st.Error
 	}
 	return st.verifyKeyConfig(key, config)
 }
 
-func (st *StubClient) DeleteConfig(key proxy.Key) error {
+func (st *StubClient) DeleteConfig(key server.Key) error {
 	if st.Error != nil {
 		return st.Error
 	}
@@ -73,15 +74,17 @@ func (st *StubClient) DeleteConfig(key proxy.Key) error {
 
 }
 
-func (st *StubClient) ListConfig(string, string) ([]apiserver.Config, error) {
+func (st *StubClient) ListConfig(string, string) ([]server.Config, error) {
 	if st.Error != nil {
 		return nil, st.Error
 	}
-	var res []apiserver.Config
+	var res []server.Config
 	for _, config := range st.KeyConfigMap {
-		if err := config.ParseSpec(); err != nil {
-			return nil, err
-		}
+		/*
+			if err := config.ParseSpec(); err != nil {
+				return nil, err
+			}
+		*/
 		res = append(res, config)
 	}
 	return res, nil
@@ -99,41 +102,41 @@ func (st *StubClient) Version() (*version.BuildInfo, error) {
 }
 
 func (st *StubClient) setupTwoRouteRuleMap() {
-	st.KeyConfigMap = make(map[proxy.Key]apiserver.Config)
-	key1 := proxy.Key{
+	st.KeyConfigMap = make(map[server.Key]server.Config)
+	key1 := server.Key{
 		Name:      "test-v1",
 		Namespace: namespace,
 		Kind:      "route-rule",
 	}
-	key2 := proxy.Key{
+	key2 := server.Key{
 		Name:      "test-v2",
 		Namespace: namespace,
 		Kind:      "route-rule",
 	}
-	st.KeyConfigMap[key1] = apiserver.Config{
-		Name: "test-v1",
+	st.KeyConfigMap[key1] = server.Config{
+		Key:  "test-v1",
 		Type: "route-rule",
 	}
-	st.KeyConfigMap[key2] = apiserver.Config{
-		Name: "test-v2",
+	st.KeyConfigMap[key2] = server.Config{
+		Key:  "test-v2",
 		Type: "route-rule",
 	}
 }
 
 func (st *StubClient) setupDeleteKeys() {
-	st.WantKeys = make(map[proxy.Key]struct{})
-	st.WantKeys[proxy.Key{Name: "test-v1", Namespace: "default", Kind: "route-rule"}] = struct{}{}
-	st.WantKeys[proxy.Key{Name: "test-v2", Namespace: "default", Kind: "route-rule"}] = struct{}{}
+	st.WantKeys = make(map[server.Key]struct{})
+	st.WantKeys[server.Key{Name: "test-v1", Namespace: "default", Kind: "route-rule"}] = struct{}{}
+	st.WantKeys[server.Key{Name: "test-v2", Namespace: "default", Kind: "route-rule"}] = struct{}{}
 }
 
-func (st *StubClient) verifyKeyConfig(key proxy.Key, config apiserver.Config) error {
+func (st *StubClient) verifyKeyConfig(key server.Key, config server.Config) error {
 	wantConfig, ok := st.KeyConfigMap[key]
 	if !ok {
 		return fmt.Errorf("received unexpected key/config pair\n key: %+v\nconfig: %+v", key, config)
 	}
 	// ToDo: test spec as well
-	if strings.Compare(wantConfig.Name, config.Name) != 0 {
-		return fmt.Errorf("received unexpected config name: %s, wanted: %s", config.Name, wantConfig.Name)
+	if strings.Compare(wantConfig.Key, config.Key) != 0 {
+		return fmt.Errorf("received unexpected config name: %s, wanted: %s", config.Key, wantConfig.Key)
 	}
 	if strings.Compare(wantConfig.Type, config.Type) != 0 {
 		return fmt.Errorf("received unexpected config type: %s, wanted: %s", config.Type, wantConfig.Type)

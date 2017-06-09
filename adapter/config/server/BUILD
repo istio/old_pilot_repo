@@ -4,7 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apiserver.go",
-        "config.go",
+        "client.go",
         "handler.go",
     ],
     visibility = ["//visibility:public"],
@@ -13,14 +13,16 @@ go_library(
         "//model:go_default_library",
         "@com_github_emicklei_go_restful//:go_default_library",
         "@com_github_golang_glog//:go_default_library",
-        "@com_github_golang_protobuf//proto:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     size = "small",
-    srcs = ["apiserver_test.go"],
+    srcs = [
+        "apiserver_test.go",
+        "client_test.go",
+    ],
     data = glob(["testdata/*.golden"]),
     library = ":go_default_library",
     deps = [
