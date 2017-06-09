@@ -116,7 +116,7 @@ func TestSecret(t *testing.T) {
 
 	// append an ingress notification handler that just counts number of notifications
 	notificationCount := 0
-	_ = ctl.RegisterEventHandler(model.IngressRule, func(model.Config, model.Event) {
+	ctl.RegisterEventHandler(model.IngressRule, func(model.Config, model.Event) {
 		notificationCount++
 	})
 
@@ -177,7 +177,7 @@ func TestIngressController(t *testing.T) {
 
 	// Append an ingress notification handler that just counts number of notifications
 	notificationCount := 0
-	_ = ctl.RegisterEventHandler(model.IngressRule, func(model.Config, model.Event) {
+	ctl.RegisterEventHandler(model.IngressRule, func(model.Config, model.Event) {
 		notificationCount++
 	})
 
@@ -380,7 +380,7 @@ func TestController(t *testing.T) {
 	ctl := NewController(cl, &mesh, ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 	added, deleted := 0, 0
 	n := 5
-	err = ctl.RegisterEventHandler(mock.Type, func(c model.Config, ev model.Event) {
+	ctl.RegisterEventHandler(mock.Type, func(c model.Config, ev model.Event) {
 		switch ev {
 		case model.EventAdd:
 			if deleted != 0 {
@@ -395,9 +395,6 @@ func TestController(t *testing.T) {
 		}
 		glog.Infof("Added %d, deleted %d", added, deleted)
 	})
-	if err != nil {
-		t.Error(err)
-	}
 	go ctl.Run(stop)
 
 	mock.CheckMapInvariant(cl, t, n)
@@ -425,7 +422,7 @@ func TestControllerCacheFreshness(t *testing.T) {
 	done := false
 
 	// validate cache consistency
-	err = ctl.RegisterEventHandler(mock.Type, func(config model.Config, ev model.Event) {
+	ctl.RegisterEventHandler(mock.Type, func(config model.Config, ev model.Event) {
 		elts, _ := ctl.List(mock.Type)
 		switch ev {
 		case model.EventAdd:
@@ -448,9 +445,6 @@ func TestControllerCacheFreshness(t *testing.T) {
 			doneMu.Unlock()
 		}
 	})
-	if err != nil {
-		t.Error(err)
-	}
 
 	go ctl.Run(stop)
 	o := mock.Make(0)

@@ -186,16 +186,16 @@ func (c *Controller) createInformer(
 }
 
 // RegisterEventHandler adds a notification handler.
-func (c *Controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) error {
+func (c *Controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) {
 	switch typ {
 	case model.IngressRule:
-		return c.appendIngressConfigHandler(typ, f)
+		c.appendIngressConfigHandler(typ, f)
 	default:
-		return c.appendTPRConfigHandler(typ, f)
+		c.appendTPRConfigHandler(typ, f)
 	}
 }
 
-func (c *Controller) appendTPRConfigHandler(typ string, f func(model.Config, model.Event)) error {
+func (c *Controller) appendTPRConfigHandler(typ string, f func(model.Config, model.Event)) {
 	c.kinds[IstioKind].handler.append(func(obj interface{}, ev model.Event) error {
 		tpr, ok := obj.(*Config)
 		if ok {
@@ -211,12 +211,12 @@ func (c *Controller) appendTPRConfigHandler(typ string, f func(model.Config, mod
 		}
 		return nil
 	})
-	return nil
 }
 
-func (c *Controller) appendIngressConfigHandler(k string, f func(model.Config, model.Event)) error {
+func (c *Controller) appendIngressConfigHandler(k string, f func(model.Config, model.Event)) {
 	if c.mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-		return fmt.Errorf("cannot append ingress config handler: ingress resources synchronization is off")
+		glog.Warning("cannot append ingress config handler: ingress resources synchronization is off")
+		return
 	}
 
 	c.ingresses.handler.append(func(obj interface{}, ev model.Event) error {
@@ -239,7 +239,6 @@ func (c *Controller) appendIngressConfigHandler(k string, f func(model.Config, m
 
 		return nil
 	})
-	return nil
 }
 
 // HasSynced returns true after the initial state synchronization
@@ -289,6 +288,11 @@ func keyFunc(name, namespace string) string {
 		return name
 	}
 	return namespace + "/" + name
+}
+
+// ConfigDescriptor ...
+func (c *Controller) ConfigDescriptor() model.ConfigDescriptor {
+	return c.client.ConfigDescriptor()
 }
 
 // Get implements a registry operation

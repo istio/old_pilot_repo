@@ -32,25 +32,25 @@ func TestKindMapValidate(t *testing.T) {
 	goodLabel := strings.Repeat("a", dns1123LabelMaxLength-1)
 
 	cases := []struct {
-		name    string
-		kindMap ConfigDescriptor
-		wantErr bool
+		name       string
+		descriptor ConfigDescriptor
+		wantErr    bool
 	}{{
-		name:    "Valid ConfigDescriptor (IstioConfig)",
-		kindMap: IstioConfigTypes,
-		wantErr: false,
+		name:       "Valid ConfigDescriptor (IstioConfig)",
+		descriptor: IstioConfigTypes,
+		wantErr:    false,
 	}, {
-		name:    "Invalid DNS11234Label in ConfigDescriptor",
-		kindMap: ConfigDescriptor{ProtoSchema{Type: badLabel}},
-		wantErr: true,
+		name:       "Invalid DNS11234Label in ConfigDescriptor",
+		descriptor: ConfigDescriptor{ProtoSchema{Type: badLabel}},
+		wantErr:    true,
 	}, {
-		name:    "Bad MessageName in ProtoMessage",
-		kindMap: ConfigDescriptor{ProtoSchema{Type: goodLabel}},
-		wantErr: true,
+		name:       "Bad MessageName in ProtoMessage",
+		descriptor: ConfigDescriptor{ProtoSchema{Type: goodLabel}},
+		wantErr:    true,
 	}}
 
 	for _, c := range cases {
-		if err := c.kindMap.Validate(); (err != nil) != c.wantErr {
+		if err := c.descriptor.Validate(); (err != nil) != c.wantErr {
 			t.Errorf("%v failed: got %v but wantErr=%v", c.name, err, c.wantErr)
 		}
 	}
