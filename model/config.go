@@ -287,13 +287,8 @@ func (i istioConfigStore) RouteRules() map[string]*proxyconfig.RouteRule {
 	return out
 }
 
-type routeRuleConfig struct {
-	key  string
-	rule *proxyconfig.RouteRule
-}
-
 func (i *istioConfigStore) RouteRulesBySource(instances []*ServiceInstance) []*proxyconfig.RouteRule {
-	rules := make([]*routeRuleConfig, 0)
+	rules := make([]Config, 0)
 	for key, rule := range i.RouteRules() {
 		// validate that rule match predicate applies to source service instances
 		if rule.Match != nil {
@@ -314,18 +309,19 @@ func (i *istioConfigStore) RouteRulesBySource(instances []*ServiceInstance) []*p
 				continue
 			}
 		}
-		rules = append(rules, &routeRuleConfig{key: key, rule: rule})
+		rules = append(rules, Config{Key: key, Content: rule})
 	}
 	// sort by high precedence first, key string second (keys are unique)
 	sort.Slice(rules, func(i, j int) bool {
-		return rules[i].rule.Precedence > rules[j].rule.Precedence ||
-			(rules[i].rule.Precedence == rules[j].rule.Precedence && rules[i].key < rules[j].key)
+		return rules[i].Content.(*proxyconfig.RouteRule).Precedence > rules[j].Content.(*proxyconfig.RouteRule).Precedence ||
+			(rules[i].Content.(*proxyconfig.RouteRule).Precedence == rules[j].Content.(*proxyconfig.RouteRule).Precedence &&
+				rules[i].Key < rules[j].Key)
 	})
 
 	// project to rules
 	out := make([]*proxyconfig.RouteRule, len(rules))
 	for i, rule := range rules {
-		out[i] = rule.rule
+		out[i] = rule.Content.(*proxyconfig.RouteRule)
 	}
 	return out
 }
