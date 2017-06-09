@@ -63,7 +63,8 @@ func Make(i int) *MockConfig {
 // CheckMapInvariant validates operational invariants of an empty config registry
 func CheckMapInvariant(r model.ConfigStore, t *testing.T, n int) {
 	// check that the config descriptor is the mock config descriptor
-	if len(r.ConfigDescriptor()) != 1 || r.ConfigDescriptor()[0].Type != Type {
+	_, contains := r.ConfigDescriptor().GetByType(Type)
+	if !contains {
 		t.Error("expected config mock types")
 	}
 
@@ -119,9 +120,13 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, n int) {
 		t.Error("expected error putting object without revision")
 	}
 
+	if _, err := r.Put(elts[0], "missing"); err == nil {
+		t.Error("expected error putting object with a bad revision")
+	}
+
 	// check for missing type
 	if l, _ := r.List("missing"); len(l) > 0 {
-		t.Errorf("unexpected objects for missing kind")
+		t.Errorf("unexpected objects for missing type")
 	}
 
 	// check for missing element
@@ -136,7 +141,7 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, n int) {
 
 	// delete missing elements
 	if err := r.Delete("missing", "missing"); err == nil {
-		t.Error("expected error on deletion of missing element")
+		t.Error("expected error on deletion of missing type")
 	}
 
 	// delete missing elements
