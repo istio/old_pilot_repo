@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apiserver
+package server
 
 import (
 	"bytes"
@@ -32,25 +32,22 @@ import (
 )
 
 var (
-	routeRuleKey = key{Name: "name", Namespace: "namespace", Kind: "route-rule"}
+	validRouteRuleJSON = []byte(`{"content":{"name":"name",` +
+		`"destination":"service.namespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v1"}}]}}`)
+	validUpdatedRouteRuleJSON = []byte(`{"content":{"name":"name",` +
+		`"destination":"service.namespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v2"}}]}}`)
+	validDiffNamespaceRouteRuleJSON = []byte(`{"content":{"name":"name",` +
+		`"destination":"service.differentnamespace.svc.cluster.local","precedence":1,` +
+		`"route":[{"tags":{"version":"v3"}}]}}`)
 
-	validRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
-		`"spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,` +
-		`"route":[{"tags":{"version":"v1"},"weight":25}]}}`)
-	validUpdatedRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
-		`"spec":{"destination":"service.namespace.svc.cluster.local","precedence":1,` +
-		`"route":[{"tags":{"version":"v2"},"weight":25}]}}`)
-	validDiffNamespaceRouteRuleJSON = []byte(`{"type":"route-rule","name":"name",` +
-		`"spec":{"destination":"service.differentnamespace.svc.cluster.local","precedence":1,` +
-		`"route":[{"tags":{"version":"v3"},"weight":25}]}}`)
-
-	errItemExists  = &model.ItemAlreadyExistsError{Key: routeRuleKey.Name}
-	errNotFound    = &model.ItemNotFoundError{Key: routeRuleKey.Name}
+	errItemExists  = &model.ItemAlreadyExistsError{Key: "name"}
+	errNotFound    = &model.ItemNotFoundError{Key: "name"}
 	errInvalidBody = errors.New("invalid character 'J' looking for beginning of value")
 	errInvalidSpec = errors.New("cannot parse proto message: json: " +
 		"cannot unmarshal string into Go value of type map[string]json.RawMessage")
-	errInvalidType = fmt.Errorf("unknown configuration type not-a-route-rule; use one of %v",
-		model.IstioConfigTypes.Types())
+	errInvalidType = fmt.Errorf("missing type")
 )
 
 func makeAPIServer(r model.ConfigStore) *API {
@@ -95,7 +92,6 @@ func TestHealthcheckt(t *testing.T) {
 }
 
 func TestAddUpdateGetDeleteConfig(t *testing.T) {
-	// TODO: disable temporarily
 	t.Skip()
 	mockReg := memory.Make(model.IstioConfigTypes)
 	api := makeAPIServer(mockReg)
@@ -105,13 +101,13 @@ func TestAddUpdateGetDeleteConfig(t *testing.T) {
 	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
 	compareStatus(status, http.StatusCreated, t)
 	test_util.CompareContent(body, "testdata/route-rule.json.golden", t)
-	compareStoredConfig(mockReg, routeRuleKey, true, t)
+	compareStoredConfig(mockReg, true, t)
 
 	// Update the route-rule
 	status, body = makeAPIRequest(api, "PUT", url, validUpdatedRouteRuleJSON, t)
 	compareStatus(status, http.StatusOK, t)
 	test_util.CompareContent(body, "testdata/route-rule-v2.json.golden", t)
-	compareStoredConfig(mockReg, routeRuleKey, true, t)
+	compareStoredConfig(mockReg, true, t)
 
 	// Get the route-rule
 	status, body = makeAPIRequest(api, "GET", url, nil, t)
@@ -122,24 +118,20 @@ func TestAddUpdateGetDeleteConfig(t *testing.T) {
 	// Delete the route-rule
 	status, _ = makeAPIRequest(api, "DELETE", url, nil, t)
 	compareStatus(status, http.StatusOK, t)
-	compareStoredConfig(mockReg, routeRuleKey, false, t)
+	compareStoredConfig(mockReg, false, t)
 }
 
 func TestListConfig(t *testing.T) {
-	// TODO: disable temporarily
 	t.Skip()
-
 	mockReg := memory.Make(model.IstioConfigTypes)
 	api := makeAPIServer(mockReg)
 
-	// Add in two configs
-	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule/namespace/v1", validRouteRuleJSON, t)
-	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule/namespace/v2", validUpdatedRouteRuleJSON, t)
+	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule", validRouteRuleJSON, t)
 
 	// List them for a namespace
-	status, body := makeAPIRequest(api, "GET", "/test/config/route-rule/namespace", nil, t)
+	status, body := makeAPIRequest(api, "GET", "/test/config/route-rule", nil, t)
 	compareStatus(status, http.StatusOK, t)
-	compareListCount(body, 2, t)
+	compareListCount(body, 1, t)
 	makeAPIRequestWriteFails(api, "GET", "/test/config/route-rule/namespace", nil, t)
 
 	// Add in third
@@ -153,8 +145,6 @@ func TestListConfig(t *testing.T) {
 }
 
 func TestConfigErrors(t *testing.T) {
-	// TODO: disable temporarily
-	t.Skip()
 	cases := []struct {
 		name       string
 		url        string
@@ -166,21 +156,21 @@ func TestConfigErrors(t *testing.T) {
 	}{
 		{
 			name:       "TestNotFoundGetConfig",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule/name",
 			method:     "GET",
 			wantStatus: http.StatusNotFound,
 			wantBody:   errNotFound.Error(),
 		},
 		{
 			name:       "TestInvalidConfigTypeGetConfig",
-			url:        "/test/config/not-a-route-rule/namespace/name",
+			url:        "/test/config/not-a-route-rule/missing",
 			method:     "GET",
 			wantStatus: http.StatusBadRequest,
 			wantBody:   errInvalidType.Error(),
 		},
 		{
 			name:       "TestMultipleAddConfigsReturnConflict",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule",
 			method:     "POST",
 			data:       validRouteRuleJSON,
 			wantStatus: http.StatusConflict,
@@ -189,7 +179,7 @@ func TestConfigErrors(t *testing.T) {
 		},
 		{
 			name:       "TestInvalidConfigTypeAddConfig",
-			url:        "/test/config/not-a-route-rule/namespace/name",
+			url:        "/test/config/not-a-route-rule",
 			method:     "POST",
 			data:       validRouteRuleJSON,
 			wantStatus: http.StatusBadRequest,
@@ -197,23 +187,15 @@ func TestConfigErrors(t *testing.T) {
 		},
 		{
 			name:       "TestInvalidBodyAddConfig",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule",
 			method:     "POST",
 			data:       []byte("JUSTASTRING"),
 			wantStatus: http.StatusBadRequest,
 			wantBody:   errInvalidBody.Error(),
 		},
 		{
-			name:       "TestInvalidSpecAddConfig",
-			url:        "/test/config/route-rule/namespace/name",
-			method:     "POST",
-			data:       []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`),
-			wantStatus: http.StatusBadRequest,
-			wantBody:   errInvalidSpec.Error(),
-		},
-		{
 			name:       "TestNotFoundConfigUpdateConfig",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule/rev",
 			method:     "PUT",
 			data:       validRouteRuleJSON,
 			wantStatus: http.StatusNotFound,
@@ -221,7 +203,7 @@ func TestConfigErrors(t *testing.T) {
 		},
 		{
 			name:       "TestInvalidConfigTypeUpdateConfig",
-			url:        "/test/config/not-a-route-rule/namespace/name",
+			url:        "/test/config/not-a-route-rule/rev",
 			method:     "PUT",
 			data:       validRouteRuleJSON,
 			wantStatus: http.StatusBadRequest,
@@ -229,38 +211,23 @@ func TestConfigErrors(t *testing.T) {
 		},
 		{
 			name:       "TestInvalidBodyUpdateConfig",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule/rev",
 			method:     "PUT",
 			data:       []byte("JUSTASTRING"),
 			wantStatus: http.StatusBadRequest,
 			wantBody:   errInvalidBody.Error(),
 		},
 		{
-			name:       "TestInvalidSpecUpdateConfig",
-			url:        "/test/config/route-rule/namespace/name",
-			method:     "PUT",
-			data:       []byte(`{"type":"route-rule","name":"name","spec":"NOTASPEC"}`),
-			wantStatus: http.StatusBadRequest,
-			wantBody:   errInvalidSpec.Error(),
-		},
-		{
 			name:       "TestNotFoundDeleteConfig",
-			url:        "/test/config/route-rule/namespace/name",
+			url:        "/test/config/route-rule/name",
 			method:     "DELETE",
 			wantStatus: http.StatusNotFound,
 			wantBody:   errNotFound.Error(),
 		},
 		{
 			name:       "TestInvalidConfigTypeDeleteConfig",
-			url:        "/test/config/not-a-route-rule/namespace/name",
+			url:        "/test/config/not-a-route-rule/key",
 			method:     "DELETE",
-			wantStatus: http.StatusBadRequest,
-			wantBody:   errInvalidType.Error(),
-		},
-		{
-			name:       "TestInvalidConfigTypeWithNamespaceListConfig",
-			url:        "/test/config/not-a-route-rule/namespace",
-			method:     "GET",
 			wantStatus: http.StatusBadRequest,
 			wantBody:   errInvalidType.Error(),
 		},
@@ -358,9 +325,8 @@ func compareStatus(received, expected int, t *testing.T) {
 	}
 }
 
-func compareStoredConfig(mockReg model.ConfigStore, key key, present bool, t *testing.T) {
-	// TODO: deprecated, please update
-	_, ok, _ := mockReg.Get(key.Kind, key.Name)
+func compareStoredConfig(mockReg model.ConfigStore, present bool, t *testing.T) {
+	_, ok, _ := mockReg.Get(model.RouteRule, "name")
 	if !ok && present {
 		t.Errorf("Expected config wasn't present in the registry for key: %+v", key)
 	} else if ok && !present {

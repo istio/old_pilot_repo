@@ -10,8 +10,7 @@ go_library(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        "//apiserver:go_default_library",
-        "//client/proxy:go_default_library",
+        "//adapter/config/server:go_default_library",
         "//cmd:go_default_library",
         "//cmd/version:go_default_library",
         "//model:go_default_library",
@@ -47,10 +46,8 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
-        "//apiserver:go_default_library",
-        "//client/proxy:go_default_library",
+        "//adapter/config/server:go_default_library",
         "//cmd/version:go_default_library",
-        "//model:go_default_library",
         "//platform/kube:go_default_library",
         "//test/util:go_default_library",
         "@com_github_ghodss_yaml//:go_default_library",
