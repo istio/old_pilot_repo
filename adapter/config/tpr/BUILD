@@ -36,12 +36,13 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "small",
     srcs = [
+        "client_test.go",
         "controller_test.go",
         "conversion_test.go",
     ],
     data = ["//platform/kube:kubeconfig"],
-    size = "small",
     library = ":go_default_library",
     deps = [
         "//model:go_default_library",
@@ -54,7 +55,6 @@ go_test(
         "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
         "@io_k8s_apimachinery//pkg/util/intstr:go_default_library",
         "@io_k8s_client_go//kubernetes:go_default_library",
-        "@io_k8s_client_go//pkg/api/v1:go_default_library",
         "@io_k8s_client_go//pkg/apis/extensions/v1beta1:go_default_library",
     ],
 )

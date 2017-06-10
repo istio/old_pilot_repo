@@ -12,8 +12,8 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "small",
     srcs = ["config_test.go"],
     library = ":go_default_library",
     deps = ["//test/mock:go_default_library"],
-    size = "small",
 )

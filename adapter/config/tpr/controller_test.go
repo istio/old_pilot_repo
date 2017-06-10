@@ -15,8 +15,6 @@
 package tpr
 
 import (
-	"os"
-	"os/user"
 	"reflect"
 	"sync"
 	"testing"
@@ -37,60 +35,18 @@ import (
 	"istio.io/pilot/test/util"
 )
 
-func TestThirdPartyResourcesClient(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer util.DeleteNamespace(cl.client, ns)
-
-	cl.namespace = ns
-	mock.CheckMapInvariant(cl, t, 5)
-
-	// TODO(kuat) initial watch always fails, takes time to register TPR, keep
-	// around as a work-around
-	// kr.DeregisterResources()
-}
-
-func makeClient(t *testing.T) *Client {
-	usr, err := user.Current()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	kubeconfig := usr.HomeDir + "/.kube/config"
-
-	// For Bazel sandbox we search a different location:
-	if _, err = os.Stat(kubeconfig); err != nil {
-		kubeconfig, _ = os.Getwd()
-		kubeconfig = kubeconfig + "/../../../platform/kube/config"
-	}
-
-	desc := append(model.IstioConfigTypes, mock.Types...)
-	cl, err := NewClient(kubeconfig, desc, "istio-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = cl.RegisterResources()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return cl
-}
-
 func TestIngressController(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
 
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{
@@ -235,14 +191,17 @@ func TestIngressController(t *testing.T) {
 }
 
 func TestIngressClass(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
 
 	cases := []struct {
 		ingressMode   proxyconfig.ProxyMeshConfig_IngressControllerMode
@@ -291,14 +250,17 @@ func TestIngressClass(t *testing.T) {
 }
 
 func TestController(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -330,14 +292,18 @@ func TestController(t *testing.T) {
 }
 
 func TestControllerCacheFreshness(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
+
 	stop := make(chan struct{})
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{Namespace: ns, ResyncPeriod: resync})
@@ -389,15 +355,19 @@ func TestControllerCacheFreshness(t *testing.T) {
 }
 
 func TestControllerClientSync(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
+
 	n := 5
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
 	stop := make(chan struct{})
 	defer close(stop)
 
@@ -472,8 +442,7 @@ func eventually(f func() bool, t *testing.T) {
 }
 
 const (
-	testService = "test"
-	resync      = 1 * time.Second
+	resync = 1 * time.Second
 )
 
 func createIngress(ingress *v1beta1.Ingress, client kubernetes.Interface, t *testing.T) {
@@ -483,14 +452,17 @@ func createIngress(ingress *v1beta1.Ingress, client kubernetes.Interface, t *tes
 }
 
 func TestIstioConfig(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	client, err := kube.CreateInterface(kubeconfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns, err := util.CreateNamespace(client)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
-	cl.namespace = ns
+	defer util.DeleteNamespace(client, ns)
+	cl := makeClient(ns, t)
+	t.Parallel()
 
 	rule := &proxyconfig.RouteRule{
 		Destination: "foo",

@@ -14,39 +14,13 @@
 
 package tpr
 
-import (
-	"testing"
-
-	"istio.io/pilot/model"
-
-	"k8s.io/client-go/pkg/api/v1"
-)
+import "testing"
 
 var (
-	domainSuffix = "company.com"
-
 	camelKabobs = []struct{ in, out string }{
 		{"ExampleNameX", "example-name-x"},
 		{"example1", "example1"},
 		{"exampleXY", "example-x-y"},
-	}
-
-	protocols = []struct {
-		name  string
-		proto v1.Protocol
-		out   model.Protocol
-	}{
-		{"", v1.ProtocolTCP, model.ProtocolTCP},
-		{"http", v1.ProtocolTCP, model.ProtocolHTTP},
-		{"http-test", v1.ProtocolTCP, model.ProtocolHTTP},
-		{"http", v1.ProtocolUDP, model.ProtocolUDP},
-		{"httptest", v1.ProtocolTCP, model.ProtocolTCP},
-		{"https", v1.ProtocolTCP, model.ProtocolHTTPS},
-		{"https-test", v1.ProtocolTCP, model.ProtocolHTTPS},
-		{"http2", v1.ProtocolTCP, model.ProtocolHTTP2},
-		{"http2-test", v1.ProtocolTCP, model.ProtocolHTTP2},
-		{"grpc", v1.ProtocolTCP, model.ProtocolGRPC},
-		{"grpc-test", v1.ProtocolTCP, model.ProtocolGRPC},
 	}
 )
 

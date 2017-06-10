@@ -26,12 +26,6 @@ import (
 var (
 	domainSuffix = "company.com"
 
-	camelKabobs = []struct{ in, out string }{
-		{"ExampleNameX", "example-name-x"},
-		{"example1", "example1"},
-		{"exampleXY", "example-x-y"},
-	}
-
 	protocols = []struct {
 		name  string
 		proto v1.Protocol

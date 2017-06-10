@@ -60,7 +60,8 @@ type cacheHandler struct {
 }
 
 // NewController creates a new Kubernetes controller
-func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, options ControllerOptions) *Controller {
+func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig,
+	options ControllerOptions) *Controller {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
 		mesh:         mesh,

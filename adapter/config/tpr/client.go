@@ -235,12 +235,12 @@ func (cl *Client) GetKubernetesInterface() kubernetes.Interface {
 	return cl.client
 }
 
-// ConfigDescriptor ...
+// ConfigDescriptor for the store
 func (cl *Client) ConfigDescriptor() model.ConfigDescriptor {
 	return cl.mapping
 }
 
-// Get implements registry operation
+// Get implements store interface
 func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 	// TODO validate
 
@@ -269,7 +269,7 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 	return out, true, config.Metadata.ResourceVersion
 }
 
-// Post implements registry operation
+// Post implements store interface
 func (cl *Client) Post(v proto.Message) (string, error) {
 	// TODO: validate
 	schema, exists := cl.mapping.GetByMessageName(proto.MessageName(v))
@@ -295,7 +295,7 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 	return config.Metadata.ResourceVersion, nil
 }
 
-// Put implements registry operation
+// Put implements store interface
 func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 	// TODO: validate
 	schema, exists := cl.mapping.GetByMessageName(proto.MessageName(v))
@@ -327,7 +327,7 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 	return config.Metadata.ResourceVersion, nil
 }
 
-// Delete implements registry operation
+// Delete implements store interface
 func (cl *Client) Delete(typ, key string) error {
 	// TODO: validate
 
@@ -338,7 +338,6 @@ func (cl *Client) Delete(typ, key string) error {
 		Do().Error()
 }
 
-// List implements registry operation
 func (cl *Client) List(typ string) ([]model.Config, error) {
 	_, exists := cl.mapping.GetByType(typ)
 	if !exists {

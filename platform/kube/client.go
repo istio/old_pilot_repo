@@ -36,6 +36,7 @@ import (
 	"istio.io/pilot/model"
 )
 
+// CreateInterface is a helper function to create Kubernetes interface
 func CreateInterface(kubeconfig string) (kubernetes.Interface, error) {
 	if kubeconfig != "" {
 		info, exists := os.Stat(kubeconfig)
