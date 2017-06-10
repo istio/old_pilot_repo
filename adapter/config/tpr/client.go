@@ -338,6 +338,7 @@ func (cl *Client) Delete(typ, key string) error {
 		Do().Error()
 }
 
+// List implements store interface
 func (cl *Client) List(typ string) ([]model.Config, error) {
 	_, exists := cl.mapping.GetByType(typ)
 	if !exists {
