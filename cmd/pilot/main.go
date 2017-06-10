@@ -165,7 +165,12 @@ var (
 				return
 			}
 			stop := make(chan struct{})
+
+			// must start watcher after starting dependent controllers
+			go serviceController.Run(stop)
+			go configController.Run(stop)
 			go w.Run(stop)
+
 			cmd.WaitSignal(stop)
 			return
 		},
