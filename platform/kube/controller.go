@@ -25,6 +25,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -45,7 +46,7 @@ type Controller struct {
 	mesh         *proxyconfig.ProxyMeshConfig
 	domainSuffix string
 
-	client    *Client
+	client    kubernetes.Interface
 	queue     Queue
 	services  cacheHandler
 	endpoints cacheHandler
@@ -59,7 +60,7 @@ type cacheHandler struct {
 }
 
 // NewController creates a new Kubernetes controller
-func NewController(client *Client, mesh *proxyconfig.ProxyMeshConfig, options ControllerOptions) *Controller {
+func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, options ControllerOptions) *Controller {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
 		mesh:         mesh,
@@ -70,26 +71,26 @@ func NewController(client *Client, mesh *proxyconfig.ProxyMeshConfig, options Co
 
 	out.services = out.createInformer(&v1.Service{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Services(options.Namespace).List(opts)
+			return client.CoreV1().Services(options.Namespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Services(options.Namespace).Watch(opts)
+			return client.CoreV1().Services(options.Namespace).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Endpoints(options.Namespace).List(opts)
+			return client.CoreV1().Endpoints(options.Namespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Endpoints(options.Namespace).Watch(opts)
+			return client.CoreV1().Endpoints(options.Namespace).Watch(opts)
 		})
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.client.CoreV1().Pods(options.Namespace).List(opts)
+			return client.CoreV1().Pods(options.Namespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.client.CoreV1().Pods(options.Namespace).Watch(opts)
+			return client.CoreV1().Pods(options.Namespace).Watch(opts)
 		}))
 
 	return out

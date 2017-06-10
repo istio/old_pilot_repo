@@ -15,7 +15,6 @@
 package kube
 
 import (
-	"fmt"
 	"os"
 	"os/user"
 	"reflect"
@@ -30,22 +29,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/pkg/api/v1"
 
-	"io/ioutil"
-
-	"bytes"
-
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
-	"istio.io/pilot/test/mock"
 	"istio.io/pilot/test/util"
 )
 
-const (
-	controllerCertFile = "testdata/cert.crt"
-	controllerKeyFile  = "testdata/cert.key"
-)
-
-func makeClient(t *testing.T) *Client {
+func makeClient(t *testing.T) kubernetes.Interface {
 	usr, err := user.Current()
 	if err != nil {
 		t.Fatal(err.Error())
@@ -59,67 +48,12 @@ func makeClient(t *testing.T) *Client {
 		kubeconfig = kubeconfig + "/config"
 	}
 
-	desc := append(model.IstioConfigTypes, mock.Types...)
-	cl, err := NewClient(kubeconfig, desc, "istio-test")
+	cl, err := CreateInterface(kubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return cl
-}
-
-func TestSecret(t *testing.T) {
-	cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer util.DeleteNamespace(cl.client, ns)
-
-	mesh := proxy.DefaultMeshConfig()
-	ctl := NewController(cl, &mesh, ControllerOptions{
-		Namespace:    ns,
-		ResyncPeriod: resync,
-	})
-
-	stop := make(chan struct{})
-	defer close(stop)
-	go ctl.Run(stop)
-
-	// create the secret
-	cert, err := ioutil.ReadFile(controllerCertFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := ioutil.ReadFile(controllerKeyFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	secret := "istio-secret"
-	_, err = cl.client.Core().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: meta_v1.ObjectMeta{Name: secret},
-		Data:       map[string][]byte{secretCert: cert, secretKey: key},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventually(func() bool {
-		secret, err := cl.client.Core().Secrets(ns).Get(secret, meta_v1.GetOptions{})
-		return secret != nil && err == nil
-	}, t)
-
-	uri := fmt.Sprintf("%s.%s", secret, ns)
-	if tls, err := ctl.client.GetTLSSecret(uri); err != nil {
-		t.Error(err)
-	} else if tls == nil {
-		t.Errorf("GetTLSSecret => no secret")
-	} else if !bytes.Equal(cert, tls.Certificate) || !bytes.Equal(key, tls.PrivateKey) {
-		t.Errorf("GetTLSSecret => got %q and %q, want %q and %q",
-			string(tls.Certificate), string(tls.PrivateKey), string(cert), string(key))
-	}
 }
 
 func eventually(f func() bool, t *testing.T) {
@@ -143,11 +77,11 @@ const (
 func TestServices(t *testing.T) {
 	cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl.client)
+	ns, err := util.CreateNamespace(cl)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer util.DeleteNamespace(cl.client, ns)
+	defer util.DeleteNamespace(cl, ns)
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -163,7 +97,7 @@ func TestServices(t *testing.T) {
 	hostname := serviceHostname(testService, ns, domainSuffix)
 
 	var sds model.ServiceDiscovery = ctl
-	makeService(testService, ns, cl.client, t)
+	makeService(testService, ns, cl, t)
 	eventually(func() bool {
 		out := sds.Services()
 		glog.Info("Services: %#v", out)
@@ -209,7 +143,7 @@ func makeService(n, ns string, cl kubernetes.Interface, t *testing.T) {
 func TestController_GetIstioServiceAccounts(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
 	mesh := proxy.DefaultMeshConfig()
-	controller := NewController(&Client{client: clientSet}, &mesh, ControllerOptions{
+	controller := NewController(clientSet, &mesh, ControllerOptions{
 		Namespace:    "default",
 		ResyncPeriod: resync,
 		DomainSuffix: domainSuffix,

@@ -79,7 +79,7 @@ func NewController(client *Client, mesh *proxyconfig.ProxyMeshConfig, options ku
 		out.kinds[kind] = out.createInformer(&Config{}, options.ResyncPeriod,
 			func(opts meta_v1.ListOptions) (result runtime.Object, err error) {
 				result = &ConfigList{}
-				err = client.dyn.Get().
+				err = client.dynamic.Get().
 					Namespace(options.Namespace).
 					Resource(kind+"s").
 					VersionedParams(&opts, api.ParameterCodec).
@@ -88,7 +88,7 @@ func NewController(client *Client, mesh *proxyconfig.ProxyMeshConfig, options ku
 				return
 			},
 			func(opts meta_v1.ListOptions) (watch.Interface, error) {
-				return client.dyn.Get().
+				return client.dynamic.Get().
 					Prefix("watch").
 					Namespace(options.Namespace).
 					Resource(kind+"s").
@@ -266,7 +266,7 @@ func (c *Controller) getTPR(typ, key string) (proto.Message, bool, string) {
 	}
 
 	store := c.kinds[IstioKind].informer.GetStore()
-	data, exists, err := store.GetByKey(keyFunc(configKey(typ, key), c.client.dynNamespace))
+	data, exists, err := store.GetByKey(keyFunc(configKey(typ, key), c.client.namespace))
 	if !exists {
 		return nil, false, ""
 	}

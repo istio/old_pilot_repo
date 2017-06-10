@@ -56,15 +56,16 @@ const (
 	IstioKind = "IstioConfig"
 )
 
+// Client is a basic REST client for TPRs implementing config store
 type Client struct {
-	mapping      model.ConfigDescriptor
-	client       kubernetes.Interface
-	dyn          *rest.RESTClient
-	dynNamespace string
+	mapping   model.ConfigDescriptor
+	client    kubernetes.Interface
+	dynamic   *rest.RESTClient
+	namespace string
 }
 
-// CreateRESTConfig for cluster API server, pass empty config file for in-cluster
-func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
+// createRESTConfig for cluster API server, pass empty config file for in-cluster
+func createRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	if kubeconfig == "" {
 		config, err = rest.InClusterConfig()
 	} else {
@@ -127,7 +128,7 @@ func NewClient(kubeconfig string, km model.ConfigDescriptor, namespace string) (
 		}
 	}
 
-	config, err := CreateRESTConfig(kubeconfig)
+	config, err := createRESTConfig(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +137,16 @@ func NewClient(kubeconfig string, km model.ConfigDescriptor, namespace string) (
 		return nil, err
 	}
 
-	dyn, err := rest.RESTClientFor(config)
+	dynamic, err := rest.RESTClientFor(config)
 	if err != nil {
 		return nil, err
 	}
 
 	out := &Client{
-		mapping:      km,
-		client:       cl,
-		dyn:          dyn,
-		dynNamespace: namespace,
+		mapping:   km,
+		client:    cl,
+		dynamic:   dynamic,
+		namespace: namespace,
 	}
 
 	return out, nil
@@ -191,7 +192,7 @@ func (cl *Client) RegisterResources() error {
 		ready = true
 		for _, kind := range kinds {
 			list := &ConfigList{}
-			err := cl.dyn.Get().
+			err := cl.dynamic.Get().
 				Namespace(api.NamespaceAll).
 				Resource(IstioKind + "s").
 				Do().Into(list)
@@ -229,6 +230,11 @@ func (cl *Client) DeregisterResources() error {
 	return out
 }
 
+// GetKubernetesInterface returns a static Kubernetes interface
+func (cl *Client) GetKubernetesInterface() kubernetes.Interface {
+	return cl.client
+}
+
 // ConfigDescriptor ...
 func (cl *Client) ConfigDescriptor() model.ConfigDescriptor {
 	return cl.mapping
@@ -244,8 +250,8 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 	}
 
 	config := &Config{}
-	err := cl.dyn.Get().
-		Namespace(cl.dynNamespace).
+	err := cl.dynamic.Get().
+		Namespace(cl.namespace).
 		Resource(IstioKind + "s").
 		Name(configKey(typ, key)).
 		Do().Into(config)
@@ -271,13 +277,13 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 		return "", fmt.Errorf("unrecognized message name")
 	}
 
-	out, err := modelToKube(schema, cl.dynNamespace, v)
+	out, err := modelToKube(schema, cl.namespace, v)
 	if err != nil {
 		return "", err
 	}
 
 	config := &Config{}
-	err = cl.dyn.Post().
+	err = cl.dynamic.Post().
 		Namespace(out.Metadata.Namespace).
 		Resource(IstioKind + "s").
 		Body(out).
@@ -300,7 +306,7 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 		return "", fmt.Errorf("revision is required")
 	}
 
-	out, err := modelToKube(schema, cl.dynNamespace, v)
+	out, err := modelToKube(schema, cl.namespace, v)
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +314,7 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 	out.Metadata.ResourceVersion = revision
 
 	config := &Config{}
-	err = cl.dyn.Put().
+	err = cl.dynamic.Put().
 		Namespace(out.Metadata.Namespace).
 		Resource(IstioKind + "s").
 		Name(out.Metadata.Name).
@@ -325,8 +331,8 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 func (cl *Client) Delete(typ, key string) error {
 	// TODO: validate
 
-	return cl.dyn.Delete().
-		Namespace(cl.dynNamespace).
+	return cl.dynamic.Delete().
+		Namespace(cl.namespace).
 		Resource(IstioKind + "s").
 		Name(configKey(typ, key)).
 		Do().Error()
@@ -340,8 +346,8 @@ func (cl *Client) List(typ string) ([]model.Config, error) {
 	}
 
 	list := &ConfigList{}
-	errs := cl.dyn.Get().
-		Namespace(cl.dynNamespace).
+	errs := cl.dynamic.Get().
+		Namespace(cl.namespace).
 		Resource(IstioKind + "s").
 		Do().Into(list)
 
@@ -380,7 +386,7 @@ func (cl *Client) Request(namespace, service, method, path string, inBody []byte
 	absPath += "/" + path
 
 	var status int
-	outBody, err := cl.dyn.Verb(method).
+	outBody, err := cl.dynamic.Verb(method).
 		AbsPath(absPath).
 		SetHeader("Content-Type", "application/json").
 		Body(inBody).

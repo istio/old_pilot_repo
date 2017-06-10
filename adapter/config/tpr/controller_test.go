@@ -46,7 +46,7 @@ func TestThirdPartyResourcesClient(t *testing.T) {
 	}
 	defer util.DeleteNamespace(cl.client, ns)
 
-	cl.dynNamespace = ns
+	cl.namespace = ns
 	mock.CheckMapInvariant(cl, t, 5)
 
 	// TODO(kuat) initial watch always fails, takes time to register TPR, keep
@@ -90,7 +90,7 @@ func TestIngressController(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{
@@ -242,7 +242,7 @@ func TestIngressClass(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 
 	cases := []struct {
 		ingressMode   proxyconfig.ProxyMeshConfig_IngressControllerMode
@@ -298,7 +298,7 @@ func TestController(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -337,7 +337,7 @@ func TestControllerCacheFreshness(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 	stop := make(chan struct{})
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{Namespace: ns, ResyncPeriod: resync})
@@ -397,7 +397,7 @@ func TestControllerClientSync(t *testing.T) {
 	}
 	n := 5
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 	stop := make(chan struct{})
 	defer close(stop)
 
@@ -490,7 +490,7 @@ func TestIstioConfig(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl.client, ns)
-	cl.dynNamespace = ns
+	cl.namespace = ns
 
 	rule := &proxyconfig.RouteRule{
 		Destination: "foo",
