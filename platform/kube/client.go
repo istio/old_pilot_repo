@@ -119,9 +119,14 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // namespace is used to store TPRs
 func NewClient(kubeconfig string, km model.ConfigDescriptor, namespace string) (*Client, error) {
 	if kubeconfig != "" {
-		info, exists := os.Stat(kubeconfig)
-		if exists != nil {
-			return nil, fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
+		info, err := os.Stat(kubeconfig)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
+			} else {
+				err = multierror.Append(err, fmt.Errorf("kubernetes configuration file %q", kubeconfig))
+			}
+			return nil, err
 		}
 
 		// if it's an empty file, switch to in-cluster config
@@ -301,9 +306,10 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 // Put implements registry operation
 func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 	// TODO: validate
-	schema, exists := cl.mapping.GetByMessageName(proto.MessageName(v))
+	messageName := proto.MessageName(v)
+	schema, exists := cl.mapping.GetByMessageName(messageName)
 	if !exists {
-		return "", fmt.Errorf("unrecognized message name")
+		return "", fmt.Errorf("unrecognized message name %q", messageName)
 	}
 	if revision == "" {
 		return "", fmt.Errorf("revision is required")
