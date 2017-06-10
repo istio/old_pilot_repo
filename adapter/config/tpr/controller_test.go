@@ -16,11 +16,8 @@ package tpr
 
 import (
 	"reflect"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/golang/glog"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -151,14 +148,14 @@ func TestIngressController(t *testing.T) {
 	}
 	createIngress(&ingress, cl.client, t)
 
-	eventually(func() bool {
+	util.Eventually(func() bool {
 		return notificationCount == expectedRuleCount
 	}, t)
 	if notificationCount != expectedRuleCount {
 		t.Errorf("expected %d IngressRule events to be notified, found %d", expectedRuleCount, notificationCount)
 	}
 
-	eventually(func() bool {
+	util.Eventually(func() bool {
 		rules, _ := ctl.List(model.IngressRule)
 		return len(rules) == expectedRuleCount
 	}, t)
@@ -262,33 +259,10 @@ func TestController(t *testing.T) {
 	cl := makeClient(ns, t)
 	t.Parallel()
 
-	stop := make(chan struct{})
-	defer close(stop)
-
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{Namespace: ns, ResyncPeriod: resync})
-	added, deleted := 0, 0
-	n := 5
-	ctl.RegisterEventHandler(mock.Type, func(c model.Config, ev model.Event) {
-		switch ev {
-		case model.EventAdd:
-			if deleted != 0 {
-				t.Errorf("Events are not serialized (add)")
-			}
-			added++
-		case model.EventDelete:
-			if added != n {
-				t.Errorf("Events are not serialized (delete)")
-			}
-			deleted++
-		}
-		glog.Infof("Added %d, deleted %d", added, deleted)
-	})
-	go ctl.Run(stop)
 
-	mock.CheckMapInvariant(cl, t, n)
-	glog.Infof("Waiting till all events are received")
-	eventually(func() bool { return added == n && deleted == n }, t)
+	mock.CheckCacheEvents(cl, ctl, 5, t)
 }
 
 func TestControllerCacheFreshness(t *testing.T) {
@@ -304,54 +278,10 @@ func TestControllerCacheFreshness(t *testing.T) {
 	cl := makeClient(ns, t)
 	t.Parallel()
 
-	stop := make(chan struct{})
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{Namespace: ns, ResyncPeriod: resync})
 
-	// test interface implementation
-	var _ model.ConfigStoreCache = ctl
-
-	var doneMu sync.Mutex
-	done := false
-
-	// validate cache consistency
-	ctl.RegisterEventHandler(mock.Type, func(config model.Config, ev model.Event) {
-		elts, _ := ctl.List(mock.Type)
-		switch ev {
-		case model.EventAdd:
-			if len(elts) != 1 {
-				t.Errorf("Got %#v, expected %d element(s) on ADD event", elts, 1)
-			}
-			glog.Infof("Calling Delete(%#v)", config.Key)
-			err = ctl.Delete(mock.Type, config.Key)
-			if err != nil {
-				t.Error(err)
-			}
-		case model.EventDelete:
-			if len(elts) != 0 {
-				t.Errorf("Got %#v, expected zero elements on DELETE event", elts)
-			}
-			glog.Infof("Stopping channel for (%#v)", config.Key)
-			close(stop)
-			doneMu.Lock()
-			done = true
-			doneMu.Unlock()
-		}
-	})
-
-	go ctl.Run(stop)
-	o := mock.Make(0)
-
-	// add and remove
-	glog.Infof("Calling Post(%#v)", o)
-	if _, err := ctl.Post(o); err != nil {
-		t.Error(err)
-	}
-	eventually(func() bool {
-		doneMu.Lock()
-		defer doneMu.Unlock()
-		return done
-	}, t)
+	mock.CheckCacheFreshness(ctl, t)
 }
 
 func TestControllerClientSync(t *testing.T) {
@@ -367,78 +297,10 @@ func TestControllerClientSync(t *testing.T) {
 	cl := makeClient(ns, t)
 	t.Parallel()
 
-	n := 5
-	stop := make(chan struct{})
-	defer close(stop)
-
-	keys := make(map[int]*mock.MockConfig)
-	// add elements directly through client
-	for i := 0; i < n; i++ {
-		keys[i] = mock.Make(i)
-		if _, err := cl.Post(keys[i]); err != nil {
-			t.Error(err)
-		}
-	}
-
-	// check in the controller cache
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, kube.ControllerOptions{Namespace: ns, ResyncPeriod: resync})
-	go ctl.Run(stop)
-	eventually(func() bool { return ctl.HasSynced() }, t)
-	os, _ := ctl.List(mock.Type)
-	if len(os) != n {
-		t.Errorf("ctl.List => Got %d, expected %d", len(os), n)
-	}
 
-	// remove elements directly through client
-	for i := 0; i < n; i++ {
-		if err := cl.Delete(mock.Type, keys[i].Key); err != nil {
-			t.Error(err)
-		}
-	}
-
-	// check again in the controller cache
-	eventually(func() bool {
-		os, _ = ctl.List(mock.Type)
-		glog.Infof("ctl.List => Got %d, expected %d", len(os), 0)
-		return len(os) == 0
-	}, t)
-
-	// now add through the controller
-	for i := 0; i < n; i++ {
-		if _, err := ctl.Post(mock.Make(i)); err != nil {
-			t.Error(err)
-		}
-	}
-
-	// check directly through the client
-	eventually(func() bool {
-		cs, _ := ctl.List(mock.Type)
-		os, _ := cl.List(mock.Type)
-		glog.Infof("ctl.List => Got %d, expected %d", len(cs), n)
-		glog.Infof("cl.List => Got %d, expected %d", len(os), n)
-		return len(os) == n && len(cs) == n
-	}, t)
-
-	// remove elements directly through the client
-	for i := 0; i < n; i++ {
-		if err := cl.Delete(mock.Type, keys[i].Key); err != nil {
-			t.Error(err)
-		}
-	}
-}
-
-func eventually(f func() bool, t *testing.T) {
-	interval := 64 * time.Millisecond
-	for i := 0; i < 10; i++ {
-		if f() {
-			return
-		}
-		glog.Infof("Sleeping %v", interval)
-		time.Sleep(interval)
-		interval = 2 * interval
-	}
-	t.Errorf("Failed to satisfy function")
+	mock.CheckCacheSync(cl, ctl, 5, t)
 }
 
 const (
