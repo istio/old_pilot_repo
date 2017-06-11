@@ -5,7 +5,7 @@ go_library(
     srcs = ["main.go"],
     visibility = ["//visibility:private"],
     deps = [
-        "//apiserver:go_default_library",
+        "//adapter/config/server:go_default_library",
         "//cmd:go_default_library",
         "//cmd/version:go_default_library",
         "//model:go_default_library",

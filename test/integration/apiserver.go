@@ -29,7 +29,7 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
-	"istio.io/pilot/apiserver"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
@@ -39,7 +39,7 @@ type apiServerTest struct {
 	*infra
 
 	stopChannel chan struct{}
-	server      *apiserver.API
+	server      *server.API
 }
 
 type httpRequest struct {
@@ -128,7 +128,7 @@ func (r *apiServerTest) setup() error {
 	}
 	controllerOptions := kube.ControllerOptions{Namespace: r.infra.Namespace, DomainSuffix: "cluster.local"}
 	controller := kube.NewController(istioClient, mesh, controllerOptions)
-	r.server = apiserver.NewAPI(apiserver.APIServiceOptions{
+	r.server = server.NewAPI(server.APIServiceOptions{
 		Version:  kube.IstioResourceVersion,
 		Port:     8081,
 		Registry: controller,

@@ -24,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"istio.io/pilot/client/proxy"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/platform/kube"
 
 	"github.com/ghodss/yaml"
@@ -49,7 +49,7 @@ var (
 	mixerFileContent     []byte
 	mixerAPIServerAddr   string // deprecated
 	istioMixerAPIService string
-	mixerRESTRequester   proxy.RESTRequester
+	mixerRESTRequester   server.RESTRequester
 
 	mixerCmd = &cobra.Command{
 		Use:   "mixer",
@@ -82,7 +82,7 @@ for a description of Mixer configuration's scope, subject, and rules.
 					service:   istioMixerAPIService,
 				}
 			} else {
-				mixerRESTRequester = &proxy.BasicHTTPRequester{
+				mixerRESTRequester = &server.BasicHTTPRequester{
 					BaseURL: istioMixerAPIService,
 					Client:  &http.Client{Timeout: requestTimeout},
 					Version: kube.IstioResourceVersion,
