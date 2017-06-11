@@ -34,7 +34,7 @@ func (api *API) Status(request *restful.Request, response *restful.Response) {
 // GetConfig retrieves the config object from the configuration registry
 func (api *API) GetConfig(request *restful.Request, response *restful.Response) {
 	params := request.PathParameters()
-	typ := params[kind]
+	typ := params[typ]
 	k := params[key]
 
 	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
@@ -79,7 +79,7 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 // It is equivalent to a restful PUT and is idempotent
 func (api *API) AddConfig(request *restful.Request, response *restful.Response) {
 	params := request.PathParameters()
-	typ := params[kind]
+	typ := params[typ]
 	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
 	if !ok {
 		api.writeError(http.StatusBadRequest, "missing type", response)
@@ -116,15 +116,13 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 	}
 
 	glog.V(2).Infof("Added config %+v", config)
-	if err := response.WriteHeaderAndEntity(http.StatusCreated, config); err != nil {
-		api.writeError(http.StatusInternalServerError, err.Error(), response)
-	}
+	response.WriteHeader(http.StatusCreated)
 }
 
 // UpdateConfig updates the passed config object in the configuration registry
 func (api *API) UpdateConfig(request *restful.Request, response *restful.Response) {
 	params := request.PathParameters()
-	typ := params[kind]
+	typ := params[typ]
 	rev := params[revision]
 	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
 	if !ok {
@@ -168,7 +166,7 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 // DeleteConfig deletes the passed config object in the configuration registry
 func (api *API) DeleteConfig(request *restful.Request, response *restful.Response) {
 	params := request.PathParameters()
-	typ := params[kind]
+	typ := params[typ]
 	k := params[key]
 	_, ok := api.registry.ConfigDescriptor().GetByType(typ)
 	if !ok {
@@ -194,7 +192,7 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 // If kind is passed and namespace is an empty string it retrieves all rules of a kind across all namespaces
 func (api *API) ListConfigs(request *restful.Request, response *restful.Response) {
 	params := request.PathParameters()
-	typ := params[kind]
+	typ := params[typ]
 	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
 	if !ok {
 		api.writeError(http.StatusBadRequest, "missing type", response)
