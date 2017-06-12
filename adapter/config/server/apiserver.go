@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	kind     = "kind"
+	typ      = "typ"
 	key      = "key"
 	revision = "revision"
 )
@@ -81,30 +81,30 @@ func (api *API) Register(container *restful.Container) {
 	ws.Path(fmt.Sprintf("/%s", api.version))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}/{%s}", kind, key)).
+		GET(fmt.Sprintf("/config/{%s}/{%s}", typ, key)).
 		To(api.GetConfig).
 		Doc("Get a config").
 		Writes(Config{}))
 
 	ws.Route(ws.
-		POST(fmt.Sprintf("/config/{%s}", kind)).
+		POST(fmt.Sprintf("/config/{%s}", typ)).
 		To(api.AddConfig).
 		Doc("Add a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		PUT(fmt.Sprintf("/config/{%s}/{%s}", kind, revision)).
+		PUT(fmt.Sprintf("/config/{%s}/{%s}", typ, revision)).
 		To(api.UpdateConfig).
 		Doc("Update a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		DELETE(fmt.Sprintf("/config/{%s}/{%s}", kind, key)).
+		DELETE(fmt.Sprintf("/config/{%s}/{%s}", typ, key)).
 		To(api.DeleteConfig).
 		Doc("Delete a config"))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}", kind)).
+		GET(fmt.Sprintf("/config/{%s}", typ)).
 		To(api.ListConfigs).
 		Doc("List all configs").
 		Writes([]Config{}))

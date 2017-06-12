@@ -16,6 +16,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,21 +27,71 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
+	"net/url"
+
+	"github.com/stretchr/testify/assert"
 	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/model"
-	test_util "istio.io/pilot/test/util"
 )
 
 var (
 	validRouteRuleJSON = []byte(`{"content":{"name":"name",` +
 		`"destination":"service.namespace.svc.cluster.local","precedence":1,` +
 		`"route":[{"tags":{"version":"v1"}}]}}`)
+	validRouteRuleConfig = &Config{
+		Type: "route-rule",
+		Key:  "name",
+		Content: map[string]interface{}{
+			"destination": "service.namespace.svc.cluster.local",
+			"name":        "name",
+			"precedence":  float64(1),
+			"route": []interface{}{
+				map[string]interface{}{
+					"tags": map[string]interface{}{
+						"version": "v1",
+					},
+				},
+			},
+		},
+	}
 	validUpdatedRouteRuleJSON = []byte(`{"content":{"name":"name",` +
 		`"destination":"service.namespace.svc.cluster.local","precedence":1,` +
 		`"route":[{"tags":{"version":"v2"}}]}}`)
-	validDiffNamespaceRouteRuleJSON = []byte(`{"content":{"name":"name",` +
+	validUpdatedRouteRuleConfig = &Config{
+		Type: "route-rule",
+		Key:  "name",
+		Content: map[string]interface{}{
+			"destination": "service.namespace.svc.cluster.local",
+			"name":        "name",
+			"precedence":  float64(1),
+			"route": []interface{}{
+				map[string]interface{}{
+					"tags": map[string]interface{}{
+						"version": "v2",
+					},
+				},
+			},
+		},
+	}
+	validDiffNamespaceRouteRuleJSON = []byte(`{"content":{"name":"new-name",` +
 		`"destination":"service.differentnamespace.svc.cluster.local","precedence":1,` +
 		`"route":[{"tags":{"version":"v3"}}]}}`)
+	validDiffNamespaceRouteRuleConfig = &Config{
+		Type: "route-rule",
+		Key:  "new-name",
+		Content: map[string]interface{}{
+			"destination": "service.differentnamespace.svc.cluster.local",
+			"name":        "new-name",
+			"precedence":  float64(1),
+			"route": []interface{}{
+				map[string]interface{}{
+					"tags": map[string]interface{}{
+						"version": "v3",
+					},
+				},
+			},
+		},
+	}
 
 	errItemExists  = &model.ItemAlreadyExistsError{Key: "name"}
 	errNotFound    = &model.ItemNotFoundError{Key: "name"}
@@ -82,6 +133,7 @@ func TestNewAPIThenRun(t *testing.T) {
 		Registry: memory.Make(model.IstioConfigTypes),
 	})
 	go apiserver.Run()
+	apiserver.Shutdown(context.Background())
 }
 
 func TestHealthcheckt(t *testing.T) {
@@ -92,56 +144,57 @@ func TestHealthcheckt(t *testing.T) {
 }
 
 func TestAddUpdateGetDeleteConfig(t *testing.T) {
-	t.Skip()
 	mockReg := memory.Make(model.IstioConfigTypes)
 	api := makeAPIServer(mockReg)
-	url := "/test/config/route-rule/namespace/name"
 
 	// Add the route-rule
-	status, body := makeAPIRequest(api, "POST", url, validRouteRuleJSON, t)
+	addURLStr := "/test/config/route-rule"
+	status, _ := makeAPIRequest(api, "POST", addURLStr, validRouteRuleJSON, t)
 	compareStatus(status, http.StatusCreated, t)
-	test_util.CompareContent(body, "testdata/route-rule.json.golden", t)
-	compareStoredConfig(mockReg, true, t)
-
-	// Update the route-rule
-	status, body = makeAPIRequest(api, "PUT", url, validUpdatedRouteRuleJSON, t)
-	compareStatus(status, http.StatusOK, t)
-	test_util.CompareContent(body, "testdata/route-rule-v2.json.golden", t)
 	compareStoredConfig(mockReg, true, t)
 
 	// Get the route-rule
-	status, body = makeAPIRequest(api, "GET", url, nil, t)
+	getURLStr := "/test/config/route-rule/name"
+	status, body := makeAPIRequest(api, "GET", getURLStr, nil, t)
 	compareStatus(status, http.StatusOK, t)
-	test_util.CompareContent(body, "testdata/route-rule-v2.json.golden", t)
-	makeAPIRequestWriteFails(api, "GET", url, nil, t)
+	compareReturnedConfig(body, validRouteRuleConfig, t)
+
+	// Update the route-rule
+	// Generate update URL
+	tempConfig := &Config{}
+	_ = json.Unmarshal(body, tempConfig)
+	rev := tempConfig.Revision
+	updateURL := url.URL{Path: fmt.Sprintf("/test/config/route-rule/%s", rev)}
+
+	// Do the update
+	status, body = makeAPIRequest(api, "PUT", updateURL.String(), validUpdatedRouteRuleJSON, t)
+	compareStatus(status, http.StatusOK, t)
+	compareStoredConfig(mockReg, true, t)
+
+	// Get the route-rule again to verify update
+	getURLStr = "/test/config/route-rule/name"
+	status, body = makeAPIRequest(api, "GET", getURLStr, nil, t)
+	compareStatus(status, http.StatusOK, t)
+	compareReturnedConfig(body, validUpdatedRouteRuleConfig, t)
 
 	// Delete the route-rule
-	status, _ = makeAPIRequest(api, "DELETE", url, nil, t)
+	delURLStr := "/test/config/route-rule/name"
+	status, _ = makeAPIRequest(api, "DELETE", delURLStr, nil, t)
 	compareStatus(status, http.StatusOK, t)
 	compareStoredConfig(mockReg, false, t)
 }
 
 func TestListConfig(t *testing.T) {
-	t.Skip()
 	mockReg := memory.Make(model.IstioConfigTypes)
 	api := makeAPIServer(mockReg)
 
 	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule", validRouteRuleJSON, t)
-
-	// List them for a namespace
-	status, body := makeAPIRequest(api, "GET", "/test/config/route-rule", nil, t)
-	compareStatus(status, http.StatusOK, t)
-	compareListCount(body, 1, t)
-	makeAPIRequestWriteFails(api, "GET", "/test/config/route-rule/namespace", nil, t)
-
-	// Add in third
-	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule/differentnamespace/v3", validDiffNamespaceRouteRuleJSON, t)
+	_, _ = makeAPIRequest(api, "POST", "/test/config/route-rule", validDiffNamespaceRouteRuleJSON, t)
 
 	// List for all namespaces
-	status, body = makeAPIRequest(api, "GET", "/test/config/route-rule", nil, t)
+	status, body := makeAPIRequest(api, "GET", "/test/config/route-rule", nil, t)
 	compareStatus(status, http.StatusOK, t)
-	compareListCount(body, 3, t)
-	makeAPIRequestWriteFails(api, "GET", "/test/config/route-rule", nil, t)
+	compareListCount(body, 2, t)
 }
 
 func TestConfigErrors(t *testing.T) {
@@ -232,7 +285,7 @@ func TestConfigErrors(t *testing.T) {
 			wantBody:   errInvalidType.Error(),
 		},
 		{
-			name:       "TestInvalidConfigTypeWithoutNamespaceListConfig",
+			name:       "TestInvalidConfigTypeListConfig",
 			url:        "/test/config/not-a-route-rule",
 			method:     "GET",
 			wantStatus: http.StatusBadRequest,
@@ -314,6 +367,7 @@ func compareListCount(body []byte, expected int, t *testing.T) {
 	if err := json.Unmarshal(body, &configSlice); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	fmt.Printf("%+v\n", configSlice)
 	if len(configSlice) != expected {
 		t.Errorf("expected %v elements back but got %v", expected, len(configSlice))
 	}
@@ -323,6 +377,13 @@ func compareStatus(received, expected int, t *testing.T) {
 	if received != expected {
 		t.Errorf("Expected status code: %d, received: %d", expected, received)
 	}
+}
+
+func compareReturnedConfig(got []byte, want *Config, t *testing.T) {
+	gotConfig := &Config{}
+	_ = json.Unmarshal(got, gotConfig)
+	want.Revision = gotConfig.Revision // Has to be dynamically assigned because its a datetime
+	assert.Equal(t, want, gotConfig)
 }
 
 func compareStoredConfig(mockReg model.ConfigStore, present bool, t *testing.T) {
