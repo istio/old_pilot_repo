@@ -27,11 +27,11 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/cmd"
-	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
+	"istio.io/pilot/tools/version"
 )
 
 type args struct {
@@ -189,6 +189,14 @@ var (
 			return nil
 		},
 	}
+
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Display version information and exit",
+		Run: func(*cobra.Command, []string) {
+			fmt.Printf(version.Version())
+		},
+	}
 )
 
 func init() {
@@ -226,7 +234,6 @@ func init() {
 
 	rootCmd.AddCommand(discoveryCmd)
 	rootCmd.AddCommand(proxyCmd)
-	rootCmd.AddCommand(version.VersionCmd)
 }
 
 func main() {
