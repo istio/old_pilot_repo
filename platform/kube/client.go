@@ -36,22 +36,35 @@ import (
 	"istio.io/pilot/model"
 )
 
-// CreateInterface is a helper function to create Kubernetes interface
-func CreateInterface(kubeconfig string) (kubernetes.Interface, error) {
+// ResolveConfig checks whether to use the in-cluster or out-of-cluster config
+func ResolveConfig(kubeconfig string) (string, error) {
 	if kubeconfig != "" {
-		info, exists := os.Stat(kubeconfig)
-		if exists != nil {
-			return nil, fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
+		info, err := os.Stat(kubeconfig)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
+			} else {
+				err = multierror.Append(err, fmt.Errorf("kubernetes configuration file %q", kubeconfig))
+			}
+			return "", err
 		}
 
 		// if it's an empty file, switch to in-cluster config
 		if info.Size() == 0 {
-			glog.Info("Using in-cluster configuration")
-			kubeconfig = ""
+			glog.Info("using in-cluster configuration")
+			return "", nil
 		}
 	}
+	return kubeconfig, nil
+}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+// CreateInterface is a helper function to create Kubernetes interface
+func CreateInterface(kubeconfig string) (kubernetes.Interface, error) {
+	kube, err := ResolveConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", kube)
 	if err != nil {
 		return nil, err
 	}

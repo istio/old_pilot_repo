@@ -59,10 +59,10 @@ func (el *ConfigList) GetListMeta() meta_v1.List {
 // resources and @ugorji JSON optimized codec.
 // See discussion https://github.com/kubernetes/kubernetes/issues/36120
 
-// ConfigListCopy is a duplicate of ConfigList
+// ConfigListCopy is an alias of ConfigList
 type ConfigListCopy ConfigList
 
-// ConfigCopy is a duplicate of Config
+// ConfigCopy is an alias of Config
 type ConfigCopy Config
 
 // UnmarshalJSON is a workaround

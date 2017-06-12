@@ -259,8 +259,7 @@ func (c *Controller) Get(typ, key string) (proto.Message, bool, string) {
 }
 
 func (c *Controller) getTPR(typ, key string) (proto.Message, bool, string) {
-	// TODO: validate
-	schema, exists := c.client.mapping.GetByType(typ)
+	schema, exists := c.client.ConfigDescriptor().GetByType(typ)
 	if !exists {
 		return nil, false, ""
 	}
@@ -347,7 +346,7 @@ func (c *Controller) List(typ string) ([]model.Config, error) {
 }
 
 func (c *Controller) listTPRs(typ string) ([]model.Config, error) {
-	if _, ok := c.client.mapping.GetByType(typ); !ok {
+	if _, ok := c.client.ConfigDescriptor().GetByType(typ); !ok {
 		return nil, fmt.Errorf("missing type %q", typ)
 	}
 

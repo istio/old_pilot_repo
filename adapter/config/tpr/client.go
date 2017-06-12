@@ -18,7 +18,6 @@ package tpr
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -42,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform/kube"
 )
 
 const (
@@ -58,10 +58,10 @@ const (
 
 // Client is a basic REST client for TPRs implementing config store
 type Client struct {
-	mapping   model.ConfigDescriptor
-	client    kubernetes.Interface
-	dynamic   *rest.RESTClient
-	namespace string
+	descriptor model.ConfigDescriptor
+	client     kubernetes.Interface
+	dynamic    *rest.RESTClient
+	namespace  string
 }
 
 // createRESTConfig for cluster API server, pass empty config file for in-cluster
@@ -114,39 +114,30 @@ func createRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // namespace argument provides the namespace to store TPRs
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
-func NewClient(kubeconfig string, km model.ConfigDescriptor, namespace string) (*Client, error) {
-	if kubeconfig != "" {
-		info, exists := os.Stat(kubeconfig)
-		if exists != nil {
-			return nil, fmt.Errorf("kubernetes configuration file %q does not exist", kubeconfig)
-		}
-
-		// if it's an empty file, switch to in-cluster config
-		if info.Size() == 0 {
-			glog.Info("Using in-cluster configuration")
-			kubeconfig = ""
-		}
-	}
-
-	config, err := createRESTConfig(kubeconfig)
+func NewClient(config string, descriptor model.ConfigDescriptor, namespace string) (*Client, error) {
+	kubeconfig, err := kube.ResolveConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	cl, err := kubernetes.NewForConfig(config)
+	restconfig, err := createRESTConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	client, err := kubernetes.NewForConfig(restconfig)
 	if err != nil {
 		return nil, err
 	}
 
-	dynamic, err := rest.RESTClientFor(config)
+	dynamic, err := rest.RESTClientFor(restconfig)
 	if err != nil {
 		return nil, err
 	}
 
 	out := &Client{
-		mapping:   km,
-		client:    cl,
-		dynamic:   dynamic,
-		namespace: namespace,
+		descriptor: descriptor,
+		client:     client,
+		dynamic:    dynamic,
+		namespace:  namespace,
 	}
 
 	return out, nil
@@ -237,14 +228,12 @@ func (cl *Client) GetKubernetesInterface() kubernetes.Interface {
 
 // ConfigDescriptor for the store
 func (cl *Client) ConfigDescriptor() model.ConfigDescriptor {
-	return cl.mapping
+	return cl.descriptor
 }
 
 // Get implements store interface
 func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
-	// TODO validate
-
-	schema, exists := cl.mapping.GetByType(typ)
+	schema, exists := cl.descriptor.GetByType(typ)
 	if !exists {
 		return nil, false, ""
 	}
@@ -271,10 +260,14 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 
 // Post implements store interface
 func (cl *Client) Post(v proto.Message) (string, error) {
-	// TODO: validate
-	schema, exists := cl.mapping.GetByMessageName(proto.MessageName(v))
+	messageName := proto.MessageName(v)
+	schema, exists := cl.descriptor.GetByMessageName(messageName)
 	if !exists {
-		return "", fmt.Errorf("unrecognized message name")
+		return "", fmt.Errorf("unrecognized message name %q", messageName)
+	}
+
+	if err := schema.Validate(v); err != nil {
+		return "", multierror.Prefix(err, "validation error:")
 	}
 
 	out, err := modelToKube(schema, cl.namespace, v)
@@ -297,11 +290,16 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 
 // Put implements store interface
 func (cl *Client) Put(v proto.Message, revision string) (string, error) {
-	// TODO: validate
-	schema, exists := cl.mapping.GetByMessageName(proto.MessageName(v))
+	messageName := proto.MessageName(v)
+	schema, exists := cl.descriptor.GetByMessageName(messageName)
 	if !exists {
-		return "", fmt.Errorf("unrecognized message name")
+		return "", fmt.Errorf("unrecognized message name %q", messageName)
 	}
+
+	if err := schema.Validate(v); err != nil {
+		return "", multierror.Prefix(err, "validation error:")
+	}
+
 	if revision == "" {
 		return "", fmt.Errorf("revision is required")
 	}
@@ -329,7 +327,10 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 
 // Delete implements store interface
 func (cl *Client) Delete(typ, key string) error {
-	// TODO: validate
+	_, exists := cl.descriptor.GetByType(typ)
+	if !exists {
+		return fmt.Errorf("missing type %q", typ)
+	}
 
 	return cl.dynamic.Delete().
 		Namespace(cl.namespace).
@@ -340,7 +341,7 @@ func (cl *Client) Delete(typ, key string) error {
 
 // List implements store interface
 func (cl *Client) List(typ string) ([]model.Config, error) {
-	_, exists := cl.mapping.GetByType(typ)
+	_, exists := cl.descriptor.GetByType(typ)
 	if !exists {
 		return nil, fmt.Errorf("missing type %q", typ)
 	}

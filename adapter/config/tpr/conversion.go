@@ -58,7 +58,7 @@ func modelToKube(schema model.ProtoSchema, namespace string, config proto.Messag
 
 // convertConfig extracts Istio config data from k8s TPRs
 func (cl *Client) convertConfig(item *Config) (model.Config, error) {
-	for _, schema := range cl.mapping {
+	for _, schema := range cl.ConfigDescriptor() {
 		if strings.HasPrefix(item.Metadata.Name, schema.Type) {
 			data, err := schema.FromJSONMap(item.Spec)
 			if err != nil {
