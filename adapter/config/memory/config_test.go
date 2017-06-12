@@ -1,4 +1,3 @@
-<!--
 // Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,15 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
--->
 
-<html>
-<head>
-<title>
-All Done!
-</title>
-</head>
-<body>
-You may now close this browser tab
-</body>
-</html>
+package memory
+
+import (
+	"testing"
+
+	"istio.io/pilot/test/mock"
+)
+
+func TestStoreInvariant(t *testing.T) {
+	store := Make(mock.Types)
+	mock.CheckMapInvariant(store, t, 10)
+}

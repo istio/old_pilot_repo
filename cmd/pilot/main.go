@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/apiserver"
+	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
@@ -50,7 +50,7 @@ type args struct {
 
 var (
 	flags  args
-	client *kube.Client
+	client *tpr.Client
 	mesh   *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
@@ -65,7 +65,7 @@ var (
 				}
 			}
 
-			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
+			client, err = tpr.NewClient(flags.kubeconfig, model.IstioConfigTypes, flags.controllerOptions.Namespace)
 			if err != nil {
 				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 			}
@@ -86,7 +86,7 @@ var (
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			// receive mesh configuration
-			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.controllerOptions.Namespace, flags.meshConfig)
+			mesh, err = cmd.GetMeshConfig(client.GetKubernetesInterface(), flags.controllerOptions.Namespace, flags.meshConfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 			}
@@ -100,39 +100,24 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
+			serviceController := kube.NewController(client.GetKubernetesInterface(), mesh, flags.controllerOptions)
+			configController := tpr.NewController(client, mesh, flags.controllerOptions)
 			context := &proxy.Context{
-				Discovery:  controller,
-				Accounts:   controller,
-				Config:     &model.IstioRegistry{ConfigRegistry: controller},
+				Discovery:  serviceController,
+				Accounts:   serviceController,
+				Config:     model.MakeIstioStore(configController),
 				MeshConfig: mesh,
 			}
-			discovery, err := envoy.NewDiscoveryService(controller, context, flags.discoveryOptions)
+			discovery, err := envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
 			stop := make(chan struct{})
-			go controller.Run(stop)
+			go serviceController.Run(stop)
+			go configController.Run(stop)
 			go discovery.Run()
 			cmd.WaitSignal(stop)
 			return
-		},
-	}
-
-	apiserverCmd = &cobra.Command{
-		Use:   "apiserver",
-		Short: "Start Istio config API service",
-		Run: func(*cobra.Command, []string) {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
-			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
-				Version:  kube.IstioResourceVersion,
-				Port:     flags.apiserverPort,
-				Registry: &model.IstioRegistry{ConfigRegistry: controller},
-			})
-			stop := make(chan struct{})
-			go controller.Run(stop)
-			go apiserver.Run()
-			cmd.WaitSignal(stop)
 		},
 	}
 
@@ -146,22 +131,28 @@ var (
 		Short: "Envoy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			mesh.IngressControllerMode = proxyconfig.ProxyMeshConfig_OFF
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
+			serviceController := kube.NewController(client.GetKubernetesInterface(), mesh, flags.controllerOptions)
+			configController := tpr.NewController(client, mesh, flags.controllerOptions)
 			context := &proxy.Context{
-				Discovery:        controller,
-				Accounts:         controller,
-				Config:           &model.IstioRegistry{ConfigRegistry: controller},
+				Discovery:        serviceController,
+				Accounts:         serviceController,
+				Config:           model.MakeIstioStore(configController),
 				MeshConfig:       mesh,
 				IPAddress:        flags.ipAddress,
 				UID:              fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
 				PassthroughPorts: flags.passthrough,
 			}
-			w, err := envoy.NewWatcher(controller, context)
+			w, err := envoy.NewWatcher(serviceController, configController, context)
 			if err != nil {
 				return
 			}
 			stop := make(chan struct{})
+
+			// must start watcher after starting dependent controllers
+			go serviceController.Run(stop)
+			go configController.Run(stop)
 			go w.Run(stop)
+
 			cmd.WaitSignal(stop)
 			return
 		},
@@ -171,8 +162,8 @@ var (
 		Use:   "ingress",
 		Short: "Envoy ingress agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			s := kube.NewIngressStatusSyncer(mesh, client, flags.controllerOptions)
-			w, err := envoy.NewIngressWatcher(mesh, client)
+			s := kube.NewIngressStatusSyncer(mesh, client.GetKubernetesInterface(), flags.controllerOptions)
+			w, err := envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client.GetKubernetesInterface()))
 			if err != nil {
 				return err
 			}
@@ -219,9 +210,6 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	apiserverCmd.PersistentFlags().IntVar(&flags.apiserverPort, "port", 8081,
-		"Config API service port")
-
 	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
 		"IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
@@ -237,7 +225,6 @@ func init() {
 	cmd.AddFlags(rootCmd)
 
 	rootCmd.AddCommand(discoveryCmd)
-	rootCmd.AddCommand(apiserverCmd)
 	rootCmd.AddCommand(proxyCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }

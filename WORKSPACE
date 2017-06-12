@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_pilot")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "78d030fc16e7c6e0a188714980db0b04086c4a5e",  # April 12 2017 (0.4.3)
+    commit = "e1786dae19beb746bc9a6b9aabc2e134151d0182",  # 8 June 2017
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -34,7 +34,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_coreos_go_oidc",
-    commit = "be73733bb8cc830d0205609b95d125215f8e9c70",
+    commit = "c797a55f1c1001ec3169f1d0fbb4c5523563bec6",
     importpath = "github.com/coreos/go-oidc",
 )
 
@@ -278,6 +278,12 @@ new_go_repository(
 )
 
 new_go_repository(
+    name = "com_github_inconshreveable_mousetrap",
+    commit = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75",
+    importpath = "github.com/inconshreveable/mousetrap",
+)
+
+new_go_repository(
     name = "com_github_cpuguy83_go_md2man",
     commit = "648eed146d3f3beacb64063cd0daae908015eebd",  # Mar 19, 2017 (no releases)
     importpath = "github.com/cpuguy83/go-md2man",
@@ -405,7 +411,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "94aa4ce91ada31c401f407324fec6cf1a6b52b02",  # June 2, 2017
+    commit = "af5afdafc95826a5716facc2ea025f1e27bb8225",  # June 8, 2017
     remote = "https://github.com/istio/api.git",
 )
 

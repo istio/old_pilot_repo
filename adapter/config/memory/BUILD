@@ -2,23 +2,18 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["proxy.go"],
+    srcs = ["config.go"],
     visibility = ["//visibility:public"],
     deps = [
-        "//apiserver:go_default_library",
-        "//cmd/version:go_default_library",
         "//model:go_default_library",
-        "@com_github_golang_glog//:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     size = "small",
-    srcs = ["proxy_test.go"],
+    srcs = ["config_test.go"],
     library = ":go_default_library",
-    deps = [
-        "//apiserver:go_default_library",
-        "//model:go_default_library",
-    ],
+    deps = ["//test/mock:go_default_library"],
 )
