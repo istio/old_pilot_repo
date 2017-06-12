@@ -245,26 +245,32 @@ var (
 		},
 	}
 
+	// IngressRuleDescriptor describes ingress rules
+	IngressRuleDescriptor = ProtoSchema{
+		Type:        IngressRule,
+		MessageName: IngressRuleProto,
+		Validate:    ValidateIngressRule,
+		Key: func(config proto.Message) string {
+			rule := config.(*proxyconfig.IngressRule)
+			return fmt.Sprintf("%s", rule.Name)
+		},
+	}
+
+	// DestinationPolicyDescriptor describes destination rules
+	DestinationPolicyDescriptor = ProtoSchema{
+		Type:        DestinationPolicy,
+		MessageName: DestinationPolicyProto,
+		Validate:    ValidateDestinationPolicy,
+		Key: func(config proto.Message) string {
+			return config.(*proxyconfig.DestinationPolicy).Destination
+		},
+	}
+
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
 		RouteRuleDescriptor,
-		ProtoSchema{
-			Type:        IngressRule,
-			MessageName: IngressRuleProto,
-			Validate:    ValidateIngressRule,
-			Key: func(config proto.Message) string {
-				rule := config.(*proxyconfig.IngressRule)
-				return fmt.Sprintf("%s", rule.Name)
-			},
-		},
-		ProtoSchema{
-			Type:        DestinationPolicy,
-			MessageName: DestinationPolicyProto,
-			Validate:    ValidateDestinationPolicy,
-			Key: func(config proto.Message) string {
-				return config.(*proxyconfig.DestinationPolicy).Destination
-			},
-		},
+		IngressRuleDescriptor,
+		DestinationPolicyDescriptor,
 	}
 )
 
