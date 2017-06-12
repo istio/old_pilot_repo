@@ -194,7 +194,7 @@ var (
 		Use:   "version",
 		Short: "Display version information and exit",
 		Run: func(*cobra.Command, []string) {
-			fmt.Printf(version.Version())
+			fmt.Print(version.Version())
 		},
 	}
 )
