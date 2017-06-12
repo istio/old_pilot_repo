@@ -31,12 +31,12 @@ import (
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
+	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/apiserver"
 	"istio.io/pilot/client/proxy"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
-	"istio.io/pilot/platform/kube"
 )
 
 const (
@@ -49,7 +49,7 @@ const (
 type k8sRESTRequester struct {
 	namespace string
 	service   string
-	client    *kube.Client
+	client    *tpr.Client
 }
 
 // Request wraps Kubernetes specific requester to provide the proper
@@ -58,7 +58,7 @@ func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) (int, []
 	return rr.client.Request(rr.namespace, rr.service, method, path, inBody)
 }
 
-func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
+func kubeClientFromConfig(kubeconfig string) (*tpr.Client, error) {
 	if kubeconfig == "" {
 		if v := os.Getenv("KUBECONFIG"); v != "" {
 			glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
@@ -66,11 +66,11 @@ func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
 		}
 	}
 
-	c, err := kube.NewClient(kubeconfig, model.IstioConfig)
+	c, err := tpr.NewClient(kubeconfig, model.IstioConfigTypes, istioNamespace)
 	if err != nil && kubeconfig == "" {
 		// If no configuration was specified, and the platform
 		// client failed, try again using ~/.kube/config
-		c, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
+		c, err = tpr.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfigTypes, istioNamespace)
 	}
 	if err != nil {
 		return nil, multierror.Prefix(err, "failed to connect to Kubernetes API.")
@@ -91,7 +91,7 @@ var (
 	// output format (yaml or short)
 	outputFormat string
 
-	key    model.Key
+	key    proxy.Key
 	schema model.ProtoSchema
 
 	rootCmd = &cobra.Command{
@@ -114,7 +114,7 @@ and destination policies.
 
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
-`, model.IstioConfig.Kinds()),
+`, model.IstioConfigTypes.Types()),
 		PersistentPreRunE: func(*cobra.Command, []string) error {
 			var err error
 			client, err = kubeClientFromConfig(kubeconfig)
@@ -138,7 +138,7 @@ istioctl mixer command documentation.
 				apiClient = proxy.NewConfigClient(&proxy.BasicHTTPRequester{
 					BaseURL: istioConfigAPIService,
 					Client:  &http.Client{Timeout: 60 * time.Second},
-					Version: kube.IstioResourceVersion,
+					Version: tpr.IstioResourceVersion,
 				})
 			}
 
@@ -231,7 +231,7 @@ istioctl get route-rule productpage-default
 			if len(args) < 1 {
 				c.Println(c.UsageString())
 				return fmt.Errorf("specify the type of resource to get. Types are %v",
-					strings.Join(model.IstioConfig.Kinds(), ", "))
+					strings.Join(model.IstioConfigTypes.Types(), ", "))
 			}
 
 			if len(args) > 1 {
@@ -424,14 +424,14 @@ func setup(kind, name string) error {
 
 	// set proto schema
 	var ok bool
-	schema, ok = model.IstioConfig[kind]
+	schema, ok = model.IstioConfigTypes.GetByType(kind)
 	if !ok {
 		return fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
-			kind, strings.Join(model.IstioConfig.Kinds(), ", "))
+			kind, strings.Join(model.IstioConfigTypes.Types(), ", "))
 	}
 
 	// set the config key
-	key = model.Key{
+	key = proxy.Key{
 		Kind:      kind,
 		Name:      name,
 		Namespace: namespace,
