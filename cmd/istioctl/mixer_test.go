@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"istio.io/pilot/client/proxy"
+	"istio.io/pilot/adapter/config/server"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/test/util"
 
@@ -48,7 +48,7 @@ func TestMixerRuleCreate(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	mixerRESTRequester = &proxy.BasicHTTPRequester{
+	mixerRESTRequester = &server.BasicHTTPRequester{
 		BaseURL: ts.URL,
 		Client:  &http.Client{Timeout: 1 * time.Second},
 		Version: kube.IstioResourceVersion,
@@ -124,7 +124,7 @@ func TestMixerRuleDelete(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
-	mixerRESTRequester = &proxy.BasicHTTPRequester{
+	mixerRESTRequester = &server.BasicHTTPRequester{
 		BaseURL: ts.URL,
 		Client:  &http.Client{Timeout: 1 * time.Second},
 		Version: kube.IstioResourceVersion,
@@ -187,7 +187,7 @@ func TestMixerRuleGet(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	mixerRESTRequester = &proxy.BasicHTTPRequester{
+	mixerRESTRequester = &server.BasicHTTPRequester{
 		BaseURL: ts.URL,
 		Client:  &http.Client{Timeout: 1 * time.Second},
 		Version: kube.IstioResourceVersion,
@@ -252,7 +252,7 @@ func TestMixerAdapterOrDescriptorCreate(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	mixerRESTRequester = &proxy.BasicHTTPRequester{
+	mixerRESTRequester = &server.BasicHTTPRequester{
 		BaseURL: ts.URL,
 		Client:  &http.Client{Timeout: 1 * time.Second},
 		Version: kube.IstioResourceVersion,
@@ -372,7 +372,7 @@ func TestMixerAdapterOrDescriptorsGet(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	mixerRESTRequester = &proxy.BasicHTTPRequester{
+	mixerRESTRequester = &server.BasicHTTPRequester{
 		BaseURL: ts.URL,
 		Client:  &http.Client{Timeout: 1 * time.Second},
 		Version: kube.IstioResourceVersion,

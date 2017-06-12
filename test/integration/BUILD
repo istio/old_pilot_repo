@@ -16,7 +16,7 @@ go_library(
         "zipkin.go",
     ],
     deps = [
-        "//apiserver:go_default_library",
+        "//adapter/config/server:go_default_library",
         "//cmd:go_default_library",
         "//model:go_default_library",
         "//platform/kube:go_default_library",

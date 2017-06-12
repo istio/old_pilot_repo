@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apiserver
+package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"istio.io/pilot/cmd/version"
@@ -34,24 +33,25 @@ func (api *API) Status(request *restful.Request, response *restful.Response) {
 
 // GetConfig retrieves the config object from the configuration registry
 func (api *API) GetConfig(request *restful.Request, response *restful.Response) {
-
 	params := request.PathParameters()
-	k, err := setup(params)
-	if err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
+	typ := params[typ]
+	k := params[key]
+
+	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
+	if !ok {
+		api.writeError(http.StatusBadRequest, "missing type", response)
 		return
 	}
 
 	glog.V(2).Infof("Getting config from Istio registry: %+v", k)
-	// TODO: incorrect use with new registry
-	proto, ok, _ := api.registry.Get(k.Kind, k.Name)
+
+	proto, ok, rev := api.registry.Get(typ, k)
 	if !ok {
-		errLocal := &model.ItemNotFoundError{Key: k.Name}
+		errLocal := &model.ItemNotFoundError{Key: k}
 		api.writeError(http.StatusNotFound, errLocal.Error(), response)
 		return
 	}
 
-	var schema model.ProtoSchema
 	retrieved, err := schema.ToJSON(proto)
 	if err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
@@ -62,10 +62,12 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
 	}
+
 	config := Config{
-		Name: params["name"],
-		Type: params["kind"],
-		Spec: retJSON,
+		Type:     typ,
+		Key:      k,
+		Revision: rev,
+		Content:  retJSON,
 	}
 	glog.V(2).Infof("Retrieved config %+v", config)
 	if err = response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
@@ -76,30 +78,33 @@ func (api *API) GetConfig(request *restful.Request, response *restful.Response) 
 // AddConfig creates and stores the passed config object in the configuration registry
 // It is equivalent to a restful PUT and is idempotent
 func (api *API) AddConfig(request *restful.Request, response *restful.Response) {
-
-	// ToDo: check url name matches body name
-
 	params := request.PathParameters()
-	k, err := setup(params)
+	typ := params[typ]
+	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
+	if !ok {
+		api.writeError(http.StatusBadRequest, "missing type", response)
+		return
+	}
+
+	config := &Config{}
+	if err := request.ReadEntity(config); err != nil {
+		api.writeError(http.StatusBadRequest, err.Error(), response)
+		return
+	}
+
+	byteSpec, err := json.Marshal(config.Content)
+	if err != nil {
+		api.writeError(http.StatusBadRequest, err.Error(), response)
+	}
+
+	msg, err := schema.FromJSON(string(byteSpec))
 	if err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	config := &Config{}
-	if err = request.ReadEntity(config); err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
-		return
-	}
-
-	if err = config.ParseSpec(); err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
-		return
-	}
-
-	glog.V(2).Infof("Adding config to Istio registry: key %+v, config %+v", k, config)
-	// TODO: incorrect use with new registry
-	if _, err = api.registry.Post(config.ParsedSpec); err != nil {
+	glog.V(2).Infof("Adding config to Istio registry: config %+v", config)
+	if _, err = api.registry.Post(msg); err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		switch err.(type) {
 		case *model.ItemAlreadyExistsError:
@@ -109,39 +114,41 @@ func (api *API) AddConfig(request *restful.Request, response *restful.Response) 
 		}
 		return
 	}
+
 	glog.V(2).Infof("Added config %+v", config)
-	if err = response.WriteHeaderAndEntity(http.StatusCreated, config); err != nil {
-		api.writeError(http.StatusInternalServerError, err.Error(), response)
-	}
+	response.WriteHeader(http.StatusCreated)
 }
 
 // UpdateConfig updates the passed config object in the configuration registry
 func (api *API) UpdateConfig(request *restful.Request, response *restful.Response) {
-
-	// ToDo: check url name matches body name
-
 	params := request.PathParameters()
-	k, err := setup(params)
+	typ := params[typ]
+	rev := params[revision]
+	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
+	if !ok {
+		api.writeError(http.StatusBadRequest, "missing type", response)
+		return
+	}
+
+	config := &Config{}
+	if err := request.ReadEntity(config); err != nil {
+		api.writeError(http.StatusBadRequest, err.Error(), response)
+		return
+	}
+
+	byteSpec, err := json.Marshal(config.Content)
+	if err != nil {
+		api.writeError(http.StatusBadRequest, err.Error(), response)
+	}
+
+	msg, err := schema.FromJSON(string(byteSpec))
 	if err != nil {
 		api.writeError(http.StatusBadRequest, err.Error(), response)
 		return
 	}
 
-	config := &Config{}
-	if err = request.ReadEntity(config); err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
-		return
-	}
-
-	if err = config.ParseSpec(); err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
-		return
-	}
-
-	glog.V(2).Infof("Updating config in Istio registry: key %+v, config %+v", k, config)
-
-	// TODO: incorrect use with new registry
-	if _, err = api.registry.Put(config.ParsedSpec, ""); err != nil {
+	glog.V(2).Infof("Updating config in Istio registry: config %+v", config)
+	if _, err = api.registry.Put(msg, rev); err != nil {
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
@@ -151,24 +158,24 @@ func (api *API) UpdateConfig(request *restful.Request, response *restful.Respons
 		return
 	}
 	glog.V(2).Infof("Updated config to %+v", config)
-	if err = response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
+	if err := response.WriteHeaderAndEntity(http.StatusOK, config); err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 	}
 }
 
 // DeleteConfig deletes the passed config object in the configuration registry
 func (api *API) DeleteConfig(request *restful.Request, response *restful.Response) {
-
 	params := request.PathParameters()
-	k, err := setup(params)
-	if err != nil {
-		api.writeError(http.StatusBadRequest, err.Error(), response)
+	typ := params[typ]
+	k := params[key]
+	_, ok := api.registry.ConfigDescriptor().GetByType(typ)
+	if !ok {
+		api.writeError(http.StatusBadRequest, "missing type", response)
 		return
 	}
 
 	glog.V(2).Infof("Deleting config from Istio registry: %+v", k)
-	// TODO: incorrect use with new registry
-	if err = api.registry.Delete(k.Kind, k.Name); err != nil {
+	if err := api.registry.Delete(typ, k); err != nil {
 		switch err.(type) {
 		case *model.ItemNotFoundError:
 			api.writeError(http.StatusNotFound, err.Error(), response)
@@ -184,17 +191,16 @@ func (api *API) DeleteConfig(request *restful.Request, response *restful.Respons
 // If kind and namespace are passed then it retrieves all rules of a kind in a namespace
 // If kind is passed and namespace is an empty string it retrieves all rules of a kind across all namespaces
 func (api *API) ListConfigs(request *restful.Request, response *restful.Response) {
-
 	params := request.PathParameters()
-	namespace, kind := params["namespace"], params["kind"]
-
-	if _, ok := model.IstioConfigTypes.GetByType(kind); !ok {
-		api.writeError(http.StatusBadRequest,
-			fmt.Sprintf("unknown configuration type %s; use one of %v", kind, model.IstioConfigTypes.Types()), response)
+	typ := params[typ]
+	schema, ok := api.registry.ConfigDescriptor().GetByType(typ)
+	if !ok {
+		api.writeError(http.StatusBadRequest, "missing type", response)
 		return
 	}
-	glog.V(2).Infof("Getting configs of kind %s in namespace %s", kind, namespace)
-	result, err := api.registry.List(kind)
+
+	glog.V(2).Infof("Getting configs of kind %s", typ)
+	result, err := api.registry.List(typ)
 	if err != nil {
 		api.writeError(http.StatusInternalServerError, err.Error(), response)
 		return
@@ -202,7 +208,6 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 
 	// Parse back to config
 	out := []Config{}
-	var schema model.ProtoSchema
 	for _, v := range result {
 		retrieved, errLocal := schema.ToJSON(v.Content)
 		if errLocal != nil {
@@ -215,9 +220,10 @@ func (api *API) ListConfigs(request *restful.Request, response *restful.Response
 			return
 		}
 		config := Config{
-			Name: v.Key,
-			Type: v.Type,
-			Spec: retJSON,
+			Type:     v.Type,
+			Key:      v.Key,
+			Revision: v.Revision,
+			Content:  retJSON,
 		}
 		glog.V(2).Infof("Retrieved config %+v", config)
 		out = append(out, config)
@@ -241,23 +247,4 @@ func (api *API) writeError(status int, msg string, response *restful.Response) {
 	if err := response.WriteErrorString(status, msg); err != nil {
 		glog.Warning(err)
 	}
-}
-
-type key struct {
-	Kind      string
-	Name      string
-	Namespace string
-}
-
-func setup(params map[string]string) (key, error) {
-	name, namespace, kind := params["name"], params["namespace"], params["kind"]
-	if _, ok := model.IstioConfigTypes.GetByType(kind); !ok {
-		return key{}, fmt.Errorf("unknown configuration type %s; use one of %v", kind, model.IstioConfigTypes.Types())
-	}
-
-	return key{
-		Kind:      kind,
-		Name:      name,
-		Namespace: namespace,
-	}, nil
 }

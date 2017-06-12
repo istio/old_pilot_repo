@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apiserver
+// Package server is an HTTP server that exposes a config store via a REST
+// interface. The server wraps a config store, and the client communicates
+// with the server to expose a config store interface on the client side.
+package server
 
 import (
 	"context"
@@ -28,10 +31,19 @@ import (
 )
 
 const (
-	kind      = "kind"
-	name      = "name"
-	namespace = "namespace"
+	typ      = "typ"
+	key      = "key"
+	revision = "revision"
 )
+
+// Config is the complete configuration
+type Config struct {
+	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, or destination-policy
+	Type     string      `json:"type,omitempty"`
+	Key      string      `json:"name,omitempty"`
+	Revision string      `json:"revision,omitempty"`
+	Content  interface{} `json:"content,omitempty"`
+}
 
 // APIServiceOptions are the options available for configuration on the API
 // Version is the API version e.g. v1 for /v1/config
@@ -69,38 +81,32 @@ func (api *API) Register(container *restful.Container) {
 	ws.Path(fmt.Sprintf("/%s", api.version))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
+		GET(fmt.Sprintf("/config/{%s}/{%s}", typ, key)).
 		To(api.GetConfig).
 		Doc("Get a config").
 		Writes(Config{}))
 
 	ws.Route(ws.
-		POST(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
+		POST(fmt.Sprintf("/config/{%s}", typ)).
 		To(api.AddConfig).
 		Doc("Add a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		PUT(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
+		PUT(fmt.Sprintf("/config/{%s}/{%s}", typ, revision)).
 		To(api.UpdateConfig).
 		Doc("Update a config").
 		Reads(Config{}))
 
 	ws.Route(ws.
-		DELETE(fmt.Sprintf("/config/{%s}/{%s}/{%s}", kind, namespace, name)).
+		DELETE(fmt.Sprintf("/config/{%s}/{%s}", typ, key)).
 		To(api.DeleteConfig).
 		Doc("Delete a config"))
 
 	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}/{%s}", kind, namespace)).
+		GET(fmt.Sprintf("/config/{%s}", typ)).
 		To(api.ListConfigs).
-		Doc("List all configs for kind in a given namespace").
-		Writes([]Config{}))
-
-	ws.Route(ws.
-		GET(fmt.Sprintf("/config/{%s}", kind)).
-		To(api.ListConfigs).
-		Doc("List all configs for kind in across all namespaces").
+		Doc("List all configs").
 		Writes([]Config{}))
 
 	ws.Route(ws.
