@@ -38,10 +38,9 @@ type args struct {
 	kubeconfig string
 	meshConfig string
 
-	ipAddress     string
-	podName       string
-	passthrough   []int
-	apiserverPort int
+	ipAddress   string
+	podName     string
+	passthrough []int
 
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
@@ -83,6 +82,7 @@ var (
 			if flags.controllerOptions.Namespace == "" {
 				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 			}
+			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			// receive mesh configuration
