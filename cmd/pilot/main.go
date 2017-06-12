@@ -234,6 +234,7 @@ func init() {
 
 	rootCmd.AddCommand(discoveryCmd)
 	rootCmd.AddCommand(proxyCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 func main() {

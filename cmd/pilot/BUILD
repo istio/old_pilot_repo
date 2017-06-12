@@ -23,6 +23,6 @@ go_library(
 go_binary(
     name = "pilot",
     library = ":go_default_library",
-    linkstamp = "istio.io/pilot/cmd/version",
+    linkstamp = "istio.io/pilot/tools/version",
     visibility = ["//visibility:public"],
 )
