@@ -25,16 +25,31 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-func TestKindMapKinds(t *testing.T) {
-	km := ConfigDescriptor{
-		ProtoSchema{Type: "a"},
-		ProtoSchema{Type: "b"},
-		ProtoSchema{Type: "c"},
+func TestConfigDescriptor(t *testing.T) {
+	a := ProtoSchema{Type: "a", MessageName: "proxy.A"}
+	descriptor := ConfigDescriptor{
+		a,
+		ProtoSchema{Type: "b", MessageName: "proxy.B"},
+		ProtoSchema{Type: "c", MessageName: "proxy.C"},
 	}
 	want := []string{"a", "b", "c"}
-	got := km.Types()
+	got := descriptor.Types()
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("KindMap.Kinds failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
+		t.Errorf("descriptor.Types() => got %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
+	}
+
+	aType, aExists := descriptor.GetByType(a.Type)
+	if !aExists || !reflect.DeepEqual(aType, a) {
+		t.Errorf("descriptor.GetByType(a) => got %+v, want %+v", aType, a)
+	}
+
+	aSchema, aSchemaExists := descriptor.GetByMessageName(a.MessageName)
+	if !aSchemaExists || !reflect.DeepEqual(aSchema, a) {
+		t.Errorf("descriptor.GetByMessageName(a) => got %+v, want %+v", aType, a)
+	}
+	_, aSchemaNotExist := descriptor.GetByMessageName("blah")
+	if aSchemaNotExist {
+		t.Errorf("descriptor.GetByMessageName(blah) => got true, want false")
 	}
 }
 
@@ -48,10 +63,8 @@ func initTestRegistry(t *testing.T) *testRegistry {
 	ctrl := gomock.NewController(t)
 	mock := NewMockConfigStore(ctrl)
 	return &testRegistry{
-		mock: mock,
-		registry: &istioConfigStore{
-			ConfigStore: mock,
-		},
+		mock:     mock,
+		registry: MakeIstioStore(mock),
 	}
 }
 
