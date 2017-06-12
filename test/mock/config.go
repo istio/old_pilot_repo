@@ -29,28 +29,29 @@ import (
 	"istio.io/pilot/test/util"
 )
 
-// Mock config type
 const (
+	// Type is the mock config type
 	Type = "mock-config"
 )
 
-// Mock config descriptor
 var (
-	Types = model.ConfigDescriptor{
-		model.ProtoSchema{
-			Type:        Type,
-			MessageName: "mock.MockConfig",
-			Validate: func(config proto.Message) error {
-				if config.(*MockConfig).Key == "" {
-					return errors.New("empty key")
-				}
-				return nil
-			},
-			Key: func(config proto.Message) string {
-				return config.(*MockConfig).Key
-			},
+	// Descriptor for the mock config
+	Descriptor = model.ProtoSchema{
+		Type:        Type,
+		MessageName: "mock.MockConfig",
+		Validate: func(config proto.Message) error {
+			if config.(*MockConfig).Key == "" {
+				return errors.New("empty key")
+			}
+			return nil
+		},
+		Key: func(config proto.Message) string {
+			return config.(*MockConfig).Key
 		},
 	}
+
+	// Types defines the mock config descriptor
+	Types = model.ConfigDescriptor{Descriptor}
 )
 
 // Make creates a mock config indexed by a number

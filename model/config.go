@@ -234,17 +234,20 @@ const (
 )
 
 var (
+	// RouteRuleDescriptor describes route rules
+	RouteRuleDescriptor = ProtoSchema{
+		Type:        RouteRule,
+		MessageName: RouteRuleProto,
+		Validate:    ValidateRouteRule,
+		Key: func(config proto.Message) string {
+			rule := config.(*proxyconfig.RouteRule)
+			return fmt.Sprintf("%s", rule.Name)
+		},
+	}
+
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
-		ProtoSchema{
-			Type:        RouteRule,
-			MessageName: RouteRuleProto,
-			Validate:    ValidateRouteRule,
-			Key: func(config proto.Message) string {
-				rule := config.(*proxyconfig.RouteRule)
-				return fmt.Sprintf("%s", rule.Name)
-			},
-		},
+		RouteRuleDescriptor,
 		ProtoSchema{
 			Type:        IngressRule,
 			MessageName: IngressRuleProto,
