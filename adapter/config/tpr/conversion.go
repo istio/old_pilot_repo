@@ -109,7 +109,6 @@ func convertIngress(ingress v1beta1.Ingress, domainSuffix string) map[string]pro
 	messages := make(map[string]proto.Message)
 
 	keyOf := func(ruleNum, pathNum int) string {
-		// TODO: namespace
 		return encodeIngressRuleName(ingress.Name, ingress.Namespace, ruleNum, pathNum)
 	}
 
