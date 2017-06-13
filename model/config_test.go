@@ -158,7 +158,6 @@ var (
 
 	dstTags0 = map[string]string{"a": "b"}
 	dstTags1 = map[string]string{"c": "d"}
-	dstTags2 = map[string]string{"e": "f"}
 
 	dstPolicy1 = &proxyconfig.DestinationPolicy{
 		Destination: "foo",
@@ -170,10 +169,6 @@ var (
 	dstPolicy3 = &proxyconfig.DestinationPolicy{
 		Destination: "bar",
 		Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags1}},
-	}
-	dstPolicy4 = &proxyconfig.DestinationPolicy{
-		Destination: "baz",
-		Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags2}},
 	}
 )
 
