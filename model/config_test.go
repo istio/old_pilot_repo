@@ -116,6 +116,7 @@ var (
 
 	routeRule1MatchNil = &proxyconfig.RouteRule{
 		Destination: "foo",
+		Name:        "foo",
 		Precedence:  1,
 	}
 
@@ -176,9 +177,13 @@ var (
 	}
 )
 
-func TestIstioRegistryRouteAndIngressRules(t *testing.T) {
+func TestIstioRegistryRouteRules(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
+
+	if RouteRuleDescriptor.Key(routeRule1MatchNil) != routeRule1MatchNil.Name {
+		t.Errorf("unexpected route rule key not equal to name")
+	}
 
 	cases := []struct {
 		name      string
@@ -212,6 +217,37 @@ func TestIstioRegistryRouteAndIngressRules(t *testing.T) {
 			t.Errorf("%v with RouteRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
 	}
+}
+
+func TestIstioRegistryIngressRules(t *testing.T) {
+	r := initTestRegistry(t)
+	defer r.shutdown()
+
+	rule := &proxyconfig.IngressRule{
+		Name:        "sample-ingress",
+		Destination: "a.svc",
+	}
+
+	if IngressRuleDescriptor.Key(rule) != rule.Name {
+		t.Errorf("unexpected ingress rule key not equal to name")
+	}
+
+	r.mock.EXPECT().List(IngressRule).Return([]Config{{
+		Key:     rule.Name,
+		Content: rule,
+	}}, nil)
+
+	if got := r.registry.IngressRules(); !reflect.DeepEqual(got, map[string]*proxyconfig.IngressRule{
+		rule.Name: rule,
+	}) {
+		t.Errorf("IngressRules failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(rule))
+	}
+
+	r.mock.EXPECT().List(IngressRule).Return(nil, errors.New("cannot list"))
+	if got := r.registry.IngressRules(); len(got) > 0 {
+		t.Errorf("IngressRules failed: \ngot %+vwant empty", spew.Sdump(got))
+	}
+
 }
 
 func TestIstioRegistryRouteRulesBySource(t *testing.T) {
@@ -290,17 +326,19 @@ func TestIstioRegistryDestinationPolicies(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
 
-	mockObjs := []Config{
-		{Key: "foo", Content: dstPolicy1},
-		{Key: "foo2", Content: dstPolicy2},
-		{Key: "bar", Content: dstPolicy3},
-		{Key: "baz", Content: dstPolicy4},
+	if DestinationPolicyDescriptor.Key(dstPolicy1) != dstPolicy1.Destination {
+		t.Error("expect destination policy key to be hostname")
 	}
 
-	r.mock.EXPECT().List(DestinationPolicy).Return(mockObjs, nil)
+	r.mock.EXPECT().Get(DestinationPolicy, dstPolicy1.Destination).Return(dstPolicy1, true, "rev")
 	want := dstPolicy1.Policy[0]
 	if got := r.registry.DestinationPolicy(dstPolicy1.Destination, want.Tags); !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
+	}
+
+	r.mock.EXPECT().Get(DestinationPolicy, dstPolicy3.Destination).Return(nil, false, "")
+	if got := r.registry.DestinationPolicy(dstPolicy3.Destination, nil); got != nil {
+		t.Errorf("Failed: \ngot %+vwant nil", spew.Sdump(got))
 	}
 }
 

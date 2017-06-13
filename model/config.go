@@ -367,13 +367,11 @@ func (i *istioConfigStore) DestinationPolicies() []*proxyconfig.DestinationPolic
 }
 
 func (i *istioConfigStore) DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy {
-	// TODO: optimize destination policy retrieval
-	for _, value := range i.DestinationPolicies() {
-		if value.Destination == destination {
-			for _, policy := range value.Policy {
-				if tags.Equals(policy.Tags) {
-					return policy
-				}
+	value, exists, _ := i.Get(DestinationPolicy, destination)
+	if exists {
+		for _, policy := range value.(*proxyconfig.DestinationPolicy).Policy {
+			if tags.Equals(policy.Tags) {
+				return policy
 			}
 		}
 	}
