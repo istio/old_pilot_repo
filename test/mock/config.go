@@ -226,13 +226,19 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, n int) {
 // CheckIstioConfigTypes validates that an empty store can ingest Istio config objects
 func CheckIstioConfigTypes(store model.ConfigStore, t *testing.T) {
 	if _, err := store.Post(ExampleRouteRule); err != nil {
-		t.Error(err)
+		t.Errorf("Post(RouteRule) => got %v", err)
 	}
 	if _, err := store.Post(ExampleIngressRule); err != nil {
-		t.Error(err)
+		t.Errorf("Post(IngressRule) => got %v", err)
 	}
 	if _, err := store.Post(ExampleDestinationPolicy); err != nil {
-		t.Error(err)
+		t.Errorf("Post(DestinationPolicy) => got %v", err)
+	}
+
+	registry := model.MakeIstioStore(store)
+	rules := registry.RouteRules()
+	if len(rules) != 1 || !reflect.DeepEqual(rules[ExampleRouteRule.Name], ExampleRouteRule) {
+		t.Errorf("RouteRules() => %v, want %v", rules, ExampleRouteRule)
 	}
 }
 
