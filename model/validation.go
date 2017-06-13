@@ -649,6 +649,9 @@ func ValidateRouteRule(msg proto.Message) error {
 	if value.Name == "" {
 		errs = multierror.Append(errs, fmt.Errorf("route rule must have a name"))
 	}
+	if !IsDNS1123Label(value.Name) {
+		errs = multierror.Append(errs, fmt.Errorf("route rule name must be a host name label"))
+	}
 	if value.Destination == "" {
 		errs = multierror.Append(errs, fmt.Errorf("route rule must have a destination service"))
 	}
@@ -737,6 +740,9 @@ func ValidateIngressRule(msg proto.Message) error {
 	var errs error
 	if value.Name == "" {
 		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a name"))
+	}
+	if !IsDNS1123Label(value.Name) {
+		errs = multierror.Append(errs, fmt.Errorf("ingress rule name must be a host name label"))
 	}
 	if value.Destination == "" {
 		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a destination service"))

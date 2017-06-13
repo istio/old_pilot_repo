@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"
 )
@@ -52,6 +53,34 @@ var (
 
 	// Types defines the mock config descriptor
 	Types = model.ConfigDescriptor{Descriptor}
+
+	// ExampleRouteRule is an example route rule
+	ExampleRouteRule = &proxyconfig.RouteRule{
+		Name:        "sample-rule",
+		Destination: WorldService.Hostname,
+		Route: []*proxyconfig.DestinationWeight{
+			{Weight: 80, Tags: map[string]string{"version": "v1"}},
+			{Weight: 20, Tags: map[string]string{"version": "v2"}},
+		},
+	}
+
+	// ExampleIngressRule is an example ingress rule
+	ExampleIngressRule = &proxyconfig.IngressRule{
+		Name:                   "sample-ingress",
+		Port:                   80,
+		Destination:            WorldService.Hostname,
+		DestinationServicePort: &proxyconfig.IngressRule_DestinationPort{DestinationPort: 80},
+	}
+
+	// ExampleDestinationPolicy is an example destination policy
+	ExampleDestinationPolicy = &proxyconfig.DestinationPolicy{
+		Destination: WorldService.Hostname,
+		Policy: []*proxyconfig.DestinationVersionPolicy{
+			{LoadBalancing: &proxyconfig.LoadBalancing{
+				LbPolicy: &proxyconfig.LoadBalancing_Name{Name: proxyconfig.LoadBalancing_RANDOM},
+			}},
+		},
+	}
 )
 
 // Make creates a mock config indexed by a number
@@ -191,6 +220,19 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, n int) {
 	}
 	if len(l) != 0 {
 		t.Errorf("wanted 0 element(s), got %d in %v", len(l), l)
+	}
+}
+
+// CheckIstioConfigTypes validates that an empty store can ingest Istio config objects
+func CheckIstioConfigTypes(store model.ConfigStore, t *testing.T) {
+	if _, err := store.Post(ExampleRouteRule); err != nil {
+		t.Error(err)
+	}
+	if _, err := store.Post(ExampleIngressRule); err != nil {
+		t.Error(err)
+	}
+	if _, err := store.Post(ExampleDestinationPolicy); err != nil {
+		t.Error(err)
 	}
 }
 

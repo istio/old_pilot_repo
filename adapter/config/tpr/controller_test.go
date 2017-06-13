@@ -313,7 +313,7 @@ func createIngress(ingress *v1beta1.Ingress, client kubernetes.Interface, t *tes
 	}
 }
 
-func TestIstioConfig(t *testing.T) {
+func TestIstioConfigTODO(t *testing.T) {
 	client, err := kube.CreateInterface(kubeconfig(t))
 	if err != nil {
 		t.Fatal(err)
