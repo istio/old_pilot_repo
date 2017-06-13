@@ -31,8 +31,11 @@ func TestStoreInvariant(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	mock.CheckMapInvariant(store, t, 10)
+}
 
-	if _, err = aggregate.Make([]model.ConfigStore{mockStore, mockStore}); err == nil {
+func TestStoreValidation(t *testing.T) {
+	mockStore := memory.Make(mock.Types)
+	if _, err := aggregate.Make([]model.ConfigStore{mockStore, mockStore}); err == nil {
 		t.Error("expected error in duplicate types in the config store")
 	}
 }

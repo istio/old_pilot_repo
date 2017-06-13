@@ -48,6 +48,23 @@ func Make(stores []model.ConfigStore) (model.ConfigStore, error) {
 	}, nil
 }
 
+// MakeCache creates an aggregate config store cache from several config store
+// caches.
+func MakeCache(caches []model.ConfigStoreCache) (model.ConfigStoreCache, error) {
+	stores := make([]model.ConfigStore, len(caches))
+	for _, cache := range caches {
+		stores = append(stores, cache)
+	}
+	store, err := Make(stores)
+	if err != nil {
+		return nil, err
+	}
+	return &storeCache{
+		store:  store,
+		caches: caches,
+	}, nil
+}
+
 type store struct {
 	// descriptor is the unified
 	descriptor model.ConfigDescriptor
@@ -100,4 +117,58 @@ func (cr *store) Put(config proto.Message, oldRevision string) (string, error) {
 	}
 	store := cr.stores[schema.Type]
 	return store.Put(config, oldRevision)
+}
+
+type storeCache struct {
+	store  model.ConfigStore
+	caches []model.ConfigStoreCache
+}
+
+func (cr *storeCache) ConfigDescriptor() model.ConfigDescriptor {
+	return cr.store.ConfigDescriptor()
+}
+
+func (cr *storeCache) Get(typ, key string) (config proto.Message, exists bool, revision string) {
+	return cr.store.Get(typ, key)
+}
+
+func (cr *storeCache) List(typ string) ([]model.Config, error) {
+	return cr.store.List(typ)
+}
+
+func (cr *storeCache) Post(val proto.Message) (string, error) {
+	return cr.store.Post(val)
+}
+
+func (cr *storeCache) Put(val proto.Message, revision string) (string, error) {
+	return cr.store.Put(val, revision)
+}
+
+func (cr *storeCache) Delete(typ, key string) error {
+	return cr.store.Delete(typ, key)
+}
+
+func (cr *storeCache) HasSynced() bool {
+	for _, cache := range cr.caches {
+		if !cache.HasSynced() {
+			return false
+		}
+	}
+	return true
+}
+
+func (cr *storeCache) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
+	for _, cache := range cr.caches {
+		if _, exists := cache.ConfigDescriptor().GetByType(typ); exists {
+			cache.RegisterEventHandler(typ, handler)
+			return
+		}
+	}
+}
+
+func (cr *storeCache) Run(stop <-chan struct{}) {
+	for _, cache := range cr.caches {
+		go cache.Run(stop)
+	}
+	<-stop
 }
