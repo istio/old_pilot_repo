@@ -28,6 +28,6 @@ func TestStoreInvariant(t *testing.T) {
 }
 
 func TestIstioConfig(t *testing.T) {
-	store := Make(model.IstioConfigTypes)
+	store := memory.Make(model.IstioConfigTypes)
 	mock.CheckIstioConfigTypes(store, t)
 }
