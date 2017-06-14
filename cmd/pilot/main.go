@@ -30,9 +30,33 @@ import (
 	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/platform/vms"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
+
+	"github.com/amalgam8/amalgam8/sidecar/register"
+	vmsconfig "github.com/amalgam8/amalgam8/sidecar/config"
+	"github.com/amalgam8/amalgam8/sidecar/identity"
 )
+
+// Adapter defines options for underlying platform
+type Adapter string
+
+const (
+	KubernetesAdapter Adapter = "Kubernetes"
+	VMsAdapter        Adapter = "VMs"
+)
+
+// store the args related to VMs configuration
+type VMsArgs struct {
+	config    string
+	serverURL string
+	authToken string
+}
+
+// store the args related to K8s configuration
+type KubeConfig struct {
+}
 
 type args struct {
 	kubeconfig string
@@ -46,11 +70,16 @@ type args struct {
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
+
+	adapter Adapter
+
+	vmsArgs VMsArgs
 }
 
 var (
 	flags  args
 	client *kube.Client
+	vmsClient *vms.Client
 	mesh   *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
@@ -58,39 +87,52 @@ var (
 		Short: "Istio Pilot",
 		Long:  "Istio Pilot provides management plane functionality to the Istio service mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			if flags.kubeconfig == "" {
-				if v := os.Getenv("KUBECONFIG"); v != "" {
-					glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
-					flags.kubeconfig = v
+			if flags.adapter == "" {
+				flags.adapter = KubernetesAdapter
+			}
+
+			if flags.adapter == KubernetesAdapter {
+				if flags.kubeconfig == "" {
+					if v := os.Getenv("KUBECONFIG"); v != "" {
+						glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
+						flags.kubeconfig = v
+					}
 				}
-			}
 
-			client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
-			if err != nil {
-				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
-			}
-			if err = client.RegisterResources(); err != nil {
-				return multierror.Prefix(err, "failed to register Third-Party Resources.")
-			}
+				client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
+				if err != nil {
+					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
+				}
+				if err = client.RegisterResources(); err != nil {
+					return multierror.Prefix(err, "failed to register Third-Party Resources.")
+				}
 
-			// set values from environment variables
-			if flags.ipAddress == "" {
-				flags.ipAddress = os.Getenv("POD_IP")
-			}
-			if flags.podName == "" {
-				flags.podName = os.Getenv("POD_NAME")
-			}
-			if flags.controllerOptions.Namespace == "" {
-				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-			}
-			glog.V(2).Infof("flags %s", spew.Sdump(flags))
+				// set values from environment variables
+				if flags.ipAddress == "" {
+					flags.ipAddress = os.Getenv("POD_IP")
+				}
+				if flags.podName == "" {
+					flags.podName = os.Getenv("POD_NAME")
+				}
+				if flags.controllerOptions.Namespace == "" {
+					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
+				}
+				glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
-			// receive mesh configuration
-			mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.controllerOptions.Namespace, flags.meshConfig)
-			if err != nil {
-				return multierror.Prefix(err, "failed to retrieve mesh configuration.")
+				// receive mesh configuration
+				mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.controllerOptions.Namespace, flags.meshConfig)
+				if err != nil {
+					return multierror.Prefix(err, "failed to retrieve mesh configuration.")
+				}
+			} else if flags.adapter == VMsAdapter {
+				vmsClient, err = vms.NewClient(vms.ClientConfig{
+						URL: flags.VMsArgs.serverURL,
+						AuthToken: flags.VMsArgs.authToken,
+					})
+				if err != nil {
+					return multierror.Prefix(err, "failed to create VMs client.")
+				mesh = proxy.DefaultMeshConfig()
 			}
-
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			return
 		},
@@ -100,7 +142,15 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) (err error) {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
+			if flags.adapter == KubernetesAdapter {
+				controller := kube.NewController(client, mesh, flags.controllerOptions)
+			} else if flags.adapter == VMsAdapter {
+				controller := vms.NewController(
+					discovery: ,
+					mesh: mesh,
+				)
+			}
+
 			context := &proxy.Context{
 				Discovery:  controller,
 				Accounts:   controller,
@@ -123,12 +173,24 @@ var (
 		Use:   "apiserver",
 		Short: "Start Istio config API service",
 		Run: func(*cobra.Command, []string) {
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
+			var version string
+			if flags.adapter == KubernetesAdapter {
+				controller := kube.NewController(client, mesh, flags.controllerOptions)
+				version = kube.IstioResourceVersion
+			} else if flags.adapter == VMsAdapter {
+				controller := vms.NewController(
+					discovery: vmsClient,
+					mesh: mesh,
+				)
+				version = vms.IstioResourceVersion
+			}
+
 			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
-				Version:  kube.IstioResourceVersion,
+				Version:  version,
 				Port:     flags.apiserverPort,
 				Registry: &model.IstioRegistry{ConfigRegistry: controller},
 			})
+
 			stop := make(chan struct{})
 			go controller.Run(stop)
 			go apiserver.Run()
@@ -145,15 +207,47 @@ var (
 		Use:   "sidecar",
 		Short: "Envoy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
+			var uid string
+			var regAgent *register.RegistrationAgent
 			mesh.IngressControllerMode = proxyconfig.ProxyMeshConfig_OFF
-			controller := kube.NewController(client, mesh, flags.controllerOptions)
+			if flags.adapter == KubernetesAdapter {
+				controller := kube.NewController(client, mesh, flags.controllerOptions)
+				uid =  fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace)
+			} else if flags.adapter == VMsAdapter {
+				controller := vms.NewController(
+					discovery: vmsClient,
+					mesh: mesh,
+				)
+				// Get app info from config file
+				vmsConfig := *&vmsconfig.DefaultConfig
+				err := vmsConfig.loadFromFile(flags.VMsArgs.config)
+			        if err != nil {
+					return multierror.Prefix(err, "failed to read vms config file.")
+				}
+
+				identity, err := identity.New(vmsConfig, nil)
+			        if err != nil {
+					return multierror.Prefix(err, "failed to create identity for service.")
+				}
+				// Create a registration agent for vms platform
+				regAgent, err := register.NewRegistrationAgent(register.RegistrationConfig{
+					Registry: vmsClient,
+					Identity: identity,
+				})
+				if err != nil {
+					return multierror.Prefix(err, "failed to create registration agent.")
+				}
+
+			}
+
 			context := &proxy.Context{
 				Discovery:        controller,
 				Accounts:         controller,
 				Config:           &model.IstioRegistry{ConfigRegistry: controller},
 				MeshConfig:       mesh,
 				IPAddress:        flags.ipAddress,
-				UID:              fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
+				UID:              uid,
+				Registration:     regAgent,
 				PassthroughPorts: flags.passthrough,
 			}
 			w, err := envoy.NewWatcher(controller, context)
