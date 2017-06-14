@@ -1,0 +1,18 @@
+register: true
+
+service:
+  name: productpage
+  tags:
+    - version=v1
+
+endpoint:
+  host: productpage-v1
+  port: 6379
+  type: tcp
+
+service_port:
+  name: http
+
+registry:
+  url: http://registry:8080
+  poll: 5s

@@ -1,0 +1,18 @@
+register: true
+
+service:
+  name: reviews
+  tags:
+    - version=v1
+
+endpoint:
+  host: reviews-v1.mybluemix.net
+  port: 80
+  type: tcp
+
+service_port:
+  name: http
+
+registry:
+  url: http://a8registry-server.mybluemix.net
+  poll: 5s

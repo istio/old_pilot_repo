@@ -1,0 +1,14 @@
+Getting apps in org zijun.wang / space dev as zijun.wang@ibm.com...
+OK
+
+name                requested state   instances   memory   disk   urls
+a8registry          stopped           0/1         32M      64M
+a8registry-server   started           1/1         32M      64M    a8registry-server.mybluemix.net
+details-v1          started           1/1         16M      128M   details-v1.mybluemix.net
+gateway-v1          started           1/1         128M     128M   gateway-v1.mybluemix.net
+productpage-v1      started           1/1         16M      128M   productpage-v1.mybluemix.net
+ratings-v1          started           1/1         16M      128M   ratings-v1.mybluemix.net
+registry            stopped           0/1         32M      64M
+reviews-v1          started           1/1         16M      128M   reviews-v1.mybluemix.net, reviews-service.mybluemix.net/reviews
+reviews-v2          started           1/1         16M      128M   reviews-v2.mybluemix.net, reviews-service.mybluemix.net/reviews
+reviews-v3          started           1/1         16M      128M   reviews-v3.mybluemix.net, reviews-service.mybluemix.net/reviews

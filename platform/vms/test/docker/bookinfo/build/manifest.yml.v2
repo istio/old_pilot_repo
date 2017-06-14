@@ -1,0 +1,71 @@
+---
+applications:
+  - name: a8registry-server
+    memory: 32M
+    disk_quota: 64M
+    path: ../registry
+    buildpack: binary_buildpack
+    command: ./a8registry
+    
+  - name: productpage-v1
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/productpage
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: productpage
+      SERVICE_VERSION: v1
+    command: ./start_service.sh v1
+
+  - name: details-v1
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/details
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: details
+      SERVICE_VERSION: v1
+    command: ./start_service.sh v1
+
+  - name: ratings-v1
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/ratings
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: ratings
+      SERVICE_VERSION: v1
+    command: ./start_service.sh v1
+
+  - name: reviews-v1
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/reviews
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: reviews
+      SERVICE_VERSION: v1
+    command: ./start_service.sh v1
+
+  - name: reviews-v2
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/reviews
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: reviews
+      SERVICE_VERSION: v2
+      ENABLE_RATINGS: "true"
+    command: ./start_service.sh v2
+
+  - name: reviews-v3
+    memory: 16M
+    disk_quota: 128M
+    path: ../apps/reviews
+    buildpack: binary_buildpack
+    env:
+      SERVICE_NAME: reviews
+      SERVICE_VERSION: v3
+      ENABLE_RATINGS: "true"
+      STAR_COLOR: red
+    command: ./start_service.sh v3

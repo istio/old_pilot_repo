@@ -20,6 +20,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"github.com/amalgam8/amalgam8/sidecar/register"
 )
 
 // Context defines local proxy context information about the global service mesh
@@ -57,6 +58,9 @@ type Context struct {
 	// upgrade (such as utilizng TLS for proxy-to-proxy traffic) will be applied
 	// to the passthrough port.
 	PassthroughPorts []int
+
+	// Registration contains the service information and Registry APIs for the VMs platform
+	Registration register.RegistrationAgent
 }
 
 // DefaultMeshConfig configuration
