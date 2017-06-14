@@ -62,7 +62,6 @@ func (cl *client) Get(typ, key string) (proto.Message, bool, string) {
 		glog.Warning(err)
 		return nil, false, ""
 	}
-
 	if len(resp.Kvs) < 1 {
 		return nil, false, ""
 	}
@@ -87,7 +86,7 @@ func (cl *client) List(typ string) ([]model.Config, error) {
 		return nil, err
 	}
 	var errs error
-	out := make([]model.Config, 0)
+	out := make([]model.Config, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		content, err := schema.FromJSON(string(kv.Value))
 		if err != nil {
