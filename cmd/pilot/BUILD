@@ -5,13 +5,13 @@ go_library(
     srcs = ["main.go"],
     visibility = ["//visibility:private"],
     deps = [
-        "//apiserver:go_default_library",
+        "//adapter/config/tpr:go_default_library",
         "//cmd:go_default_library",
-        "//cmd/version:go_default_library",
         "//model:go_default_library",
         "//platform/kube:go_default_library",
         "//proxy:go_default_library",
         "//proxy/envoy:go_default_library",
+        "//tools/version:go_default_library",
         "@com_github_davecgh_go_spew//spew:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
@@ -23,6 +23,6 @@ go_library(
 go_binary(
     name = "pilot",
     library = ":go_default_library",
-    linkstamp = "istio.io/pilot/cmd/version",
+    linkstamp = "istio.io/pilot/tools/version",
     visibility = ["//visibility:public"],
 )
