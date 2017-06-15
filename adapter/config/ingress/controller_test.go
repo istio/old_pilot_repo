@@ -30,6 +30,7 @@ import (
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/proxy"
+	"istio.io/pilot/test/mock"
 	"istio.io/pilot/test/util"
 )
 
@@ -79,6 +80,23 @@ func TestIngressController(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	go ctl.Run(stop)
+
+	if len(ctl.ConfigDescriptor()) == 0 {
+		t.Errorf("must support ingress type")
+	}
+
+	// make sure all operations error out
+	if _, err := ctl.Post(mock.ExampleIngressRule); err == nil {
+		t.Errorf("Post should not be allowed")
+	}
+
+	if _, err := ctl.Put(mock.ExampleIngressRule, ""); err == nil {
+		t.Errorf("Put should not be allowed")
+	}
+
+	if err := ctl.Delete(model.IngressRule, "test"); err == nil {
+		t.Errorf("Delete should not be allowed")
+	}
 
 	// Append an ingress notification handler that just counts number of notifications
 	notificationCount := 0
@@ -209,7 +227,6 @@ func TestIngressController(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func createIngress(ingress *v1beta1.Ingress, client kubernetes.Interface, t *testing.T) {

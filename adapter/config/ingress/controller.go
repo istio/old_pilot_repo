@@ -114,7 +114,7 @@ func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model
 			return nil
 		}
 
-		// Convert the ingress into a map[Key]Message, and invoke handler for each
+		// Convert the ingress into a map[Key]rule, and invoke handler for each
 		// TODO: This works well for Add and Delete events, but no so for Update:
 		// A updated ingress may also trigger an Add or Delete for one of its constituent sub-rules.
 		rules := convertIngress(*ingress, c.domainSuffix)
@@ -146,6 +146,10 @@ func (c *controller) ConfigDescriptor() model.ConfigDescriptor {
 }
 
 func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
+	if typ != model.IngressRule {
+		return nil, false, ""
+	}
+
 	ingressName, ingressNamespace, _, _, err := decodeIngressRuleName(key)
 	if err != nil {
 		glog.V(2).Infof("getIngress(%s) => error %v", key, err)
@@ -167,24 +171,27 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	messages := convertIngress(*ingress, c.domainSuffix)
-	message, exists := messages[key]
-	return message, exists, ingress.GetResourceVersion()
+	rules := convertIngress(*ingress, c.domainSuffix)
+	rule, exists := rules[key]
+	return rule, exists, ingress.GetResourceVersion()
 }
 
 func (c *controller) List(typ string) ([]model.Config, error) {
-	out := make([]model.Config, 0)
+	if typ != model.IngressRule {
+		return nil, nil
+	}
 
+	out := make([]model.Config, 0)
 	for _, obj := range c.informer.GetStore().List() {
 		ingress := obj.(*v1beta1.Ingress)
 		if shouldProcessIngress(c.mesh, ingress) {
 			ingressRules := convertIngress(*ingress, c.domainSuffix)
-			for key, message := range ingressRules {
+			for key, rule := range ingressRules {
 				out = append(out, model.Config{
 					Type:     model.IngressRule,
 					Key:      key,
 					Revision: ingress.GetResourceVersion(),
-					Content:  message,
+					Content:  rule,
 				})
 			}
 		}

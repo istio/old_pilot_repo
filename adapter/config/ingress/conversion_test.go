@@ -17,11 +17,12 @@ package ingress
 import (
 	"testing"
 
-	"istio.io/pilot/adapter/config/ingress"
-	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/proxy"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/proxy"
 )
 
 func TestDecodeIngressRuleName(t *testing.T) {
@@ -54,6 +55,23 @@ func TestDecodeIngressRuleName(t *testing.T) {
 	}
 }
 
+func TestEncoding(t *testing.T) {
+	if got := encodeIngressRuleName("name", "namespace", 3, 5); got != "namespace.name.3.5" {
+		t.Errorf("unexpected ingress encoding %q", got)
+	}
+
+	cases := []string{
+		"namespace.name",
+		"namespace.name.path.5",
+		"namespace.name.3.path",
+	}
+	for _, code := range cases {
+		if _, _, _, _, err := decodeIngressRuleName(code); err == nil {
+			t.Errorf("expected error on decoding %q", code)
+		}
+	}
+}
+
 func TestIsRegularExpression(t *testing.T) {
 	cases := []struct {
 		s       string
@@ -74,9 +92,7 @@ func TestIsRegularExpression(t *testing.T) {
 }
 
 func TestIngressClass(t *testing.T) {
-	ns, cl, cleanup := makeTempClient(t)
-	defer cleanup()
-
+	istio := proxy.DefaultMeshConfig().IngressClass
 	cases := []struct {
 		ingressMode   proxyconfig.ProxyMeshConfig_IngressControllerMode
 		ingressClass  string
@@ -84,8 +100,9 @@ func TestIngressClass(t *testing.T) {
 	}{
 		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "nginx", shouldProcess: false},
 		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "nginx", shouldProcess: false},
-		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "istio", shouldProcess: true},
-		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "istio", shouldProcess: true},
+		{ingressMode: proxyconfig.ProxyMeshConfig_OFF, ingressClass: istio, shouldProcess: false},
+		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: istio, shouldProcess: true},
+		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: istio, shouldProcess: true},
 		{ingressMode: proxyconfig.ProxyMeshConfig_DEFAULT, ingressClass: "", shouldProcess: true},
 		{ingressMode: proxyconfig.ProxyMeshConfig_STRICT, ingressClass: "", shouldProcess: false},
 	}
@@ -107,16 +124,12 @@ func TestIngressClass(t *testing.T) {
 
 		mesh := proxy.DefaultMeshConfig()
 		mesh.IngressControllerMode = c.ingressMode
-		ctl := ingress.NewController(cl, &mesh, kube.ControllerOptions{
-			Namespace:    ns,
-			ResyncPeriod: resync,
-		})
 
 		if c.ingressClass != "" {
 			ing.Annotations["kubernetes.io/ingress.class"] = c.ingressClass
 		}
 
-		if c.shouldProcess != ctl.shouldProcessIngress(&ing) {
+		if c.shouldProcess != shouldProcessIngress(&mesh, &ing) {
 			t.Errorf("shouldProcessIngress(<ingress of class '%s'>) => %v, want %v",
 				c.ingressClass, !c.shouldProcess, c.shouldProcess)
 		}
