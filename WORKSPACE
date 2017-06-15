@@ -332,7 +332,7 @@ DEBUG_BASE_IMAGE_SHA = "79702c8cc8c89117b99a2ccf591d5b9ddb4708eb3cf7806ceb3e2d61
 http_file(
     name = "ubuntu_xenial_debug",
     sha256 = DEBUG_BASE_IMAGE_SHA,
-    url = "https://storage.googleapis.com/istio-build/manager/ubuntu_xenial_debug-" + DEBUG_BASE_IMAGE_SHA + ".tar.gz",
+    url = "https://storage.googleapis.com/istio-build/pilot/ubuntu_xenial_debug-" + DEBUG_BASE_IMAGE_SHA + ".tar.gz",
 )
 
 new_http_archive(
