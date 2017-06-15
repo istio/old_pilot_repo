@@ -21,38 +21,50 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/mock/gomock"
-	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-func TestKindMapKinds(t *testing.T) {
-	km := KindMap{
-		"b": ProtoSchema{},
-		"a": ProtoSchema{},
-		"c": ProtoSchema{},
+func TestConfigDescriptor(t *testing.T) {
+	a := ProtoSchema{Type: "a", MessageName: "proxy.A"}
+	descriptor := ConfigDescriptor{
+		a,
+		ProtoSchema{Type: "b", MessageName: "proxy.B"},
+		ProtoSchema{Type: "c", MessageName: "proxy.C"},
 	}
 	want := []string{"a", "b", "c"}
-	got := km.Kinds()
+	got := descriptor.Types()
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("KindMap.Kinds failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
+		t.Errorf("descriptor.Types() => got %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
+	}
+
+	aType, aExists := descriptor.GetByType(a.Type)
+	if !aExists || !reflect.DeepEqual(aType, a) {
+		t.Errorf("descriptor.GetByType(a) => got %+v, want %+v", aType, a)
+	}
+
+	aSchema, aSchemaExists := descriptor.GetByMessageName(a.MessageName)
+	if !aSchemaExists || !reflect.DeepEqual(aSchema, a) {
+		t.Errorf("descriptor.GetByMessageName(a) => got %+v, want %+v", aType, a)
+	}
+	_, aSchemaNotExist := descriptor.GetByMessageName("blah")
+	if aSchemaNotExist {
+		t.Errorf("descriptor.GetByMessageName(blah) => got true, want false")
 	}
 }
 
 type testRegistry struct {
 	ctrl     gomock.Controller
-	mock     *MockConfigRegistry
-	registry IstioRegistry
+	mock     *MockConfigStore
+	registry IstioConfigStore
 }
 
 func initTestRegistry(t *testing.T) *testRegistry {
 	ctrl := gomock.NewController(t)
-	mock := NewMockConfigRegistry(ctrl)
+	mock := NewMockConfigStore(ctrl)
 	return &testRegistry{
-		mock: mock,
-		registry: IstioRegistry{
-			ConfigRegistry: mock,
-		},
+		mock:     mock,
+		registry: MakeIstioStore(mock),
 	}
 }
 
@@ -104,6 +116,7 @@ var (
 
 	routeRule1MatchNil = &proxyconfig.RouteRule{
 		Destination: "foo",
+		Name:        "foo",
 		Precedence:  1,
 	}
 
@@ -145,7 +158,6 @@ var (
 
 	dstTags0 = map[string]string{"a": "b"}
 	dstTags1 = map[string]string{"c": "d"}
-	dstTags2 = map[string]string{"e": "f"}
 
 	dstPolicy1 = &proxyconfig.DestinationPolicy{
 		Destination: "foo",
@@ -158,52 +170,79 @@ var (
 		Destination: "bar",
 		Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags1}},
 	}
-	dstPolicy4 = &proxyconfig.DestinationPolicy{
-		Destination: "baz",
-		Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags2}},
-	}
 )
 
-func TestIstioRegistryRouteAndIngressRules(t *testing.T) {
+func TestIstioRegistryRouteRules(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
+
+	if RouteRuleDescriptor.Key(routeRule1MatchNil) != routeRule1MatchNil.Name {
+		t.Errorf("unexpected route rule key not equal to name")
+	}
 
 	cases := []struct {
 		name      string
 		mockError error
-		mockObjs  map[Key]proto.Message
-		want      map[Key]*proxyconfig.RouteRule
+		mockObjs  []Config
+		want      map[string]*proxyconfig.RouteRule
 	}{
 		{
 			name:      "Empty object map with error",
-			mockObjs:  map[Key]proto.Message{},
+			mockObjs:  nil,
 			mockError: errors.New("foobar"),
-			want:      map[Key]*proxyconfig.RouteRule{},
+			want:      map[string]*proxyconfig.RouteRule{},
 		},
 		{
 			name: "Slice of unsorted RouteRules",
-			mockObjs: map[Key]proto.Message{
-				{Name: "foo"}: routeRule1MatchNil,
-				{Name: "bar"}: routeRule3SourceMismatch,
-				{Name: "baz"}: routeRule2SourceEmpty,
+			mockObjs: []Config{
+				{Key: "foo", Content: routeRule1MatchNil},
+				{Key: "bar", Content: routeRule3SourceMismatch},
+				{Key: "baz", Content: routeRule2SourceEmpty},
 			},
-			want: map[Key]*proxyconfig.RouteRule{
-				{Name: "foo"}: routeRule1MatchNil,
-				{Name: "bar"}: routeRule3SourceMismatch,
-				{Name: "baz"}: routeRule2SourceEmpty,
+			want: map[string]*proxyconfig.RouteRule{
+				"foo": routeRule1MatchNil,
+				"bar": routeRule3SourceMismatch,
+				"baz": routeRule2SourceEmpty,
 			},
 		},
 	}
 	for _, c := range cases {
-		r.mock.EXPECT().List(RouteRule, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.RouteRules(""); !reflect.DeepEqual(got, c.want) {
+		r.mock.EXPECT().List(RouteRule).Return(c.mockObjs, c.mockError)
+		if got := r.registry.RouteRules(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%v with RouteRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
-		r.mock.EXPECT().List(IngressRule, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.IngressRules(""); !reflect.DeepEqual(got, c.want) {
-			t.Errorf("%v with IngressRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
-		}
 	}
+}
+
+func TestIstioRegistryIngressRules(t *testing.T) {
+	r := initTestRegistry(t)
+	defer r.shutdown()
+
+	rule := &proxyconfig.IngressRule{
+		Name:        "sample-ingress",
+		Destination: "a.svc",
+	}
+
+	if IngressRuleDescriptor.Key(rule) != rule.Name {
+		t.Errorf("unexpected ingress rule key not equal to name")
+	}
+
+	r.mock.EXPECT().List(IngressRule).Return([]Config{{
+		Key:     rule.Name,
+		Content: rule,
+	}}, nil)
+
+	if got := r.registry.IngressRules(); !reflect.DeepEqual(got, map[string]*proxyconfig.IngressRule{
+		rule.Name: rule,
+	}) {
+		t.Errorf("IngressRules failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(rule))
+	}
+
+	r.mock.EXPECT().List(IngressRule).Return(nil, errors.New("cannot list"))
+	if got := r.registry.IngressRules(); len(got) > 0 {
+		t.Errorf("IngressRules failed: \ngot %+vwant empty", spew.Sdump(got))
+	}
+
 }
 
 func TestIstioRegistryRouteRulesBySource(t *testing.T) {
@@ -212,13 +251,13 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 
 	instances := []*ServiceInstance{serviceInstance1, serviceInstance2}
 
-	mockObjs := map[Key]proto.Message{
-		{Name: "match-nil"}:              routeRule1MatchNil,
-		{Name: "source-empty"}:           routeRule2SourceEmpty,
-		{Name: "source-mismatch"}:        routeRule3SourceMismatch,
-		{Name: "source-match"}:           routeRule4SourceMatch,
-		{Name: "tag-subset-of-mismatch"}: routeRule5TagSubsetOfMismatch,
-		{Name: "tag-subset-of-match"}:    routeRule6TagSubsetOfMatch,
+	mockObjs := []Config{
+		{Key: "match-nil", Content: routeRule1MatchNil},
+		{Key: "source-empty", Content: routeRule2SourceEmpty},
+		{Key: "source-mismatch", Content: routeRule3SourceMismatch},
+		{Key: "source-match", Content: routeRule4SourceMatch},
+		{Key: "tag-subset-of-mismatch", Content: routeRule5TagSubsetOfMismatch},
+		{Key: "tag-subset-of-match", Content: routeRule6TagSubsetOfMatch},
 	}
 	want := []*proxyconfig.RouteRule{
 		routeRule6TagSubsetOfMatch,
@@ -227,35 +266,35 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 		routeRule2SourceEmpty,
 	}
 
-	r.mock.EXPECT().List(RouteRule, "").Return(mockObjs, nil)
-	got := r.registry.RouteRulesBySource("", instances)
+	r.mock.EXPECT().List(RouteRule).Return(mockObjs, nil)
+	got := r.registry.RouteRulesBySource(instances)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
 	}
 }
 
-func TestIstioRegistryPoliciesByNamespace(t *testing.T) {
+func TestIstioRegistryPolicies(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
 
 	cases := []struct {
 		name      string
 		mockError error
-		mockObjs  map[Key]proto.Message
+		mockObjs  []Config
 		want      []*proxyconfig.DestinationPolicy
 	}{
 		{
 			name:      "Empty object map with error",
-			mockObjs:  map[Key]proto.Message{},
+			mockObjs:  nil,
 			mockError: errors.New("foobar"),
 			want:      []*proxyconfig.DestinationPolicy{},
 		},
 		{
 			name: "Slice of unsorted DestinationPolicy",
-			mockObjs: map[Key]proto.Message{
-				{Name: "foo"}: dstPolicy1,
-				{Name: "bar"}: dstPolicy2,
-				{Name: "baz"}: dstPolicy3,
+			mockObjs: []Config{
+				{Key: "foo", Content: dstPolicy1},
+				{Key: "bar", Content: dstPolicy2},
+				{Key: "baz", Content: dstPolicy3},
 			},
 			want: []*proxyconfig.DestinationPolicy{
 				dstPolicy1, dstPolicy2, dstPolicy3,
@@ -271,8 +310,8 @@ func TestIstioRegistryPoliciesByNamespace(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r.mock.EXPECT().List(DestinationPolicy, "").Return(c.mockObjs, c.mockError)
-		if got := r.registry.PoliciesByNamespace(""); !reflect.DeepEqual(makeSet(got), makeSet(c.want)) {
+		r.mock.EXPECT().List(DestinationPolicy).Return(c.mockObjs, c.mockError)
+		if got := r.registry.DestinationPolicies(); !reflect.DeepEqual(makeSet(got), makeSet(c.want)) {
 			t.Errorf("%v failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
 	}
@@ -282,33 +321,19 @@ func TestIstioRegistryDestinationPolicies(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()
 
-	mockObjs := map[Key]proto.Message{
-		{Name: "foo"}:  dstPolicy1,
-		{Name: "foo2"}: dstPolicy2,
-		{Name: "bar"}:  dstPolicy3,
-		{Name: "baz"}:  dstPolicy4,
+	if DestinationPolicyDescriptor.Key(dstPolicy1) != dstPolicy1.Destination {
+		t.Error("expect destination policy key to be hostname")
 	}
 
-	r.mock.EXPECT().List(DestinationPolicy, "").Return(mockObjs, nil)
+	r.mock.EXPECT().Get(DestinationPolicy, dstPolicy1.Destination).Return(dstPolicy1, true, "rev")
 	want := dstPolicy1.Policy[0]
 	if got := r.registry.DestinationPolicy(dstPolicy1.Destination, want.Tags); !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
 	}
-}
 
-func TestKeyString(t *testing.T) {
-	// TODO - Tests string formatting with blank name and namespace?
-	cases := []struct {
-		in   Key
-		want string
-	}{{
-		in:   Key{Kind: "example-kind", Name: "x", Namespace: "default"},
-		want: "default/example-kind-x",
-	}}
-	for _, c := range cases {
-		if c.in.String() != c.want {
-			t.Errorf("Bad human-readable string: got %v want %v", c.in.String(), c.want)
-		}
+	r.mock.EXPECT().Get(DestinationPolicy, dstPolicy3.Destination).Return(nil, false, "")
+	if got := r.registry.DestinationPolicy(dstPolicy3.Destination, nil); got != nil {
+		t.Errorf("Failed: \ngot %+vwant nil", spew.Sdump(got))
 	}
 }
 

@@ -11,7 +11,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//model:go_default_library",
+        "//test/util:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
+        "@io_istio_api//:go_default_library",
     ],
 )
 
@@ -25,7 +28,6 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
-        "config_test.go",
         "secret_test.go",
         "service_test.go",
     ],

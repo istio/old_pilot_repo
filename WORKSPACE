@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_pilot")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "78d030fc16e7c6e0a188714980db0b04086c4a5e",  # April 12 2017 (0.4.3)
+    commit = "e1786dae19beb746bc9a6b9aabc2e134151d0182",  # 8 June 2017
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -34,7 +34,7 @@ new_go_repository(
 
 new_go_repository(
     name = "com_github_coreos_go_oidc",
-    commit = "be73733bb8cc830d0205609b95d125215f8e9c70",
+    commit = "c797a55f1c1001ec3169f1d0fbb4c5523563bec6",
     importpath = "github.com/coreos/go-oidc",
 )
 
@@ -278,6 +278,12 @@ new_go_repository(
 )
 
 new_go_repository(
+    name = "com_github_inconshreveable_mousetrap",
+    commit = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75",
+    importpath = "github.com/inconshreveable/mousetrap",
+)
+
+new_go_repository(
     name = "com_github_cpuguy83_go_md2man",
     commit = "648eed146d3f3beacb64063cd0daae908015eebd",  # Mar 19, 2017 (no releases)
     importpath = "github.com/cpuguy83/go-md2man",
@@ -321,12 +327,12 @@ http_file(
 ## Docker rules
 ##
 
-DEBUG_BASE_IMAGE_SHA = "79702c8cc8c89117b99a2ccf591d5b9ddb4708eb3cf7806ceb3e2d6156b2ba54"
+DEBUG_BASE_IMAGE_SHA = "3350805cd019192b1a71fcdcc786ac4a8500e0d4f96c30e5e4c8ff43b9208195"
 
 http_file(
     name = "ubuntu_xenial_debug",
     sha256 = DEBUG_BASE_IMAGE_SHA,
-    url = "https://storage.googleapis.com/istio-build/manager/ubuntu_xenial_debug-" + DEBUG_BASE_IMAGE_SHA + ".tar.gz",
+    url = "https://storage.googleapis.com/istio-build/pilot/ubuntu_xenial_debug-" + DEBUG_BASE_IMAGE_SHA + ".tar.gz",
 )
 
 new_http_archive(
@@ -405,37 +411,8 @@ go_proto_library(
     ],
 )
     """,
-    commit = "94aa4ce91ada31c401f407324fec6cf1a6b52b02",  # June 2, 2017
+    commit = "af5afdafc95826a5716facc2ea025f1e27bb8225",  # June 8, 2017
     remote = "https://github.com/istio/api.git",
-)
-
-GOOGLEAPIS_BUILD_FILE = """
-package(default_visibility = ["//visibility:public"])
-
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
-load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
-go_prefix("github.com/googleapis/googleapis/google/rpc")
-
-go_proto_library(
-    name = "go_default_library",
-    srcs = [
-        "google/rpc/code.proto",
-        "google/rpc/error_details.proto",
-        "google/rpc/status.proto",
-    ],
-    deps = [
-        "@com_github_golang_protobuf//ptypes/any:go_default_library",
-        "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-        "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-    ],
-)
-"""
-
-new_git_repository(
-    name = "com_github_googleapis_googleapis",
-    build_file_content = GOOGLEAPIS_BUILD_FILE,
-    commit = "13ac2436c5e3d568bd0e938f6ed58b77a48aba15",  # Oct 21, 2016 (only release pre-dates sha)
-    remote = "https://github.com/googleapis/googleapis.git",
 )
 
 ##
