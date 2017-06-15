@@ -307,6 +307,12 @@ new_go_repository(
     importpath = "github.com/golang/sync",
 )
 
+new_go_repository(
+    name = "com_github_coreos_etcd",
+    commit = "762b2c625cfdc7b679325a284c42b7920940a6b7",
+    importpath = "github.com/coreos/etcd",
+)
+
 ##
 ## Proxy build rules
 ##
