@@ -215,8 +215,15 @@ func TestIngressController(t *testing.T) {
 		if !exists {
 			t.Errorf("expected IngressRule with key %v to exist", listMsg.Key)
 
-			listRule := listMsg.Content.(*proxyconfig.IngressRule)
-			getRule := getMsg.(*proxyconfig.IngressRule)
+			listRule, ok := listMsg.Content.(*proxyconfig.IngressRule)
+			if !ok {
+				t.Errorf("expected IngressRule but got %v", listMsg.Content)
+			}
+
+			getRule, ok := getMsg.(*proxyconfig.IngressRule)
+			if !ok {
+				t.Errorf("expected IngressRule but got %v", getMsg)
+			}
 
 			// TODO:  Compare listRule and getRule objects
 			if listRule == nil {

@@ -178,7 +178,7 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 
 func (c *controller) List(typ string) ([]model.Config, error) {
 	if typ != model.IngressRule {
-		return nil, nil
+		return nil, errUnsupportedOp
 	}
 
 	out := make([]model.Config, 0)
