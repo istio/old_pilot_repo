@@ -35,6 +35,7 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
+        "//platform/kube:go_default_library",
         "//proxy:go_default_library",
         "@io_istio_api//:go_default_library",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",

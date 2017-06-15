@@ -61,10 +61,10 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 	// informer framework from Kubernetes
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			func(opts meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
 				return client.ExtensionsV1beta1().Ingresses(options.Namespace).List(opts)
 			},
-			func(opts meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				return client.ExtensionsV1beta1().Ingresses(options.Namespace).Watch(opts)
 			},
 		}, &v1beta1.Ingress{},
