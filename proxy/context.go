@@ -32,7 +32,7 @@ type Context struct {
 	Accounts model.ServiceAccounts
 
 	// Config interface for listing routing rules
-	Config *model.IstioRegistry
+	Config model.IstioConfigStore
 
 	// MeshConfig defines global configuration settings
 	MeshConfig *proxyconfig.ProxyMeshConfig

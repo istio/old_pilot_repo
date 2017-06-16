@@ -65,10 +65,6 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
-    stage('Build istioctl') {
-      def remotePath = gitUtils.artifactsPath('istioctl')
-      sh("bin/cross-compile-istioctl -p ${remotePath}")
-    }
     stage('Go Build') {
       sh('bin/init.sh')
     }
@@ -81,7 +77,7 @@ def presubmit(gitUtils, bazel, utils) {
     stage('Code Coverage') {
       sh('bin/codecov.sh > codecov.report')
       sh('bazel-bin/bin/toolbox/presubmit/package_coverage_check')
-      utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
+      utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     stage('Integration Tests') {
       timeout(15) {
@@ -96,10 +92,6 @@ def stablePresubmit(gitUtils, bazel, utils) {
     bazel.updateBazelRc()
     utils.initTestingCluster()
     sh('ln -s ~/.kube/config platform/kube/')
-    stage('Build istioctl') {
-      def remotePath = gitUtils.artifactsPath('istioctl')
-      sh("bin/cross-compile-istioctl -p ${remotePath}")
-    }
     stage('Integration Tests') {
       timeout(60) {
         sh("bin/e2e.sh -count 10 -logs=false -tag ${env.GIT_SHA}")
@@ -112,10 +104,6 @@ def stablePostsubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/pilot') {
     bazel.updateBazelRc()
     sh('touch platform/kube/config')
-    stage('Build istioctl') {
-      def remotePath = gitUtils.artifactsPath('istioctl')
-      sh("bin/cross-compile-istioctl -p ${remotePath}")
-    }
     stage('Docker Push') {
       def images = 'init,app,proxy,proxy_debug,pilot'
       def tags = "${env.GIT_SHORT_SHA},${env.ISTIO_VERSION}-${env.GIT_SHORT_SHA}"
@@ -143,7 +131,7 @@ def postsubmit(gitUtils, bazel, utils) {
       bazel.test('//...')
       sh('bin/init.sh')
       sh('bin/codecov.sh')
-      utils.publishCodeCoverage('MANAGER_CODECOV_TOKEN')
+      utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     utils.fastForwardStable('pilot')
   }

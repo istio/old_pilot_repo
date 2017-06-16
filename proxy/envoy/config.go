@@ -109,6 +109,7 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 				RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
 			},
 		},
+		StatsdUDPIPAddress: mesh.StatsdUdpAddress,
 	}
 
 	if mesh.ZipkinAddress != "" {
@@ -316,14 +317,14 @@ func buildOutboundHTTPRoutes(
 	services []*model.Service,
 	accounts model.ServiceAccounts,
 	mesh *proxyconfig.ProxyMeshConfig,
-	config *model.IstioRegistry) HTTPRouteConfigs {
+	config model.IstioConfigStore) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
 
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 
 	// get all the route rules applicable to the instances
-	rules := config.RouteRulesBySource("", instances)
+	rules := config.RouteRulesBySource(instances)
 
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters

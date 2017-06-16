@@ -191,6 +191,8 @@ var (
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
 
+			ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+
 			stop := make(chan struct{})
 			go serviceController.Run(stop)
 			go configController.Run(stop)
