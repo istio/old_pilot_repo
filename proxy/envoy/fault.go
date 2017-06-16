@@ -40,7 +40,8 @@ func buildFaultFilters(routeConfig *HTTPRouteConfig) []HTTPFilter {
 
 // buildFaultFilter builds a single fault filter for envoy cluster
 func buildHTTPFaultFilter(cluster string, faultRule *proxyconfig.HTTPFaultInjection, headers Headers) *HTTPFilter {
-	abort, delay := buildAbortConfig(faultRule.Abort), buildDelayConfig(faultRule.Delay)
+	abort := buildAbortConfig(faultRule.Abort)
+	delay := buildDelayConfig(faultRule.Delay)
 	if abort == nil && delay == nil {
 		return nil
 	}
