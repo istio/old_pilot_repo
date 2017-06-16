@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
@@ -43,17 +42,26 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
-	glog.V(2).Infof("Local instance address: %s", context.IPAddress)
+func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, proxyCtx *proxy.Context) (Watcher, error) {
+	glog.V(2).Infof("Local instance address: %s", proxyCtx.IPAddress)
+
+	if proxyCtx.MeshConfig.StatsdUdpAddress != "" {
+		if addr, err := resolveStatsdAddr(proxyCtx.MeshConfig.StatsdUdpAddress); err == nil {
+			proxyCtx.MeshConfig.StatsdUdpAddress = addr
+		} else {
+			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
+			proxyCtx.MeshConfig.StatsdUdpAddress = ""
+		}
+	}
 
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
-	agent := proxy.NewAgent(runEnvoy(context.MeshConfig, context.IPAddress), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(proxyCtx.MeshConfig, proxyCtx.IPAddress), proxy.DefaultRetry)
 
 	out := &watcher{
 		registration: context.Registration,
-		agent:  agent,
-		context: context,
+		agent:   agent,
+		context: proxyCtx,
 		ctl:     ctl,
 	}
 
@@ -67,14 +75,10 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 		return nil, err
 	}
 
-	handler := func(model.Key, proto.Message, model.Event) { out.reload() }
-
-	if err := ctl.AppendConfigHandler(model.RouteRule, handler); err != nil {
-		return nil, err
-	}
-
-	if err := ctl.AppendConfigHandler(model.DestinationPolicy, handler); err != nil {
-		return nil, err
+	if configCache != nil {
+		handler := func(model.Config, model.Event) { out.reload() }
+		configCache.RegisterEventHandler(model.RouteRule, handler)
+		configCache.RegisterEventHandler(model.DestinationPolicy, handler)
 	}
 
 	return out, nil
@@ -83,9 +87,6 @@ func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 func (w *watcher) Run(stop <-chan struct{}) {
 	// agent consumes notifications from the controllerr
 	go w.agent.Run(stop)
-
-	// initiate controller to fetch the latest state
-	go w.ctl.Run(stop)
 
 	// Start registration agent
 	if w.registration != nil {

@@ -19,25 +19,28 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/apiserver"
+	"istio.io/pilot/adapter/config/aggregate"
+	"istio.io/pilot/adapter/config/ingress"
+	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/cmd"
-	"istio.io/pilot/cmd/version"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/platform/vms"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
+	"istio.io/pilot/tools/version"
 
-	"github.com/amalgam8/amalgam8/sidecar/register"
 	vmsclient "github.com/amalgam8/amalgam8/registry/client"
 	vmsconfig "github.com/amalgam8/amalgam8/sidecar/config"
 	"github.com/amalgam8/amalgam8/sidecar/identity"
+	"github.com/amalgam8/amalgam8/sidecar/register"
 )
 
 // Adapter defines options for underlying platform
@@ -63,10 +66,9 @@ type args struct {
 	kubeconfig string
 	meshConfig string
 
-	ipAddress     string
-	podName       string
-	passthrough   []int
-	apiserverPort int
+	ipAddress   string
+	podName     string
+	passthrough []int
 
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
@@ -78,10 +80,10 @@ type args struct {
 }
 
 var (
-	flags  args
-	client *kube.Client
+	flags     args
+	client    kubernetes.Interface
 	vmsClient *vmsclient.Client
-	mesh   *proxyconfig.ProxyMeshConfig
+	mesh      *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
 		Use:   "pilot",
@@ -100,12 +102,9 @@ var (
 					}
 				}
 
-				client, err = kube.NewClient(flags.kubeconfig, model.IstioConfig)
+				client, err = kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
-				}
-				if err = client.RegisterResources(); err != nil {
-					return multierror.Prefix(err, "failed to register Third-Party Resources.")
 				}
 
 				// set values from environment variables
@@ -118,23 +117,25 @@ var (
 				if flags.controllerOptions.Namespace == "" {
 					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 				}
+				glog.V(2).Infof("version %s", version.Line())
 				glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 				// receive mesh configuration
-				mesh, err = cmd.GetMeshConfig(client.GetKubernetesClient(), flags.controllerOptions.Namespace, flags.meshConfig)
+				mesh, err = cmd.GetMeshConfig(client, flags.controllerOptions.Namespace, flags.meshConfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 				}
 			} else if flags.adapter == VMsAdapter {
 				vmsClient, err = vmsclient.New(vmsclient.Config{
-						URL: flags.VMsArgs.serverURL,
-						AuthToken: flags.VMsArgs.authToken,
-					})
+					URL:       flags.VMsArgs.serverURL,
+					AuthToken: flags.VMsArgs.authToken,
+				})
 				if err != nil {
 					return multierror.Prefix(err, "failed to create VMs client.")
 				}
-				mesh = proxy.DefaultMeshConfig()
+				mesh = &proxy.DefaultMeshConfig()
 			}
+
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			return
 		},
@@ -143,60 +144,61 @@ var (
 	discoveryCmd = &cobra.Command{
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
-		RunE: func(c *cobra.Command, args []string) (err error) {
+		RunE: func(c *cobra.Command, args []string) error {
+			var serviceController model.ServiceDiscovery
+			var configController model.ConfigStoreCache
+			var ingressSyncer *ingress.StatusSyncer
 			if flags.adapter == KubernetesAdapter {
-				controller := kube.NewController(client, mesh, flags.controllerOptions)
+				tprClient, err := tpr.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+					model.RouteRuleDescriptor,
+					model.DestinationPolicyDescriptor,
+				}, flags.controllerOptions.Namespace)
+				if err != nil {
+					return multierror.Prefix(err, "failed to open a TPR client")
+				}
+
+				if err = tprClient.RegisterResources(); err != nil {
+					return multierror.Prefix(err, "failed to register Third-Party Resources.")
+				}
+
+				serviceController = kube.NewController(client, mesh, flags.controllerOptions)
+				configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
+					tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod),
+					ingress.NewController(client, mesh, flags.controllerOptions),
+				})
+				if err != nil {
+					return err
+				}
+				ingressSyncer = ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 			} else if flags.adapter == VMsAdapter {
 				controller := vms.NewController(vms.ControllerConfig{
-					discovery: vmsClient,
-					mesh: mesh,
+					Discovery: vmsClient,
+					Mesh:      mesh,
 				})
+				serviceController = controller
+				configController = controller
+				ingressSyncer = ingress.NewStatusSyncer(mesh, vmsClient, flags.controllerOptions)
 			}
 
 			context := &proxy.Context{
-				Discovery:  controller,
-				Accounts:   controller,
-				Config:     &model.IstioRegistry{ConfigRegistry: controller},
+				Discovery:  serviceController,
+				Accounts:   serviceController,
+				Config:     model.MakeIstioStore(configController),
 				MeshConfig: mesh,
 			}
-			discovery, err := envoy.NewDiscoveryService(controller, context, flags.discoveryOptions)
+			discovery, err := envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
+
 			stop := make(chan struct{})
-			go controller.Run(stop)
+			go serviceController.Run(stop)
+			go configController.Run(stop)
 			go discovery.Run()
+			go ingressSyncer.Run(stop)
 			cmd.WaitSignal(stop)
-			return
-		},
-	}
 
-	apiserverCmd = &cobra.Command{
-		Use:   "apiserver",
-		Short: "Start Istio config API service",
-		Run: func(*cobra.Command, []string) {
-			var version string
-			if flags.adapter == KubernetesAdapter {
-				controller := kube.NewController(client, mesh, flags.controllerOptions)
-				version = kube.IstioResourceVersion
-			} else if flags.adapter == VMsAdapter {
-				controller := vms.NewController(vms.ControllerConfig{
-					discovery: vmsClient,
-					mesh: mesh,
-				})
-				version = vms.IstioResourceVersion
-			}
-
-			apiserver := apiserver.NewAPI(apiserver.APIServiceOptions{
-				Version:  version,
-				Port:     flags.apiserverPort,
-				Registry: &model.IstioRegistry{ConfigRegistry: controller},
-			})
-
-			stop := make(chan struct{})
-			go controller.Run(stop)
-			go apiserver.Run()
-			cmd.WaitSignal(stop)
+			return nil
 		},
 	}
 
@@ -209,26 +211,41 @@ var (
 		Use:   "sidecar",
 		Short: "Envoy sidecar agent",
 		RunE: func(c *cobra.Command, args []string) (err error) {
+			var serviceController model.ServiceDiscovery
+			var configController model.ConfigStoreCache
 			var uid string
 			var regAgent *register.RegistrationAgent
 			mesh.IngressControllerMode = proxyconfig.ProxyMeshConfig_OFF
+
 			if flags.adapter == KubernetesAdapter {
-				controller := kube.NewController(client, mesh, flags.controllerOptions)
-				uid =  fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace)
+				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
+				tprClient, err := tpr.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+					model.RouteRuleDescriptor,
+					model.DestinationPolicyDescriptor,
+				}, flags.controllerOptions.Namespace)
+				if err != nil {
+					return
+				}
+
+				configController := tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod)
+				uid = fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace)
 			} else if flags.adapter == VMsAdapter {
 				controller := vms.NewController(vms.ControllerConfig{
-					discovery: vmsClient,
-					mesh: mesh,
+					Discovery: vmsClient,
+					Mesh:      mesh,
 				})
+				serviceController = controller
+				configController = controller
+
 				// Get app info from config file
 				vmsConfig := *&vmsconfig.DefaultConfig
 				err := vmsConfig.loadFromFile(flags.VMsArgs.config)
-			        if err != nil {
+				if err != nil {
 					return multierror.Prefix(err, "failed to read vms config file.")
 				}
 
 				identity, err := identity.New(vmsConfig, nil)
-			        if err != nil {
+				if err != nil {
 					return multierror.Prefix(err, "failed to create identity for service.")
 				}
 				// Create a registration agent for vms platform
@@ -243,22 +260,28 @@ var (
 			}
 
 			context := &proxy.Context{
-				Discovery:        controller,
-				Accounts:         controller,
-				Config:           &model.IstioRegistry{ConfigRegistry: controller},
+				Discovery:        serviceController,
+				Accounts:         serviceController,
+				Config:           model.MakeIstioStore(configController),
 				MeshConfig:       mesh,
 				IPAddress:        flags.ipAddress,
 				UID:              uid,
-				Registration:     regAgent,
+				Registraion:      regAgent,
 				PassthroughPorts: flags.passthrough,
 			}
-			w, err := envoy.NewWatcher(controller, context)
+
+			watcher, err := envoy.NewWatcher(serviceController, configController, context)
 			if err != nil {
 				return
 			}
+
+			// must start watcher after starting dependent controllers
 			stop := make(chan struct{})
-			go w.Run(stop)
+			go serviceController.Run(stop)
+			go configController.Run(stop)
+			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
+
 			return
 		},
 	}
@@ -267,15 +290,15 @@ var (
 		Use:   "ingress",
 		Short: "Envoy ingress agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			s := kube.NewIngressStatusSyncer(mesh, client, flags.controllerOptions)
-			w, err := envoy.NewIngressWatcher(mesh, client)
+			watcher, err := envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
 			if err != nil {
 				return err
 			}
+
 			stop := make(chan struct{})
-			go w.Run(stop)
-			go s.Run(stop)
+			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
+
 			return nil
 		},
 	}
@@ -284,14 +307,22 @@ var (
 		Use:   "egress",
 		Short: "Envoy external service agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			w, err := envoy.NewEgressWatcher(mesh)
+			watcher, err := envoy.NewEgressWatcher(mesh)
 			if err != nil {
 				return err
 			}
 			stop := make(chan struct{})
-			go w.Run(stop)
+			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
 			return nil
+		},
+	}
+
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Display version information and exit",
+		Run: func(*cobra.Command, []string) {
+			fmt.Print(version.Version())
 		},
 	}
 )
@@ -315,9 +346,6 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	apiserverCmd.PersistentFlags().IntVar(&flags.apiserverPort, "port", 8081,
-		"Config API service port")
-
 	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
 		"IP address. If not provided uses ${POD_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
@@ -333,9 +361,8 @@ func init() {
 	cmd.AddFlags(rootCmd)
 
 	rootCmd.AddCommand(discoveryCmd)
-	rootCmd.AddCommand(apiserverCmd)
 	rootCmd.AddCommand(proxyCmd)
-	rootCmd.AddCommand(version.VersionCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 func main() {
