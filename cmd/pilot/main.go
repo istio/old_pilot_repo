@@ -35,6 +35,7 @@ import (
 	"istio.io/pilot/proxy/envoy"
 
 	"github.com/amalgam8/amalgam8/sidecar/register"
+	vmsclient "github.com/amalgam8/amalgam8/registry/client"
 	vmsconfig "github.com/amalgam8/amalgam8/sidecar/config"
 	"github.com/amalgam8/amalgam8/sidecar/identity"
 )
@@ -79,7 +80,7 @@ type args struct {
 var (
 	flags  args
 	client *kube.Client
-	vmsClient *vms.Client
+	vmsClient *vmsclient.Client
 	mesh   *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
@@ -125,12 +126,13 @@ var (
 					return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 				}
 			} else if flags.adapter == VMsAdapter {
-				vmsClient, err = vms.NewClient(vms.ClientConfig{
+				vmsClient, err = vmsclient.New(vmsclient.Config{
 						URL: flags.VMsArgs.serverURL,
 						AuthToken: flags.VMsArgs.authToken,
 					})
 				if err != nil {
 					return multierror.Prefix(err, "failed to create VMs client.")
+				}
 				mesh = proxy.DefaultMeshConfig()
 			}
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
@@ -145,10 +147,10 @@ var (
 			if flags.adapter == KubernetesAdapter {
 				controller := kube.NewController(client, mesh, flags.controllerOptions)
 			} else if flags.adapter == VMsAdapter {
-				controller := vms.NewController(
-					discovery: ,
+				controller := vms.NewController(vms.ControllerConfig{
+					discovery: vmsClient,
 					mesh: mesh,
-				)
+				})
 			}
 
 			context := &proxy.Context{
@@ -178,10 +180,10 @@ var (
 				controller := kube.NewController(client, mesh, flags.controllerOptions)
 				version = kube.IstioResourceVersion
 			} else if flags.adapter == VMsAdapter {
-				controller := vms.NewController(
+				controller := vms.NewController(vms.ControllerConfig{
 					discovery: vmsClient,
 					mesh: mesh,
-				)
+				})
 				version = vms.IstioResourceVersion
 			}
 
@@ -214,10 +216,10 @@ var (
 				controller := kube.NewController(client, mesh, flags.controllerOptions)
 				uid =  fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace)
 			} else if flags.adapter == VMsAdapter {
-				controller := vms.NewController(
+				controller := vms.NewController(vms.ControllerConfig{
 					discovery: vmsClient,
 					mesh: mesh,
-				)
+				})
 				// Get app info from config file
 				vmsConfig := *&vmsconfig.DefaultConfig
 				err := vmsConfig.loadFromFile(flags.VMsArgs.config)

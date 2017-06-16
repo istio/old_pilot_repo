@@ -16,6 +16,7 @@ go_library(
         "@com_github_amalgam8_amalgam8//sidecar/config:go_default_library",
         "@com_github_amalgam8_amalgam8//sidecar/identity:go_default_library",
         "@com_github_amalgam8_amalgam8//sidecar/register:go_default_library",
+        "@com_github_amalgam8_amalgam8//registry/client:go_default_library",
         "@com_github_davecgh_go_spew//spew:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
