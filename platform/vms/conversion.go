@@ -2,8 +2,8 @@ package vms
 
 import(
 	"strings"
-	"github.com/amalgam8/amalgam8/registry/client/test/model"
 	"github.com/amalgam8/amalgam8/pkg/api"
+	"istio.io/pilot/model"
 )
 
 const()

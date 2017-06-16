@@ -60,7 +60,7 @@ type Context struct {
 	PassthroughPorts []int
 
 	// Registration contains the service information and Registry APIs for the VMs platform
-	Registration register.RegistrationAgent
+	Registration *register.RegistrationAgent
 }
 
 // DefaultMeshConfig configuration

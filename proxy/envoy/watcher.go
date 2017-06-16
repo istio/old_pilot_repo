@@ -27,7 +27,6 @@ import (
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 
-	"github.com/amalgam8/amalgam8/sidecar/identity"
 	"github.com/amalgam8/amalgam8/sidecar/register"
 )
 
@@ -47,24 +46,12 @@ type watcher struct {
 func NewWatcher(ctl model.Controller, context *proxy.Context) (Watcher, error) {
 	glog.V(2).Infof("Local instance address: %s", context.IPAddress)
 
-	// Create a registration agent for vms platform
-	var regAgent *register.RegistrationAgent
-	if context.Identity != nil {
-		regAgent, err := register.NewRegistrationAgent(register.RegistrationConfig{
-			Registry: vmsClient,
-			Identity: identity,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
 	agent := proxy.NewAgent(runEnvoy(context.MeshConfig, context.IPAddress), proxy.DefaultRetry)
 
 	out := &watcher{
-		registration: proxy.registrationAgent,
+		registration: context.Registration,
 		agent:  agent,
 		context: context,
 		ctl:     ctl,
@@ -101,7 +88,7 @@ func (w *watcher) Run(stop <-chan struct{}) {
 	go w.ctl.Run(stop)
 
 	// Start registration agent
-	if w.registratin != nil {
+	if w.registration != nil {
 		go w.registration.Start()
 	}
 
@@ -115,7 +102,7 @@ func (w *watcher) Run(stop <-chan struct{}) {
 
 	<-stop
 	// Stop registration agent
-	if w.registratin != nil {
+	if w.registration != nil {
 		go w.registration.Stop()
 	}
 }

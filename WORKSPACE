@@ -353,7 +353,7 @@ new_go_repository(
 new_go_repository(
     name = "com_github_Sirupsen_logrus",
     commit = "418b41d23a1bf978c06faea5313ba194650ac088",
-    importpath = "github.com/sirupsen/logrus",
+    importpath = "github.com/Sirupsen/logrus",
 )
 
 new_go_repository(
@@ -544,12 +544,18 @@ new_git_repository(
 
 AMALGAM8_BUILD_FILE = "../../amalgam8/amalgam8/BUILD.bazel"
 
-new_local_repository(
-    name = "com_github_amalgam8_amalgam8",
-    build_file = AMALGAM8_BUILD_FILE,
+#local_repository(
+#    name = "com_github_amalgam8_amalgam8",
+#    build_file = AMALGAM8_BUILD_FILE,
 #    commit = "ff33ac132b26ac09604f159dae2a782e40133293",
 #    remote = "https://github.com/kimikowang/amalgam8.git",
-    path = "../../amalgam8/amalgam8",
+#    path = "../../amalgam8/amalgam8",
+#)
+
+new_go_repository(
+    name = "com_github_amalgam8_amalgam8",
+    commit = "320551036b8984c6bb3cf818ff0f1c7e46e9f59b",
+    importpath = "github.com/kimikowang/istio_vms",
 )
 
 ##
