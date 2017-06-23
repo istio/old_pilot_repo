@@ -180,11 +180,11 @@ func (i *IstioRegistry) RouteRulesBySource(namespace string, instances []*Servic
 	rules := make([]*routeRuleConfig, 0)
 	for key, rule := range i.RouteRules(namespace) {
 		// validate that rule match predicate applies to source service instances
-		if rule.Match != nil {
+		if rule.Match != nil && rule.Match.Source != "" {
 			found := false
 			for _, instance := range instances {
 				// must match the source field if it is set
-				if rule.Match.Source != "" && rule.Match.Source != instance.Service.Hostname {
+				if rule.Match.Source != instance.Service.Hostname {
 					continue
 				}
 				// must match the tags field - the rule tags are a subset of the instance tags
