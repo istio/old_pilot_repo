@@ -6,7 +6,7 @@ service:
     - version=v3
 
 endpoint:
-  host: reviews
+  host: reviews-v3
   port: 6379
   type: tcp
 

@@ -1,0 +1,18 @@
+register: true
+
+service:
+  name: details 
+  tags:
+    - version=v1
+
+endpoint:
+  host: details-v1
+  port: 6379 
+  type: tcp
+
+service_port:
+  name: http
+
+registry:
+  url: http://registry:8080
+  poll: 5s

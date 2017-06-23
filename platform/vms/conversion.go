@@ -61,7 +61,7 @@ func convertProtocol(proto string) model.Protocol {
 func convertTags(tagList []string) model.Tags {
 	tags := make(model.Tags)
 	for _, tag := range tagList {
-		keyVal := strings.Split(tag, ":")
+		keyVal := strings.Split(tag, "=")
 		if len(keyVal) != 2 {continue}
 		tags[keyVal[0]] = keyVal[1]
 	}

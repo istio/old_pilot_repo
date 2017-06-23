@@ -259,12 +259,6 @@ new_go_repository(
     importpath = "github.com/xeipuuv/gojsonschema",
 )
 
-#local_repository(
-#    name = "com_github_xeipuuv_gojsonschema",
-#    build_file_content = "",
-#    path = "../../amalgam8/amalgam8/vendor/github.com/xeipuuv/gojsonschema",
-#)
-
 new_go_repository(
     name = "com_github_pborman_uuid",
     commit = "1b00554d822231195d1babd97ff4a781231955c9",
@@ -294,13 +288,6 @@ new_go_repository(
     commit = "8c45ba33b0a495057cba9985cd5dd1a3803ac7b4",
     importpath = "github.com/dgrijalva/jwt-go",
 )
-
-#new_local_repository(
-#    name = "com_github_dgrijalva_jwt_go",
-#    build_file_content = "",
-#    commit = "a539ee1a749a2b895533f979515ac7e6e0f5b650",
-#    path = "../../amalgam8/amalgam8/vendor/github.com/dgrijalva/jwt-go",
-#)
 
 new_go_repository(
     name = "com_github_nicksnyder_go_i18n",
@@ -548,11 +535,9 @@ new_git_repository(
     remote = "https://github.com/googleapis/googleapis.git",
 )
 
-AMALGAM8_BUILD_FILE = "../../amalgam8/amalgam8/BUILD.bazel"
-
 new_go_repository(
     name = "com_github_amalgam8_amalgam8",
-    commit = "320551036b8984c6bb3cf818ff0f1c7e46e9f59b",
+    commit = "7fb7317dbb3fe61570e9811418ee53a7184e523a",
     importpath = "github.com/kimikowang/istio_vms",
 )
 

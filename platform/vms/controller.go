@@ -6,17 +6,18 @@ import (
 	"github.com/golang/protobuf/proto"
 	"istio.io/pilot/model"
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"github.com/amalgam8/amalgam8/registry/client"
 )
 
 const ()
 
 type ControllerConfig struct {
-	Discovery *Client
+	Discovery *client.Client
 	Mesh	  *proxyconfig.ProxyMeshConfig
 }
 
 type Controller struct {
-	discovery *Client
+	discovery *client.Client
 	mesh   *proxyconfig.ProxyMeshConfig
 }
 
@@ -29,10 +30,6 @@ func NewController(config ControllerConfig) *Controller {
 	return controller
 }
 
-func (c *Controller) AppendConfigHandler(kind string, f func(model.Key, proto.Message, model.Event)) error {
-	return nil
-}
-
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
 	return nil
 }
@@ -41,25 +38,36 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 	return nil
 }
 
-func (c *Controller) Run(stop <-chan struct{}) {}
-
-func (c *Controller) Get(key model.Key) (proto.Message, bool) {
-	return nil, true
+func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)){
 }
 
-func (c *Controller) List(kind string, namespace string) (map[model.Key]proto.Message, error) {
+func (c *Controller) Run(stop <-chan struct{}) {}
+
+func (c *Controller) HasSynced() bool {
+	return false
+}
+
+func (c *Controller) ConfigDescriptor() model.ConfigDescriptor {
+	return nil
+}
+
+func (c *Controller) Get(typ, key string) (config proto.Message, exists bool, revision string) {
+	return nil, false, ""
+}
+
+func (c *Controller) List(typ string) ([]model.Config, error) {
 	return nil, nil
 }
 
-func (c *Controller) Post(key model.Key, v proto.Message) error {
-	return nil
+func (c *Controller) Post(config proto.Message) (revision string, err error) {
+	return "", nil
 }
 
-func (c *Controller) Put(key model.Key, v proto.Message) error {
-	return nil
+func (c *Controller) Put(config proto.Message, oldRevision string) (newRevision string, err error) {
+	return "", nil
 }
 
-func (c *Controller) Delete(key model.Key) error {
+func (c *Controller) Delete(typ, key string) error {
 	return nil
 }
 // Implements the Istio ServiceDiscovery interface
@@ -97,7 +105,7 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 
 func (c *Controller) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
 	svc, err := c.discovery.GetServiceObject(hostname)
-	if err != nil {
+	if err != nil || svc == nil {
 		return nil
 	}
 

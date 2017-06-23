@@ -1,0 +1,18 @@
+register: true
+
+service:
+  name: reviews
+  tags:
+    - version=v3
+
+endpoint:
+  host: reviews-v3
+  port: 6379
+  type: tcp
+
+service_port:
+  name: http
+
+registry:
+  url: http://registry:8080
+  poll: 5s

@@ -33,6 +33,7 @@ import (
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/platform/vms"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
@@ -83,6 +84,7 @@ var (
 	flags     args
 	client    kubernetes.Interface
 	vmsClient *vmsclient.Client
+	vmsConfig vmsconfig.Config
 	mesh      *proxyconfig.ProxyMeshConfig
 
 	rootCmd = &cobra.Command{
@@ -90,6 +92,7 @@ var (
 		Short: "Istio Pilot",
 		Long:  "Istio Pilot provides management plane functionality to the Istio service mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
+			glog.Warningf("adapter: %s", flags.adapter)
 			if flags.adapter == "" {
 				flags.adapter = KubernetesAdapter
 			}
@@ -126,14 +129,30 @@ var (
 					return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 				}
 			} else if flags.adapter == VMsAdapter {
+				glog.Warningf("config: %s", flags.vmsArgs.config)
+				vmsConfig = *&vmsconfig.DefaultConfig
+				err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
+				if err != nil {
+					return multierror.Prefix(err, "failed to read vms config file.")
+				}
+
+				glog.Warningf("service_name: %s",vmsConfig.Service.Name)
+				if flags.vmsArgs.serverURL != ""{
+					vmsConfig.A8Registry.URL = flags.vmsArgs.serverURL
+				}
+				if flags.vmsArgs.authToken != ""{
+					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
+				}
+
 				vmsClient, err = vmsclient.New(vmsclient.Config{
-					URL:       flags.VMsArgs.serverURL,
-					AuthToken: flags.VMsArgs.authToken,
+					URL:       vmsConfig.A8Registry.URL,
+					AuthToken: vmsConfig.A8Registry.Token,
 				})
 				if err != nil {
 					return multierror.Prefix(err, "failed to create VMs client.")
 				}
-				mesh = &proxy.DefaultMeshConfig()
+				m := proxy.DefaultMeshConfig()
+				mesh = &m
 			}
 
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
@@ -145,9 +164,9 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
-			var serviceController model.ServiceDiscovery
-			var configController model.ConfigStoreCache
-			var ingressSyncer *ingress.StatusSyncer
+			var discovery *envoy.DiscoveryService
+			var err error
+			stop := make(chan struct{})
 			if flags.adapter == KubernetesAdapter {
 				tprClient, err := tpr.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 					model.RouteRuleDescriptor,
@@ -161,43 +180,50 @@ var (
 					return multierror.Prefix(err, "failed to register Third-Party Resources.")
 				}
 
-				serviceController = kube.NewController(client, mesh, flags.controllerOptions)
-				configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
+				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
+				configController, err := aggregate.MakeCache([]model.ConfigStoreCache{
 					tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod),
 					ingress.NewController(client, mesh, flags.controllerOptions),
 				})
 				if err != nil {
 					return err
 				}
-				ingressSyncer = ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+				ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+				context := &proxy.Context{
+					Discovery:  serviceController,
+					Accounts:   serviceController,
+					Config:     model.MakeIstioStore(configController),
+					MeshConfig: mesh,
+				}
+				discovery, err = envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
+				if err != nil {
+					return fmt.Errorf("failed to create discovery service: %v", err)
+				}
+
+				go serviceController.Run(stop)
+				go configController.Run(stop)
+				go ingressSyncer.Run(stop)
+
 			} else if flags.adapter == VMsAdapter {
 				controller := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
 					Mesh:      mesh,
 				})
-				serviceController = controller
-				configController = controller
-				ingressSyncer = ingress.NewStatusSyncer(mesh, vmsClient, flags.controllerOptions)
+				context := &proxy.Context{
+					Discovery:  controller,
+					Accounts:   controller,
+					Config:     model.MakeIstioStore(controller),
+					MeshConfig: mesh,
+				}
+				discovery, err = envoy.NewDiscoveryService(controller, controller, context, flags.discoveryOptions)
+				if err != nil {
+					return fmt.Errorf("failed to create discovery service: %v", err)
+				}
+
+				go controller.Run(stop)
 			}
 
-			context := &proxy.Context{
-				Discovery:  serviceController,
-				Accounts:   serviceController,
-				Config:     model.MakeIstioStore(configController),
-				MeshConfig: mesh,
-			}
-			discovery, err := envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
-			if err != nil {
-				return fmt.Errorf("failed to create discovery service: %v", err)
-			}
-
-			ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
-
-			stop := make(chan struct{})
-			go serviceController.Run(stop)
-			go configController.Run(stop)
 			go discovery.Run()
-			go ingressSyncer.Run(stop)
 			cmd.WaitSignal(stop)
 
 			return nil
@@ -212,11 +238,9 @@ var (
 	sidecarCmd = &cobra.Command{
 		Use:   "sidecar",
 		Short: "Envoy sidecar agent",
-		RunE: func(c *cobra.Command, args []string) (err error) {
-			var serviceController model.ServiceDiscovery
-			var configController model.ConfigStoreCache
-			var uid string
-			var regAgent *register.RegistrationAgent
+		RunE: func(c *cobra.Command, args []string) error {
+			var watcher envoy.Watcher
+			stop := make(chan struct{})
 			mesh.IngressControllerMode = proxyconfig.ProxyMeshConfig_OFF
 
 			if flags.adapter == KubernetesAdapter {
@@ -226,65 +250,76 @@ var (
 					model.DestinationPolicyDescriptor,
 				}, flags.controllerOptions.Namespace)
 				if err != nil {
-					return
+					return err
 				}
 
 				configController := tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod)
-				uid = fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace)
+				context := &proxy.Context{
+					Discovery:        serviceController,
+					Accounts:         serviceController,
+					Config:           model.MakeIstioStore(configController),
+					MeshConfig:       mesh,
+					IPAddress:        flags.ipAddress,
+					UID:              fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
+					PassthroughPorts: flags.passthrough,
+				}
+
+				watcher, err = envoy.NewWatcher(serviceController, configController, context)
+				if err != nil {
+					return err
+				}
+
+				// must start watcher after starting dependent controllers
+				go serviceController.Run(stop)
+				go configController.Run(stop)
 			} else if flags.adapter == VMsAdapter {
 				controller := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
 					Mesh:      mesh,
 				})
-				serviceController = controller
-				configController = controller
 
 				// Get app info from config file
-				vmsConfig := *&vmsconfig.DefaultConfig
-				err := vmsConfig.loadFromFile(flags.VMsArgs.config)
-				if err != nil {
-					return multierror.Prefix(err, "failed to read vms config file.")
-				}
-
-				identity, err := identity.New(vmsConfig, nil)
+				provider, err := identity.New(&vmsConfig, nil)
 				if err != nil {
 					return multierror.Prefix(err, "failed to create identity for service.")
 				}
+				id, err := provider.GetIdentity()
+				if err != nil {
+					return multierror.Prefix(err, "failed to get identity.")
+				}
+				glog.Warningf("service_name: %s, endpoint: name: %s, port: %d, protocol: %s", id.ServiceName, id.Endpoint.ServicePort.Name, id.Endpoint.ServicePort.Port, id.Endpoint.ServicePort.Protocol)
 				// Create a registration agent for vms platform
 				regAgent, err := register.NewRegistrationAgent(register.RegistrationConfig{
 					Registry: vmsClient,
-					Identity: identity,
+					Identity: provider,
 				})
 				if err != nil {
 					return multierror.Prefix(err, "failed to create registration agent.")
 				}
+				mesh.IstioServiceCluster = id.ServiceName
+				context := &proxy.Context{
+					Discovery:        controller,
+					Accounts:         controller,
+					Config:           model.MakeIstioStore(controller),
+					MeshConfig:       mesh,
+					IPAddress:        id.Endpoint.Value,
+					UID:              fmt.Sprintf("vms://%s", id.Endpoint.Value),
+					Registration:     regAgent,
+					PassthroughPorts: flags.passthrough,
+				}
 
+				watcher, err = envoy.NewWatcher(controller, controller, context)
+				if err != nil {
+					return err
+				}
+
+				go controller.Run(stop)
 			}
 
-			context := &proxy.Context{
-				Discovery:        serviceController,
-				Accounts:         serviceController,
-				Config:           model.MakeIstioStore(configController),
-				MeshConfig:       mesh,
-				IPAddress:        flags.ipAddress,
-				UID:              uid,
-				Registraion:      regAgent,
-				PassthroughPorts: flags.passthrough,
-			}
-
-			watcher, err := envoy.NewWatcher(serviceController, configController, context)
-			if err != nil {
-				return
-			}
-
-			// must start watcher after starting dependent controllers
-			stop := make(chan struct{})
-			go serviceController.Run(stop)
-			go configController.Run(stop)
 			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
 
-			return
+			return nil
 		},
 	}
 
@@ -330,6 +365,8 @@ var (
 )
 
 func init() {
+	rootCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(KubernetesAdapter),
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter),string(VMsAdapter)))
 	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&flags.controllerOptions.Namespace, "namespace", "n", "",
@@ -355,6 +392,15 @@ func init() {
 
 	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
 		"Passthrough ports for health checks")
+
+	sidecarCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "config", "",
+		"Config file for sidecar")
+
+	sidecarCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
+		"URL for the registry server")
+
+	sidecarCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "authToken", "",
+		"Authorization token used to access the registry server")
 
 	proxyCmd.AddCommand(sidecarCmd)
 	proxyCmd.AddCommand(ingressCmd)

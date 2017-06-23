@@ -1,0 +1,134 @@
+version: '2'
+services:
+  registry:
+    build:
+      context: ../registry
+    networks:
+      envoymesh:
+        aliases:
+          - registry
+    expose:
+      - "8080"
+    ports:
+      - "31300:8080"
+
+  gateway:
+    build:
+      context: ../gateway
+    volumes:
+      - ../gateway/gateway-envoy.json:/etc/gateway-envoy.json
+    networks:
+      envoymesh:
+        aliases:
+          - gateway
+    expose:
+      - "6379"
+    ports:
+      - "32000:6379"
+
+  details-v1:
+    build:
+      context: ../apps/details
+    volumes:
+      - ../apps/details/details-envoy.json:/etc/details-envoy.json
+      - ../apps/details/config.yaml.v1:/etc/config.yaml.v1
+    networks:
+      envoymesh:
+        aliases:
+          - details-v1
+    environment:
+      - SERVICE_NAME=details
+      - SERVICE_VERSION=v1
+    expose:
+      - "6379"
+
+  ratings-v1:
+    build:
+      context: ../apps/ratings
+    volumes:
+      - ../apps/ratings/ratings-envoy.json:/etc/ratings-envoy.json
+      - ../apps/ratings/config.yaml.v1:/etc/config.yaml.v1
+    networks:
+      envoymesh:
+        aliases:
+          - ratings-v1
+    environment:
+      - SERVICE_NAME=ratings
+      - SERVICE_VERSION=v1
+    expose:
+      - "6379"
+
+  reviews-v1:
+    build:
+      context: ../apps/reviews
+      dockerfile: Dockerfile.v1
+    volumes:
+      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
+      - ../apps/reviews/config.yaml.v1:/etc/config.yaml.v1
+    networks:
+      envoymesh:
+        aliases:
+          - reviews-v1
+    environment:
+      - SERVICE_NAME=reviews
+      - SERVICE_VERSION=v1
+    expose:
+      - "6379"
+
+  reviews-v2:
+    build:
+      context: ../apps/reviews
+      dockerfile: Dockerfile.v2
+      args:
+        enable_ratings: "true"
+    volumes:
+      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
+      - ../apps/reviews/config.yaml.v2:/etc/config.yaml.v2
+    networks:
+      envoymesh:
+        aliases:
+          - reviews-v2
+    environment:
+      - SERVICE_NAME=reviews
+      - SERVICE_VERSION=v2
+    expose:
+      - "6379"
+
+  reviews-v3:
+    build:
+      context: ../apps/reviews
+      dockerfile: Dockerfile.v3
+      args:
+        enable_ratings: "true"
+        star_color: red
+    volumes:
+      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
+      - ../apps/reviews/config.yaml.v3:/etc/config.yaml.v3
+    networks:
+      envoymesh:
+        aliases:
+          - reviews-v3
+    environment:
+      - SERVICE_NAME=reviews
+      - SERVICE_VERSION=v3
+    expose:
+      - "6379"
+
+  productpage-v1:
+    build:
+      context: ../apps/productpage
+    volumes:
+      - ../apps/productpage/productpage-envoy.json:/etc/productpage-envoy.json
+      - ../apps/productpage/config.yaml.v1:/etc/config.yaml.v1
+    networks:
+      envoymesh:
+        aliases:
+          - productpage-v1
+    environment:
+      - SERVICE_NAME=productpage
+      - SERVICE_VERSION=v1
+    expose:
+      - "6379"
+
+networks:
+  envoymesh: {}

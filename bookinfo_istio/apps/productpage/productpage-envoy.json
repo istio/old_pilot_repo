@@ -1,0 +1,101 @@
+{
+  "listeners": [
+    {
+      "address": "tcp://0.0.0.0:6379",
+      "filters": [
+        {
+          "type": "read",
+          "name": "http_connection_manager",
+          "config": {
+            "codec_type": "auto",
+            "stat_prefix": "ingress_http",
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "service",
+                  "domains": ["*"],
+                  "routes": [
+                    {
+                      "timeout_ms": 0,
+                      "prefix": "/productpage",
+                      "cluster": "local_service",
+                      "auto_host_rewrite": true
+                    },
+                    {
+                      "timeout_ms": 0,
+                      "prefix": "/reviews",
+                      "cluster": "reviews",
+                      "auto_host_rewrite": true
+                    },
+                    {
+                      "timeout_ms": 0,
+                      "prefix": "/details",
+                      "cluster": "details",
+                      "auto_host_rewrite": true
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "type": "decoder",
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "admin": {
+    "access_log_path": "/dev/null",
+    "address": "tcp://0.0.0.0:8001"
+  },
+  "cluster_manager": {
+    "clusters": [
+      {
+        "name": "local_service",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://127.0.0.1:9080"
+          }
+        ]
+      },
+      {
+        "name": "reviews",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://reviews-v1:6379"
+          }, 
+          {
+            "url": "tcp://reviews-v2:6379"
+          },
+          {
+            "url": "tcp://reviews-v3:6379"
+          }
+        ]
+      },
+      {
+        "name": "details",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "features": "http2",
+        "hosts": [
+          {
+            "url": "tcp://details-v1:6379"
+          }
+        ]
+      }
+
+    ]
+  }
+}

@@ -54,12 +54,14 @@ func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, proxyC
 		}
 	}
 
+	glog.Warningf("ip: %s", proxyCtx.IPAddress)
+	glog.Warningf("istio_service_cluster: %s", proxyCtx.MeshConfig.IstioServiceCluster)
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
 	agent := proxy.NewAgent(runEnvoy(proxyCtx.MeshConfig, proxyCtx.IPAddress), proxy.DefaultRetry)
 
 	out := &watcher{
-		registration: context.Registration,
+		registration: proxyCtx.Registration,
 		agent:   agent,
 		context: proxyCtx,
 		ctl:     ctl,
@@ -166,7 +168,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			}
 
 			glog.V(2).Infof("Envoy command: %v", args)
-
+			glog.Warningf("Envoy command: %v", args)
 			/* #nosec */
 			cmd := exec.Command(BinaryPath, args...)
 			cmd.Stdout = os.Stdout

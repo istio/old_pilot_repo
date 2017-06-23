@@ -1,15 +1,12 @@
 package vms
 
 import (
-	"github.com/amalgam8/amalgam8/registry/client"
-	"github.com/amalgam8/amalgam8/registry/client/test/model"
-	//	"github.com/Sirupsen/logrus"
-//	"fmt"
-//	"github.com/amalgam8/amalgam8/pkg/api"
-	"github.com/stretchr/testify/assert"
-//	"os"
 	"sort"
 	"testing"
+
+	"github.com/amalgam8/amalgam8/registry/client"
+	"istio.io/pilot/model"
+	"github.com/stretchr/testify/assert"
 )
 
 type Services []*model.Service
@@ -25,8 +22,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("details"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "details-v1.mybluemix.net",
-				Port:        80,
+				Address:     "details-v1",
+				Port:        6379,
 				ServicePort: detailsSvcPort,
 			},
 			Tags:        model.Tags{"version": "v1"},
@@ -34,8 +31,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("productpage"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "productpage-v1.mybluemix.net",
-				Port:        80,
+				Address:     "productpage-v1",
+				Port:        6379,
 				ServicePort: productpageSvcPort,
 			},
 			Tags:        model.Tags{"version": "v1"},
@@ -43,8 +40,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("ratings"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "ratings-v1.mybluemix.net",
-				Port:        80,
+				Address:     "ratings-v1",
+				Port:        6379,
 				ServicePort: ratingsSvcPort,
 			},
 				Tags:        model.Tags{"version": "v1"},
@@ -52,8 +49,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("reviews"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "reviews-v1.mybluemix.net",
-				Port:        80,
+				Address:     "reviews-v1",
+				Port:        6379,
 				ServicePort: reviewsSvcPort,
 			},
 				Tags:        model.Tags{"version": "v1"},
@@ -61,8 +58,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("reviews"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "reviews-v2.mybluemix.net",
-				Port:        80,
+				Address:     "reviews-v2",
+				Port:        6379,
 				ServicePort: reviewsSvcPort,
 			},
 				Tags:        model.Tags{"version": "v2"},
@@ -70,8 +67,8 @@ func GetGroundTrueServiceInstances() Instances {
 		{
 			Service: services.GetService("reviews"),
 			Endpoint: model.NetworkEndpoint{
-				Address:     "reviews-v3.mybluemix.net",
-				Port:        80,
+				Address:     "reviews-v3",
+				Port:        6379,
 				ServicePort:  reviewsSvcPort,
 			},
 				Tags:        model.Tags{"version": "v3"},
@@ -137,7 +134,7 @@ func GetGroundTrueServices() Services {
 
 func newClient(t *testing.T) *client.Client {
 	config := client.Config{
-		URL: "http://a8registry-server.mybluemix.net:80",
+		URL: "http://localhost:31300",
 	}
 
 	c, err := client.New(config)
@@ -155,7 +152,9 @@ func newClient(t *testing.T) *client.Client {
 // Test whether the returned Services information are the same as defined
 func TestServices(t *testing.T) {
 	client := newClient(t)
-	controller := NewController(client, nil)
+	controller := NewController(ControllerConfig{
+		Discovery: client,
+	})
 
 	gtSvcs := GetGroundTrueServices()
 
@@ -165,13 +164,15 @@ func TestServices(t *testing.T) {
 	// sort list
 	sort.Sort(retSvcs)
 
-	// compare the sorted list to the constructed list
+	// compare the groundtruth to the returned result
 	CompareServices(t, gtSvcs, retSvcs)
 }
 
 func TestGetService(t *testing.T) {
 	client := newClient(t)
-	controller := NewController(client, nil)
+	controller := NewController(ControllerConfig{
+		Discovery: client,
+	})
 
 	gtSvcs := GetGroundTrueServices()
 
@@ -191,16 +192,14 @@ func TestGetService(t *testing.T) {
 
 func TestInstances(t *testing.T) {
 	client := newClient(t)
-	controller := NewController(client, nil)
+	controller := NewController(ControllerConfig{
+		Discovery: client,
+	})
 
 	gtInstances := GetGroundTrueServiceInstances()
 
 	testHostname := "reviews"
 	testPorts := []string{"http"}
-//	testTags := model.TagsList{
-//		{model.Tags{"version": "v1"}},
-//		{model.Tags{"version": "v2"}},
-//	}
 
 	testTags := make(model.TagsList, 0)
 	testTags = append(testTags, model.Tags{"version":"v1"})
@@ -225,7 +224,9 @@ func TestInstances(t *testing.T) {
 
 func TestHostInstances(t *testing.T) {
 	client := newClient(t)
-	controller := NewController(client, nil)
+	controller := NewController(ControllerConfig{
+		Discovery: client,
+	})
 
 	gtInstances := GetGroundTrueServiceInstances()
 
@@ -292,7 +293,7 @@ func (slice Instances) GetHostInstances(addrs map[string]bool) []*model.ServiceI
 	out := make([]*model.ServiceInstance, 0)
 
 	for _, ins := range slice {
-		if addrs[ins.Endpoint.Address] {
+		if addrs[ins.Service.Address] {
 			out = append(out, ins)
 		}
 	}
