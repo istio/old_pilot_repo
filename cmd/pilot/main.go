@@ -92,7 +92,6 @@ var (
 		Short: "Istio Pilot",
 		Long:  "Istio Pilot provides management plane functionality to the Istio service mesh and Istio Mixer.",
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			glog.Warningf("adapter: %s", flags.adapter)
 			if flags.adapter == "" {
 				flags.adapter = KubernetesAdapter
 			}
@@ -129,14 +128,12 @@ var (
 					return multierror.Prefix(err, "failed to retrieve mesh configuration.")
 				}
 			} else if flags.adapter == VMsAdapter {
-				glog.Warningf("config: %s", flags.vmsArgs.config)
 				vmsConfig = *&vmsconfig.DefaultConfig
 				err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
 				if err != nil {
 					return multierror.Prefix(err, "failed to read vms config file.")
 				}
 
-				glog.Warningf("service_name: %s",vmsConfig.Service.Name)
 				if flags.vmsArgs.serverURL != ""{
 					vmsConfig.A8Registry.URL = flags.vmsArgs.serverURL
 				}
@@ -287,7 +284,6 @@ var (
 				if err != nil {
 					return multierror.Prefix(err, "failed to get identity.")
 				}
-				glog.Warningf("service_name: %s, endpoint: name: %s, port: %d, protocol: %s", id.ServiceName, id.Endpoint.ServicePort.Name, id.Endpoint.ServicePort.Port, id.Endpoint.ServicePort.Protocol)
 				// Create a registration agent for vms platform
 				regAgent, err := register.NewRegistrationAgent(register.RegistrationConfig{
 					Registry: vmsClient,
