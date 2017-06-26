@@ -1,3 +1,5 @@
+hub="docker.io/kimikowang"
+
 SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 WORKSPACE=$SCRIPTDIR/../..
 BINDIR=$WORKSPACE/bazel-bin
@@ -18,17 +20,13 @@ fi
 set -x
 set -o errexit
 
-make -C $APPSDIR/productpage build GOOS=linux GOARCH=amd64
-make -C $APPSDIR/details build GOOS=linux GOARCH=amd64
-make -C $APPSDIR/ratings build GOOS=linux GOARCH=amd64
-make -C $APPSDIR/reviews build GOOS=linux GOARCH=amd64
-
-# Copy the a8registry binary to registry dir
-#cp $BINDIR/a8registry $REGDIR/
+#docker push $hub
 
 # Copy the pilot binary to each app dir
+# Build the images and  push them to hub
 for app in details productpage ratings reviews; do
   rm -rf $APPSDIR/$app/pilot && cp $BINDIR/cmd/pilot/pilot $_  
+  make -C $APPSDIR/$app build build.dockerize docker.push clean GOOS=linux GOARCH=amd64 HUB=$hub
 done
 
 # Bring up all app containers onto Docker

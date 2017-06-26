@@ -1,8 +1,7 @@
 version: '2'
 services:
   registry:
-    build:
-      context: ../registry
+    image: kimikowang/a8registry:latest
     networks:
       envoymesh:
         aliases:
@@ -12,26 +11,8 @@ services:
     ports:
       - "31300:8080"
 
-  gateway:
-    build:
-      context: ../gateway
-    volumes:
-      - ../gateway/gateway-envoy.json:/etc/gateway-envoy.json
-    networks:
-      envoymesh:
-        aliases:
-          - gateway
-    expose:
-      - "6379"
-    ports:
-      - "32000:6379"
-
   details-v1:
-    build:
-      context: ../apps/details
-    volumes:
-      - ../apps/details/details-envoy.json:/etc/details-envoy.json
-      - ../apps/details/config.yaml.v1:/etc/config.yaml.v1
+    image: kimikowang/details-v1:latest
     networks:
       envoymesh:
         aliases:
@@ -43,11 +24,7 @@ services:
       - "6379"
 
   ratings-v1:
-    build:
-      context: ../apps/ratings
-    volumes:
-      - ../apps/ratings/ratings-envoy.json:/etc/ratings-envoy.json
-      - ../apps/ratings/config.yaml.v1:/etc/config.yaml.v1
+    image: kimikowang/ratings-v1:latest
     networks:
       envoymesh:
         aliases:
@@ -59,12 +36,7 @@ services:
       - "6379"
 
   reviews-v1:
-    build:
-      context: ../apps/reviews
-      dockerfile: Dockerfile.v1
-    volumes:
-      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
-      - ../apps/reviews/config.yaml.v1:/etc/config.yaml.v1
+    image: kimikowang/reviews-v1:latest
     networks:
       envoymesh:
         aliases:
@@ -76,14 +48,7 @@ services:
       - "6379"
 
   reviews-v2:
-    build:
-      context: ../apps/reviews
-      dockerfile: Dockerfile.v2
-      args:
-        enable_ratings: "true"
-    volumes:
-      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
-      - ../apps/reviews/config.yaml.v2:/etc/config.yaml.v2
+    image: kimikowang/reviews-v2:latest
     networks:
       envoymesh:
         aliases:
@@ -95,15 +60,7 @@ services:
       - "6379"
 
   reviews-v3:
-    build:
-      context: ../apps/reviews
-      dockerfile: Dockerfile.v3
-      args:
-        enable_ratings: "true"
-        star_color: red
-    volumes:
-      - ../apps/reviews/reviews-envoy.json:/etc/reviews-envoy.json
-      - ../apps/reviews/config.yaml.v3:/etc/config.yaml.v3
+    image: kimikowang/reviews-v3:latest
     networks:
       envoymesh:
         aliases:
@@ -115,11 +72,7 @@ services:
       - "6379"
 
   productpage-v1:
-    build:
-      context: ../apps/productpage
-    volumes:
-      - ../apps/productpage/productpage-envoy.json:/etc/productpage-envoy.json
-      - ../apps/productpage/config.yaml.v1:/etc/config.yaml.v1
+    image: kimikowang/productpage-v1:latest
     networks:
       envoymesh:
         aliases:
