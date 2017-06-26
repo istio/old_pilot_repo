@@ -22,8 +22,9 @@ set -o errexit
 # Copy the pilot binary to each app dir
 # Build the images and  push them to hub
 for app in details productpage ratings reviews; do
-  rm -rf $APPSDIR/$app/pilot && cp $BINDIR/cmd/pilot/pilot $_  
+  rm -f $APPSDIR/$app/pilot && cp $BINDIR/cmd/pilot/pilot $_  
   make -C $APPSDIR/$app build build.dockerize docker.push clean GOOS=linux GOARCH=amd64 HUB=$hub
+  rm -f $APPSDIR/$app/pilot
 done
 
 # Bring up all app containers
