@@ -4,6 +4,7 @@ RUN mkdir /opt/microservices
 RUN mkdir /opt/istio
 RUN mkdir /etc/envoy/
 
+ADD ./config.yaml.v1 /etc/
 ADD ./productpage /opt/microservices
 ADD ./pilot /opt/istio
 ADD ./start_service.sh /usr/local/bin/start_service.sh
