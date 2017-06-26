@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	batch "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
@@ -315,6 +316,12 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 				typ: &v1.ReplicationController{},
 				inject: func(typ interface{}) error {
 					return injectIntoPodTemplateSpec(p, ((typ.(*v1.ReplicationController)).Spec.Template))
+				},
+			},
+			"StatefulSet": {
+				typ: &appsv1beta1.StatefulSet{},
+				inject: func(typ interface{}) error {
+					return injectIntoPodTemplateSpec(p, &((typ.(*appsv1beta1.StatefulSet)).Spec.Template))
 				},
 			},
 		}
