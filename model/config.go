@@ -15,7 +15,6 @@
 package model
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -241,7 +240,7 @@ var (
 		Validate:    ValidateRouteRule,
 		Key: func(config proto.Message) string {
 			rule := config.(*proxyconfig.RouteRule)
-			return fmt.Sprintf("%s", rule.Name)
+			return rule.Name
 		},
 	}
 
@@ -252,7 +251,7 @@ var (
 		Validate:    ValidateIngressRule,
 		Key: func(config proto.Message) string {
 			rule := config.(*proxyconfig.IngressRule)
-			return fmt.Sprintf("%s", rule.Name)
+			return rule.Name
 		},
 	}
 
