@@ -260,7 +260,6 @@ func buildDestinationHTTPRoutes(service *model.Service,
 	servicePort *model.Port,
 	rules []*proxyconfig.RouteRule) []*HTTPRoute {
 	protocol := servicePort.Protocol
-	glog.Infof("protocol: %s", protocol)
 	switch protocol {
 	case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 		routes := make([]*HTTPRoute, 0)
@@ -321,15 +320,12 @@ func buildOutboundHTTPRoutes(
 	config model.IstioConfigStore) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
 
-	glog.Infof("Inside buildOutboundHTTPRoutes")
-
 	// used for shortcut domain names for outbound hostnames
 	suffix := sharedInstanceHost(instances)
 
 	// get all the route rules applicable to the instances
 	rules := config.RouteRulesBySource(instances)
 
-	glog.Infof("len of rules: %d", len(rules))
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
@@ -340,7 +336,6 @@ func buildOutboundHTTPRoutes(
 			}
 
 			routes := buildDestinationHTTPRoutes(service, servicePort, rules)
-			glog.Infof("len of routes: %d", len(routes))
 			if len(routes) > 0 {
 				// must use egress proxy to route external name services
 				if service.External() {
