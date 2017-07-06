@@ -4,6 +4,7 @@ import (
 	"strings"
 	"strconv"
 	"github.com/golang/protobuf/proto"
+//	"github.com/golang/glog"
 	"istio.io/pilot/model"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"github.com/amalgam8/amalgam8/registry/client"
@@ -155,40 +156,35 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 
 func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	var instances []*model.ServiceInstance
-	services, err := c.discovery.ListServiceObjects()
+	insts, err := c.discovery.ListInstances()
 
 	if err != nil {
 		return nil
 	}
 
-	for _, svc := range services {
-		service := convertService(svc)
-		if addrs[service.Address] {
-			items, err := c.discovery.ListServiceInstances(service.Hostname)
-			if err != nil { continue}
-			for _, item := range items {
-				addrPort := strings.Split(item.Endpoint.Value, ":")
-				if len(addrPort) != 2 {
-					return nil
-				}
+	for _, inst := range insts {
+		addrPort := strings.Split(inst.Endpoint.Value, ":")
+		if len(addrPort) != 2 {
+			return nil
+		}
 
-				port, err := strconv.Atoi(addrPort[1])
-				if err != nil { return nil}
+		if addrs[addrPort[0]] {
+			port, err := strconv.Atoi(addrPort[1])
+			if err != nil { return nil}
+			service := convertService(&inst.Service)
+			svcPort, exists := service.Ports.Get(inst.Endpoint.ServicePort.Name)
 
-				svcPort, exists := service.Ports.Get(item.Endpoint.ServicePort.Name)
+			if !exists {return nil}
 
-				if !exists {return nil}
-
-				instances = append(instances, &model.ServiceInstance{
-					Endpoint: model.NetworkEndpoint {
-						Address: addrPort[0],
-						Port: port,
-						ServicePort: svcPort,
-					},
-					Service: service,
-					Tags: convertTags(item.Tags),
-				})
-			}
+			instances = append(instances, &model.ServiceInstance{
+				Endpoint: model.NetworkEndpoint {
+					Address: addrPort[0],
+					Port: port,
+					ServicePort: svcPort,
+				},
+				Service: service,
+				Tags: convertTags(inst.Tags),
+			})
 		}
 	}
 

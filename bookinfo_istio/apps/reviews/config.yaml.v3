@@ -2,16 +2,17 @@ register: true
 
 service:
   name: reviews
+  address: 10.0.0.4
   tags:
     - version=v3
 
 endpoint:
-  host: reviews-v3
-  port: 6379
-  type: tcp
+  port: 9080
+  type: http
 
 service_port:
-  name: http
+  name: istio-http
+  protocol: http
 
 registry:
   url: http://registry:8080

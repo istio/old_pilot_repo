@@ -3,6 +3,8 @@ FROM lyft/envoy:latest
 RUN mkdir /opt/microservices
 RUN mkdir /opt/istio
 RUN mkdir /etc/envoy/
+RUN adduser -disabled-password --gecos "" --uid 1337 istio
+RUN chown istio /etc/envoy
 
 ADD ./config.yaml.v1 /etc/
 ADD ./ratings /opt/microservices

@@ -7,6 +7,7 @@ go_library(
     deps = [
         "//adapter/config/aggregate:go_default_library",
         "//adapter/config/ingress:go_default_library",
+        "//adapter/config/memory:go_default_library",
         "//adapter/config/tpr:go_default_library",
         "//cmd:go_default_library",
         "//model:go_default_library",

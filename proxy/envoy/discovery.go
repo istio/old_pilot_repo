@@ -397,6 +397,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 
 // ListAllClusters responds to CDS requests that are not limited by a service-cluster and service-node
 func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *restful.Response) {
+	glog.Infof("inside ListAllClusters")
 
 	endpoints := ds.allServiceNodes()
 
@@ -421,6 +422,7 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 
 // ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
+	glog.Infof("inside ListClusters")
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
 	if !cached {
@@ -432,6 +434,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 
 		// service-node holds the IP address
 		node := request.PathParameter(ServiceNode)
+		glog.Infof("node: %s", node)
 		clusters := ds.getClusters(node)
 
 		var err error
@@ -585,19 +588,24 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 	case egressNode:
 		httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
 	default:
+		glog.Infof("In side default of getClusters, node: %s", node)
 		instances := ds.Discovery.HostInstances(map[string]bool{node: true})
 		services := ds.Discovery.Services()
+		glog.Infof("Number of instances: %d", len(instances))
+		glog.Infof("Number of services: %d", len(services))
 		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
 	}
 
 	// de-duplicate and canonicalize clusters
 	clusters := httpRouteConfigs.clusters().normalize()
+	glog.Infof("length of clusters: %d", len(clusters))
 
 	// set connect timeout
 	clusters.setTimeout(ds.MeshConfig.ConnectTimeout)
 
 	// egress proxy clusters reference external destinations
 	if node != egressNode {
+		glog.Infof("Inside generation for external destinations")
 		// apply custom policies for HTTP clusters
 		for _, cluster := range clusters {
 			insertDestinationPolicy(ds.Config, cluster)

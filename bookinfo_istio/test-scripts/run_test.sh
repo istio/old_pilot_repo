@@ -4,6 +4,7 @@ SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 WORKSPACE=$SCRIPTDIR/../..
 BINDIR=$WORKSPACE/bazel-bin
 APPSDIR=$SCRIPTDIR/../apps
+DISCOVERYDIR=$SCRIPTDIR/../discovery
 BUILDPATH=$SCRIPTDIR/../docker
 PILOTSRCPATH=$WORKSPACE/cmd/pilot
 
@@ -27,6 +28,13 @@ for app in details productpage ratings reviews; do
   rm -f $APPSDIR/$app/pilot
 done
 
+# Build discovery image
+cd $DISCOVERYDIR
+rm -f pilot && cp $BINDIR/cmd/pilot/pilot $_  
+docker build -t $hub/discovery:latest .
+docker push $hub/discovery:latest
+rm -f pilot
+
 # Bring up all app containers
 cd $BUILDPATH
 docker-compose up -d
@@ -37,5 +45,5 @@ if [ $STATUS -ne 0 ]; then
 fi
 
 # Run tests
-cd $WORKSPACE
-bazel test //platform/vms:go_default_test
+#cd $WORKSPACE
+#bazel test //platform/vms:go_default_test

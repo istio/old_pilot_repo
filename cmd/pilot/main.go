@@ -29,6 +29,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/ingress"
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
@@ -129,18 +130,20 @@ var (
 				}
 			} else if flags.adapter == VMsAdapter {
 				vmsConfig = *&vmsconfig.DefaultConfig
-				err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
-				if err != nil {
-					return multierror.Prefix(err, "failed to read vms config file.")
+				if flags.vmsArgs.config != "" {
+					err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
+					if err != nil {
+						return multierror.Prefix(err, "failed to read vms config file.")
+					}
 				}
-
-				if flags.vmsArgs.serverURL != ""{
+				if flags.vmsArgs.serverURL != "" {
 					vmsConfig.A8Registry.URL = flags.vmsArgs.serverURL
 				}
-				if flags.vmsArgs.authToken != ""{
+				if flags.vmsArgs.authToken != "" {
 					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
 				}
 
+				glog.V(2).Infof("url: %s", vmsConfig.A8Registry.URL)
 				vmsClient, err = vmsclient.New(vmsclient.Config{
 					URL:       vmsConfig.A8Registry.URL,
 					AuthToken: vmsConfig.A8Registry.Token,
@@ -202,22 +205,29 @@ var (
 				go ingressSyncer.Run(stop)
 
 			} else if flags.adapter == VMsAdapter {
-				controller := vms.NewController(vms.ControllerConfig{
+				serviceController := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
 					Mesh:      mesh,
 				})
+				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
+					model.RouteRuleDescriptor,
+					model.DestinationPolicyDescriptor,
+				}))
+
 				context := &proxy.Context{
-					Discovery:  controller,
-					Accounts:   controller,
-					Config:     model.MakeIstioStore(controller),
+					Discovery:  serviceController,
+					Accounts:   serviceController,
+					Config:     model.MakeIstioStore(configController),
 					MeshConfig: mesh,
 				}
-				discovery, err = envoy.NewDiscoveryService(controller, controller, context, flags.discoveryOptions)
+
+				discovery, err = envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
 				if err != nil {
 					return fmt.Errorf("failed to create discovery service: %v", err)
 				}
 
-				go controller.Run(stop)
+				go serviceController.Run(stop)
+				go configController.Run(stop)
 			}
 
 			go discovery.Run()
@@ -362,7 +372,7 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(KubernetesAdapter),
-		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter),string(VMsAdapter)))
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter), string(VMsAdapter)))
 	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	rootCmd.PersistentFlags().StringVarP(&flags.controllerOptions.Namespace, "namespace", "n", "",
@@ -380,6 +390,13 @@ func init() {
 		"Enable profiling via web interface host:port/debug/pprof")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "config", "",
+		"Config file for discovery")
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
+		"URL for the registry server")
+
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "authToken", "",
+		"Authorization token used to access the registry server")
 
 	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
 		"IP address. If not provided uses ${POD_IP} environment variable.")

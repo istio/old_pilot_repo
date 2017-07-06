@@ -1,5 +1,16 @@
 version: '2'
 services:
+  discovery:
+    image: kimikowang/discovery:latest
+    networks:
+      envoymesh:
+        aliases:
+          - istio-pilot 
+    expose:
+      - "8080"
+    ports:
+      - "8080:8080"
+    
   registry:
     image: kimikowang/a8registry:latest
     networks:
@@ -13,6 +24,9 @@ services:
 
   details-v1:
     image: kimikowang/details-v1:latest
+    privileged: true
+    extra_hosts:
+      - "details: 127.0.0.1"
     networks:
       envoymesh:
         aliases:
@@ -21,7 +35,7 @@ services:
       - SERVICE_NAME=details
       - SERVICE_VERSION=v1
     expose:
-      - "6379"
+      - "9080"
 
   ratings-v1:
     image: kimikowang/ratings-v1:latest
@@ -33,7 +47,7 @@ services:
       - SERVICE_NAME=ratings
       - SERVICE_VERSION=v1
     expose:
-      - "6379"
+      - "9080"
 
   reviews-v1:
     image: kimikowang/reviews-v1:latest
@@ -45,7 +59,7 @@ services:
       - SERVICE_NAME=reviews
       - SERVICE_VERSION=v1
     expose:
-      - "6379"
+      - "9080"
 
   reviews-v2:
     image: kimikowang/reviews-v2:latest
@@ -57,7 +71,7 @@ services:
       - SERVICE_NAME=reviews
       - SERVICE_VERSION=v2
     expose:
-      - "6379"
+      - "9080"
 
   reviews-v3:
     image: kimikowang/reviews-v3:latest
@@ -69,10 +83,11 @@ services:
       - SERVICE_NAME=reviews
       - SERVICE_VERSION=v3
     expose:
-      - "6379"
+      - "9080"
 
   productpage-v1:
     image: kimikowang/productpage-v1:latest
+    privileged: true
     networks:
       envoymesh:
         aliases:
@@ -81,7 +96,7 @@ services:
       - SERVICE_NAME=productpage
       - SERVICE_VERSION=v1
     expose:
-      - "6379"
+      - "9080"
 
 networks:
   envoymesh: {}
