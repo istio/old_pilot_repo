@@ -289,3 +289,23 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 	time.Sleep(3 * time.Second)
 	return nil
 }
+
+func (infra *infra) deleteAllConfigs() error {
+	istioClient, err := tpr.NewClient(kubeconfig, model.IstioConfigTypes, infra.Namespace)
+	if err != nil {
+		return err
+	}
+	for _, desc := range istioClient.ConfigDescriptor() {
+		configs, err := istioClient.List(desc.Type)
+		if err != nil {
+			return err
+		}
+		for _, config := range configs {
+			glog.Infof("Delete config %s %s", desc.Type, config.Key)
+			if err = istioClient.Delete(desc.Type, config.Key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
