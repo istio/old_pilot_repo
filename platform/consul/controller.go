@@ -22,12 +22,17 @@ import (
 
 type Controller struct {
 	client *api.Client
+	dataCenter string
 }
 
-func NewController() (*Controller, error) {
-	client, err := api.NewClient(api.DefaultConfig())
+func NewController(addr, datacenter string) (*Controller, error) {
+	conf := api.DefaultConfig()
+	conf.Address = addr
+
+	client, err := api.NewClient(conf)
 	return &Controller{
 		client: client,
+		dataCenter: datacenter,
 	}, err
 }
 
@@ -59,7 +64,10 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 		return nil, false
 	}
 
-	return convertService(endpoints), true
+	out := convertService(endpoints)
+	glog.V(1).Info(out)
+
+	return out, true
 }
 
 func (c *Controller) getServices() map[string][]string {
@@ -107,6 +115,8 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 		}
 	}
 
+	glog.V(1).Info(instances)
+
 	return instances
 }
 
@@ -133,14 +143,16 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 	for svcName := range data {
 		for addr := range addrs {
 			// TODO assume provided address is a datacenter name?
-			endpoints := c.getCatalogService(svcName, &api.QueryOptions{
-				Datacenter: addr,
-			})
+			endpoints := c.getCatalogService(svcName, nil)
 			for _, endpoint := range endpoints {
-				out = append(out, convertInstance(endpoint))
+				if addr == endpoint.Address {
+					out = append(out, convertInstance(endpoint))
+				}
 			}
 		}
 	}
+
+	glog.V(1).Info(out)
 
 	return out
 }

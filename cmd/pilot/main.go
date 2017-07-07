@@ -36,6 +36,7 @@ import (
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
+	"istio.io/pilot/platform/consul"
 )
 
 type args struct {
@@ -122,8 +123,13 @@ var (
 				return err
 			}
 
+			sds, err := consul.NewController("169.44.5.250:8500", "dc1")
+			if err != nil {
+				return err
+			}
+
 			context := &proxy.Context{
-				Discovery:  serviceController,
+				Discovery:  sds,
 				Accounts:   serviceController,
 				Config:     model.MakeIstioStore(configController),
 				MeshConfig: mesh,
@@ -165,9 +171,14 @@ var (
 				return
 			}
 
+			sds, err := consul.NewController("169.44.5.250:8500", "dc1")
+			if err != nil {
+				return err
+			}
+
 			configController := tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod)
 			context := &proxy.Context{
-				Discovery:        serviceController,
+				Discovery:        sds,
 				Accounts:         serviceController,
 				Config:           model.MakeIstioStore(configController),
 				MeshConfig:       mesh,
