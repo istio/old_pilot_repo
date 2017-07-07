@@ -194,7 +194,8 @@ func (infra *infra) teardown() {
 }
 
 func (infra *infra) kubeApply(yaml string) error {
-	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", infra.Namespace), yaml)
+	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
+		kubeconfig, infra.Namespace), yaml)
 }
 
 type response struct {
@@ -222,8 +223,8 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	}
 
 	pod := infra.apps[app][0]
-	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d %s",
-		pod, infra.Namespace, url, count, extra))
+	request, err := util.Shell(fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
+		pod, kubeconfig, infra.Namespace, url, count, extra))
 
 	if err != nil {
 		glog.Errorf("client request error %v for %s in %s", err, url, app)
