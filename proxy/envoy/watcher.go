@@ -43,7 +43,8 @@ type watcher struct {
 
 // NewWatcher creates a new watcher instance with an agent
 func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, proxyCtx *proxy.Context) (Watcher, error) {
-	glog.V(2).Infof("Local instance address: %s", proxyCtx.IPAddress)
+//	glog.Infof("Local instance address: %s", proxyCtx.IPAddress)
+//	glog.Infof("service-cluster: %s", proxyCtx.MeshConfig.IstioServiceCluster)
 
 	if proxyCtx.MeshConfig.StatsdUdpAddress != "" {
 		if addr, err := resolveStatsdAddr(proxyCtx.MeshConfig.StatsdUdpAddress); err == nil {

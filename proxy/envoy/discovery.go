@@ -588,24 +588,19 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 	case egressNode:
 		httpRouteConfigs = buildEgressRoutes(ds.Discovery, ds.MeshConfig)
 	default:
-		glog.Infof("In side default of getClusters, node: %s", node)
 		instances := ds.Discovery.HostInstances(map[string]bool{node: true})
 		services := ds.Discovery.Services()
-		glog.Infof("Number of instances: %d", len(instances))
-		glog.Infof("Number of services: %d", len(services))
 		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
 	}
 
 	// de-duplicate and canonicalize clusters
 	clusters := httpRouteConfigs.clusters().normalize()
-	glog.Infof("length of clusters: %d", len(clusters))
 
 	// set connect timeout
 	clusters.setTimeout(ds.MeshConfig.ConnectTimeout)
 
 	// egress proxy clusters reference external destinations
 	if node != egressNode {
-		glog.Infof("Inside generation for external destinations")
 		// apply custom policies for HTTP clusters
 		for _, cluster := range clusters {
 			insertDestinationPolicy(ds.Config, cluster)

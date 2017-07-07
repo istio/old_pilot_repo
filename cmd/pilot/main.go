@@ -302,7 +302,7 @@ var (
 				if err != nil {
 					return multierror.Prefix(err, "failed to create registration agent.")
 				}
-				mesh.IstioServiceCluster = id.ServiceName
+			//	mesh.IstioServiceCluster = id.ServiceName
 				context := &proxy.Context{
 					Discovery:        controller,
 					Accounts:         controller,
