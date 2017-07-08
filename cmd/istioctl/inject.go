@@ -21,18 +21,11 @@ import (
 	"os"
 
 	"istio.io/pilot/cmd"
-	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"
+	"istio.io/pilot/tools/version"
 
 	"github.com/spf13/cobra"
-)
-
-const (
-	// DefaultHubEnvVar is the environment variable that defaults the value of the --hub flag to istioctl kube-inject
-	DefaultHubEnvVar = "PILOT_HUB"
-	// DefaultTagEnvVar is the environment variable that defaults the value of the --tag flag to istioctl kube-inject
-	DefaultTagEnvVar = "PILOT_TAG"
 )
 
 var (
@@ -47,10 +40,6 @@ var (
 
 	inFilename  string
 	outFilename string
-
-	kubeconfig string
-	client     *kube.Client
-	config     model.ConfigRegistry
 )
 
 var (
@@ -92,12 +81,6 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 			if inFilename == "" {
 				return errors.New("filename not specified (see --filename or -f)")
 			}
-			if hub == "" {
-				return fmt.Errorf("specify --hub or define %v", DefaultHubEnvVar)
-			}
-			if tag == "" {
-				return fmt.Errorf("specify --tag or define %v", DefaultTagEnvVar)
-			}
 
 			var reader io.Reader
 			if inFilename == "-" {
@@ -124,11 +107,16 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 				versionStr = version.Line()
 			}
 
-			mesh, err := cmd.GetMeshConfig(client.GetKubernetesClient(), namespace, meshConfig)
+			client, err := kube.CreateInterface(kubeconfig)
+			if err != nil {
+				return err
+			}
+
+			mesh, err := cmd.GetMeshConfig(client, istioSystem, meshConfig)
 			if err != nil {
 				return fmt.Errorf("Istio configuration not found. Verify istio configmap is "+
 					"installed in namespace %q with `kubectl get -n %s configmap istio`",
-					namespace, namespace)
+					istioSystem, istioSystem)
 			}
 			params := &inject.Params{
 				InitImage:       inject.InitImageName(hub, tag),
@@ -151,19 +139,8 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 func init() {
 	rootCmd.AddCommand(injectCmd)
 
-	// Order of precedence for setting docker hub/tag is flags,
-	// envvars, and then compiled in defaults.
-	defaultHub := version.KubeInjectHub
-	if v := os.Getenv(DefaultHubEnvVar); v != "" {
-		defaultHub = v
-	}
-	injectCmd.PersistentFlags().StringVar(&hub, "hub", defaultHub, "Docker hub")
-
-	defaultTag := version.KubeInjectTag
-	if v := os.Getenv(DefaultTagEnvVar); v != "" {
-		defaultTag = v
-	}
-	injectCmd.PersistentFlags().StringVar(&tag, "tag", defaultTag, "Docker tag")
+	injectCmd.PersistentFlags().StringVar(&hub, "hub", "docker.io/istio", "Docker hub")
+	injectCmd.PersistentFlags().StringVar(&tag, "tag", "0.1", "Docker tag")
 
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
 		"", "Input Kubernetes resource filename")

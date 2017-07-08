@@ -15,81 +15,30 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
+	"istio.io/pilot/adapter/config/tpr"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
-	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/tools/version"
 )
-
-const (
-	// TODO istio/istio e2e integration test needs to be updated to
-	// use --istioNamespace. Temporarily default to empty string so we
-	// can detect and use --namespace.
-	defaultIstioNamespace = "" // istio-system?
-)
-
-type k8sRESTRequester struct {
-	namespace string
-	service   string
-	client    *kube.Client
-}
-
-// Request wraps Kubernetes specific requester to provide the proper
-// namespace and service names.a
-func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) (int, []byte, error) {
-	return rr.client.Request(rr.namespace, rr.service, method, path, inBody)
-}
-
-func kubeClientFromConfig(kubeconfig string) (*kube.Client, error) {
-	if kubeconfig == "" {
-		if v := os.Getenv("KUBECONFIG"); v != "" {
-			glog.V(2).Infof("Setting configuration from KUBECONFIG environment variable")
-			kubeconfig = v
-		}
-	}
-
-	c, err := kube.NewClient(kubeconfig, model.IstioConfig)
-	if err != nil && kubeconfig == "" {
-		// If no configuration was specified, and the platform
-		// client failed, try again using ~/.kube/config
-		c, err = kube.NewClient(os.Getenv("HOME")+"/.kube/config", model.IstioConfig)
-	}
-	if err != nil {
-		return nil, multierror.Prefix(err, "failed to connect to Kubernetes API.")
-	}
-	return c, nil
-}
 
 var (
-	namespace             string
-	istioNamespace        string
-	apiClient             proxy.Client
-	istioConfigAPIService string
-	useKubeRequester      bool
+	kubeconfig  string
+	istioSystem string
+
+	configClient model.ConfigStore
 
 	// input file name
 	file string
 
 	// output format (yaml or short)
 	outputFormat string
-
-	key    model.Key
-	schema model.ProtoSchema
 
 	rootCmd = &cobra.Command{
 		Use:               "istioctl",
@@ -111,37 +60,14 @@ and destination policies.
 
 More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
-`, model.IstioConfig.Kinds()),
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			var err error
-			client, err = kubeClientFromConfig(kubeconfig)
-			if err != nil {
-				return err
-			}
+`, model.IstioConfigTypes.Types()),
+		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
+			configClient, err = tpr.NewClient(kubeconfig, model.ConfigDescriptor{
+				model.RouteRuleDescriptor,
+				model.DestinationPolicyDescriptor,
+			}, istioSystem)
 
-			if useKubeRequester {
-				// TODO temporarily use --namespace instead of
-				// --istioNamespace for RESTRequester namespace until
-				// istio/istio e2e tests are updated.
-				if istioNamespace == "" {
-					istioNamespace = namespace
-				}
-				apiClient = proxy.NewConfigClient(&k8sRESTRequester{
-					client:    client,
-					namespace: istioNamespace,
-					service:   istioConfigAPIService,
-				})
-			} else {
-				apiClient = proxy.NewConfigClient(&proxy.BasicHTTPRequester{
-					BaseURL: istioConfigAPIService,
-					Client:  &http.Client{Timeout: 60 * time.Second},
-					Version: kube.IstioResourceVersion,
-				})
-			}
-
-			config = client
-
-			return err
+			return
 		},
 	}
 
@@ -149,30 +75,32 @@ istioctl mixer command documentation.
 		Use:   "create",
 		Short: "Create policies and rules",
 		Example: `
-istioctl create -f example-routing.yaml
-`,
+		istioctl create -f example-routing.yaml
+		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				c.Println(c.UsageString())
-				return fmt.Errorf("create takes no arguments")
-			}
-			varr, err := readInputs()
-			if err != nil {
-				return err
-			}
-			if len(varr) == 0 {
-				return errors.New("nothing to create")
-			}
-			for _, config := range varr {
-				if err = setup(config.Type, config.Name); err != nil {
-					return err
+			/*
+				if len(args) != 0 {
+					c.Println(c.UsageString())
+					return fmt.Errorf("create takes no arguments")
 				}
-				err = apiClient.AddConfig(key, config)
+				varr, err := readInputs()
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Created config: %v %v\n", config.Type, config.Name)
-			}
+				if len(varr) == 0 {
+					return errors.New("nothing to create")
+				}
+				for _, config := range varr {
+					if err = setup(config.Type, config.Name); err != nil {
+						return err
+					}
+					err = apiClient.AddConfig(key, config)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Created config: %v %v\n", config.Type, config.Name)
+				}
+			*/
 
 			return nil
 		},
@@ -182,30 +110,32 @@ istioctl create -f example-routing.yaml
 		Use:   "replace",
 		Short: "Replace existing policies and rules",
 		Example: `
-istioctl replace -f example-routing.yaml
-`,
+		istioctl replace -f example-routing.yaml
+		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				c.Println(c.UsageString())
-				return fmt.Errorf("replace takes no arguments")
-			}
-			varr, err := readInputs()
-			if err != nil {
-				return err
-			}
-			if len(varr) == 0 {
-				return errors.New("nothing to replace")
-			}
-			for _, config := range varr {
-				if err = setup(config.Type, config.Name); err != nil {
-					return err
+			/*
+				if len(args) != 0 {
+					c.Println(c.UsageString())
+					return fmt.Errorf("replace takes no arguments")
 				}
-				err = apiClient.UpdateConfig(key, config)
+				varr, err := readInputs()
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Updated config: %v %v\n", config.Type, config.Name)
-			}
+				if len(varr) == 0 {
+					return errors.New("nothing to replace")
+				}
+				for _, config := range varr {
+					if err = setup(config.Type, config.Name); err != nil {
+						return err
+					}
+					err = apiClient.UpdateConfig(key, config)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Updated config: %v %v\n", config.Type, config.Name)
+				}
+			*/
 
 			return nil
 		},
@@ -215,68 +145,60 @@ istioctl replace -f example-routing.yaml
 		Use:   "get <type> [<name>]",
 		Short: "Retrieve policies and rules",
 		Example: `
-# List all route rules
-istioctl get route-rules
+		# List all route rules
+		istioctl get route-rules
 
-# List all destination policies
-istioctl get destination-policies
+		# List all destination policies
+		istioctl get destination-policies
 
-# Get a specific rule named productpage-default
-istioctl get route-rule productpage-default
-`,
+		# Get a specific rule named productpage-default
+		istioctl get route-rule productpage-default
+		`,
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				c.Println(c.UsageString())
 				return fmt.Errorf("specify the type of resource to get. Types are %v",
-					strings.Join(model.IstioConfig.Kinds(), ", "))
+					strings.Join(configClient.ConfigDescriptor().Types(), ", "))
 			}
 
+			typ, err := schema(args[0])
+			if err != nil {
+				c.Println(c.UsageString())
+				return err
+			}
+
+			var configs []model.Config
 			if len(args) > 1 {
-				if err := setup(args[0], args[1]); err != nil {
-					c.Println(c.UsageString())
-					return err
+				config, exists, rev := configClient.Get(typ.Type, args[1])
+				if exists {
+					configs = append(configs, model.Config{
+						Type:     typ.Type,
+						Key:      typ.Key(config),
+						Revision: rev,
+						Content:  config,
+					})
 				}
-				glog.V(2).Infof("Getting single config with key: %+v", key)
-				config, err := apiClient.GetConfig(key)
-				if err != nil {
-					return err
-				}
-				cSpecBytes, err := json.Marshal(config.Spec)
-				if err != nil {
-					return err
-				}
-				out, err := yaml.JSONToYAML(cSpecBytes)
-				if err != nil {
-					return err
-				}
-				fmt.Print(string(out))
 			} else {
-				if err := setup(args[0], ""); err != nil {
-					c.Println(c.UsageString())
-					return err
-				}
-				glog.V(2).Infof("Getting multiple configs of kind %v in namespace %v", key.Kind, key.Namespace)
-				configList, err := apiClient.ListConfig(key.Kind, key.Namespace)
+				configs, err = configClient.List(typ.Type)
 				if err != nil {
 					return err
 				}
-				if len(configList) == 0 {
-					fmt.Fprintf(os.Stderr, "No resources found.\n")
-					return nil
-				}
+			}
 
-				var outputters = map[string](func([]apiserver.Config) error){
-					"yaml":  printYamlOutput,
-					"short": printShortOutput,
-				}
-				if outputFunc, ok := outputters[outputFormat]; ok {
-					if err := outputFunc(configList); err != nil {
-						return err
-					}
-				} else {
-					return fmt.Errorf("unknown output format %v. Types are yaml|short", outputFormat)
-				}
+			if len(configs) == 0 {
+				fmt.Fprintf(os.Stderr, "No resources found.\n")
+				return nil
+			}
 
+			var outputters = map[string](func([]model.Config)){
+				"yaml":  printYamlOutput,
+				"short": printShortOutput,
+			}
+
+			if outputFunc, ok := outputters[outputFormat]; ok {
+				outputFunc(configs)
+			} else {
+				return fmt.Errorf("unknown output format %v. Types are yaml|short", outputFormat)
 			}
 
 			return nil
@@ -287,102 +209,87 @@ istioctl get route-rule productpage-default
 		Use:   "delete <type> <name> [<name2> ... <nameN>]",
 		Short: "Delete policies or rules",
 		Example: `
-# Delete a rule using the definition in example-routing.yaml.
-istioctl delete -f example-routing.yaml
+		# Delete a rule using the definition in example-routing.yaml.
+		istioctl delete -f example-routing.yaml
 
-# Delete the rule productpage-default
-istioctl delete route-rule productpage-default
-`,
+		# Delete the rule productpage-default
+		istioctl delete route-rule productpage-default
+		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			// If we did not receive a file option, get names of resources to delete from command line
-			if file == "" {
-				if len(args) < 2 {
+			/*
+				// If we did not receive a file option, get names of resources to delete from command line
+				if file == "" {
+					if len(args) < 2 {
+						c.Println(c.UsageString())
+						return fmt.Errorf("provide configuration type and name or -f option")
+					}
+					var errs error
+					for i := 1; i < len(args); i++ {
+						if err := setup(args[0], args[i]); err != nil {
+							// If the user specified an invalid rule kind on the CLI,
+							// don't keep processing -- it's probably a typo.
+							return err
+						}
+						if err := apiClient.DeleteConfig(key); err != nil {
+							errs = multierror.Append(errs,
+								fmt.Errorf("cannot delete %s: %v", args[i], err))
+						} else {
+							fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
+						}
+					}
+					return errs
+				}
+
+				// As we did get a file option, make sure the command line did not include any resources to delete
+				if len(args) != 0 {
 					c.Println(c.UsageString())
-					return fmt.Errorf("provide configuration type and name or -f option")
+					return fmt.Errorf("delete takes no arguments when the file option is used")
+				}
+				varr, err := readInputs()
+				if err != nil {
+					return err
+				}
+				if len(varr) == 0 {
+					return errors.New("nothing to delete")
 				}
 				var errs error
-				for i := 1; i < len(args); i++ {
-					if err := setup(args[0], args[i]); err != nil {
-						// If the user specified an invalid rule kind on the CLI,
-						// don't keep processing -- it's probably a typo.
-						return err
-					}
-					if err := apiClient.DeleteConfig(key); err != nil {
-						errs = multierror.Append(errs,
-							fmt.Errorf("cannot delete %s: %v", args[i], err))
+				for _, v := range varr {
+					if err = setup(v.Type, v.Name); err != nil {
+						errs = multierror.Append(errs, err)
 					} else {
-						fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
+						if err = apiClient.DeleteConfig(key); err != nil {
+							errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", v.Name, err))
+						} else {
+							fmt.Printf("Deleted config: %v %v\n", v.Type, v.Name)
+						}
 					}
 				}
 				return errs
-			}
+			*/
 
-			// As we did get a file option, make sure the command line did not include any resources to delete
-			if len(args) != 0 {
-				c.Println(c.UsageString())
-				return fmt.Errorf("delete takes no arguments when the file option is used")
-			}
-			varr, err := readInputs()
-			if err != nil {
-				return err
-			}
-			if len(varr) == 0 {
-				return errors.New("nothing to delete")
-			}
-			var errs error
-			for _, v := range varr {
-				if err = setup(v.Type, v.Name); err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					if err = apiClient.DeleteConfig(key); err != nil {
-						errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", v.Name, err))
-					} else {
-						fmt.Printf("Deleted config: %v %v\n", v.Type, v.Name)
-					}
-				}
-			}
-
-			return errs
+			return nil
 		},
 	}
 
-	apiVersionCmd = &cobra.Command{
+	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Display version information",
 		RunE: func(c *cobra.Command, args []string) error {
-			fmt.Printf("istioctl version:\n\n")
-			printInfo(version.Info, true)
-			fmt.Printf("\n\n")
-
-			fmt.Printf("apiserver version:\n\n")
-			apiserverVersion, err := apiClient.Version()
-			if err != nil {
-				return err
-			}
-			printInfo(*apiserverVersion, false)
-
+			fmt.Printf(version.Version())
 			return nil
 		},
 	}
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", "",
-		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", api.NamespaceDefault,
-		"Select a Kubernetes namespace")
-
-	rootCmd.PersistentFlags().StringVar(&istioNamespace, "istioNamespace", defaultIstioNamespace,
-		"Namespace where Istio system resides")
-	// TODO hide istioNamespace until Istio can be installed in a
-	// separate namespace from that which it manages.
-	rootCmd.PersistentFlags().MarkHidden("istioNamespace") // nolint: errcheck
-
-	rootCmd.PersistentFlags().StringVar(&istioConfigAPIService,
-		"configAPIService", "istio-pilot:8081",
-		"Name of Istio config service. When --kube=false this sets the address of the config service")
-	rootCmd.PersistentFlags().BoolVar(&useKubeRequester, "kube", true,
-		"Use Kubernetes client to send API requests to the config service")
+	defaultKubeconfig := os.Getenv("HOME") + "/.kube/config"
+	if v := os.Getenv("KUBECONFIG"); v != "" {
+		defaultKubeconfig = v
+	}
+	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", defaultKubeconfig,
+		"Kubernetes configuration file")
+	rootCmd.PersistentFlags().StringVarP(&istioSystem, "namespace", "n", api.NamespaceDefault,
+		"Kubernetes Istio system namespace")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
@@ -398,7 +305,7 @@ func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(deleteCmd)
-	rootCmd.AddCommand(apiVersionCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 func main() {
@@ -407,36 +314,26 @@ func main() {
 	}
 }
 
-// Set the schema, key, and namespace
 // The schema is based on the kind (for example "route-rule" or "destination-policy")
-// name represents the name of an instance
-func setup(kind, name string) error {
+func schema(typ string) (model.ProtoSchema, error) {
 	var singularForm = map[string]string{
 		"route-rules":          "route-rule",
 		"destination-policies": "destination-policy",
 	}
-	if singular, ok := singularForm[kind]; ok {
-		kind = singular
+	if singular, ok := singularForm[typ]; ok {
+		typ = singular
 	}
 
-	// set proto schema
-	var ok bool
-	schema, ok = model.IstioConfig[kind]
+	out, ok := configClient.ConfigDescriptor().GetByType(typ)
 	if !ok {
-		return fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
-			kind, strings.Join(model.IstioConfig.Kinds(), ", "))
+		return model.ProtoSchema{}, fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
+			typ, strings.Join(configClient.ConfigDescriptor().Types(), ", "))
 	}
 
-	// set the config key
-	key = model.Key{
-		Kind:      kind,
-		Name:      name,
-		Namespace: namespace,
-	}
-
-	return nil
+	return out, nil
 }
 
+/*
 // readInputs reads multiple documents from the input and checks with the schema
 func readInputs() ([]apiserver.Config, error) {
 
@@ -470,58 +367,30 @@ func readInputs() ([]apiserver.Config, error) {
 
 	return varr, nil
 }
+*/
 
 // Print a simple list of names
-func printShortOutput(configList []apiserver.Config) error {
+func printShortOutput(configList []model.Config) {
 	for _, c := range configList {
-		fmt.Printf("%v\n", c.Name)
+		fmt.Printf("%v\n", c.Key)
 	}
-
-	return nil
 }
 
 // Print as YAML
-func printYamlOutput(configList []apiserver.Config) error {
-	var retVal error
-
+func printYamlOutput(configList []model.Config) {
 	for _, c := range configList {
-		cSpecBytes, err := json.Marshal(c.Spec)
-		if err != nil {
-			retVal = multierror.Append(retVal, err)
-		}
-		out, err := yaml.JSONToYAML(cSpecBytes)
-		if err != nil {
-			retVal = multierror.Append(retVal, err)
-		}
-		if err != nil {
-			retVal = multierror.Append(retVal, err)
-		} else {
-			fmt.Printf("type: %s\n", c.Type)
-			fmt.Printf("name: %s\n", c.Name)
-			fmt.Printf("namespace: %s\n", namespace)
-			fmt.Println("spec:")
-			lines := strings.Split(string(out), "\n")
-			for _, line := range lines {
-				if line != "" {
-					fmt.Printf("  %s\n", line)
-				}
+		schema, _ := configClient.ConfigDescriptor().GetByType(c.Type)
+		out, _ := schema.ToYAML(c.Content)
+		fmt.Printf("type: %s\n", c.Type)
+		fmt.Printf("key: %s\n", c.Key)
+		fmt.Printf("revision: %s\n", c.Revision)
+		fmt.Println("spec:")
+		lines := strings.Split(out, "\n")
+		for _, line := range lines {
+			if line != "" {
+				fmt.Printf("  %s\n", line)
 			}
 		}
 		fmt.Println("---")
-	}
-
-	return retVal
-}
-
-func printInfo(info version.BuildInfo, showKubeInjectInfo bool) {
-	fmt.Printf("Version: %v\n", info.Version)
-	fmt.Printf("GitRevision: %v\n", info.GitRevision)
-	fmt.Printf("GitBranch: %v\n", info.GitBranch)
-	fmt.Printf("User: %v@%v\n", info.User, info.Host)
-	fmt.Printf("GolangVersion: %v\n", info.GolangVersion)
-
-	if showKubeInjectInfo {
-		fmt.Printf("KubeInjectHub: %v\n", version.KubeInjectHub)
-		fmt.Printf("KubeInjectTag: %v\n", version.KubeInjectTag)
 	}
 }

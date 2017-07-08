@@ -24,7 +24,8 @@ import (
 	"os"
 	"time"
 
-	"istio.io/pilot/platform/kube"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ghodss/yaml"
 	rpc "github.com/googleapis/googleapis/google/rpc"
@@ -43,12 +44,39 @@ const (
 	scopesPath     = "api/v1/scopes/"
 )
 
+type k8sRESTRequester struct {
+	namespace string
+	service   string
+	client    *rest.RESTClient
+}
+
+// Request sends requests through the Kubernetes apiserver proxy to
+// the a Kubernetes service.
+// (see https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#discovering-builtin-services)
+func (rr *k8sRESTRequester) Request(method, path string, inBody []byte) (int, []byte, error) {
+	// Kubernetes apiserver proxy prefix for the specified namespace and service.
+	absPath := fmt.Sprintf("api/v1/namespaces/%s/services/%s/proxy", rr.namespace, rr.service)
+
+	// API server resource path.
+	absPath += "/" + path
+
+	var status int
+	outBody, err := rr.client.Verb(method).
+		AbsPath(absPath).
+		SetHeader("Content-Type", "application/json").
+		Body(inBody).
+		Do().
+		StatusCode(&status).
+		Raw()
+	return status, outBody, err
+}
+
 var (
 	mixerFile            string
 	mixerFileContent     []byte
 	mixerAPIServerAddr   string // deprecated
 	istioMixerAPIService string
-	mixerRESTRequester   proxy.RESTRequester
+	mixerRESTRequester   *k8sRESTRequester
 
 	mixerCmd = &cobra.Command{
 		Use:   "mixer",
@@ -62,30 +90,19 @@ for a description of Mixer configuration's scope, subject, and rules.
 `,
 		SilenceUsage: true,
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
-			var err error
-			client, err = kubeClientFromConfig(kubeconfig)
+			restconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+			if err != nil {
+				return err
+			}
+			client, err := rest.RESTClientFor(restconfig)
 			if err != nil {
 				return err
 			}
 
-			if useKubeRequester {
-				// TODO temporarily use namespace instead of
-				// istioNamespace until istio/istio e2e tests are
-				// updated.
-				if istioNamespace == "" {
-					istioNamespace = namespace
-				}
-				mixerRESTRequester = &k8sRESTRequester{
-					client:    client,
-					namespace: istioNamespace,
-					service:   istioMixerAPIService,
-				}
-			} else {
-				mixerRESTRequester = &proxy.BasicHTTPRequester{
-					BaseURL: istioMixerAPIService,
-					Client:  &http.Client{Timeout: requestTimeout},
-					Version: kube.IstioResourceVersion,
-				}
+			mixerRESTRequester = &k8sRESTRequester{
+				client:    client,
+				namespace: istioSystem,
+				service:   istioMixerAPIService,
 			}
 
 			if c.Name() == "create" {
