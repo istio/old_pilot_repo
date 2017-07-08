@@ -15,11 +15,18 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/api"
 
 	"istio.io/pilot/adapter/config/tpr"
@@ -78,29 +85,29 @@ istioctl mixer command documentation.
 		istioctl create -f example-routing.yaml
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			/*
-				if len(args) != 0 {
-					c.Println(c.UsageString())
-					return fmt.Errorf("create takes no arguments")
-				}
-				varr, err := readInputs()
+			if len(args) != 0 {
+				c.Println(c.UsageString())
+				return fmt.Errorf("create takes no arguments")
+			}
+			varr, err := readInputs()
+			if err != nil {
+				return err
+			}
+			if len(varr) == 0 {
+				return errors.New("nothing to create")
+			}
+			for _, config := range varr {
+				spec, err := config.ParseSpec()
 				if err != nil {
 					return err
 				}
-				if len(varr) == 0 {
-					return errors.New("nothing to create")
+				schema, _ := configClient.ConfigDescriptor().GetByType(config.Type)
+				rev, err := configClient.Post(spec)
+				if err != nil {
+					return err
 				}
-				for _, config := range varr {
-					if err = setup(config.Type, config.Name); err != nil {
-						return err
-					}
-					err = apiClient.AddConfig(key, config)
-					if err != nil {
-						return err
-					}
-					fmt.Printf("Created config: %v %v\n", config.Type, config.Name)
-				}
-			*/
+				fmt.Printf("Created config %v %v at revision %v\n", config.Type, schema.Key(spec), rev)
+			}
 
 			return nil
 		},
@@ -113,29 +120,35 @@ istioctl mixer command documentation.
 		istioctl replace -f example-routing.yaml
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			/*
-				if len(args) != 0 {
-					c.Println(c.UsageString())
-					return fmt.Errorf("replace takes no arguments")
-				}
-				varr, err := readInputs()
+			if len(args) != 0 {
+				c.Println(c.UsageString())
+				return fmt.Errorf("replace takes no arguments")
+			}
+			varr, err := readInputs()
+			if err != nil {
+				return err
+			}
+			if len(varr) == 0 {
+				return errors.New("nothing to replace")
+			}
+			for _, config := range varr {
+				spec, err := config.ParseSpec()
 				if err != nil {
 					return err
 				}
-				if len(varr) == 0 {
-					return errors.New("nothing to replace")
+				schema, _ := configClient.ConfigDescriptor().GetByType(config.Type)
+				// fill up revision
+				if config.Revision == "" {
+					_, _, rev := configClient.Get(config.Type, schema.Key(spec))
+					config.Revision = rev
 				}
-				for _, config := range varr {
-					if err = setup(config.Type, config.Name); err != nil {
-						return err
-					}
-					err = apiClient.UpdateConfig(key, config)
-					if err != nil {
-						return err
-					}
-					fmt.Printf("Updated config: %v %v\n", config.Type, config.Name)
+				newRev, _ := configClient.Put(spec, config.Revision)
+
+				if err != nil {
+					return err
 				}
-			*/
+				fmt.Printf("Updated config %v %v to revision %v\n", config.Type, schema.Key(spec), newRev)
+			}
 
 			return nil
 		},
@@ -216,58 +229,50 @@ istioctl mixer command documentation.
 		istioctl delete route-rule productpage-default
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			/*
-				// If we did not receive a file option, get names of resources to delete from command line
-				if file == "" {
-					if len(args) < 2 {
-						c.Println(c.UsageString())
-						return fmt.Errorf("provide configuration type and name or -f option")
-					}
-					var errs error
-					for i := 1; i < len(args); i++ {
-						if err := setup(args[0], args[i]); err != nil {
-							// If the user specified an invalid rule kind on the CLI,
-							// don't keep processing -- it's probably a typo.
-							return err
-						}
-						if err := apiClient.DeleteConfig(key); err != nil {
-							errs = multierror.Append(errs,
-								fmt.Errorf("cannot delete %s: %v", args[i], err))
-						} else {
-							fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
-						}
-					}
-					return errs
-				}
-
-				// As we did get a file option, make sure the command line did not include any resources to delete
-				if len(args) != 0 {
+			// If we did not receive a file option, get names of resources to delete from command line
+			if file == "" {
+				if len(args) < 2 {
 					c.Println(c.UsageString())
-					return fmt.Errorf("delete takes no arguments when the file option is used")
+					return fmt.Errorf("provide configuration type and name or -f option")
 				}
-				varr, err := readInputs()
+				var errs error
+				typ, err := schema(args[0])
 				if err != nil {
 					return err
 				}
-				if len(varr) == 0 {
-					return errors.New("nothing to delete")
-				}
-				var errs error
-				for _, v := range varr {
-					if err = setup(v.Type, v.Name); err != nil {
-						errs = multierror.Append(errs, err)
+				for i := 1; i < len(args); i++ {
+					key := args[i]
+					if err := configClient.Delete(typ.Type, key); err != nil {
+						errs = multierror.Append(errs,
+							fmt.Errorf("cannot delete %s: %v", args[i], err))
 					} else {
-						if err = apiClient.DeleteConfig(key); err != nil {
-							errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", v.Name, err))
-						} else {
-							fmt.Printf("Deleted config: %v %v\n", v.Type, v.Name)
-						}
+						fmt.Printf("Deleted config: %v %v\n", args[0], args[i])
 					}
 				}
 				return errs
-			*/
+			}
 
-			return nil
+			// As we did get a file option, make sure the command line did not include any resources to delete
+			if len(args) != 0 {
+				c.Println(c.UsageString())
+				return fmt.Errorf("delete takes no arguments when the file option is used")
+			}
+			varr, err := readInputs()
+			if err != nil {
+				return err
+			}
+			if len(varr) == 0 {
+				return errors.New("nothing to delete")
+			}
+			var errs error
+			for _, config := range varr {
+				if err = configClient.Delete(config.Type, config.Key); err != nil {
+					errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", config.Key, err))
+				} else {
+					fmt.Printf("Deleted config: %v %v\n", config.Type, config.Key)
+				}
+			}
+			return errs
 		},
 	}
 
@@ -333,10 +338,41 @@ func schema(typ string) (model.ProtoSchema, error) {
 	return out, nil
 }
 
-/*
-// readInputs reads multiple documents from the input and checks with the schema
-func readInputs() ([]apiserver.Config, error) {
+// Config is the complete configuration including a parsed spec
+type Config struct {
+	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, or destination-policy
+	Type string `json:"type,omitempty"`
+	// Key is the unique key per type
+	Key string `json:"key,omitempty"`
+	// Revision is optional for updating configs
+	Revision string `json:"revision,omitempty"`
+	// Spec is the content of the config
+	Spec interface{} `json:"spec,omitempty"`
+}
 
+// ParseSpec takes the field in the config object and parses into a protobuf message
+// Then assigns it to the ParseSpec field
+func (c *Config) ParseSpec() (proto.Message, error) {
+	byteSpec, err := json.Marshal(c.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode Spec: %v", err)
+	}
+	schema, ok := model.IstioConfigTypes.GetByType(c.Type)
+	if !ok {
+		return nil, fmt.Errorf("unknown spec type %s", c.Type)
+	}
+	message, err := schema.FromJSON(string(byteSpec))
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse proto message: %v", err)
+	}
+	if err = schema.Validate(message); err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
+// readInputs reads multiple documents from the input and checks with the schema
+func readInputs() ([]Config, error) {
 	var reader io.Reader
 	var err error
 
@@ -349,25 +385,27 @@ func readInputs() ([]apiserver.Config, error) {
 		}
 	}
 
-	var varr []apiserver.Config
+	var varr []Config
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
-		v := apiserver.Config{}
+		v := Config{}
 		err = yamlDecoder.Decode(&v)
+
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
+
 		varr = append(varr, v)
 	}
+	glog.V(2).Infof("parsed %d inputs", len(varr))
 
 	return varr, nil
 }
-*/
 
 // Print a simple list of names
 func printShortOutput(configList []model.Config) {
