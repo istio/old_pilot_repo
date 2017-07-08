@@ -269,7 +269,7 @@ istioctl mixer command documentation.
 			for _, config := range varr {
 				// compute key if necessary
 				if config.Key == "" {
-					if spec, err := config.ParseSpec(); err == nil {
+					if spec, specErr := config.ParseSpec(); specErr == nil {
 						schema, _ := configClient.ConfigDescriptor().GetByType(config.Type)
 						config.Key = schema.Key(spec)
 					}
