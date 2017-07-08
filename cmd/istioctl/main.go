@@ -142,11 +142,12 @@ istioctl mixer command documentation.
 					_, _, rev := configClient.Get(config.Type, schema.Key(spec))
 					config.Revision = rev
 				}
-				newRev, _ := configClient.Put(spec, config.Revision)
 
+				newRev, err := configClient.Put(spec, config.Revision)
 				if err != nil {
 					return err
 				}
+
 				fmt.Printf("Updated config %v %v to revision %v\n", config.Type, schema.Key(spec), newRev)
 			}
 
@@ -199,7 +200,7 @@ istioctl mixer command documentation.
 			}
 
 			if len(configs) == 0 {
-				fmt.Fprintf(os.Stderr, "No resources found.\n")
+				fmt.Println("No resources found.")
 				return nil
 			}
 
@@ -280,7 +281,7 @@ istioctl mixer command documentation.
 		Use:   "version",
 		Short: "Display version information",
 		RunE: func(c *cobra.Command, args []string) error {
-			fmt.Printf(version.Version())
+			fmt.Println(version.Version())
 			return nil
 		},
 	}
@@ -418,7 +419,10 @@ func printShortOutput(configList []model.Config) {
 func printYamlOutput(configList []model.Config) {
 	for _, c := range configList {
 		schema, _ := configClient.ConfigDescriptor().GetByType(c.Type)
-		out, _ := schema.ToYAML(c.Content)
+		out, err := schema.ToYAML(c.Content)
+		if err != nil {
+			glog.Warning(err)
+		}
 		fmt.Printf("type: %s\n", c.Type)
 		fmt.Printf("key: %s\n", c.Key)
 		fmt.Printf("revision: %s\n", c.Revision)

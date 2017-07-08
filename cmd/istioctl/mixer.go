@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -40,8 +39,7 @@ type mixerAPIResponse struct {
 }
 
 const (
-	requestTimeout = 60 * time.Second
-	scopesPath     = "api/v1/scopes/"
+	scopesPath = "api/v1/scopes/"
 )
 
 type k8sRESTRequester struct {
