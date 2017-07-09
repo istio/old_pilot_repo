@@ -18,7 +18,6 @@ package tpr
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -68,8 +67,8 @@ type Client struct {
 	namespace string
 }
 
-// createRESTConfig for cluster API server, pass empty config file for in-cluster
-func createRESTConfig(kubeconfig string) (config *rest.Config, err error) {
+// CreateRESTConfig for cluster API server, pass empty config file for in-cluster
+func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	if kubeconfig == "" {
 		config, err = rest.InClusterConfig()
 	} else {
@@ -123,7 +122,7 @@ func NewClient(config string, descriptor model.ConfigDescriptor, namespace strin
 	if err != nil {
 		return nil, err
 	}
-	restconfig, err := createRESTConfig(kubeconfig)
+	restconfig, err := CreateRESTConfig(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -368,35 +367,4 @@ func (cl *Client) List(typ string) ([]model.Config, error) {
 		}
 	}
 	return out, errs
-}
-
-// Request sends requests through the Kubernetes apiserver proxy to
-// the a Kubernetes service.
-// (see https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#discovering-builtin-services)
-func (cl *Client) Request(namespace, service, method, path string, inBody []byte) (int, []byte, error) {
-	// Kubernetes apiserver proxy prefix for the specified namespace and service.
-	absPath := fmt.Sprintf("api/v1/namespaces/%s/services/%s/proxy", namespace, service)
-
-	// TODO(https://github.com/istio/api/issues/94) - pilot and
-	// mixer API server paths are not consistent. Pilot path is
-	// prefixed with Istio resource version (i.e. v1alpha1) and mixer
-	// path is not. Short term workaround is to special case this
-	// behavior. Long term solution is to unify API scheme and server
-	// implementations.
-	if strings.HasPrefix(path, "config") || strings.HasPrefix(path, "version") {
-		absPath += "/" + IstioResourceVersion // pilot api server path
-	}
-
-	// API server resource path.
-	absPath += "/" + path
-
-	var status int
-	outBody, err := cl.dynamic.Verb(method).
-		AbsPath(absPath).
-		SetHeader("Content-Type", "application/json").
-		Body(inBody).
-		Do().
-		StatusCode(&status).
-		Raw()
-	return status, outBody, err
 }
