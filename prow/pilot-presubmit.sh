@@ -6,7 +6,7 @@ set -ex
 # but we depend on being at path $GOPATH/src/istio.io/pilot for imports
 if [ "$CI" == "bootstrap" ]; then
     mkdir -p $GOPATH/src/istio.io
-    mv $GOPATH/src/github.com/nlandolfi/pilot $GOPATH/src/istio.io
+    mv $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
     cd $GOPATH/src/istio.io/pilot/
 
     # use the provided pull head sha
