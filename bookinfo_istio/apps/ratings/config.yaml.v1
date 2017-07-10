@@ -12,6 +12,7 @@ endpoint:
 
 service_port:
   name: istio-http
+  port: 9080
   protocol: http
 
 registry:
