@@ -11,24 +11,19 @@ if [ "$CI" == "bootstrap" ]; then
 
     # use the provided pull head sha
     GIT_SHA=$PULL_PULL_SHA
+
+    # use volume mount from pilot-presubmit job's pod spec
+    ln -s /etc/e2e-testing-kubeconfig platform/kube/config
 else
     # use the current commit
     GIT_SHA=$(git rev-parse --verify HEAD)
 fi
 
-# Get configuration for the separate test cluster, it must be at
-# ~/.kube and platform/kube because different aspects of testing
-# & building require it in each place.
-gcloud config set container/use_client_certificate True
-gcloud container clusters get-credentials e2e-testing --zone us-west1-a --project istio-testing
-if [ -e platform/kube/config ]; then
-    rm platform/kube/config
-fi
-ln -s ~/.kube/config platform/kube/
+# TODO(nclandolfi) need this line? will remove if not
+# gcloud config set container/use_client_certificate True
 
 echo "=== Bazel Build ==="
 ./bin/install-prereqs.sh
-bazel fetch -k //...
 bazel build //...
 
 echo "=== Go Build ==="
@@ -40,5 +35,5 @@ echo "=== Code Check ==="
 echo "=== Bazel Tests ==="
 bazel test //...
 
-echo "=== Integration Tests ==="
+echo "=== Running e2e Tests ==="
 ./bin/e2e.sh -tag $GIT_SHA -hub "gcr.io/istio-testing"
