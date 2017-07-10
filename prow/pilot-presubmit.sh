@@ -19,10 +19,8 @@ fi
 # Get configuration for the separate test cluster, it must be at
 # ~/.kube and platform/kube because different aspects of testing
 # & building require it in each place.
-# (c.f., https://github.com/istio/pilot/issues/893, which tracks
-# this discrepancy)
 gcloud config set container/use_client_certificate True
-gcloud container clusters get-credentials testing --zone us-central1-a --project isito-prow
+gcloud container clusters get-credentials e2e-testing --zone us-west1-a --project istio-testing
 if [ -e platform/kube/config ]; then
     rm platform/kube/config
 fi
