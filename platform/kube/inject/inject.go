@@ -129,9 +129,9 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		"imagePullPolicy": "Always",
 		"securityContext": map[string]interface{}{
 			"capabilities": map[string]interface{}{
-				"add":        []string{"NET_ADMIN"},
+				"add": []string{"NET_ADMIN"},
 			},
-		  "privileged": true,
+			"privileged": true,
 		},
 	})
 
