@@ -287,7 +287,6 @@ func MakeIstioStore(store ConfigStore) IstioConfigStore {
 func (i istioConfigStore) RouteRules() map[string]*proxyconfig.RouteRule {
 	out := make(map[string]*proxyconfig.RouteRule)
 	rs, err := i.List(RouteRule)
-	glog.Infof("len of rs: %d", len(rs))
 	if err != nil {
 		glog.V(2).Infof("RouteRules => %v", err)
 	}

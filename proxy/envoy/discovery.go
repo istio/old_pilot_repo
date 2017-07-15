@@ -428,9 +428,9 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 
 // ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
-	glog.Infof("inside ListClusters")
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
+	cached = false
 	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
@@ -440,7 +440,6 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 
 		// service-node holds the IP address
 		node := request.PathParameter(ServiceNode)
-		glog.Infof("node: %s", node)
 		clusters := ds.getClusters(node)
 
 		var err error
@@ -597,6 +596,7 @@ func (ds *DiscoveryService) getClusters(node string) Clusters {
 		instances := ds.Discovery.HostInstances(map[string]bool{node: true})
 		services := ds.Discovery.Services()
 		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Accounts, ds.MeshConfig, ds.Config)
+
 	}
 
 	// de-duplicate and canonicalize clusters

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"strings"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -302,13 +303,15 @@ var (
 				if err != nil {
 					return multierror.Prefix(err, "failed to create registration agent.")
 				}
-			//	mesh.IstioServiceCluster = id.ServiceName
+
+				ipAddr := strings.Split(id.Endpoint.Value,":")[0]
+
 				context := &proxy.Context{
 					Discovery:        controller,
 					Accounts:         controller,
 					Config:           model.MakeIstioStore(controller),
 					MeshConfig:       mesh,
-					IPAddress:        id.Endpoint.Value,
+					IPAddress:        ipAddr,
 					UID:              fmt.Sprintf("vms://%s", id.Endpoint.Value),
 					Registration:     regAgent,
 					PassthroughPorts: flags.passthrough,

@@ -9,6 +9,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
 	"//model:go_default_library",
+	"//platform/kube:go_default_library",
 	"@com_github_golang_protobuf//proto:go_default_library",
 	"@com_github_golang_glog//:go_default_library",
         "@com_github_amalgam8_amalgam8//pkg/adapters/discovery/amalgam8:go_default_library",

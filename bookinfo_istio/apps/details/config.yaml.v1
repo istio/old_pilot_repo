@@ -8,8 +8,8 @@ service:
     - version=v1
 
 endpoint:
-  port: 9080 
-  type: http 
+  port: 9080
+  type: http
 
 service_port:
   name: istio-http

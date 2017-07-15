@@ -1,45 +1,59 @@
 package vms
 
 import (
-	"strings"
-	"strconv"
 	"github.com/golang/protobuf/proto"
-//	"github.com/golang/glog"
-	"istio.io/pilot/model"
-	proxyconfig "istio.io/api/proxy/v1/config"
+	"strconv"
+	"strings"
+	"github.com/golang/glog"
+	//a8api "github.com/amalgam8/amalgam8/pkg/api"
 	"github.com/amalgam8/amalgam8/registry/client"
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
+	util "istio.io/pilot/platform/kube"
 )
 
 const ()
 
 type ControllerConfig struct {
 	Discovery *client.Client
-	Mesh	  *proxyconfig.ProxyMeshConfig
+	Mesh      *proxyconfig.ProxyMeshConfig
 }
 
 type Controller struct {
-	discovery *client.Client
-	mesh   *proxyconfig.ProxyMeshConfig
+	serviceHandlers  *util.ChainHandler
+	instanceHandlers *util.ChainHandler
+	discovery        *client.Client
+	mesh             *proxyconfig.ProxyMeshConfig
 }
 
 func NewController(config ControllerConfig) *Controller {
 	controller := &Controller{
 		discovery: config.Discovery,
-		mesh : config.Mesh,
+		mesh:      config.Mesh,
 	}
 
 	return controller
 }
 
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
-	return nil
+/*	c.serviceHandlers.Append(func(obj interface{}, event model.Event) error {
+		f(convertService(&(*obj.(*a8api.Service))), event)
+		return nil
+	})
+*/	return nil
 }
 
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
-	return nil
+/*	c.instanceHandlers.Append(func(obj interface{}, event model.Event) error {
+		a8instance := *obj.(*a8api.ServiceInstance)
+		service := convertService(&a8instance.Service)
+		f(&model.ServiceInstance{Service: service}, event)
+		return nil
+	})
+*/	return nil
 }
 
-func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)){
+func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
 }
 
 func (c *Controller) Run(stop <-chan struct{}) {}
@@ -71,6 +85,7 @@ func (c *Controller) Put(config proto.Message, oldRevision string) (newRevision 
 func (c *Controller) Delete(typ, key string) error {
 	return nil
 }
+
 // Implements the Istio ServiceDiscovery interface
 func (c *Controller) Services() []*model.Service {
 	items, err := c.discovery.ListServiceObjects()
@@ -136,16 +151,18 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 				}
 
 				port, err := strconv.Atoi(addrPort[1])
-				if err != nil { return nil}
+				if err != nil {
+					return nil
+				}
 
 				instances = append(instances, &model.ServiceInstance{
-					Endpoint: model.NetworkEndpoint {
-						Address: addrPort[0],
-						Port: port,
+					Endpoint: model.NetworkEndpoint{
+						Address:     addrPort[0],
+						Port:        port,
 						ServicePort: svcPort,
 					},
 					Service: service,
-					Tags: instanceTags,
+					Tags:    instanceTags,
 				})
 			}
 		}
@@ -162,6 +179,11 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 		return nil
 	}
 
+	glog.Infof("Input addr to HostInstance")
+	for addr := range addrs {
+		glog.Infof(addr)
+	}
+
 	for _, inst := range insts {
 		addrPort := strings.Split(inst.Endpoint.Value, ":")
 		if len(addrPort) != 2 {
@@ -170,20 +192,26 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 
 		if addrs[addrPort[0]] {
 			port, err := strconv.Atoi(addrPort[1])
-			if err != nil { return nil}
+			if err != nil {
+				glog.Infof("Error in converting port: %s", addrPort[1])
+				return nil
+			}
 			service := convertService(&inst.Service)
 			svcPort, exists := service.Ports.Get(inst.Endpoint.ServicePort.Name)
 
-			if !exists {return nil}
+			if !exists {
+				glog.Infof("Error in getting svcPort: %s", inst.Endpoint.ServicePort.Name)
+				return nil
+			}
 
 			instances = append(instances, &model.ServiceInstance{
-				Endpoint: model.NetworkEndpoint {
-					Address: addrPort[0],
-					Port: port,
+				Endpoint: model.NetworkEndpoint{
+					Address:     addrPort[0],
+					Port:        port,
 					ServicePort: svcPort,
 				},
 				Service: service,
-				Tags: convertTags(inst.Tags),
+				Tags:    convertTags(inst.Tags),
 			})
 		}
 	}
