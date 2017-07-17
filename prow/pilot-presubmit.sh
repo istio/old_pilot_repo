@@ -56,5 +56,17 @@ echo "=== Code Check ==="
 echo "=== Bazel Tests ==="
 bazel test //...
 
+echo "=== Code Coverage ==="
+./bin/codecov.sh > codecov.report
+bazel-bin/bin/toolbox/presubmit/package_coverage_check
+
+env # TODO(nclandolfi) remove
+
+# TODO(nclandolfi) publish code coverage somehow.
+if [ "${CI:-}" == "bootstrap" ]; then
+    echo "submit code cov stand in"
+    # curl -s https://codecov.io/bash | bash /dev/stdin -K -B
+fi
+
 echo "=== Running e2e Tests ==="
 ./bin/e2e.sh -tag $GIT_SHA -hub "gcr.io/istio-testing"
