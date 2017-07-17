@@ -26,7 +26,7 @@ set -u
 # Print commands
 set -x
 
-if [ "${CI}" == "bootstrap" ]; then
+if [ "${CI:-}" == "bootstrap" ]; then
     # Test harness will checkout code to directory $GOPATH/src/github.com/istio/istio
     # but we depend on being at path $GOPATH/src/istio.io/istio for imports.
     mkdir -p $GOPATH/src/istio.io
