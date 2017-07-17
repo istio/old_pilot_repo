@@ -57,10 +57,9 @@ echo "=== Bazel Tests ==="
 bazel test //...
 
 echo "=== Code Coverage ==="
-./bin/codecov.sh > codecov.report
-./bin/toolbox/presubmit/package_coverage_check
-
 env # TODO(nclandolfi) remove
+./bin/codecov.sh > codecov.report
+./bin/toolbox/presubmit/pkg_coverage.sh
 
 # TODO(nclandolfi) publish code coverage somehow.
 if [ "${CI:-}" == "bootstrap" ]; then
