@@ -58,7 +58,7 @@ bazel test //...
 
 echo "=== Code Coverage ==="
 ./bin/codecov.sh > codecov.report
-bazel-bin/bin/toolbox/presubmit/package_coverage_check
+./bin/toolbox/presubmit/package_coverage_check
 
 env # TODO(nclandolfi) remove
 
