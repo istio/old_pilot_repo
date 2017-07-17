@@ -59,7 +59,7 @@ bazel test //...
 echo "=== Code Coverage ==="
 ./bin/codecov.sh | tee codecov.report
 if [ "${CI:-}" == "bootstrap" ]; then
-    BUILD_ID="PROW-${BUILD_NUMBER} ./bin/toolbox/presubmit/pkg_coverage.sh
+    BUILD_ID="PROW-${BUILD_NUMBER}" ./bin/toolbox/presubmit/pkg_coverage.sh
     curl -s https://codecov.io/bash | bash /dev/stdin -K -B ${PULL_BASE_REF} -C ${PULL_PULL_SHA} -P ${PULL_NUMBER}
 else
     echo "Not in bootstrap environment, skipping code coverage publishing"
