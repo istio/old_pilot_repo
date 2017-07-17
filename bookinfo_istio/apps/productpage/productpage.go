@@ -29,9 +29,6 @@ const (
 	requestIDHeader = "X-Request-ID"
 )
 
-// Globals
-var proxyURL = ""
-
 type productPage struct {
 	Details map[string]string  `json:"details,omitempty"`
 	Reviews map[string]*review `json:"reviews,omitempty"`
@@ -49,12 +46,11 @@ type rating struct {
 
 func main() {
 	if len(os.Args) < 3 {
-		log.Printf("Usage: %s <port> <proxy url>", os.Args[0])
+		log.Printf("Usage: %s <port>", os.Args[0])
 		os.Exit(-1)
 	}
 
 	port := os.Args[1]
-	proxyURL = os.Args[2]
 
 	http.HandleFunc("/productpage", productpageHandler)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +79,7 @@ func getDetails(forwardHeaders http.Header) map[string]string {
 	const attempts = 1
 	const timeout = 1 * time.Second
 
-	bytes, err := doRequest("/details", forwardHeaders, timeout, attempts)
+	bytes, err := doRequest("http://details:9080/details", forwardHeaders, timeout, attempts)
 	if err != nil {
 		log.Printf("Error getting details: %v", err)
 		return nil
@@ -103,7 +99,7 @@ func getReviews(forwardHeaders http.Header) map[string]*review {
 	const attempts = 2
 	const timeout = 3 * time.Second
 
-	bytes, err := doRequest("/reviews", forwardHeaders, timeout, attempts)
+	bytes, err := doRequest("http://reviews:9080/reviews", forwardHeaders, timeout, attempts)
 	if err != nil {
 		log.Printf("Error getting reviews: %v", err)
 		return nil
@@ -124,7 +120,7 @@ func doRequest(path string, forwardHeaders http.Header, timeout time.Duration, a
 	client.Timeout = timeout
 
 	for i := 0; i < attempts; i++ {
-		req, _ := http.NewRequest("GET", proxyURL+path, nil)
+		req, _ := http.NewRequest("GET", path, nil)
 		req.Header = forwardHeaders
 
 		resp, err := client.Do(req)
@@ -147,7 +143,7 @@ func doRequest(path string, forwardHeaders http.Header, timeout time.Duration, a
 	}
 
 	err := fmt.Errorf("run out of attempts")
-	log.Printf("Error executing HTTP request (%s %s): %v", "GET", proxyURL+path, err)
+	log.Printf("Error executing HTTP request (%s %s): %v", "GET", path, err)
 	return nil, err
 }
 

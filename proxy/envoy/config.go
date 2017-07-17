@@ -129,9 +129,6 @@ func buildListeners(context *proxy.Context) (Listeners, Clusters) {
 	instances := context.Discovery.HostInstances(map[string]bool{context.IPAddress: true})
 	services := context.Discovery.Services()
 
-	glog.Infof("context ip addr: %s", context.IPAddress)
-	glog.Infof("len of instances: %d", len(instances))
-
 	inbound, inClusters := buildInboundListeners(instances, context.MeshConfig)
 	outbound, outClusters := buildOutboundListeners(instances, services, context)
 

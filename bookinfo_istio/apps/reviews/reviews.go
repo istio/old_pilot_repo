@@ -34,7 +34,6 @@ const (
 
 // Globals
 var (
-	proxyURL      string
 	enableRatings bool
 	starColor     string
 )
@@ -60,12 +59,11 @@ var reviews = map[string]*review{
 
 func main() {
 	if len(os.Args) < 3 {
-		log.Printf("Usage: %s <port> <proxy url>", os.Args[0])
+		log.Printf("Usage: %s <port>", os.Args[0])
 		os.Exit(-1)
 	}
 
 	port := os.Args[1]
-	proxyURL = os.Args[2]
 
 	enableRatings = os.Getenv(enableRatingsEnvVar) == "true"
 	starColor = os.Getenv(starColorEnvVar)
@@ -120,7 +118,7 @@ func getRatings(forwardHeaders http.Header) map[string]*rating {
 
 	ratings := map[string]*rating{}
 
-	bytes, err := doRequest("/ratings", forwardHeaders, timeout)
+	bytes, err := doRequest("http://ratings:9080/ratings", forwardHeaders, timeout)
 	if err != nil {
 		log.Printf("Error getting ratings: %v", err)
 		return ratings
@@ -138,7 +136,7 @@ func doRequest(path string, forwardHeaders http.Header, timeout time.Duration) (
 	client := http.Client{}
 	client.Timeout = timeout
 
-	req, _ := http.NewRequest("GET", proxyURL+path, nil)
+	req, _ := http.NewRequest("GET", path, nil)
 	req.Header = forwardHeaders
 
 	resp, err := client.Do(req)
