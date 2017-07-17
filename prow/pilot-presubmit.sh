@@ -26,24 +26,22 @@ set -u
 # Print commands
 set -x
 
-# but we depend on being at path $GOPATH/src/istio.io/pilot for imports
-if [ "$CI" == "bootstrap" ]; then
+if [ "${CI}" == "bootstrap" ]; then
+    # Test harness will checkout code to directory $GOPATH/src/github.com/istio/istio
+    # but we depend on being at path $GOPATH/src/istio.io/istio for imports.
     mkdir -p $GOPATH/src/istio.io
-    mv $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
+    ln -s $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
     cd $GOPATH/src/istio.io/pilot/
 
-    # use the provided pull head sha
+    # Use the provided pull head sha, from prow.
     GIT_SHA=$PULL_PULL_SHA
 
-    # use volume mount from pilot-presubmit job's pod spec
+    # Use volume mount from pilot-presubmit job's pod spec.
     ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
 else
-    # use the current commit
+    # Use the current commit.
     GIT_SHA=$(git rev-parse --verify HEAD)
 fi
-
-# TODO(nclandolfi) need this line? will remove if not
-# gcloud config set container/use_client_certificate True
 
 echo "=== Bazel Build ==="
 ./bin/install-prereqs.sh
