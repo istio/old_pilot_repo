@@ -1,15 +1,15 @@
 package vms
 
 import (
-	"github.com/golang/protobuf/proto"
+	"time"
 	"strconv"
 	"strings"
 	"github.com/golang/glog"
-	//a8api "github.com/amalgam8/amalgam8/pkg/api"
+	"github.com/golang/protobuf/proto"
 	"github.com/amalgam8/amalgam8/registry/client"
+	a8api "github.com/amalgam8/amalgam8/pkg/api"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
-	util "istio.io/pilot/platform/kube"
 )
 
 const ()
@@ -20,14 +20,14 @@ type ControllerConfig struct {
 }
 
 type Controller struct {
-	serviceHandlers  *util.ChainHandler
-	instanceHandlers *util.ChainHandler
+	monitor		 Monitor
 	discovery        *client.Client
 	mesh             *proxyconfig.ProxyMeshConfig
 }
 
 func NewController(config ControllerConfig) *Controller {
 	controller := &Controller{
+		monitor: NewVMsMonitor(config.Discovery, time.Second * 1),
 		discovery: config.Discovery,
 		mesh:      config.Mesh,
 	}
@@ -36,27 +36,29 @@ func NewController(config ControllerConfig) *Controller {
 }
 
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
-/*	c.serviceHandlers.Append(func(obj interface{}, event model.Event) error {
+	c.monitor.AppendServiceHandler(func(obj interface{}, event model.Event) error {
 		f(convertService(&(*obj.(*a8api.Service))), event)
 		return nil
 	})
-*/	return nil
+	return nil
 }
 
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
-/*	c.instanceHandlers.Append(func(obj interface{}, event model.Event) error {
+	c.monitor.AppendInstanceHandler(func(obj interface{}, event model.Event) error {
 		a8instance := *obj.(*a8api.ServiceInstance)
 		service := convertService(&a8instance.Service)
 		f(&model.ServiceInstance{Service: service}, event)
 		return nil
 	})
-*/	return nil
+	return nil
 }
 
 func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
 }
 
-func (c *Controller) Run(stop <-chan struct{}) {}
+func (c *Controller) Run(stop <-chan struct{}) {
+	c.monitor.Start(stop)
+}
 
 func (c *Controller) HasSynced() bool {
 	return false
@@ -177,11 +179,6 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 
 	if err != nil {
 		return nil
-	}
-
-	glog.Infof("Input addr to HostInstance")
-	for addr := range addrs {
-		glog.Infof(addr)
 	}
 
 	for _, inst := range insts {

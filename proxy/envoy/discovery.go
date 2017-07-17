@@ -430,7 +430,7 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
-	cached = false
+//	cached = false
 	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,

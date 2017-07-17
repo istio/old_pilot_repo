@@ -144,7 +144,6 @@ var (
 					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
 				}
 
-				glog.V(2).Infof("url: %s", vmsConfig.A8Registry.URL)
 				vmsClient, err = vmsclient.New(vmsclient.Config{
 					URL:       vmsConfig.A8Registry.URL,
 					AuthToken: vmsConfig.A8Registry.Token,
