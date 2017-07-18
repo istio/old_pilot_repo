@@ -17,10 +17,10 @@ package main
 import (
 	"fmt"
 
+	uuid "github.com/satori/go.uuid"
+
 	"strings"
 	"sync"
-
-	"github.com/satori/go.uuid"
 )
 
 const (
@@ -83,7 +83,7 @@ func (t *zipkin) makeRequests() error {
 // verify that the traces were picked up by Zipkin
 func (t *zipkin) verifyTraces() error {
 	f := func() status {
-		response := t.infra.clientRequest("t", "http://zipkin:9411/api/v1/traces", 1, "")
+		response := t.infra.clientRequest("t", "http://zipkin:9411/api/v1/traces?limit=10000", 1, "")
 		if len(response.code) == 0 || response.code[0] != httpOk {
 			return errAgain
 		}
