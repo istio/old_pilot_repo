@@ -28,7 +28,6 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
-	"istio.io/pilot/test/util"
 )
 
 func TestRoutesByPath(t *testing.T) {
@@ -229,24 +228,6 @@ const (
 	rewriteRouteRule  = "testdata/rewrite-route.yaml.golden"
 )
 
-func testConfig(r model.ConfigStore, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
-	config := Generate(mesh, &proxy.Context{
-		IPAddress: instance,
-		UID:       fmt.Sprintf("uid://%s.my-namespace", instance),
-	})
-
-	if config == nil {
-		t.Fatal("Failed to generate config")
-	}
-
-	err := config.WriteFile(envoyConfig)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	util.CompareYAML(envoyConfig, t)
-}
-
 func configObjectFromYAML(kind, file string) (proto.Message, error) {
 	schema, ok := model.IstioConfigTypes.GetByType(kind)
 	if !ok {
@@ -326,5 +307,6 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 	mesh.DiscoveryRefreshDelay = ptypes.DurationProto(10 * time.Millisecond)
 	mesh.EgressProxyAddress = "localhost:8888"
 	mesh.StatsdUdpAddress = "10.1.1.10:9125"
+	mesh.ZipkinAddress = "localhost:6000"
 	return mesh
 }

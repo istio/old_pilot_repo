@@ -11,6 +11,9 @@
             "codec_type": "auto",
             "stat_prefix": "http",
             "generate_request_id": true,
+            "tracing": {
+              "operation_name": "ingress"
+            },
             "rds": {
               "cluster": "rds",
               "route_config_name": "8888",
@@ -65,6 +68,17 @@
             "url": "tcp://localhost:8080"
           }
         ]
+      },
+      {
+        "name": "zipkin",
+        "connect_timeout_ms": 1000,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://localhost:6000"
+          }
+        ]
       }
     ],
     "sds": {
@@ -96,5 +110,16 @@
       "refresh_delay_ms": 10
     }
   },
-  "statsd_udp_ip_address": "10.1.1.10:9125"
+  "statsd_udp_ip_address": "10.1.1.10:9125",
+  "tracing": {
+    "http": {
+      "driver": {
+        "type": "zipkin",
+        "config": {
+          "collector_cluster": "zipkin",
+          "collector_endpoint": "/api/v1/spans"
+        }
+      }
+    }
+  }
 }

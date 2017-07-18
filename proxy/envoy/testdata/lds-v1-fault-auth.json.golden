@@ -18,12 +18,29 @@
        "codec_type": "auto",
        "stat_prefix": "http",
        "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
        "rds": {
         "cluster": "rds",
         "route_config_name": "443",
-        "refresh_delay_ms": 1000
+        "refresh_delay_ms": 10
        },
        "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.1",
+           "target.service": "hello.default.svc.cluster.local"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.1"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
         {
          "type": "decoder",
          "name": "router",
@@ -51,12 +68,29 @@
        "codec_type": "auto",
        "stat_prefix": "http",
        "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
        "rds": {
         "cluster": "rds",
         "route_config_name": "80",
-        "refresh_delay_ms": 1000
+        "refresh_delay_ms": 10
        },
        "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.1",
+           "target.service": "hello.default.svc.cluster.local"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.1"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
         {
          "type": "decoder",
          "name": "router",
@@ -84,12 +118,29 @@
        "codec_type": "auto",
        "stat_prefix": "http",
        "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
        "rds": {
         "cluster": "rds",
         "route_config_name": "81",
-        "refresh_delay_ms": 1000
+        "refresh_delay_ms": 10
        },
        "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.1",
+           "target.service": "hello.default.svc.cluster.local"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.1"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
         {
          "type": "decoder",
          "name": "router",
@@ -141,6 +192,9 @@
        "codec_type": "auto",
        "stat_prefix": "http",
        "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
        "route_config": {
         "virtual_hosts": [
          {
@@ -151,13 +205,31 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.1081"
+            "cluster": "in.1081",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
            }
           ]
          }
         ]
        },
        "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.1",
+           "target.service": "hello.default.svc.cluster.local"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.1"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
         {
          "type": "decoder",
          "name": "router",
@@ -219,6 +291,9 @@
        "codec_type": "auto",
        "stat_prefix": "http",
        "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
        "route_config": {
         "virtual_hosts": [
          {
@@ -229,13 +304,31 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.80"
+            "cluster": "in.80",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
            }
           ]
          }
         ]
        },
        "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.1",
+           "target.service": "hello.default.svc.cluster.local"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.1"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
         {
          "type": "decoder",
          "name": "router",

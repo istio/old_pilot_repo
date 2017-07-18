@@ -21,19 +21,6 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func TestHandlers(t *testing.T) {
-	controller := mockController{}
-	mesh := proxy.DefaultMeshConfig()
-	context := proxy.Context{}
-	_, err := NewWatcher(&controller, nil, &mesh, &context)
-	if err != nil {
-		t.Errorf("failed creating watcher %v", err)
-	}
-	if controller.handlers != 2 {
-		t.Errorf("expected handlers for services, instances, got %d", controller.handlers)
-	}
-}
-
 func TestEnvoyArgs(t *testing.T) {
 	mesh := proxy.DefaultMeshConfig()
 	got := envoyArgs("test.json", 5, &mesh, "my-proxy")
