@@ -15,8 +15,7 @@ rules:
   resources: ["thirdpartyresources", "thirdpartyresources.extensions", "ingresses", "ingresses/status"]
   verbs: ["*"]
 - apiGroups: [""]
-#  resources: ["configmaps", "endpoints", "pods", "services", "secrets", "ingresses", "ingresses/status"]
-  resources: ["*"]
+  resources: ["configmaps", "endpoints", "pods", "services", "secrets", "nodes"]
   verbs: ["*"]
 ---
 kind: ClusterRole
