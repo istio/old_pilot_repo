@@ -43,9 +43,8 @@ type args struct {
 	kubeconfig string
 	meshConfig string
 
-	ipAddress   string
-	podName     string
-	passthrough []int
+	ipAddress string
+	podName   string
 
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
@@ -172,6 +171,8 @@ var (
 					watcher = envoy.NewWatcher(mesh, proxy.Egress{})
 
 				case proxy.IngressNode:
+					// Ingress watcher requires TLS secret files watched independently.
+					// Once listener incorporates the secret data, this can be merged into the main watcher.
 					watcher = envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
 
 				default:

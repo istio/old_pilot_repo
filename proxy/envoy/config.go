@@ -96,20 +96,15 @@ for _, port := range context.PassthroughPorts {
 */
 
 // buildConfig creates a proxy config with discovery services and admin port
-func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {
+func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyconfig.ProxyMeshConfig) *Config {
 	out := &Config{
 		Listeners: listeners,
-		LDS: &LDSCluster{
-			Cluster:        LDSName,
-			RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
-		},
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
 			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: append(clusters,
-				buildCluster(mesh.DiscoveryAddress, LDSName, mesh.ConnectTimeout),
 				buildCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout)),
 			SDS: &DiscoveryCluster{
 				Cluster:        buildCluster(mesh.DiscoveryAddress, SDSName, mesh.ConnectTimeout),
@@ -121,6 +116,15 @@ func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.Proxy
 			},
 		},
 		StatsdUDPIPAddress: mesh.StatsdUdpAddress,
+	}
+
+	if lds {
+		out.LDS = &LDSCluster{
+			Cluster:        LDSName,
+			RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
+		}
+		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
+			buildCluster(mesh.DiscoveryAddress, LDSName, mesh.ConnectTimeout))
 	}
 
 	if mesh.ZipkinAddress != "" {

@@ -314,7 +314,7 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 
 func TestConfig(t *testing.T) {
 	mesh := makeMeshConfig()
-	config := buildConfig(make(Listeners, 0), make(Clusters, 0), &mesh)
+	config := buildConfig(make(Listeners, 0), make(Clusters, 0), true, &mesh)
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}

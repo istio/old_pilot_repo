@@ -152,7 +152,7 @@ func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, ce
 		}
 	}
 
-	config := buildConfig(listeners, nil, mesh)
+	config := buildConfig(listeners, nil, false, mesh)
 
 	h := sha256.New()
 	hashed := false
