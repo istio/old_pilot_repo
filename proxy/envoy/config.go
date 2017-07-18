@@ -173,6 +173,7 @@ func buildListeners(env proxy.Environment, ipAddress string) (Listeners, Cluster
 
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	listeners = append(listeners, &Listener{
+		Name:           RedirectListenerName,
 		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, env.Mesh.ProxyListenPort),
 		BindToPort:     true,
 		UseOriginalDst: true,
@@ -234,19 +235,18 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 	}
 }
 
-func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) *Listener {
+func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.ProxyMeshConfig_NONE:
 	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
 		listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
 	}
-	return listener
 }
 
 // buildTCPListener constructs a listener for the TCP proxy
-func buildTCPListener(tcpConfig *TCPRouteConfig, name string, ip string, port int) *Listener {
+func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener {
 	return &Listener{
-		Name:    name,
+		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
 		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
 		Filters: []*NetworkFilter{{
 			Type: "read",
@@ -411,8 +411,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 				route := buildTCPRoute(cluster, []string{service.Address})
 				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-				listener := buildTCPListener(config, fmt.Sprintf("tcp_outbound_%s_%d", service.Address, servicePort.Port),
-					service.Address, servicePort.Port)
+				listener := buildTCPListener(config, service.Address, servicePort.Port)
 				tcpClusters = append(tcpClusters, cluster)
 				tcpListeners = append(tcpListeners, listener)
 			}
@@ -468,17 +467,20 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				applyInboundAuth(buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, false), mesh))
+				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, false))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
-			}, fmt.Sprintf("tcp_inbound_%s_%d", endpoint.Address, endpoint.Port),
-				endpoint.Address, endpoint.Port))
+			}, endpoint.Address, endpoint.Port))
 
 		default:
 			glog.Warningf("Unsupported inbound protocol %v for port %#v", protocol, servicePort)
 		}
+	}
+
+	for _, listener := range listeners {
+		applyInboundAuth(listener, mesh)
 	}
 
 	return listeners, clusters

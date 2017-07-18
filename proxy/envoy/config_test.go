@@ -26,10 +26,8 @@ import (
 	"github.com/golang/protobuf/ptypes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
-	"istio.io/pilot/test/mock"
 	"istio.io/pilot/test/util"
 )
 
@@ -221,8 +219,8 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyConfig       = "testdata/envoy.json"
-	envoyFaultConfig  = "testdata/envoy-fault.json"
+	envoyConfig = "testdata/envoy.json"
+
 	cbPolicy          = "testdata/cb-policy.yaml.golden"
 	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
@@ -329,68 +327,4 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 	mesh.EgressProxyAddress = "localhost:8888"
 	mesh.StatsdUdpAddress = "10.1.1.10:9125"
 	return mesh
-}
-
-func TestMockConfig(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestMockConfigWithAuth(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestMockConfigTimeout(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addTimeout(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestMockConfigCircuitBreaker(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addCircuitBreaker(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestHTTPRedirect(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addRedirect(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestHTTPRewrite(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addRewrite(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestMockConfigWeighted(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addWeightedRoute(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-}
-
-func TestMockConfigFault(t *testing.T) {
-	r := memory.Make(model.IstioConfigTypes)
-	mesh := makeMeshConfig()
-	addFaultRoute(r, t)
-	// Fault rule uses source condition, hence the different golden artifacts
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyFaultConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }

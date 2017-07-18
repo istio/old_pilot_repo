@@ -333,6 +333,9 @@ func (ds *DiscoveryService) GetCacheStats(_ *restful.Request, response *restful.
 	for k, v := range ds.rdsCache.stats() {
 		stats[k] = v
 	}
+	for k, v := range ds.ldsCache.stats() {
+		stats[k] = v
+	}
 	if err := response.WriteEntity(discoveryCacheStats{stats}); err != nil {
 		glog.Warning(err)
 	}
@@ -343,6 +346,7 @@ func (ds *DiscoveryService) ClearCacheStats(_ *restful.Request, _ *restful.Respo
 	ds.sdsCache.resetStats()
 	ds.cdsCache.resetStats()
 	ds.rdsCache.resetStats()
+	ds.ldsCache.resetStats()
 }
 
 func (ds *DiscoveryService) clearCache() {
@@ -350,6 +354,7 @@ func (ds *DiscoveryService) clearCache() {
 	ds.sdsCache.clear()
 	ds.cdsCache.clear()
 	ds.rdsCache.clear()
+	ds.ldsCache.clear()
 }
 
 // ListAllEndpoints responds with all Services and is not restricted to a single service-key

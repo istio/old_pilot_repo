@@ -64,22 +64,6 @@ func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, mesh *
 		ctl:     ctl,
 	}
 
-	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
-		return nil, err
-	}
-
-	// TODO: notification granularity: restrict the notification callback to co-located instances (e.g. with the same IP)
-	// TODO: editing pod tags directly does not trigger instance handlers, we need to listen on pod resources.
-	if err := ctl.AppendInstanceHandler(func(*model.ServiceInstance, model.Event) { out.reload() }); err != nil {
-		return nil, err
-	}
-
-	if configCache != nil {
-		handler := func(model.Config, model.Event) { out.reload() }
-		configCache.RegisterEventHandler(model.RouteRule, handler)
-		configCache.RegisterEventHandler(model.DestinationPolicy, handler)
-	}
-
 	return out, nil
 }
 

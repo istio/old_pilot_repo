@@ -480,10 +480,16 @@ type Listener struct {
 // Listeners is a collection of listeners
 type Listeners []*Listener
 
-// normalize sorts listeners by address
+// normalize sorts and de-duplicates listeners by address
 func (listeners Listeners) normalize() Listeners {
-	out := make(Listeners, len(listeners))
-	copy(out, listeners)
+	out := make(Listeners, 0)
+	set := make(map[string]bool)
+	for _, listener := range listeners {
+		if !set[listener.Address] {
+			set[listener.Address] = true
+			out = append(out, listener)
+		}
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Address < out[j].Address })
 	return out
 }

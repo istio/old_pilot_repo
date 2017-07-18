@@ -2,6 +2,7 @@
   "listeners": [
    {
     "address": "tcp://0.0.0.0:15001",
+    "name": "redirect",
     "filters": [],
     "bind_to_port": true,
     "use_original_dst": true
@@ -107,7 +108,7 @@
    },
    {
     "address": "tcp://10.1.0.0:90",
-    "name": "tcp_outbound_10.1.0.0_90",
+    "name": "tcp_10.1.0.0_90",
     "filters": [
      {
       "type": "read",
@@ -171,11 +172,16 @@
       }
      }
     ],
+    "ssl_context": {
+     "cert_chain_file": "/etc/certs/cert-chain.pem",
+     "private_key_file": "/etc/certs/key.pem",
+     "ca_cert_file": "/etc/certs/root-cert.pem"
+    },
     "bind_to_port": false
    },
    {
     "address": "tcp://10.1.1.1:1090",
-    "name": "tcp_inbound_10.1.1.1_1090",
+    "name": "tcp_10.1.1.1_1090",
     "filters": [
      {
       "type": "read",
@@ -195,6 +201,11 @@
       }
      }
     ],
+    "ssl_context": {
+     "cert_chain_file": "/etc/certs/cert-chain.pem",
+     "private_key_file": "/etc/certs/key.pem",
+     "ca_cert_file": "/etc/certs/root-cert.pem"
+    },
     "bind_to_port": false
    },
    {
@@ -239,11 +250,16 @@
       }
      }
     ],
+    "ssl_context": {
+     "cert_chain_file": "/etc/certs/cert-chain.pem",
+     "private_key_file": "/etc/certs/key.pem",
+     "ca_cert_file": "/etc/certs/root-cert.pem"
+    },
     "bind_to_port": false
    },
    {
     "address": "tcp://10.2.0.0:90",
-    "name": "tcp_outbound_10.2.0.0_90",
+    "name": "tcp_10.2.0.0_90",
     "filters": [
      {
       "type": "read",
