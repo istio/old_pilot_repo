@@ -18,22 +18,14 @@ import (
 	"reflect"
 	"testing"
 
-	"istio.io/pilot/adapter/config/memory"
-	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
-	"istio.io/pilot/test/mock"
 )
 
 func TestHandlers(t *testing.T) {
 	controller := mockController{}
 	mesh := proxy.DefaultMeshConfig()
-	context := proxy.Context{
-		Discovery:  mock.Discovery,
-		Accounts:   mock.Discovery,
-		Config:     model.MakeIstioStore(memory.Make(model.IstioConfigTypes)),
-		MeshConfig: &mesh,
-	}
-	_, err := NewWatcher(&controller, nil, &context)
+	context := proxy.Context{}
+	_, err := NewWatcher(&controller, nil, &mesh, &context)
 	if err != nil {
 		t.Errorf("failed creating watcher %v", err)
 	}

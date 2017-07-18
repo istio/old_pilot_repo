@@ -127,13 +127,13 @@ var (
 				}
 			}
 
-			context := &proxy.Context{
-				Discovery:  serviceController,
-				Accounts:   serviceController,
-				Config:     model.MakeIstioStore(configController),
-				MeshConfig: mesh,
+			environment := proxy.Environment{
+				ServiceDiscovery: serviceController,
+				ServiceAccounts:  serviceController,
+				IstioConfigStore: model.MakeIstioStore(configController),
+				Mesh:             mesh,
 			}
-			discovery, err := envoy.NewDiscoveryService(serviceController, configController, context, flags.discoveryOptions)
+			discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
@@ -170,17 +170,13 @@ var (
 			}
 
 			configController := tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod)
+
 			context := &proxy.Context{
-				Discovery:        serviceController,
-				Accounts:         serviceController,
-				Config:           model.MakeIstioStore(configController),
-				MeshConfig:       mesh,
-				IPAddress:        flags.ipAddress,
-				UID:              fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
-				PassthroughPorts: flags.passthrough,
+				IPAddress: flags.ipAddress,
+				UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
 			}
 
-			watcher, err := envoy.NewWatcher(serviceController, configController, context)
+			watcher, err := envoy.NewWatcher(serviceController, configController, mesh, context)
 			if err != nil {
 				return
 			}

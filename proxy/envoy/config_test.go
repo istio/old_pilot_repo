@@ -221,10 +221,7 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 }
 
 const (
-	envoyV0Config     = "testdata/envoy-v0.json"
-	envoyV0ConfigAuth = "testdata/envoy-v0-auth.json"
-	envoyV1Config     = "testdata/envoy-v1.json"
-	envoyV1ConfigAuth = "testdata/envoy-v1-auth.json"
+	envoyConfig       = "testdata/envoy.json"
 	envoyFaultConfig  = "testdata/envoy-fault.json"
 	cbPolicy          = "testdata/cb-policy.yaml.golden"
 	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
@@ -235,15 +232,9 @@ const (
 )
 
 func testConfig(r model.ConfigStore, mesh *proxyconfig.ProxyMeshConfig, instance, envoyConfig string, t *testing.T) {
-	config := Generate(&proxy.Context{
-		Discovery:  mock.Discovery,
-		Accounts:   mock.Discovery,
-		Config:     model.MakeIstioStore(r),
-		MeshConfig: mesh,
-		IPAddress:  instance,
-		UID:        fmt.Sprintf("uid://%s.my-namespace", instance),
-		// 1090 is deliberately already used by the instances, 3333 requires a new listener
-		PassthroughPorts: []int{1090, 3333},
+	config := Generate(mesh, &proxy.Context{
+		IPAddress: instance,
+		UID:       fmt.Sprintf("uid://%s.my-namespace", instance),
 	})
 
 	if config == nil {
@@ -343,56 +334,56 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 func TestMockConfig(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestMockConfigWithAuth(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0ConfigAuth, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1ConfigAuth, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestMockConfigTimeout(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	addTimeout(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestMockConfigCircuitBreaker(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	addCircuitBreaker(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestHTTPRedirect(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	addRedirect(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestHTTPRewrite(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	addRewrite(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestMockConfigWeighted(t *testing.T) {
 	r := memory.Make(model.IstioConfigTypes)
 	mesh := makeMeshConfig()
 	addWeightedRoute(r, t)
-	testConfig(r, &mesh, mock.HostInstanceV0, envoyV0Config, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }
 
 func TestMockConfigFault(t *testing.T) {
@@ -401,5 +392,5 @@ func TestMockConfigFault(t *testing.T) {
 	addFaultRoute(r, t)
 	// Fault rule uses source condition, hence the different golden artifacts
 	testConfig(r, &mesh, mock.HostInstanceV0, envoyFaultConfig, t)
-	testConfig(r, &mesh, mock.HostInstanceV1, envoyV1Config, t)
+	testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
 }

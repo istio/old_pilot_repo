@@ -33,6 +33,9 @@ const (
 	// DefaultLbType defines the default load balancer policy
 	DefaultLbType = LbTypeRoundRobin
 
+	// LDSName is the name of LDS cluster
+	LDSName = "lds"
+
 	// RDSName is the name of RDS cluster
 	RDSName = "rds"
 
@@ -41,6 +44,9 @@ const (
 
 	// CDSName is the name of CDS cluster
 	CDSName = "cds"
+
+	// RedirectListenerName is the name for traffic capture listener
+	RedirectListenerName = "redirect"
 
 	// ClusterTypeStrictDNS name for clusters of type 'strict_dns'
 	ClusterTypeStrictDNS = "strict_dns"
@@ -100,6 +106,7 @@ func protoDurationToMS(dur *duration.Duration) int64 {
 type Config struct {
 	RootRuntime        *RootRuntime   `json:"runtime,omitempty"`
 	Listeners          Listeners      `json:"listeners"`
+	LDS                *LDSCluster    `json:"lds,omitempty"`
 	Admin              Admin          `json:"admin"`
 	ClusterManager     ClusterManager `json:"cluster_manager"`
 	StatsdUDPIPAddress string         `json:"statsd_udp_ip_address,omitempty"`
@@ -463,6 +470,7 @@ type NetworkFilter struct {
 // Listener definition
 type Listener struct {
 	Address        string           `json:"address"`
+	Name           string           `json:"name,omitempty"`
 	Filters        []*NetworkFilter `json:"filters"`
 	SSLContext     *SSLContext      `json:"ssl_context,omitempty"`
 	BindToPort     bool             `json:"bind_to_port"`
@@ -648,6 +656,12 @@ func (s Headers) Less(i, j int) bool {
 type DiscoveryCluster struct {
 	Cluster        *Cluster `json:"cluster"`
 	RefreshDelayMs int64    `json:"refresh_delay_ms"`
+}
+
+// LDSCluster is a reference to LDS cluster by name
+type LDSCluster struct {
+	Cluster        string `json:"cluster"`
+	RefreshDelayMs int64  `json:"refresh_delay_ms"`
 }
 
 // RDS definition

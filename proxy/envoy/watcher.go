@@ -34,29 +34,32 @@ type Watcher interface {
 
 type watcher struct {
 	agent   proxy.Agent
+	mesh    *proxyconfig.ProxyMeshConfig
 	context *proxy.Context
 	ctl     model.Controller
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, proxyCtx *proxy.Context) (Watcher, error) {
+func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, mesh *proxyconfig.ProxyMeshConfig,
+	proxyCtx *proxy.Context) (Watcher, error) {
 	glog.V(2).Infof("Local instance address: %s", proxyCtx.IPAddress)
 
-	if proxyCtx.MeshConfig.StatsdUdpAddress != "" {
-		if addr, err := resolveStatsdAddr(proxyCtx.MeshConfig.StatsdUdpAddress); err == nil {
-			proxyCtx.MeshConfig.StatsdUdpAddress = addr
+	if mesh.StatsdUdpAddress != "" {
+		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
+			mesh.StatsdUdpAddress = addr
 		} else {
 			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
-			proxyCtx.MeshConfig.StatsdUdpAddress = ""
+			mesh.StatsdUdpAddress = ""
 		}
 	}
 
 	// Use proxy node IP as the node name
 	// This parameter is used as the value for "service-node"
-	agent := proxy.NewAgent(runEnvoy(proxyCtx.MeshConfig, proxyCtx.IPAddress), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, proxyCtx.IPAddress), proxy.DefaultRetry)
 
 	out := &watcher{
 		agent:   agent,
+		mesh:    mesh,
 		context: proxyCtx,
 		ctl:     ctl,
 	}
@@ -88,17 +91,17 @@ func (w *watcher) Run(stop <-chan struct{}) {
 	w.reload()
 
 	// monitor certificates
-	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go watchCerts(mesh.AuthCertsPath, stop, w.reload)
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go watchCerts(w.mesh.AuthCertsPath, stop, w.reload)
 	}
 
 	<-stop
 }
 
 func (w *watcher) reload() {
-	config := Generate(w.context)
-	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		config.Hash = generateCertHash(mesh.AuthCertsPath)
+	config := Generate(w.mesh, w.context)
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		config.Hash = generateCertHash(w.mesh.AuthCertsPath)
 	}
 	w.agent.ScheduleConfigUpdate(config)
 }

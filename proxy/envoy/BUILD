@@ -72,12 +72,12 @@ sh_test(
     srcs = ["config_test.sh"],
     args = [
         "$(location envoy)",
-        "$(location testdata/envoy-v0.json.golden)",
+        "$(location testdata/envoy.json.golden)",
         "0",
     ],
     data = [
         "envoy",
-        "testdata/envoy-v0.json.golden",
+        "testdata/envoy.json.golden",
     ],
     tags = ["exclusive"],
 )
@@ -131,23 +131,4 @@ sh_test(
         "testdata/envoy-fault.json.golden",
     ],
     tags = ["exclusive"],
-)
-
-sh_test(
-    name = "envoy_config_v0_auth_test",
-    size = "small",
-    srcs = ["config_test.sh"],
-    args = [
-        "$(location envoy)",
-        "$(location testdata/envoy-v0-auth.json.golden)",
-        "4",
-    ],
-    data = [
-        "envoy",
-        "testdata/envoy-v0-auth.json.golden",
-    ],
-    tags = [
-        "exclusive",
-        "manual",
-    ],
 )
