@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
@@ -95,6 +96,10 @@ func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 
 // ParsePort extracts port number from a valid proxy address
 func ParsePort(addr string) int {
-	port, _ := strconv.Atoi(addr[strings.Index(addr, ":")+1:])
+	port, err := strconv.Atoi(addr[strings.Index(addr, ":")+1:])
+	if err != nil {
+		glog.Warning(err)
+	}
+
 	return port
 }

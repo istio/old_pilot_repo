@@ -157,22 +157,26 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			var watcher envoy.Watcher
-			switch args[0] {
-			case proxy.EgressNode:
-				if mesh.EgressProxyAddress == "" {
-					return errors.New("egress proxy requires address configuration")
-				}
-				watcher = envoy.NewWatcher(mesh, proxy.Egress{})
-
-			case proxy.IngressNode:
-				watcher = envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
-
-			default:
+			if len(args) == 0 {
 				role := proxy.Sidecar{
 					IPAddress: flags.ipAddress,
 					UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
 				}
 				watcher = envoy.NewWatcher(mesh, role)
+			} else {
+				switch args[0] {
+				case proxy.EgressNode:
+					if mesh.EgressProxyAddress == "" {
+						return errors.New("egress proxy requires address configuration")
+					}
+					watcher = envoy.NewWatcher(mesh, proxy.Egress{})
+
+				case proxy.IngressNode:
+					watcher = envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
+
+				default:
+					return fmt.Errorf("failed to recognize proxy role %s", args[0])
+				}
 			}
 
 			stop := make(chan struct{})
