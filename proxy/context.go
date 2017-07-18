@@ -50,6 +50,7 @@ type Environment struct {
 
 // Role declares the proxy node role in the mesh
 type Role interface {
+	// nolint: megacheck
 	isProxyRole()
 }
 
