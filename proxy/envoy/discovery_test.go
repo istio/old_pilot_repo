@@ -388,28 +388,6 @@ func TestListenerDiscovery(t *testing.T) {
 			compareResponse(response, fmt.Sprintf("testdata/lds-v1-%s-auth.json", testCase.name), t)
 		})
 	}
-
-	/*
-		config := Generate(mesh, &proxy.Context{
-			IPAddress: instance,
-			UID:       fmt.Sprintf("uid://%s.my-namespace", instance),
-		})
-
-		if config == nil {
-			t.Fatal("Failed to generate config")
-		}
-
-		err := config.WriteFile(envoyConfig)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-
-		util.CompareYAML(envoyConfig, t)
-
-		// Fault rule uses source condition, hence the different golden artifacts
-		// testConfig(r, &mesh, mock.HostInstanceV0, envoyConfig, t)
-		// testConfig(r, &mesh, mock.HostInstanceV1, envoyConfig, t)
-	*/
 }
 
 func TestSecretDiscovery(t *testing.T) {

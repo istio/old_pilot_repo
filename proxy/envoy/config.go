@@ -68,40 +68,32 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-// Generate Envoy sidecar proxy configuration
-func Generate(mesh *proxyconfig.ProxyMeshConfig, context *proxy.Context) *Config {
-	listeners := make(Listeners, 0)
-	clusters := make(Clusters, 0)
-
-	/* TODO: passthrough listeners are disabled since they must be provided through LDS/
-	// PassthroughPorts is a list of ports on the proxy IP address that must be
-	// open and allowed through the proxy to the co-located service instances.
-	// These ports are utilized by the underlying cluster platform for health
-	// checking, for example.
-	//
-	// The passthrough ports should be exposed irrespective of the services
-	// model. In case there is an overlap, that is the port is utilized by a
-	// service for a service instance and is also present in this list, the
-	// service model declaration takes precedence. That means any protocol
-	// upgrade (such as utilizng TLS for proxy-to-proxy traffic) will be applied
-	// to the passthrough port.
-	PassthroughPorts []int
-	// create passthrough listeners if they are missing
-	for _, port := range context.PassthroughPorts {
-		cluster := buildInboundCluster(port, model.ProtocolTCP, mesh.ConnectTimeout)
-		cluster.Name = fmt.Sprintf("passthrough_%d", port)
-		// skip naming the listener to preserve it across updates
-		listener := buildTCPListener(&TCPRouteConfig{
-			Routes: []*TCPRoute{buildTCPRoute(cluster, []string{context.IPAddress})},
-		}, "", context.IPAddress, port)
-		listener.BindToPort = false
-		listeners = append(listeners, listener)
-		clusters = append(clusters, cluster)
-	}
-	*/
-
-	return buildConfig(listeners, clusters, mesh)
+/* TODO: passthrough listeners are disabled since they must be provided through LDS/
+// PassthroughPorts is a list of ports on the proxy IP address that must be
+// open and allowed through the proxy to the co-located service instances.
+// These ports are utilized by the underlying cluster platform for health
+// checking, for example.
+//
+// The passthrough ports should be exposed irrespective of the services
+// model. In case there is an overlap, that is the port is utilized by a
+// service for a service instance and is also present in this list, the
+// service model declaration takes precedence. That means any protocol
+// upgrade (such as utilizng TLS for proxy-to-proxy traffic) will be applied
+// to the passthrough port.
+PassthroughPorts []int
+// create passthrough listeners if they are missing
+for _, port := range context.PassthroughPorts {
+	cluster := buildInboundCluster(port, model.ProtocolTCP, mesh.ConnectTimeout)
+	cluster.Name = fmt.Sprintf("passthrough_%d", port)
+	// skip naming the listener to preserve it across updates
+	listener := buildTCPListener(&TCPRouteConfig{
+		Routes: []*TCPRoute{buildTCPRoute(cluster, []string{context.IPAddress})},
+	}, "", context.IPAddress, port)
+	listener.BindToPort = false
+	listeners = append(listeners, listener)
+	clusters = append(clusters, cluster)
 }
+*/
 
 // buildConfig creates a proxy config with discovery services and admin port
 func buildConfig(listeners Listeners, clusters Clusters, mesh *proxyconfig.ProxyMeshConfig) *Config {

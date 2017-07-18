@@ -83,7 +83,7 @@ func (w *watcher) Run(stop <-chan struct{}) {
 }
 
 func (w *watcher) reload() {
-	config := Generate(w.mesh, w.context)
+	config := buildConfig(make(Listeners, 0), make(Clusters, 0), w.mesh)
 	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
 		config.Hash = generateCertHash(w.mesh.AuthCertsPath)
 	}

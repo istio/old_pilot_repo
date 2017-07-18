@@ -28,6 +28,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
+	"istio.io/pilot/test/util"
 )
 
 func TestRoutesByPath(t *testing.T) {
@@ -309,4 +310,19 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 	mesh.StatsdUdpAddress = "10.1.1.10:9125"
 	mesh.ZipkinAddress = "localhost:6000"
 	return mesh
+}
+
+func TestConfig(t *testing.T) {
+	mesh := makeMeshConfig()
+	config := buildConfig(make(Listeners, 0), make(Clusters, 0), &mesh)
+	if config == nil {
+		t.Fatal("Failed to generate config")
+	}
+
+	err := config.WriteFile(envoyConfig)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	util.CompareYAML(envoyConfig, t)
 }
