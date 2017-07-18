@@ -15,6 +15,8 @@
 package proxy
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -22,7 +24,7 @@ import (
 	"istio.io/pilot/model"
 )
 
-// Environment provides an aggregate API for Pilot
+// Environment provides an aggregate environmental API for Pilot
 type Environment struct {
 	// Discovery interface for listing services and instances
 	model.ServiceDiscovery
@@ -69,4 +71,10 @@ func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 		AuthPolicy:    proxyconfig.ProxyMeshConfig_NONE,
 		AuthCertsPath: "/etc/certs",
 	}
+}
+
+// ParsePort extracts port number from a valid proxy address
+func ParsePort(addr string) int {
+	port, _ := strconv.Atoi(addr[strings.Index(addr, ":")+1:])
+	return port
 }

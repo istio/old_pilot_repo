@@ -37,7 +37,6 @@ go_test(
         "cert_test.go",
         "config_test.go",
         "discovery_test.go",
-        "egress_test.go",
         "header_test.go",
         "ingress_test.go",
         "route_test.go",
@@ -99,22 +98,6 @@ sh_test(
         "exclusive",
         "manual",
     ],
-)
-
-sh_test(
-    name = "envoy_config_egress_test",
-    size = "small",
-    srcs = ["config_test.sh"],
-    args = [
-        "$(location envoy)",
-        "$(location testdata/envoy-egress.json.golden)",
-        "2",
-    ],
-    data = [
-        "envoy",
-        "testdata/envoy-egress.json.golden",
-    ],
-    tags = ["exclusive"],
 )
 
 sh_test(

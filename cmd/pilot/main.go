@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -159,36 +160,35 @@ var (
 	sidecarCmd = &cobra.Command{
 		Use:   "sidecar",
 		Short: "Envoy sidecar agent",
-		RunE: func(c *cobra.Command, args []string) (err error) {
-			serviceController := kube.NewController(client, mesh, flags.controllerOptions)
-			tprClient, err := tpr.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-				model.RouteRuleDescriptor,
-				model.DestinationPolicyDescriptor,
-			}, flags.controllerOptions.Namespace)
-			if err != nil {
-				return
-			}
-
-			configController := tpr.NewController(tprClient, flags.controllerOptions.ResyncPeriod)
-
+		RunE: func(c *cobra.Command, args []string) error {
 			context := &proxy.Context{
 				IPAddress: flags.ipAddress,
 				UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
 			}
 
-			watcher, err := envoy.NewWatcher(serviceController, configController, mesh, context)
-			if err != nil {
-				return
-			}
-
-			// must start watcher after starting dependent controllers
+			watcher := envoy.NewWatcher(mesh, context)
 			stop := make(chan struct{})
-			go serviceController.Run(stop)
-			go configController.Run(stop)
 			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
+			return nil
+		},
+	}
 
-			return
+	egressCmd = &cobra.Command{
+		Use:   "egress",
+		Short: "Envoy external service agent",
+		RunE: func(c *cobra.Command, args []string) error {
+			if mesh.EgressProxyAddress == "" {
+				return errors.New("egress proxy requires address configuration")
+			}
+			context := &proxy.Context{
+				IPAddress: "egress",
+			}
+			watcher := envoy.NewWatcher(mesh, context)
+			stop := make(chan struct{})
+			go watcher.Run(stop)
+			cmd.WaitSignal(stop)
+			return nil
 		},
 	}
 
@@ -205,21 +205,6 @@ var (
 			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
 
-			return nil
-		},
-	}
-
-	egressCmd = &cobra.Command{
-		Use:   "egress",
-		Short: "Envoy external service agent",
-		RunE: func(c *cobra.Command, args []string) error {
-			watcher, err := envoy.NewEgressWatcher(mesh)
-			if err != nil {
-				return err
-			}
-			stop := make(chan struct{})
-			go watcher.Run(stop)
-			cmd.WaitSignal(stop)
 			return nil
 		},
 	}

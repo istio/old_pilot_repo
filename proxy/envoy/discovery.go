@@ -613,9 +613,15 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	case ingressNode:
 		httpRouteConfigs, _ := buildIngressRoutes(ds.IngressRules(), ds, ds)
 		clusters = httpRouteConfigs.clusters().normalize()
+
 	case egressNode:
 		httpRouteConfigs := buildEgressRoutes(ds, ds.Mesh)
 		clusters = httpRouteConfigs.clusters().normalize()
+		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)
+		listener := buildHTTPListener(ds.Mesh, nil, WildcardAddress, port, true, false)
+		applyInboundAuth(listener, ds.Mesh)
+		listeners = Listeners{listener}
+
 	default:
 		listeners, clusters = buildListeners(ds.Environment, node)
 	}
