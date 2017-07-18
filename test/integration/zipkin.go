@@ -84,7 +84,11 @@ func (t *zipkin) makeRequests() error {
 func (t *zipkin) verifyTraces() error {
 	f := func() status {
 		for _, id := range t.traces {
-			response := t.infra.clientRequest("t", fmt.Sprintf("http://zipkin:9411/api/v1/traces?annotationQuery=guid:x-request-id=/%s", id), 1, "")
+			response := t.infra.clientRequest(
+				"t",
+				fmt.Sprintf("http://zipkin:9411/api/v1/traces?annotationQuery=guid:x-request-id=/%s", id),
+				1, "",
+			)
 
 			if len(response.code) == 0 || response.code[0] != httpOk {
 				return errAgain
