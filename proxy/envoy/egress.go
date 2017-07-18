@@ -24,10 +24,6 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-const (
-	egressNode = "egress"
-)
-
 // buildEgressRoutes lists all HTTP route configs on the egress proxy
 func buildEgressRoutes(services model.ServiceDiscovery, mesh *proxyconfig.ProxyMeshConfig) HTTPRouteConfigs {
 	// Create a VirtualHost for each external service

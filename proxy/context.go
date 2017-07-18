@@ -24,6 +24,14 @@ import (
 	"istio.io/pilot/model"
 )
 
+const (
+	// EgressNode is the name for the egress proxy node
+	EgressNode = "egress"
+
+	// IngressNode is the name for the ingress proxy node
+	IngressNode = "ingress"
+)
+
 // Environment provides an aggregate environmental API for Pilot
 type Environment struct {
 	// Discovery interface for listing services and instances
@@ -39,8 +47,13 @@ type Environment struct {
 	Mesh *proxyconfig.ProxyMeshConfig
 }
 
-// Context defines local proxy context information about the global service mesh
-type Context struct {
+// Role declares the proxy node role in the mesh
+type Role interface {
+	isProxyRole()
+}
+
+// Sidecar defines the sidecar proxy role
+type Sidecar struct {
 	// IPAddress is the IP address of the proxy used to identify it and its
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
@@ -50,6 +63,13 @@ type Context struct {
 	// proxy. Example: "kubernetes://my-pod.my-namespace"
 	UID string
 }
+
+func (Sidecar) isProxyRole() {}
+
+// Egress defines the egress proxy role
+type Egress struct{}
+
+func (Egress) isProxyRole() {}
 
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {

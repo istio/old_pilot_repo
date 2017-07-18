@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	ingressNode = "ingress"
-	certFile    = "/etc/tls.crt"
-	keyFile     = "/etc/tls.key"
+	certFile = "/etc/tls.crt"
+	keyFile  = "/etc/tls.key"
 )
 
 type ingressWatcher struct {
@@ -46,7 +45,7 @@ type ingressWatcher struct {
 }
 
 // NewIngressWatcher creates a new ingress watcher instance with an agent
-func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig, secrets model.SecretRegistry) (Watcher, error) {
+func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig, secrets model.SecretRegistry) Watcher {
 	if mesh.StatsdUdpAddress != "" {
 		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
 			mesh.StatsdUdpAddress = addr
@@ -55,13 +54,13 @@ func NewIngressWatcher(mesh *proxyconfig.ProxyMeshConfig, secrets model.SecretRe
 			mesh.StatsdUdpAddress = ""
 		}
 	}
-	agent := proxy.NewAgent(runEnvoy(mesh, ingressNode), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, proxy.IngressNode), proxy.DefaultRetry)
 	out := &ingressWatcher{
 		agent:   agent,
 		secrets: secrets,
 		mesh:    mesh,
 	}
-	return out, nil
+	return out
 }
 
 func (w *ingressWatcher) Run(stop <-chan struct{}) {
@@ -75,7 +74,7 @@ func (w *ingressWatcher) Run(stop <-chan struct{}) {
 
 	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
 	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
-		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, ingressNode)
+		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, proxy.IngressNode)
 
 	config := generateIngress(w.mesh, nil, certFile, keyFile)
 	w.agent.ScheduleConfigUpdate(config)

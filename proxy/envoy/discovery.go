@@ -543,7 +543,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 		return
 	}
 
-	if sc := request.PathParameter(ServiceNode); sc != ingressNode {
+	if sc := request.PathParameter(ServiceNode); sc != proxy.IngressNode {
 		errorResponse(response, http.StatusNotFound,
 			fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
 		return
@@ -592,10 +592,12 @@ func (ds *DiscoveryService) allServiceNodes() []string {
 
 func (ds *DiscoveryService) getRouteConfigs(node string) (httpRouteConfigs HTTPRouteConfigs) {
 	switch node {
-	case ingressNode:
+	case proxy.IngressNode:
 		httpRouteConfigs, _ = buildIngressRoutes(ds.IngressRules(), ds, ds)
-	case egressNode:
+
+	case proxy.EgressNode:
 		httpRouteConfigs = buildEgressRoutes(ds, ds.Mesh)
+
 	default:
 		instances := ds.HostInstances(map[string]bool{node: true})
 		services := ds.Services()
@@ -610,11 +612,11 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 	// skip computing the actual HTTP routes
 	switch node {
-	case ingressNode:
+	case proxy.IngressNode:
 		httpRouteConfigs, _ := buildIngressRoutes(ds.IngressRules(), ds, ds)
 		clusters = httpRouteConfigs.clusters().normalize()
 
-	case egressNode:
+	case proxy.EgressNode:
 		httpRouteConfigs := buildEgressRoutes(ds, ds.Mesh)
 		clusters = httpRouteConfigs.clusters().normalize()
 		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)
@@ -630,7 +632,7 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	clusters.setTimeout(ds.Mesh.ConnectTimeout)
 
 	// egress proxy clusters reference external destinations
-	if node != egressNode {
+	if node != proxy.EgressNode {
 		// apply custom policies for outbound clusters
 		for _, cluster := range clusters {
 			if cluster.port != nil {

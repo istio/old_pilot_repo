@@ -169,7 +169,7 @@ func TestClusterDiscoveryIngress(t *testing.T) {
 	registry := memory.Make(model.IstioConfigTypes)
 	addIngressRoutes(registry, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
-	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.Mesh.IstioServiceCluster, ingressNode)
+	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.Mesh.IstioServiceCluster, proxy.IngressNode)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/cds-ingress.json", t)
 }
@@ -178,7 +178,7 @@ func TestClusterDiscoveryEgress(t *testing.T) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)
 	ds := makeDiscoveryService(t, registry, &mesh)
-	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.Mesh.IstioServiceCluster, egressNode)
+	url := fmt.Sprintf("/v1/clusters/%s/%s", ds.Mesh.IstioServiceCluster, proxy.EgressNode)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/cds-egress.json", t)
 }
@@ -282,11 +282,11 @@ func TestRouteDiscoveryIngress(t *testing.T) {
 	addIngressRoutes(registry, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
 
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, ingressNode)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, proxy.IngressNode)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-ingress.json", t)
 
-	url = fmt.Sprintf("/v1/routes/443/%s/%s", ds.Mesh.IstioServiceCluster, ingressNode)
+	url = fmt.Sprintf("/v1/routes/443/%s/%s", ds.Mesh.IstioServiceCluster, proxy.IngressNode)
 	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-ingress-ssl.json", t)
 }
@@ -298,7 +298,7 @@ func TestRouteDiscoveryIngressWeighted(t *testing.T) {
 	addWeightedRoute(registry, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
 
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, ingressNode)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, proxy.IngressNode)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-ingress-weighted.json", t)
 }
@@ -307,7 +307,7 @@ func TestRouteDiscoveryEgress(t *testing.T) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)
 	ds := makeDiscoveryService(t, registry, &mesh)
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, egressNode)
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, proxy.EgressNode)
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-egress.json", t)
 }
@@ -395,7 +395,7 @@ func TestSecretDiscovery(t *testing.T) {
 	registry := memory.Make(model.IstioConfigTypes)
 	addIngressRoutes(registry, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
-	url := fmt.Sprintf("/v1alpha/secret/%s/%s", ds.Mesh.IstioServiceCluster, ingressNode)
+	url := fmt.Sprintf("/v1alpha/secret/%s/%s", ds.Mesh.IstioServiceCluster, proxy.IngressNode)
 	got := makeDiscoveryRequest(ds, "GET", url, t)
 	want := "my-secret.default"
 	if string(got) != want {

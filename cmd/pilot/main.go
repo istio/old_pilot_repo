@@ -154,57 +154,30 @@ var (
 
 	proxyCmd = &cobra.Command{
 		Use:   "proxy",
-		Short: "Envoy agent",
-	}
-
-	sidecarCmd = &cobra.Command{
-		Use:   "sidecar",
-		Short: "Envoy sidecar agent",
+		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			context := &proxy.Context{
-				IPAddress: flags.ipAddress,
-				UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
-			}
+			var watcher envoy.Watcher
+			switch args[0] {
+			case proxy.EgressNode:
+				if mesh.EgressProxyAddress == "" {
+					return errors.New("egress proxy requires address configuration")
+				}
+				watcher = envoy.NewWatcher(mesh, proxy.Egress{})
 
-			watcher := envoy.NewWatcher(mesh, context)
-			stop := make(chan struct{})
-			go watcher.Run(stop)
-			cmd.WaitSignal(stop)
-			return nil
-		},
-	}
+			case proxy.IngressNode:
+				watcher = envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
 
-	egressCmd = &cobra.Command{
-		Use:   "egress",
-		Short: "Envoy external service agent",
-		RunE: func(c *cobra.Command, args []string) error {
-			if mesh.EgressProxyAddress == "" {
-				return errors.New("egress proxy requires address configuration")
-			}
-			context := &proxy.Context{
-				IPAddress: "egress",
-			}
-			watcher := envoy.NewWatcher(mesh, context)
-			stop := make(chan struct{})
-			go watcher.Run(stop)
-			cmd.WaitSignal(stop)
-			return nil
-		},
-	}
-
-	ingressCmd = &cobra.Command{
-		Use:   "ingress",
-		Short: "Envoy ingress agent",
-		RunE: func(c *cobra.Command, args []string) error {
-			watcher, err := envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
-			if err != nil {
-				return err
+			default:
+				role := proxy.Sidecar{
+					IPAddress: flags.ipAddress,
+					UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
+				}
+				watcher = envoy.NewWatcher(mesh, role)
 			}
 
 			stop := make(chan struct{})
 			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
-
 			return nil
 		},
 	}
@@ -242,12 +215,8 @@ func init() {
 	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
 		"Pod name. If not provided uses ${POD_NAME} environment variable")
 
-	sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
-		"Passthrough ports for health checks")
-
-	proxyCmd.AddCommand(sidecarCmd)
-	proxyCmd.AddCommand(ingressCmd)
-	proxyCmd.AddCommand(egressCmd)
+	//sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
+	//	"Passthrough ports for health checks")
 
 	cmd.AddFlags(rootCmd)
 
