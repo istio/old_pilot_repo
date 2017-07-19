@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -179,9 +180,13 @@ var (
 			}
 
 			watcher := envoy.NewWatcher(mesh, role, kube.MakeSecretRegistry(client))
+			ctx, cancel := context.WithCancel(context.Background())
+			go watcher.Run(ctx)
+
 			stop := make(chan struct{})
-			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
+			<-stop
+			cancel()
 			return nil
 		},
 	}

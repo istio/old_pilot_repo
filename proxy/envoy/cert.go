@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"context"
 	"hash"
 	"io/ioutil"
 	"os"
@@ -37,7 +38,7 @@ var (
 // watchCerts watches a certificate directory and calls the provided
 // `updateFunc` method when changes are detected. This method is blocking
 // so should be run as a goroutine.
-func watchCerts(certsDir string, stop <-chan struct{}, updateFunc func()) {
+func watchCerts(ctx context.Context, certsDir string, updateFunc func()) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Warning("failed to create a watcher for certificate files")
@@ -60,7 +61,7 @@ func watchCerts(certsDir string, stop <-chan struct{}, updateFunc func()) {
 			glog.V(2).Infof("Change to %q is detected, reload the proxy if necessary", certsDir)
 			updateFunc()
 
-		case <-stop:
+		case <-ctx.Done():
 			glog.V(2).Info("Certificate watcher is terminated")
 			return
 		}

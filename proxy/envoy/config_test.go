@@ -17,7 +17,6 @@ package envoy
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -222,9 +221,6 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 const (
 	envoyConfig = "testdata/envoy.json"
 
-	ingressCertFile = "testdata/tls.crt"
-	ingressKeyFile  = "testdata/tls.key"
-
 	cbPolicy          = "testdata/cb-policy.yaml.golden"
 	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
@@ -331,10 +327,13 @@ func TestSidecarConfig(t *testing.T) {
 	util.CompareYAML(envoyConfig, t)
 }
 
+/*
 var (
 	ingressCert      = []byte("abcdefghijklmnop")
 	ingressKey       = []byte("qrstuvwxyz123456")
 	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
+	ingressCertFile = "testdata/tls.crt"
+	ingressKeyFile  = "testdata/tls.key"
 )
 
 func compareFile(filename string, golden []byte, t *testing.T) {
@@ -350,3 +349,4 @@ func compareFile(filename string, golden []byte, t *testing.T) {
 		t.Errorf("Failed cleaning up temporary file %s", filename)
 	}
 }
+*/

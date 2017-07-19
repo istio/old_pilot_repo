@@ -45,7 +45,7 @@ type Role interface {
 	// nolint: megacheck
 	isProxyRole()
 
-	// ServiceNode uniquely identifies the proxy role
+	// ServiceNode encodes the role information into a string
 	ServiceNode() string
 }
 
@@ -63,6 +63,8 @@ type Sidecar struct {
 }
 
 func (Sidecar) isProxyRole() {}
+
+// ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
 	return role.IPAddress
 }
@@ -79,6 +81,8 @@ const (
 type EgressRole struct{}
 
 func (EgressRole) isProxyRole() {}
+
+// ServiceNode for egress
 func (EgressRole) ServiceNode() string {
 	return EgressNode
 }
@@ -87,6 +91,8 @@ func (EgressRole) ServiceNode() string {
 type IngressRole struct{}
 
 func (IngressRole) isProxyRole() {}
+
+// ServiceNode for ingress
 func (IngressRole) ServiceNode() string {
 	return IngressNode
 }

@@ -32,13 +32,17 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-// Watcher observes service registry and triggers a reload on a change
+// Watcher triggers reloads on changes to the proxy config
 type Watcher interface {
-	Run(stop <-chan struct{})
+	// Run the watcher loop (blocking call)
+	Run(context.Context)
+
+	// Reload the agent with the latest configuration
 	Reload()
 }
 
 const (
+	// IngressCerts is the path location for ingress certificates
 	IngressCerts = "/etc/ingress/"
 )
 
@@ -73,28 +77,21 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, secrets mode
 	return out
 }
 
-func (w *watcher) Run(stop <-chan struct{}) {
+func (w *watcher) Run(ctx context.Context) {
 	// agent consumes notifications from the controllerr
-	go w.agent.Run(stop)
+	go w.agent.Run(ctx)
 
 	// kickstart the proxy with partial state (in case there are no notifications coming)
 	w.Reload()
 
 	// monitor auth certificates
 	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go watchCerts(w.mesh.AuthCertsPath, stop, w.Reload)
+		go watchCerts(ctx, w.mesh.AuthCertsPath, w.Reload)
 	}
 
 	// monitor ingress certificates
 	if w.role.ServiceNode() == proxy.IngressNode {
-		go watchCerts(IngressCerts, stop, w.Reload)
-
-		// create a context using stop channel
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			<-stop
-			cancel()
-		}()
+		go watchCerts(ctx, IngressCerts, w.Reload)
 
 		// update secrets with polling
 		go func() {
@@ -114,7 +111,7 @@ func (w *watcher) Run(stop <-chan struct{}) {
 		}()
 	}
 
-	<-stop
+	<-ctx.Done()
 }
 
 func (w *watcher) Reload() {
@@ -167,7 +164,10 @@ func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
 	}
 
 	if _, err := os.Stat(IngressCerts); os.IsNotExist(err) {
-		os.Mkdir(IngressCerts, 0755)
+		err = os.Mkdir(IngressCerts, 0755)
+		if err != nil {
+			return multierror.Prefix(err, "cannot create parent directory")
+		}
 	}
 
 	if err := ioutil.WriteFile(IngressCerts+"tls.crt", tls.Certificate, 0755); err != nil {

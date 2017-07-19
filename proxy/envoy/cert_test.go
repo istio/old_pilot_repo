@@ -16,6 +16,7 @@ package envoy
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"io/ioutil"
 	"os"
@@ -40,8 +41,7 @@ func TestWatchCerts(t *testing.T) {
 		called <- true
 	}
 
-	stopCh := make(chan struct{})
-	go watchCerts(name, stopCh, callbackFunc)
+	go watchCerts(context.Background(), name, callbackFunc)
 
 	// sleep one second to make sure the watcher is set up before change is made
 	time.Sleep(time.Second)
