@@ -33,8 +33,14 @@ if [ "${CI:-}" == "bootstrap" ]; then
     ln -s $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
     cd $GOPATH/src/istio.io/pilot/
 
+    # Use the provided base sha, from prow.
+    GIT_SHA=$PULL_BASE_SHA
+
     # Use volume mount from pilot-presubmit job's pod spec.
     ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
+else
+    # Use the current commit.
+    GIT_SHA=$(git rev-parse --verify HEAD)
 fi
 
 echo "=== Prerequisites ==="
@@ -55,3 +61,6 @@ if [ "${CI:-}" == "bootstrap" ]; then
 else
     echo "Not in bootstrap environment, skipping code coverage publishing"
 fi
+
+echo "=== Running e2e Tests ==="
+bin/e2e.sh -count 10 -logs=false -tag $GIT_SHA
