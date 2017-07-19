@@ -1,0 +1,3 @@
+registry:
+  url: http://registry:8080
+  poll: 5s

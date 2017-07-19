@@ -13,13 +13,24 @@ When a service instance is brought up, a configuration file should be provided a
 Noted that Istio pilot is running inside each app container so as to coordinate Envoy and the service mesh.
 Currently the bookinfo demo and test for functionalities on Docker is provided. CloudFoundry is targeted for the next step.
 
-## Test and Demo
-The bookinfo demo is used to test the functionalities of this platform adapter.Currently all latest related images are pushed to my own docker hub(kimikowang). Containers can be brought up by running `docker-compose up -d` in the docker directory.
+## Bookinfo Demo
 
-Each App image contains a running app process and a pilot binary running as a proxy sidecar. iptables rules for the proxy are setup by running script `prepare_proxy.sh -u 1337 -p 15001` copied from the `pilot/bin` directory.
+The ingress controller is still under construction, rounting functionalities can be tested by going into containers and making requsts to services.
 
-You can also go through the full procedure --- building images, pushing image to hub and bringing up containers by running `test_scripts/run_test.sh`. 
+To bring up all containers directly, you can go into the `/docker` directory and run 
 
-Noted that currently CDS/SDS/RDS info can be retrived from discovery container successfully. (You can calling the APIs by curling the host `localhost:8080` outside of containers or `istio-pilot:8080` within a container by switching to user `istio`)
+    docker-compose up -d 
 
-However, now the service instances can not talk to each other yet. This issue is still being debugged.
+This will pull images from docker hub to your local computing space.
+
+If you want to fo through the complete building process(build the app binaries, images and bring up the containers to docker), you can run the script 
+
+    ./test_script/run_test.sh
+
+Now you can see all the containers in the mesh by running `docker ps -a`.
+
+Go into one of the productpage containers and run `curl productpage:9080/productpage`, you should see the result returned and displayed in the console.
+
+If you run this command several times, you should see different versions of reviews showing in the productpage response presented in a round robin style. This Proves the functionality of the load balancer of Envoy in the productpage container.
+
+Noted that access log of Envoy is redirected to `/tmp/envoy.log` within each container. 

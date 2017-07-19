@@ -137,7 +137,7 @@ func fetchSecret(ctx context.Context, client *http.Client, url string,
 // generateIngress generates ingress proxy configuration
 func generateIngress(mesh *proxyconfig.ProxyMeshConfig, tls *model.TLSSecret, certFile, keyFile string) *Config {
 	listeners := []*Listener{
-		buildHTTPListener(mesh, nil, WildcardAddress, 80, true, true),
+		buildHTTPListener(mesh, nil, WildcardAddress, 8080, true, true),
 	}
 
 	if tls != nil {

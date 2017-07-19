@@ -1,5 +1,16 @@
 version: '2'
 services:
+  ingress:
+    image: kimikowang/ingress:latest
+    networks:
+      envoymesh:
+        aliases:
+          - gateway
+    expose:
+      - "8080"
+    ports:
+      - "31200:8080"
+
   discovery:
     image: kimikowang/discovery:latest
     networks:

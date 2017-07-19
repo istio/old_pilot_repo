@@ -85,7 +85,6 @@ type args struct {
 var (
 	flags     args
 	client    kubernetes.Interface
-	vmsClient *vmsclient.Client
 	vmsConfig vmsconfig.Config
 	mesh      *proxyconfig.ProxyMeshConfig
 
@@ -144,13 +143,6 @@ var (
 					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
 				}
 
-				vmsClient, err = vmsclient.New(vmsclient.Config{
-					URL:       vmsConfig.A8Registry.URL,
-					AuthToken: vmsConfig.A8Registry.Token,
-				})
-				if err != nil {
-					return multierror.Prefix(err, "failed to create VMs client.")
-				}
 				m := proxy.DefaultMeshConfig()
 				mesh = &m
 			}
@@ -165,7 +157,6 @@ var (
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
 			var discovery *envoy.DiscoveryService
-			var err error
 			stop := make(chan struct{})
 			if flags.adapter == KubernetesAdapter {
 				tprClient, err := tpr.NewClient(flags.kubeconfig, model.ConfigDescriptor{
@@ -205,6 +196,13 @@ var (
 				go ingressSyncer.Run(stop)
 
 			} else if flags.adapter == VMsAdapter {
+				vmsClient, err := vmsclient.New(vmsclient.Config{
+					URL:       vmsConfig.A8Registry.URL,
+					AuthToken: vmsConfig.A8Registry.Token,
+				})
+				if err != nil {
+					return multierror.Prefix(err, "failed to create VMs client.")
+				}
 				serviceController := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
 					Mesh:      mesh,
@@ -280,6 +278,13 @@ var (
 				go serviceController.Run(stop)
 				go configController.Run(stop)
 			} else if flags.adapter == VMsAdapter {
+				vmsClient, err := vmsclient.New(vmsclient.Config{
+					URL:       vmsConfig.A8Registry.URL,
+					AuthToken: vmsConfig.A8Registry.Token,
+				})
+				if err != nil {
+					return multierror.Prefix(err, "failed to create VMs client.")
+				}
 				controller := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
 					Mesh:      mesh,
@@ -335,7 +340,11 @@ var (
 		Use:   "ingress",
 		Short: "Envoy ingress agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			watcher, err := envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
+			var secrets model.SecretRegistry
+			if flags.adapter == KubernetesAdapter {
+				secrets = kube.MakeSecretRegistry(client)
+			}
+			watcher, err := envoy.NewIngressWatcher(mesh, secrets)
 			if err != nil {
 				return err
 			}
