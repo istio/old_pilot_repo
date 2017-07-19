@@ -43,8 +43,7 @@ type args struct {
 	kubeconfig string
 	meshConfig string
 
-	ipAddress string
-	podName   string
+	sidecar proxy.Sidecar
 
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
@@ -74,12 +73,16 @@ var (
 			}
 
 			// set values from environment variables
-			if flags.ipAddress == "" {
-				flags.ipAddress = os.Getenv("POD_IP")
+			if flags.sidecar.IPAddress == "" {
+				flags.sidecar.IPAddress = os.Getenv("POD_IP")
 			}
-			if flags.podName == "" {
-				flags.podName = os.Getenv("POD_NAME")
+			if flags.sidecar.PodName == "" {
+				flags.sidecar.PodName = os.Getenv("POD_NAME")
 			}
+			if flags.sidecar.PodNamespace == "" {
+				flags.sidecar.PodNamespace = os.Getenv("POD_NAMESPACE")
+			}
+
 			if flags.controllerOptions.Namespace == "" {
 				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 			}
@@ -155,31 +158,27 @@ var (
 		Use:   "proxy",
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			var watcher envoy.Watcher
-			if len(args) == 0 {
-				role := proxy.Sidecar{
-					IPAddress: flags.ipAddress,
-					UID:       fmt.Sprintf("kubernetes://%s.%s", flags.podName, flags.controllerOptions.Namespace),
-				}
-				watcher = envoy.NewWatcher(mesh, role)
-			} else {
+			var role proxy.Role = flags.sidecar
+			if len(args) > 0 {
 				switch args[0] {
 				case proxy.EgressNode:
 					if mesh.EgressProxyAddress == "" {
 						return errors.New("egress proxy requires address configuration")
 					}
-					watcher = envoy.NewWatcher(mesh, proxy.Egress{})
+					role = proxy.EgressRole{}
 
 				case proxy.IngressNode:
-					// Ingress watcher requires TLS secret files watched independently.
-					// Once listener incorporates the secret data, this can be merged into the main watcher.
-					watcher = envoy.NewIngressWatcher(mesh, kube.MakeSecretRegistry(client))
+					if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
+						return errors.New("ingress proxy is disabled")
+					}
+					role = proxy.IngressRole{}
 
 				default:
 					return fmt.Errorf("failed to recognize proxy role %s", args[0])
 				}
 			}
 
+			watcher := envoy.NewWatcher(mesh, role, kube.MakeSecretRegistry(client))
 			stop := make(chan struct{})
 			go watcher.Run(stop)
 			cmd.WaitSignal(stop)
@@ -215,10 +214,12 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	proxyCmd.PersistentFlags().StringVar(&flags.ipAddress, "ipAddress", "",
-		"IP address. If not provided uses ${POD_IP} environment variable.")
-	proxyCmd.PersistentFlags().StringVar(&flags.podName, "podName", "",
-		"Pod name. If not provided uses ${POD_NAME} environment variable")
+	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.IPAddress, "ipAddress", "",
+		"Sidecar IP address. If not provided uses ${POD_IP} environment variable.")
+	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.PodName, "podName", "",
+		"Sidecar pod name. If not provided uses ${POD_NAME} environment variable")
+	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.PodNamespace, "podNamespace", "",
+		"Sidecar pod namespace. If not provided uses ${POD_NAMESPACE} environment variable")
 
 	//sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,
 	//	"Passthrough ports for health checks")

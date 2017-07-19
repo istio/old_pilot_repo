@@ -25,14 +25,6 @@ import (
 	"istio.io/pilot/model"
 )
 
-const (
-	// EgressNode is the name for the egress proxy node
-	EgressNode = "egress"
-
-	// IngressNode is the name for the ingress proxy node
-	IngressNode = "ingress"
-)
-
 // Environment provides an aggregate environmental API for Pilot
 type Environment struct {
 	// Discovery interface for listing services and instances
@@ -52,6 +44,9 @@ type Environment struct {
 type Role interface {
 	// nolint: megacheck
 	isProxyRole()
+
+	// ServiceNode uniquely identifies the proxy role
+	ServiceNode() string
 }
 
 // Sidecar defines the sidecar proxy role
@@ -60,18 +55,41 @@ type Sidecar struct {
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
 
-	// UID is the platform specific unique identifier of the proxy.
-	// UID should serve as a key to lookup additional information associated with the
-	// proxy. Example: "kubernetes://my-pod.my-namespace"
-	UID string
+	// PodName for the proxy sidecar
+	PodName string
+
+	// PodNamespace for the proxy sidecar
+	PodNamespace string
 }
 
 func (Sidecar) isProxyRole() {}
+func (role Sidecar) ServiceNode() string {
+	return role.IPAddress
+}
 
-// Egress defines the egress proxy role
-type Egress struct{}
+const (
+	// EgressNode is the service node for egress proxies
+	EgressNode = "egress"
 
-func (Egress) isProxyRole() {}
+	// IngressNode is the service node for ingress proxies
+	IngressNode = "ingress"
+)
+
+// EgressRole defines the egress proxy role
+type EgressRole struct{}
+
+func (EgressRole) isProxyRole() {}
+func (EgressRole) ServiceNode() string {
+	return EgressNode
+}
+
+// IngressRole defines the egress proxy role
+type IngressRole struct{}
+
+func (IngressRole) isProxyRole() {}
+func (IngressRole) ServiceNode() string {
+	return IngressNode
+}
 
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {

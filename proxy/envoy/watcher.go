@@ -15,41 +15,43 @@
 package envoy
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 )
 
 // Watcher observes service registry and triggers a reload on a change
 type Watcher interface {
 	Run(stop <-chan struct{})
+	Reload()
 }
 
+const (
+	IngressCerts = "/etc/ingress/"
+)
+
 type watcher struct {
-	agent proxy.Agent
-	mesh  *proxyconfig.ProxyMeshConfig
+	agent   proxy.Agent
+	role    proxy.Role
+	mesh    *proxyconfig.ProxyMeshConfig
+	secrets model.SecretRegistry
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) Watcher {
-	var node string
-	switch role.(type) {
-	case proxy.Sidecar:
-		// Use proxy node IP as the node name
-		// This parameter is used as the value for "service-node"
-		node = role.(proxy.Sidecar).IPAddress
-	case proxy.Egress:
-		node = proxy.EgressNode
-	default:
-		node = "unknown"
-	}
-	glog.V(2).Infof("Proxy node: %s", node)
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, secrets model.SecretRegistry) Watcher {
+	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
 		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
@@ -60,10 +62,12 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) Watcher {
 		}
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, node), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode()), proxy.DefaultRetry)
 	out := &watcher{
-		agent: agent,
-		mesh:  mesh,
+		agent:   agent,
+		role:    role,
+		mesh:    mesh,
+		secrets: secrets,
 	}
 
 	return out
@@ -74,22 +78,106 @@ func (w *watcher) Run(stop <-chan struct{}) {
 	go w.agent.Run(stop)
 
 	// kickstart the proxy with partial state (in case there are no notifications coming)
-	w.reload()
+	w.Reload()
 
-	// monitor certificates
+	// monitor auth certificates
 	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go watchCerts(w.mesh.AuthCertsPath, stop, w.reload)
+		go watchCerts(w.mesh.AuthCertsPath, stop, w.Reload)
+	}
+
+	// monitor ingress certificates
+	if w.role.ServiceNode() == proxy.IngressNode {
+		go watchCerts(IngressCerts, stop, w.Reload)
+
+		// create a context using stop channel
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			<-stop
+			cancel()
+		}()
+
+		// update secrets with polling
+		go func() {
+			for {
+				err := w.UpdateIngressSecret(ctx)
+				if err != nil {
+					glog.Warning(err)
+				}
+
+				select {
+				case <-time.After(convertDuration(w.mesh.DiscoveryRefreshDelay)):
+					// try again
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 
 	<-stop
 }
 
-func (w *watcher) reload() {
-	config := buildConfig(make(Listeners, 0), make(Clusters, 0), true, w.mesh)
+func (w *watcher) Reload() {
+	config := buildConfig(Listeners{}, Clusters{}, true, w.mesh)
+
+	h := sha256.New()
 	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		config.Hash = generateCertHash(w.mesh.AuthCertsPath)
+		generateCertHash(h, w.mesh.AuthCertsPath, authFiles)
 	}
+	if w.role.ServiceNode() == proxy.IngressNode {
+		generateCertHash(h, IngressCerts, []string{"tls.crt", "tls.key"})
+	}
+	config.Hash = h.Sum(nil)
+
 	w.agent.ScheduleConfigUpdate(config)
+}
+
+// UpdateIngressSecret fetches the TLS secret from discovery and secret storage
+// and writes to well-known location
+func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
+	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
+	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
+		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, w.role.ServiceNode())
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return multierror.Prefix(err, "failed to create a request to "+url)
+	}
+
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return multierror.Prefix(err, "failed to fetch "+url)
+	}
+
+	uri, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close() // nolint: errcheck
+	if err != nil {
+		return multierror.Prefix(err, "failed to read request body")
+	}
+
+	secret := string(uri)
+	if secret == "" {
+		glog.V(4).Info("no secret needed")
+		return nil
+	}
+
+	tls, err := w.secrets.GetTLSSecret(secret)
+	if err != nil {
+		return multierror.Prefix(err, "failed to read secret from storage")
+	}
+
+	if _, err := os.Stat(IngressCerts); os.IsNotExist(err) {
+		os.Mkdir(IngressCerts, 0755)
+	}
+
+	if err := ioutil.WriteFile(IngressCerts+"tls.crt", tls.Certificate, 0755); err != nil {
+		return multierror.Prefix(err, "failed to write cert file")
+	}
+	if err := ioutil.WriteFile(IngressCerts+"tls.key", tls.PrivateKey, 0755); err != nil {
+		return multierror.Prefix(err, "failed to write key file")
+	}
+
+	return nil
 }
 
 const (

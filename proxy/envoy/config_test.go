@@ -17,6 +17,7 @@ package envoy
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -221,6 +222,9 @@ func TestTCPRouteConfigByRoute(t *testing.T) {
 const (
 	envoyConfig = "testdata/envoy.json"
 
+	ingressCertFile = "testdata/tls.crt"
+	ingressKeyFile  = "testdata/tls.key"
+
 	cbPolicy          = "testdata/cb-policy.yaml.golden"
 	timeoutRouteRule  = "testdata/timeout-route-rule.yaml.golden"
 	weightedRouteRule = "testdata/weighted-route.yaml.golden"
@@ -312,9 +316,9 @@ func makeMeshConfig() proxyconfig.ProxyMeshConfig {
 	return mesh
 }
 
-func TestConfig(t *testing.T) {
+func TestSidecarConfig(t *testing.T) {
 	mesh := makeMeshConfig()
-	config := buildConfig(make(Listeners, 0), make(Clusters, 0), true, &mesh)
+	config := buildConfig(Listeners{}, Clusters{}, true, &mesh)
 	if config == nil {
 		t.Fatal("Failed to generate config")
 	}
@@ -325,4 +329,24 @@ func TestConfig(t *testing.T) {
 	}
 
 	util.CompareYAML(envoyConfig, t)
+}
+
+var (
+	ingressCert      = []byte("abcdefghijklmnop")
+	ingressKey       = []byte("qrstuvwxyz123456")
+	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
+)
+
+func compareFile(filename string, golden []byte, t *testing.T) {
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Fatalf("Error loading %s: %s", filename, err.Error())
+	}
+	if string(content) != string(golden) {
+		t.Errorf("Failed validating file %s, got %s", filename, string(content))
+	}
+	err = os.Remove(filename)
+	if err != nil {
+		t.Errorf("Failed cleaning up temporary file %s", filename)
+	}
 }

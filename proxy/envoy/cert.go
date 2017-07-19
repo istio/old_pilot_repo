@@ -15,8 +15,9 @@
 package envoy
 
 import (
-	"crypto/sha256"
+	"hash"
 	"io/ioutil"
+	"os"
 	"path"
 
 	"github.com/golang/glog"
@@ -27,6 +28,10 @@ const (
 	certChainFilename = "cert-chain.pem"
 	keyFilename       = "key.pem"
 	rootCertFilename  = "root-cert.pem"
+)
+
+var (
+	authFiles = []string{certChainFilename, keyFilename, rootCertFilename}
 )
 
 // watchCerts watches a certificate directory and calls the provided
@@ -62,10 +67,12 @@ func watchCerts(certsDir string, stop <-chan struct{}, updateFunc func()) {
 	}
 }
 
-func generateCertHash(certsDir string) []byte {
-	h := sha256.New()
+func generateCertHash(h hash.Hash, certsDir string, files []string) {
+	if _, err := os.Stat(certsDir); os.IsNotExist(err) {
+		return
+	}
 
-	for _, file := range []string{certChainFilename, keyFilename, rootCertFilename} {
+	for _, file := range files {
 		filename := path.Join(certsDir, file)
 		bs, err := ioutil.ReadFile(filename)
 		if err != nil {
@@ -76,6 +83,4 @@ func generateCertHash(certsDir string) []byte {
 			glog.Warning(err)
 		}
 	}
-
-	return h.Sum(nil)
 }

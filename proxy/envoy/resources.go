@@ -111,6 +111,7 @@ type Config struct {
 	ClusterManager     ClusterManager `json:"cluster_manager"`
 	StatsdUDPIPAddress string         `json:"statsd_udp_ip_address,omitempty"`
 	Tracing            *Tracing       `json:"tracing,omitempty"`
+
 	// Special value used to hash all referenced values (e.g. TLS secrets)
 	Hash []byte `json:"-"`
 }
