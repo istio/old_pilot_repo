@@ -599,7 +599,11 @@ func (ds *DiscoveryService) getRouteConfigs(node string) (httpRouteConfigs HTTPR
 		httpRouteConfigs = buildEgressRoutes(ds, ds.Mesh)
 
 	default:
-		instances := ds.HostInstances(map[string]bool{node: true})
+		sidecar, err := proxy.DecodeServiceNode(node)
+		if err != nil {
+			glog.Warning(err)
+		}
+		instances := ds.HostInstances(map[string]bool{sidecar.IPAddress: true})
 		services := ds.Services()
 		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Mesh, ds)
 	}
