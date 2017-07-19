@@ -1,11 +1,11 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1beta1
+kind: StatefulSet
 metadata:
   creationTimestamp: null
   name: hello
 spec:
-  replicas: 7
-  strategy: {}
+  replicas: 3
+  serviceName: hello
   template:
     metadata:
       annotations:
@@ -25,13 +25,14 @@ spec:
         - containerPort: 80
           name: http
         resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/data
+          name: data
       - args:
         - proxy
         - sidecar
         - -v
         - "2"
-        - --meshConfig
-        - config-map-name
         env:
         - name: POD_NAME
           valueFrom:
@@ -51,5 +52,10 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
-status: {}
+      volumes:
+      - hostPath:
+          path: /mnt/disks/ssd0
+        name: data
+status:
+  replicas: 0
 ---
