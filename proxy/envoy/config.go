@@ -137,8 +137,8 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyco
 }
 
 // buildListeners produces a list of listeners and referenced clusters.
-func buildListeners(env proxy.Environment, ipAddress string) (Listeners, Clusters) {
-	instances := env.HostInstances(map[string]bool{ipAddress: true})
+func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Clusters) {
+	instances := env.HostInstances(map[string]bool{sidecar.IPAddress: true})
 	services := env.Services()
 
 	inbound, inClusters := buildInboundListeners(instances, env.Mesh)
@@ -159,7 +159,7 @@ func buildListeners(env proxy.Environment, ipAddress string) (Listeners, Cluster
 		mixerCluster.Features = ClusterFeatureHTTP2
 
 		clusters = append(clusters, mixerCluster)
-		insertMixerFilter(listeners, instances, ipAddress)
+		insertMixerFilter(listeners, instances, sidecar)
 	}
 
 	// set bind to port values for port redirection

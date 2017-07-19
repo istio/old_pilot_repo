@@ -15,6 +15,8 @@
 package proxy
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -66,7 +68,30 @@ func (Sidecar) isProxyRole() {}
 
 // ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
-	return role.IPAddress
+	return fmt.Sprintf("%s.%s.%s", role.IPAddress, role.PodName, role.PodNamespace)
+}
+
+// PodID uniquely identifies a pod
+func (role Sidecar) PodID() string {
+	return fmt.Sprintf("kubernetes://%s.%s", role.PodName, role.PodNamespace)
+}
+
+// DecodeServiceNode is the inverse of sidecar service node
+func DecodeServiceNode(s string) (Sidecar, error) {
+	parts := strings.Split(s, ".")
+	if len(parts) < 4 {
+		return Sidecar{}, errors.New("cannot parse service node")
+	}
+	out := Sidecar{
+		IPAddress: fmt.Sprintf("%s.%s.%s.%s", parts[0], parts[1], parts[2], parts[3]),
+	}
+	if len(parts) > 4 {
+		out.PodName = parts[4]
+	}
+	if len(parts) > 5 {
+		out.PodNamespace = parts[5]
+	}
+	return out, nil
 }
 
 const (

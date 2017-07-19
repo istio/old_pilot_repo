@@ -23,9 +23,10 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
-func insertMixerFilter(listeners []*Listener, instances []*model.ServiceInstance, ipAddress string) {
+func insertMixerFilter(listeners []*Listener, instances []*model.ServiceInstance, sidecar proxy.Sidecar) {
 	// join service names with a comma
 	serviceSet := make(map[string]bool, len(instances))
 	for _, instance := range instances {
@@ -47,13 +48,13 @@ func insertMixerFilter(listeners []*Listener, instances []*model.ServiceInstance
 					Name: "mixer",
 					Config: &FilterMixerConfig{
 						MixerAttributes: map[string]string{
-							"target.ip": ipAddress,
-							// "target.uid":     "unknown", // TODO: need UID that is not IP address
+							"target.ip":      sidecar.IPAddress,
+							"target.uid":     sidecar.PodID(),
 							"target.service": service,
 						},
 						ForwardAttributes: map[string]string{
-							"source.ip": ipAddress,
-							// "source.uid": "unknown", // TODO: need UID that is not IP address
+							"source.ip":  sidecar.IPAddress,
+							"source.uid": sidecar.PodID(),
 						},
 						QuotaName: "RequestCount",
 					},

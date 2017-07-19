@@ -636,7 +636,11 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 		listeners = Listeners{listener}
 
 	default:
-		listeners, clusters = buildListeners(ds.Environment, node)
+		sidecar, err := proxy.DecodeServiceNode(node)
+		if err != nil {
+			return Listeners{}, Clusters{}
+		}
+		listeners, clusters = buildListeners(ds.Environment, sidecar)
 	}
 
 	// set connect timeout
