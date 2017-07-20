@@ -29,9 +29,6 @@ set -x
 if [ "${CI:-}" == "bootstrap" ]; then
     # Use the provided pull head sha, from prow.
     GIT_SHA=$PULL_PULL_SHA
-
-    # Use volume mount from pilot-presubmit job's pod spec.
-    ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
 else
     # Use the current commit.
     GIT_SHA=$(git rev-parse --verify HEAD)
@@ -47,6 +44,12 @@ BUCKET="istio-artifacts"
 ISTIOCTL_URL=https://storage.googleapis.com/$BUCKET/pilot/$GIT_SHA/artifacts/istioctl
 
 echo "=== Smoke Test ==="
+# Note: These tests use the default ~/.kube/config file. The prow container mounts the test cluster
+# kubeconfig at this path. On the other hand, when running this script locally,  this behavior results
+# in the test framework using whatever is your current kube context!
+#
+# In the future, this should be parameterized similarly to the integration tests, with the kubeconfig
+# location specified explicitly.
 ./tests/e2e.sh \
     --logs_bucket_path gs://$BUCKET/pilot/$GIT_SHA/e2e/logs/ \
     --pilot_hub=$HUB \
