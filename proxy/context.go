@@ -57,23 +57,23 @@ type Sidecar struct {
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
 
-	// PodName for the proxy sidecar
-	PodName string
+	// InstanceName for the proxy sidecar
+	InstanceName string
 
-	// PodNamespace for the proxy sidecar
-	PodNamespace string
+	// InstanceNamespace for the proxy sidecar
+	InstanceNamespace string
 }
 
 func (Sidecar) isProxyRole() {}
 
 // ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
-	return fmt.Sprintf("%s.%s.%s", role.IPAddress, role.PodName, role.PodNamespace)
+	return fmt.Sprintf("%s.%s.%s", role.IPAddress, role.InstanceName, role.InstanceNamespace)
 }
 
-// PodID uniquely identifies a pod
-func (role Sidecar) PodID() string {
-	return fmt.Sprintf("kubernetes://%s.%s", role.PodName, role.PodNamespace)
+// InstanceID uniquely identifies a sidecar proxy node
+func (role Sidecar) InstanceID() string {
+	return fmt.Sprintf("kubernetes://%s.%s", role.InstanceName, role.InstanceNamespace)
 }
 
 // DecodeServiceNode is the inverse of sidecar service node
@@ -86,10 +86,10 @@ func DecodeServiceNode(s string) (Sidecar, error) {
 		IPAddress: fmt.Sprintf("%s.%s.%s.%s", parts[0], parts[1], parts[2], parts[3]),
 	}
 	if len(parts) > 4 {
-		out.PodName = parts[4]
+		out.InstanceName = parts[4]
 	}
 	if len(parts) > 5 {
-		out.PodNamespace = parts[5]
+		out.InstanceNamespace = parts[5]
 	}
 	return out, nil
 }

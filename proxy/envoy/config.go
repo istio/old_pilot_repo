@@ -169,7 +169,7 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	listeners = append(listeners, &Listener{
-		Name:           RedirectListenerName,
+		Name:           VirtualListenerName,
 		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, env.Mesh.ProxyListenPort),
 		BindToPort:     true,
 		UseOriginalDst: true,

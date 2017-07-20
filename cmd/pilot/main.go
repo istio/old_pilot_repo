@@ -77,11 +77,11 @@ var (
 			if flags.sidecar.IPAddress == "" {
 				flags.sidecar.IPAddress = os.Getenv("POD_IP")
 			}
-			if flags.sidecar.PodName == "" {
-				flags.sidecar.PodName = os.Getenv("POD_NAME")
+			if flags.sidecar.InstanceName == "" {
+				flags.sidecar.InstanceName = os.Getenv("POD_NAME")
 			}
-			if flags.sidecar.PodNamespace == "" {
-				flags.sidecar.PodNamespace = os.Getenv("POD_NAMESPACE")
+			if flags.sidecar.InstanceNamespace == "" {
+				flags.sidecar.InstanceNamespace = os.Getenv("POD_NAMESPACE")
 			}
 
 			if flags.controllerOptions.Namespace == "" {
@@ -221,9 +221,9 @@ func init() {
 
 	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.IPAddress, "ipAddress", "",
 		"Sidecar IP address. If not provided uses ${POD_IP} environment variable.")
-	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.PodName, "podName", "",
+	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.InstanceName, "podName", "",
 		"Sidecar pod name. If not provided uses ${POD_NAME} environment variable")
-	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.PodNamespace, "podNamespace", "",
+	proxyCmd.PersistentFlags().StringVar(&flags.sidecar.InstanceNamespace, "podNamespace", "",
 		"Sidecar pod namespace. If not provided uses ${POD_NAMESPACE} environment variable")
 
 	//sidecarCmd.PersistentFlags().IntSliceVar(&flags.passthrough, "passthrough", nil,

@@ -45,8 +45,8 @@ const (
 	// CDSName is the name of CDS cluster
 	CDSName = "cds"
 
-	// RedirectListenerName is the name for traffic capture listener
-	RedirectListenerName = "redirect"
+	// VirtualListenerName is the name for traffic capture listener
+	VirtualListenerName = "virtual"
 
 	// ClusterTypeStrictDNS name for clusters of type 'strict_dns'
 	ClusterTypeStrictDNS = "strict_dns"
@@ -483,7 +483,7 @@ type Listeners []*Listener
 
 // normalize sorts and de-duplicates listeners by address
 func (listeners Listeners) normalize() Listeners {
-	out := make(Listeners, 0)
+	out := make(Listeners, 0, len(listeners))
 	set := make(map[string]bool)
 	for _, listener := range listeners {
 		if !set[listener.Address] {
@@ -584,7 +584,7 @@ type Clusters []*Cluster
 
 // normalize deduplicates and sorts clusters by name
 func (clusters Clusters) normalize() Clusters {
-	out := make(Clusters, 0)
+	out := make(Clusters, 0, len(clusters))
 	set := make(map[string]bool)
 	for _, cluster := range clusters {
 		if !set[cluster.Name] {

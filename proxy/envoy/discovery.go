@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"path"
 	"sort"
 	"strconv"
 	"sync"
@@ -622,8 +623,8 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 
 		listener := buildHTTPListener(ds.Mesh, nil, WildcardAddress, 443, true, true)
 		listener.SSLContext = &SSLContext{
-			CertChainFile:  IngressCerts + "tls.crt",
-			PrivateKeyFile: IngressCerts + "tls.key",
+			CertChainFile:  path.Join(IngressCertsPath, "tls.crt"),
+			PrivateKeyFile: path.Join(IngressCertsPath, "tls.key"),
 		}
 
 		listeners = Listeners{
@@ -654,18 +655,20 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	if node != proxy.EgressNode {
 		// apply custom policies for outbound clusters
 		for _, cluster := range clusters {
-			if cluster.port != nil {
-				insertDestinationPolicy(ds, cluster)
+			if cluster.port == nil {
+				continue
+			}
 
-				// apply auth policies
-				switch ds.Mesh.AuthPolicy {
-				case proxyconfig.ProxyMeshConfig_NONE:
-				case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-					// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
-					ports := model.PortList{cluster.port}.GetNames()
-					serviceAccounts := ds.GetIstioServiceAccounts(cluster.hostname, ports)
-					cluster.SSLContext = buildClusterSSLContext(ds.Mesh.AuthCertsPath, serviceAccounts)
-				}
+			insertDestinationPolicy(ds, cluster)
+
+			// apply auth policies
+			switch ds.Mesh.AuthPolicy {
+			case proxyconfig.ProxyMeshConfig_NONE:
+			case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+				// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
+				ports := model.PortList{cluster.port}.GetNames()
+				serviceAccounts := ds.GetIstioServiceAccounts(cluster.hostname, ports)
+				cluster.SSLContext = buildClusterSSLContext(ds.Mesh.AuthCertsPath, serviceAccounts)
 			}
 		}
 	}

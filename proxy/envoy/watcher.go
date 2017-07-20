@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
@@ -42,8 +43,8 @@ type Watcher interface {
 }
 
 const (
-	// IngressCerts is the path location for ingress certificates
-	IngressCerts = "/etc/ingress/"
+	// IngressCertsPath is the path location for ingress certificates
+	IngressCertsPath = "/etc/ingress/"
 )
 
 type watcher struct {
@@ -91,7 +92,7 @@ func (w *watcher) Run(ctx context.Context) {
 
 	// monitor ingress certificates
 	if w.role.ServiceNode() == proxy.IngressNode {
-		go watchCerts(ctx, IngressCerts, w.Reload)
+		go watchCerts(ctx, IngressCertsPath, w.Reload)
 
 		// update secrets with polling
 		go func() {
@@ -122,7 +123,7 @@ func (w *watcher) Reload() {
 		generateCertHash(h, w.mesh.AuthCertsPath, authFiles)
 	}
 	if w.role.ServiceNode() == proxy.IngressNode {
-		generateCertHash(h, IngressCerts, []string{"tls.crt", "tls.key"})
+		generateCertHash(h, IngressCertsPath, []string{"tls.crt", "tls.key"})
 	}
 	config.Hash = h.Sum(nil)
 
@@ -163,17 +164,17 @@ func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
 		return multierror.Prefix(err, "failed to read secret from storage")
 	}
 
-	if _, err := os.Stat(IngressCerts); os.IsNotExist(err) {
-		err = os.Mkdir(IngressCerts, 0755)
+	if _, err := os.Stat(IngressCertsPath); os.IsNotExist(err) {
+		err = os.Mkdir(IngressCertsPath, 0755)
 		if err != nil {
 			return multierror.Prefix(err, "cannot create parent directory")
 		}
 	}
 
-	if err := ioutil.WriteFile(IngressCerts+"tls.crt", tls.Certificate, 0755); err != nil {
+	if err := ioutil.WriteFile(path.Join(IngressCertsPath, "tls.crt"), tls.Certificate, 0755); err != nil {
 		return multierror.Prefix(err, "failed to write cert file")
 	}
-	if err := ioutil.WriteFile(IngressCerts+"tls.key", tls.PrivateKey, 0755); err != nil {
+	if err := ioutil.WriteFile(path.Join(IngressCertsPath, "tls.key"), tls.PrivateKey, 0755); err != nil {
 		return multierror.Prefix(err, "failed to write key file")
 	}
 
