@@ -108,6 +108,7 @@ var (
 				ServiceDiscovery: serviceController,
 				ServiceAccounts:  serviceController,
 				IstioConfigStore: model.MakeIstioStore(configController),
+				SecretRegistry:   kube.MakeSecretRegistry(client),
 				Mesh:             mesh,
 			}
 			discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
