@@ -51,10 +51,17 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
       volumes:
       - hostPath:
           path: /mnt/disks/ssd0
         name: data
+      - configMap:
+          name: istio
+        name: istio-config
 status:
   replicas: 0
 ---

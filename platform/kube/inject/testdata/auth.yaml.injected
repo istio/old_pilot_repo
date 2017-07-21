@@ -49,10 +49,16 @@ spec:
         securityContext:
           runAsUser: 1337
         volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
         - mountPath: /etc/certs/
           name: istio-certs
           readOnly: true
       volumes:
+      - configMap:
+          name: istio
+        name: istio-config
       - name: istio-certs
         secret:
           secretName: istio.default

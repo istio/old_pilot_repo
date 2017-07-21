@@ -38,7 +38,7 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
-		Short: "Istio Pilot agentt",
+		Short: "Istio Pilot agent",
 		Long:  "Istio Pilot provides management plane functionality to the Istio service mesh and Istio Mixer.",
 	}
 
@@ -87,7 +87,7 @@ var (
 				}
 			}
 
-			watcher := envoy.NewWatcher(mesh, role, nil)
+			watcher := envoy.NewWatcher(mesh, role)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
 

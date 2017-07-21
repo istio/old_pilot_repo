@@ -49,6 +49,14 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: istio
+        name: istio-config
 status: {}
 ---
 apiVersion: extensions/v1beta1
@@ -102,5 +110,13 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: istio
+        name: istio-config
 status: {}
 ---

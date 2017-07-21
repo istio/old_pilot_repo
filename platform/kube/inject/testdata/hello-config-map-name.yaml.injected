@@ -29,8 +29,6 @@ spec:
         - proxy
         - -v
         - "2"
-        - --meshConfig
-        - config-map-name
         env:
         - name: POD_NAME
           valueFrom:
@@ -50,5 +48,13 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: config-map-name
+        name: istio-config
 status: {}
 ---

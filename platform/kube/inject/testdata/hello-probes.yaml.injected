@@ -49,12 +49,6 @@ spec:
         - proxy
         - -v
         - "2"
-        - --passthrough
-        - "80"
-        - --passthrough
-        - "90"
-        - --passthrough
-        - "3333"
         env:
         - name: POD_NAME
           valueFrom:
@@ -74,5 +68,13 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
+        volumeMounts:
+        - mountPath: /etc/istio
+          name: istio-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: istio
+        name: istio-config
 status: {}
 ---
