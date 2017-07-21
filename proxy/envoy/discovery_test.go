@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	ingressSecretUri = "my-secret.default"
+	ingressSecretURI = "my-secret.default"
 	ingressCert      = []byte("abcdefghijklmnop")
 	ingressKey       = []byte("qrstuvwxyz123456")
 	ingressTLSSecret = &model.TLSSecret{Certificate: ingressCert, PrivateKey: ingressKey}
@@ -64,7 +64,7 @@ func makeDiscoveryService(t *testing.T, r model.ConfigStore, mesh *proxyconfig.P
 			ServiceAccounts:  mock.Discovery,
 			IstioConfigStore: model.MakeIstioStore(r),
 			SecretRegistry: mock.SecretRegistry{
-				ingressSecretUri: ingressTLSSecret,
+				ingressSecretURI: ingressTLSSecret,
 			},
 			Mesh: mesh,
 		},

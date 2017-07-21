@@ -51,6 +51,7 @@ func ReadMeshConfig(filename string) (*proxyconfig.ProxyMeshConfig, error) {
 	return &mesh, nil
 }
 
+// VersionCmd is a sub-command to print version information
 var VersionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Display version information and exit",

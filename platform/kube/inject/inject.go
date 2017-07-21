@@ -64,6 +64,7 @@ const (
 
 	istioConfigVolumeName = "istio-config"
 
+	// ConfigMapKey should match the expected MeshConfig file name
 	ConfigMapKey = "mesh"
 )
 
@@ -186,8 +187,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
 
+	_, _ = healthPorts(t)
 	/*
-		ports, err := healthPorts(t)
 		if err != nil {
 			return err
 		}

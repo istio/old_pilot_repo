@@ -168,7 +168,11 @@ func (a *agent) Run(ctx context.Context) {
 	rateLimiter := rate.NewLimiter(1, 10)
 
 	for {
-		rateLimiter.Wait(ctx)
+		err := rateLimiter.Wait(ctx)
+		if err != nil {
+			a.terminate()
+			return
+		}
 
 		// maximum duration or duration till next restart
 		var delay time.Duration = 1<<63 - 1
@@ -232,12 +236,16 @@ func (a *agent) Run(ctx context.Context) {
 
 		case _, more := <-ctx.Done():
 			if !more {
-				glog.V(2).Info("Agent terminating")
-				a.abortAll()
+				a.terminate()
 				return
 			}
 		}
 	}
+}
+
+func (a *agent) terminate() {
+	glog.V(2).Info("Agent terminating")
+	a.abortAll()
 }
 
 func (a *agent) reconcile() {
