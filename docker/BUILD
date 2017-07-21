@@ -5,6 +5,17 @@ load("//docker:debug_docker.bzl", "debug_docker_build")
 # Use "manual" target tag to skip rules in the wildcard expansion
 
 pkg_tar(
+    name = "agent_tar",
+    extension = "tar.gz",
+    files = [
+        "//cmd/agent",
+    ],
+    mode = "0755",
+    package_dir = "/usr/local/bin/",
+    tags = ["manual"],
+)
+
+pkg_tar(
     name = "pilot_tar",
     extension = "tar.gz",
     files = [
@@ -71,7 +82,7 @@ debug_docker_build(
 )
 
 debug_docker_build(
-    entrypoint = ["/usr/local/bin/pilot"],
+    entrypoint = ["/usr/local/bin/agent"],
     images = [
         {
             "name": "proxy",
@@ -91,7 +102,7 @@ debug_docker_build(
     repository = "istio",
     tags = ["manual"],
     tars = [
-        ":pilot_tar",
+        ":agent_tar",
         ":config_tar",
     ],
 )

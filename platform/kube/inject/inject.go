@@ -32,12 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	batch "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // Defaults values for injecting istio proxy into kubernetes
@@ -58,6 +61,10 @@ const (
 
 	istioCertVolumeName   = "istio-certs"
 	istioCertSecretPrefix = "istio."
+
+	istioConfigVolumeName = "istio-config"
+
+	ConfigMapKey = "mesh"
 )
 
 // InitImageName returns the fully qualified image name for the istio
@@ -83,6 +90,32 @@ type Params struct {
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
 	IncludeIPRanges string
+}
+
+// GetMeshConfig fetches configuration from a config map
+func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxyconfig.ProxyMeshConfig, error) {
+	config, err := kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// values in the data are strings, while proto might use a different data type.
+	// therefore, we have to get a value by a key
+	yaml, exists := config.Data[ConfigMapKey]
+	if !exists {
+		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
+	}
+
+	mesh := proxy.DefaultMeshConfig()
+	if err = model.ApplyYAML(yaml, &mesh); err != nil {
+		return nil, multierror.Prefix(err, "failed to convert to proto.")
+	}
+
+	if err = model.ValidateProxyMeshConfig(&mesh); err != nil {
+		return nil, err
+	}
+
+	return &mesh, nil
 }
 
 var enableCoreDumpContainer = map[string]interface{}{
@@ -152,19 +185,34 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	if p.Verbosity > 0 {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
-	if p.MeshConfigMapName != "" {
-		args = append(args, "--meshConfig", p.MeshConfigMapName)
-	}
 
-	ports, err := healthPorts(t)
-	if err != nil {
-		return err
-	}
-	for _, port := range ports {
-		args = append(args, "--passthrough", strconv.Itoa(port))
-	}
+	/*
+		ports, err := healthPorts(t)
+		if err != nil {
+			return err
+		}
+			for _, port := range ports {
+				args = append(args, "--passthrough", strconv.Itoa(port))
+			}
+	*/
 
-	var volumeMounts []v1.VolumeMount
+	volumeMounts := []v1.VolumeMount{{
+		Name:      istioConfigVolumeName,
+		ReadOnly:  true,
+		MountPath: "/etc/istio",
+	}}
+
+	t.Spec.Volumes = append(t.Spec.Volumes, v1.Volume{
+		Name: istioConfigVolumeName,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: p.MeshConfigMapName,
+				},
+			},
+		},
+	})
+
 	if p.Mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
 		volumeMounts = append(volumeMounts, v1.VolumeMount{
 			Name:      istioCertVolumeName,
