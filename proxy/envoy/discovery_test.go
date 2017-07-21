@@ -319,25 +319,11 @@ func TestListenerDiscovery(t *testing.T) {
 		file string
 	}{
 		{name: "none"},
+		/* these configs do not affect listeners
 		{
 			name: "cb",
 			typ:  model.DestinationPolicy,
 			file: cbPolicy,
-		},
-		{
-			name: "timeout",
-			typ:  model.RouteRule,
-			file: timeoutRouteRule,
-		},
-		{
-			name: "weighted",
-			typ:  model.RouteRule,
-			file: weightedRouteRule,
-		},
-		{
-			name: "fault",
-			typ:  model.RouteRule,
-			file: faultRouteRule,
 		},
 		{
 			name: "redirect",
@@ -348,6 +334,22 @@ func TestListenerDiscovery(t *testing.T) {
 			name: "rewrite",
 			typ:  model.RouteRule,
 			file: rewriteRouteRule,
+		},
+		{
+			name: "timeout",
+			typ:  model.RouteRule,
+			file: timeoutRouteRule,
+		},
+		*/
+		{
+			name: "weighted",
+			typ:  model.RouteRule,
+			file: weightedRouteRule,
+		},
+		{
+			name: "fault",
+			typ:  model.RouteRule,
+			file: faultRouteRule,
 		},
 	}
 
