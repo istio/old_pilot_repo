@@ -1,11 +1,11 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1beta1
+kind: StatefulSet
 metadata:
   creationTimestamp: null
   name: hello
 spec:
-  replicas: 7
-  strategy: {}
+  replicas: 3
+  serviceName: hello
   template:
     metadata:
       annotations:
@@ -25,6 +25,9 @@ spec:
         - containerPort: 80
           name: http
         resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/data
+          name: data
       - args:
         - proxy
         - -v
@@ -48,14 +51,10 @@ spec:
         resources: {}
         securityContext:
           runAsUser: 1337
-        volumeMounts:
-        - mountPath: /etc/certs/
-          name: istio-certs
-          readOnly: true
-      serviceAccountName: non-default
       volumes:
-      - name: istio-certs
-        secret:
-          secretName: istio.non-default
-status: {}
+      - hostPath:
+          path: /mnt/disks/ssd0
+        name: data
+status:
+  replicas: 0
 ---
