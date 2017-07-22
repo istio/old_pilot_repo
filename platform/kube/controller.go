@@ -73,26 +73,26 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 
 	out.services = out.createInformer(&v1.Service{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Services(options.Namespace).List(opts)
+			return client.CoreV1().Services(meta_v1.NamespaceAll).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Services(options.Namespace).Watch(opts)
+			return client.CoreV1().Services(meta_v1.NamespaceAll).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Endpoints(options.Namespace).List(opts)
+			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Endpoints(options.Namespace).Watch(opts)
+			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).Watch(opts)
 		})
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Pods(options.Namespace).List(opts)
+			return client.CoreV1().Pods(meta_v1.NamespaceAll).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Pods(options.Namespace).Watch(opts)
+			return client.CoreV1().Pods(meta_v1.NamespaceAll).Watch(opts)
 		}))
 
 	return out
@@ -104,11 +104,11 @@ func (c *Controller) notify(obj interface{}, event model.Event) error {
 	if !c.HasSynced() {
 		return errors.New("Waiting till full synchronization")
 	}
-	k, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	_, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.V(2).Infof("Error retrieving key: %v", err)
 	} else {
-		glog.V(2).Infof("Event %s: key %#v", event, k)
+		// glog.V(2).Infof("Event %s: key %#v", event, k)
 	}
 	return nil
 }
@@ -354,8 +354,16 @@ func generateServiceAccountID(sa string, ns string, domain string) string {
 // AppendServiceHandler implements a service catalog operation
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
 	c.services.handler.Append(func(obj interface{}, event model.Event) error {
-		if svc := convertService(*obj.(*v1.Service), c.domainSuffix); svc != nil {
-			f(svc, event)
+		svc := *obj.(*v1.Service)
+
+		if svc.Namespace == "kube-system" || svc.Namespace == "istio-system" {
+			return nil
+		}
+
+		glog.V(2).Infof("Handle service %s in namespace %s", svc.Name, svc.Namespace)
+
+		if svcConv := convertService(svc, c.domainSuffix); svcConv != nil {
+			f(svcConv, event)
 		}
 		return nil
 	})
@@ -366,6 +374,12 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
 	c.endpoints.handler.Append(func(obj interface{}, event model.Event) error {
 		ep := *obj.(*v1.Endpoints)
+
+		if ep.Namespace == "kube-system" || ep.Namespace == "istio-system" {
+			return nil
+		}
+
+		glog.V(2).Infof("Handle endpoint %s in namespace %s", ep.Name, ep.Namespace)
 		if item, exists := c.serviceByKey(ep.Name, ep.Namespace); exists {
 			if svc := convertService(*item, c.domainSuffix); svc != nil {
 				// TODO: we're passing an incomplete instance to the
