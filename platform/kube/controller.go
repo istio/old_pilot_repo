@@ -104,11 +104,11 @@ func (c *Controller) notify(obj interface{}, event model.Event) error {
 	if !c.HasSynced() {
 		return errors.New("Waiting till full synchronization")
 	}
-	_, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	k, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.V(2).Infof("Error retrieving key: %v", err)
 	} else {
-		// glog.V(2).Infof("Event %s: key %#v", event, k)
+		glog.V(2).Infof("Event %s: key %#v", event, k)
 	}
 	return nil
 }
