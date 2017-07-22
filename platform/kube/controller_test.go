@@ -102,7 +102,7 @@ func TestServices(t *testing.T) {
 		out := sds.Services()
 		glog.Info("Services: %#v", out)
 
-		for _, item:= range out {
+		for _, item := range out {
 			if item.Hostname == hostname &&
 				len(item.Ports) == 1 &&
 				item.Ports[0].Protocol == model.ProtocolHTTP {
