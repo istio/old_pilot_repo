@@ -15,9 +15,9 @@
 #   limitations under the License.
 
 
-#######################################
-# Presubmit script triggered by Prow. #
-#######################################
+########################################
+# Postsubmit script triggered by Prow. #
+########################################
 
 # Exit immediately for non zero status
 set -e
@@ -33,8 +33,8 @@ if [ "${CI:-}" == "bootstrap" ]; then
     ln -s $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
     cd $GOPATH/src/istio.io/pilot/
 
-    # Use the provided pull head sha, from prow.
-    GIT_SHA=$PULL_PULL_SHA
+    # Use the provided base sha, from prow.
+    GIT_SHA=$PULL_BASE_SHA
 
     # Use volume mount from pilot-presubmit job's pod spec.
     ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
@@ -43,31 +43,24 @@ else
     GIT_SHA=$(git rev-parse --verify HEAD)
 fi
 
-echo "=== Bazel Build ==="
+echo "=== Prerequisites ==="
 ./bin/install-prereqs.sh
-bazel build //...
-
-echo "=== Build istioctl ==="
-./bin/upload-istioctl -p gs://istio-artifacts/pilot/$GIT_SHA/artifacts/istioctl
 
 echo "=== Go Build ==="
 ./bin/init.sh
 
-echo "=== Code Check ==="
-./bin/check.sh
-
 echo "=== Bazel Tests ==="
 bazel test //...
 
-echo "=== Code Coverage ==="
+echo  "=== Code Coverage ==="
 ./bin/codecov.sh | tee codecov.report
 if [ "${CI:-}" == "bootstrap" ]; then
-    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME="pilot/presubmit" ./bin/toolbox/presubmit/pkg_coverage.sh
+    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME="pilot/postsubmit" ./bin/toolbox/presubmit/pkg_coverage.sh
 
-    curl -s https://codecov.io/bash | CI_JOB_ID=$JOB_NAME CI_BUILD_ID=$BUILD_NUMBER bash /dev/stdin -K -Z -B ${PULL_BASE_REF} -C ${PULL_PULL_SHA} -P ${PULL_NUMBER} -t @/etc/codecov/pilot.token
+    curl -s https://codecov.io/bash | bash /dev/stdin -K -B ${PULL_BASE_REF} -C ${PULL_BASE_SHA} -t @/etc/codecov/pilot.token
 else
     echo "Not in bootstrap environment, skipping code coverage publishing"
 fi
 
 echo "=== Running e2e Tests ==="
-./bin/e2e.sh -tag $GIT_SHA -hub "gcr.io/istio-testing"
+bin/e2e.sh -count 10 -logs=false -tag $GIT_SHA
