@@ -15,7 +15,6 @@
 package proxy
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -77,13 +76,17 @@ func (role Sidecar) ServiceNode() string {
 // DecodeServiceNode is the inverse of sidecar service node
 func DecodeServiceNode(s string) (Sidecar, error) {
 	parts := strings.Split(s, "|")
-	if len(parts) != 3 {
-		return Sidecar{}, errors.New("cannot parse service node")
+	out := Sidecar{}
+
+	if len(parts) > 0 {
+		out.IPAddress = parts[0]
 	}
-	out := Sidecar{
-		IPAddress: parts[0],
-		ID:        parts[1],
-		Domain:    parts[2],
+	if len(parts) > 1 {
+		out.ID = parts[1]
+	}
+
+	if len(parts) > 2 {
+		out.Domain = parts[2]
 	}
 	return out, nil
 }
