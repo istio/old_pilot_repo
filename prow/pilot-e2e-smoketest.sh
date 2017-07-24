@@ -57,4 +57,4 @@ echo "=== Smoke Test ==="
     --istioctl_url=$ISTIOCTL_URL
 
 cd -
-rm $ISTIO_TMP_DIR
+rm -rf ./$ISTIO_TMP_DIR
