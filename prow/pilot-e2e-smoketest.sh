@@ -36,8 +36,8 @@ fi
 
 echo "=== Clone istio/istio ==="
 ISTIO_TMP_DIR=`mktemp -d istio-XXXXX`
-git clone https://github.com/istio/istio $ISTIO_TMP_DIR
-cd $ISTIO_TMP_DIR
+git clone https://github.com/istio/istio ./$ISTIO_TMP_DIR
+cd ./$ISTIO_TMP_DIR
 
 HUB="gcr.io/istio-testing"
 BUCKET="istio-artifacts"
