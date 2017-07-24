@@ -42,7 +42,7 @@ spec:
               fieldPath: metadata.namespace
         volumeMounts:
         - name: config-volume
-          mountPath: /etc/istio
+          mountPath: /etc/istio/config
 {{if eq .Auth 1}}
         - mountPath: /etc/certs
           name: istio-certs

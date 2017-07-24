@@ -188,19 +188,19 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	}
 
 	_, _ = healthPorts(t)
-	/*
-		if err != nil {
-			return err
+	/* See issue https://github.com/istio/pilot/issues/953
+	if err != nil {
+		return err
+	}
+		for _, port := range ports {
+			args = append(args, "--passthrough", strconv.Itoa(port))
 		}
-			for _, port := range ports {
-				args = append(args, "--passthrough", strconv.Itoa(port))
-			}
 	*/
 
 	volumeMounts := []v1.VolumeMount{{
 		Name:      istioConfigVolumeName,
 		ReadOnly:  true,
-		MountPath: "/etc/istio",
+		MountPath: "/etc/istio/config",
 	}}
 
 	t.Spec.Volumes = append(t.Spec.Volumes, v1.Volume{
@@ -254,7 +254,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 				},
 			},
 		}, {
-			Name: "POD_IP",
+			Name: "INSTANCE_IP",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
 					FieldPath: "status.podIP",

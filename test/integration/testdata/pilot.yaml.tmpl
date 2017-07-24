@@ -44,7 +44,7 @@ spec:
               fieldPath: metadata.namespace
         volumeMounts:
         - name: config-volume
-          mountPath: /etc/istio
+          mountPath: /etc/istio/config
       volumes:
       - name: config-volume
         configMap:

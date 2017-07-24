@@ -45,7 +45,7 @@ type Watcher interface {
 
 const (
 	// IngressCertsPath is the path location for ingress certificates
-	IngressCertsPath = "/etc/ingress/"
+	IngressCertsPath = "/etc/istio/ingress-certs/"
 )
 
 type watcher struct {
@@ -185,7 +185,7 @@ const (
 	BinaryPath = "/usr/local/bin/envoy"
 
 	// ConfigPath is the directory to hold enovy epoch configurations
-	ConfigPath = "/etc/envoy"
+	ConfigPath = "/etc/istio/envoy"
 )
 
 func configFile(config string, epoch int) string {

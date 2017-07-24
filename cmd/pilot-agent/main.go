@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
@@ -48,24 +47,20 @@ var (
 		RunE: func(c *cobra.Command, args []string) error {
 			// set values from environment variables
 			if sidecar.IPAddress == "" {
-				sidecar.IPAddress = os.Getenv("POD_IP")
+				sidecar.IPAddress = os.Getenv("INSTANCE_IP")
 			}
-			if sidecar.InstanceName == "" {
-				sidecar.InstanceName = os.Getenv("POD_NAME")
+			if sidecar.ID == "" {
+				sidecar.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
 			}
-			if sidecar.InstanceNamespace == "" {
-				sidecar.InstanceNamespace = os.Getenv("POD_NAMESPACE")
-			}
-
-			glog.V(2).Infof("version %s", version.Line())
-
 			// receive mesh configuration
 			mesh, err := cmd.ReadMeshConfig(meshconfig)
 			if err != nil {
 				return multierror.Prefix(err, "failed to read mesh configuration.")
 			}
 
-			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("sidecar %#v", sidecar)
+			glog.V(2).Infof("mesh configuration %#v", mesh)
 
 			var role proxy.Role = sidecar
 			if len(args) > 0 {
@@ -101,17 +96,14 @@ var (
 )
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/mesh",
+	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		fmt.Sprintf("File name for Istio mesh configuration"))
-	proxyCmd.PersistentFlags().StringVar(&sidecar.IPAddress, "ipAddress", "",
-		"Sidecar IP address. If not provided uses ${POD_IP} environment variable.")
-	proxyCmd.PersistentFlags().StringVar(&sidecar.InstanceName, "podName", "",
-		"Sidecar pod name. If not provided uses ${POD_NAME} environment variable")
-	proxyCmd.PersistentFlags().StringVar(&sidecar.InstanceNamespace, "podNamespace", "",
-		"Sidecar pod namespace. If not provided uses ${POD_NAMESPACE} environment variable")
-
-	//sidecarCmd.PersistentFlags().IntSliceVar(&passthrough, "passthrough", nil,
-	//	"Passthrough ports for health checks")
+	proxyCmd.PersistentFlags().StringVar(&sidecar.IPAddress, "ip", "",
+		"Sidecar proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
+	proxyCmd.PersistentFlags().StringVar(&sidecar.ID, "id", "",
+		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
+	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
+		"DNS domain suffix")
 
 	cmd.AddFlags(rootCmd)
 

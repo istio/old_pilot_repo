@@ -60,39 +60,30 @@ type Sidecar struct {
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
 
-	// InstanceName for the proxy sidecar
-	InstanceName string
+	// ID is the unique platform-specific sidecar proxy ID
+	ID string
 
-	// InstanceNamespace for the proxy sidecar
-	InstanceNamespace string
+	// Domain defines the DNS domain suffix for short hostnames
+	Domain string
 }
 
 func (Sidecar) isProxyRole() {}
 
 // ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
-	return fmt.Sprintf("%s.%s.%s", role.IPAddress, role.InstanceName, role.InstanceNamespace)
-}
-
-// InstanceID uniquely identifies a sidecar proxy node
-func (role Sidecar) InstanceID() string {
-	return fmt.Sprintf("kubernetes://%s.%s", role.InstanceName, role.InstanceNamespace)
+	return fmt.Sprintf("%s|%s|%s", role.IPAddress, role.ID, role.Domain)
 }
 
 // DecodeServiceNode is the inverse of sidecar service node
 func DecodeServiceNode(s string) (Sidecar, error) {
-	parts := strings.Split(s, ".")
-	if len(parts) < 4 {
+	parts := strings.Split(s, "|")
+	if len(parts) != 3 {
 		return Sidecar{}, errors.New("cannot parse service node")
 	}
 	out := Sidecar{
-		IPAddress: fmt.Sprintf("%s.%s.%s.%s", parts[0], parts[1], parts[2], parts[3]),
-	}
-	if len(parts) > 4 {
-		out.InstanceName = parts[4]
-	}
-	if len(parts) > 5 {
-		out.InstanceNamespace = parts[5]
+		IPAddress: parts[0],
+		ID:        parts[1],
+		Domain:    parts[2],
 	}
 	return out, nil
 }
