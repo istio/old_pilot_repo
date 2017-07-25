@@ -29,7 +29,6 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/adapter/config/tpr"
-	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/test/util"
@@ -84,7 +83,9 @@ func (infra *infra) setup() error {
 		}
 		return nil
 	}
-
+	if err := deploy("rbac-beta.yaml.tmpl"); err != nil {
+		return err
+	}
 	if err := deploy("config.yaml.tmpl"); err != nil {
 		return err
 	}
@@ -160,19 +161,20 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 	writer := new(bytes.Buffer)
 
 	if injectProxy {
-		mesh, err := cmd.GetMeshConfig(client, infra.Namespace, "istio")
+		mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
 		if err != nil {
 			return err
 		}
 
 		p := &inject.Params{
-			InitImage:       inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:      inject.ProxyImageName(infra.Hub, infra.Tag),
-			Verbosity:       infra.Verbosity,
-			SidecarProxyUID: inject.DefaultSidecarProxyUID,
-			EnableCoreDump:  true,
-			Version:         "integration-test",
-			Mesh:            mesh,
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
+			Verbosity:         infra.Verbosity,
+			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
+			EnableCoreDump:    true,
+			Version:           "integration-test",
+			Mesh:              mesh,
+			MeshConfigMapName: "istio",
 		}
 		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
 			return err
@@ -194,7 +196,8 @@ func (infra *infra) teardown() {
 }
 
 func (infra *infra) kubeApply(yaml string) error {
-	return util.RunInput(fmt.Sprintf("kubectl apply -n %s -f -", infra.Namespace), yaml)
+	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
+		kubeconfig, infra.Namespace), yaml)
 }
 
 type response struct {
@@ -222,8 +225,8 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	}
 
 	pod := infra.apps[app][0]
-	request, err := util.Shell(fmt.Sprintf("kubectl exec %s -n %s -c app -- client -url %s -count %d %s",
-		pod, infra.Namespace, url, count, extra))
+	request, err := util.Shell(fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
+		pod, kubeconfig, infra.Namespace, url, count, extra))
 
 	if err != nil {
 		glog.Errorf("client request error %v for %s in %s", err, url, app)
@@ -287,5 +290,25 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 
 	glog.Info("Sleeping for the config to propagate")
 	time.Sleep(3 * time.Second)
+	return nil
+}
+
+func (infra *infra) deleteAllConfigs() error {
+	istioClient, err := tpr.NewClient(kubeconfig, model.IstioConfigTypes, infra.Namespace)
+	if err != nil {
+		return err
+	}
+	for _, desc := range istioClient.ConfigDescriptor() {
+		configs, err := istioClient.List(desc.Type)
+		if err != nil {
+			return err
+		}
+		for _, config := range configs {
+			glog.Infof("Delete config %s %s", desc.Type, config.Key)
+			if err = istioClient.Delete(desc.Type, config.Key); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
