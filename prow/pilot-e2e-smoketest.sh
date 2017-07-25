@@ -54,7 +54,10 @@ echo "=== Smoke Test ==="
     --logs_bucket_path gs://$BUCKET/pilot/$GIT_SHA/e2e/logs/ \
     --pilot_hub=$HUB \
     --pilot_tag=$GIT_SHA \
-    --istioctl_url=$ISTIOCTL_URL
+    --istioctl_url=$ISTIOCTL_URL \
+    --test_logs_path="../_artifacts" \
+    --log_provider="stackdriver" \
+    --project_id="istio-testing"
 
 cd -
 rm -rf ./$ISTIO_TMP_DIR
