@@ -430,7 +430,6 @@ func (ds *DiscoveryService) ListAllClusters(request *restful.Request, response *
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
-//	cached = false
 	if !cached {
 		if sc := request.PathParameter(ServiceCluster); sc != ds.MeshConfig.IstioServiceCluster {
 			errorResponse(response, http.StatusNotFound,
@@ -513,7 +512,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
 			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Missing route config for port %d", port))
+				fmt.Sprintf("Missing route config for port %d, node: %s, key: %s", port, node, key))
 			return
 		}
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {

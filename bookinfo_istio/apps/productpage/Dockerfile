@@ -2,6 +2,7 @@ FROM lyft/envoy:latest
 
 RUN mkdir /opt/microservices
 RUN mkdir /opt/istio
+RUN mkdir /opt/test
 RUN mkdir /etc/envoy/
 RUN apt-get -y install iptables
 RUN apt-get -y install curl 
