@@ -15,52 +15,137 @@
 package proxy
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"github.com/amalgam8/amalgam8/sidecar/register"
 )
 
-// Context defines local proxy context information about the global service mesh
-type Context struct {
+type Adapter string
+
+const (
+	KubernetesAdapter Adapter = "Kubernetes"
+	VMsAdapter        Adapter = "VMs"
+)
+
+// Environment provides an aggregate environmental API for Pilot
+type Environment struct {
 	// Discovery interface for listing services and instances
-	Discovery model.ServiceDiscovery
+	model.ServiceDiscovery
 
 	// Accounts interface for listing service accounts
-	Accounts model.ServiceAccounts
+	model.ServiceAccounts
 
 	// Config interface for listing routing rules
-	Config model.IstioConfigStore
+	model.IstioConfigStore
 
-	// MeshConfig defines global configuration settings
-	MeshConfig *proxyconfig.ProxyMeshConfig
+	// Access to TLS secrets from ingress proxies
+	model.SecretRegistry
+
+	// Mesh is the mesh config (to be merged into the config store)
+	Mesh *proxyconfig.ProxyMeshConfig
+}
+
+// Role declares the proxy node role in the mesh
+type Role interface {
+	// nolint: megacheck
+	isProxyRole()
+
+	// ServiceNode encodes the role information into a string
+	ServiceNode() string
+
+	// Adapter prints out the platform this proxy is running on
+	Platform() Adapter
+
+	// Retrieve the registration agent  
+	getRegistrationAgent() *register.RegistrationAgent
+}
+
+// Sidecar defines the sidecar proxy role
+type Sidecar struct {
+	// Adapter indicates indicates the underlying platform name
+	Platform Adapter
 
 	// IPAddress is the IP address of the proxy used to identify it and its
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
 
-	// UID is the platform specific unique identifier of the proxy.
-	// UID should serve as a key to lookup additional information associated with the
-	// proxy. Example: "kubernetes://my-pod.my-namespace"
-	UID string
-
-	// PassthroughPorts is a list of ports on the proxy IP address that must be
-	// open and allowed through the proxy to the co-located service instances.
-	// These ports are utilized by the underlying cluster platform for health
-	// checking, for example.
-	//
-	// The passthrough ports should be exposed irrespective of the services
-	// model. In case there is an overlap, that is the port is utilized by a
-	// service for a service instance and is also present in this list, the
-	// service model declaration takes precedence. That means any protocol
-	// upgrade (such as utilizng TLS for proxy-to-proxy traffic) will be applied
-	// to the passthrough port.
-	PassthroughPorts []int
-
 	// Registration contains the service information and Registry APIs for the VMs platform
 	Registration *register.RegistrationAgent
+
+	// ID is the unique platform-specific sidecar proxy ID
+	ID string
+
+	// Domain defines the DNS domain suffix for short hostnames
+	Domain string
+}
+
+func (Sidecar) isProxyRole() {}
+
+// ServiceNode for sidecar
+func (role Sidecar) ServiceNode() string {
+	return fmt.Sprintf("%s|%s|%s", role.IPAddress, role.ID, role.Domain)
+}
+
+func (role Sidecar) Platform() Adapter {
+	return role.Platform
+}
+
+func (role Sidecar) getRegistrationAgent() string {
+	return role.Registration
+}
+
+// DecodeServiceNode is the inverse of sidecar service node
+func DecodeServiceNode(s string) (Sidecar, error) {
+	parts := strings.Split(s, "|")
+	out := Sidecar{}
+
+	if len(parts) > 0 {
+		out.IPAddress = parts[0]
+	}
+	if len(parts) > 1 {
+		out.ID = parts[1]
+	}
+
+	if len(parts) > 2 {
+		out.Domain = parts[2]
+	}
+	return out, nil
+}
+
+const (
+	// EgressNode is the service node for egress proxies
+	EgressNode = "egress"
+
+	// IngressNode is the service node for ingress proxies
+	IngressNode = "ingress"
+)
+
+// EgressRole defines the egress proxy role
+type EgressRole struct{}
+
+func (EgressRole) isProxyRole() {}
+
+// ServiceNode for egress
+func (EgressRole) ServiceNode() string {
+	return EgressNode
+}
+
+// IngressRole defines the egress proxy role
+type IngressRole struct{}
+
+func (IngressRole) isProxyRole() {}
+
+// ServiceNode for ingress
+func (IngressRole) ServiceNode() string {
+	return IngressNode
+>>>>>>> master
 }
 
 // DefaultMeshConfig configuration
@@ -83,4 +168,14 @@ func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 		AuthPolicy:    proxyconfig.ProxyMeshConfig_NONE,
 		AuthCertsPath: "/etc/certs",
 	}
+}
+
+// ParsePort extracts port number from a valid proxy address
+func ParsePort(addr string) int {
+	port, err := strconv.Atoi(addr[strings.Index(addr, ":")+1:])
+	if err != nil {
+		glog.Warning(err)
+	}
+
+	return port
 }
