@@ -1,5 +1,5 @@
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
-load("@bazel_tools//tools/build_defs/docker:docker.bzl", "docker_build")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build")
 load("//docker:debug_docker.bzl", "debug_docker_build")
 
 # Use "manual" target tag to skip rules in the wildcard expansion
@@ -86,17 +86,11 @@ debug_docker_build(
     images = [
         {
             "name": "proxy",
-            "base": "@docker_ubuntu//:xenial",
-            "tars": [
-                "@istio_proxy//file",
-            ],
+            "base": "@istio_proxy//image",
         },
         {
             "name": "proxy_debug",
-            "base": "@ubuntu_xenial_debug//file",
-            "tars": [
-                "@istio_proxy_debug//file",
-            ],
+            "base": "@istio_proxy_debug//image",
         },
     ],
     repository = "istio",
