@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"errors"
 	"fmt"
 	"os"
@@ -55,6 +56,7 @@ var (
 	meshconfig string
 	sidecar    proxy.Sidecar
 	adapter    Adapter
+	vmsArgs    VMsArgs
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -113,18 +115,18 @@ var (
 				<-stop
 				cancel()
 			} else if adapter == VMsAdapter {
-				vmsConfig = *&vmsconfig.DefaultConfig
-				if flags.vmsArgs.config != "" {
-					err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
+				vmsConfig := *&vmsconfig.DefaultConfig
+				if vmsArgs.config != "" {
+					err := vmsConfig.LoadFromFile(vmsArgs.config)
 					if err != nil {
 						return multierror.Prefix(err, "failed to read vms config file.")
 					}
 				}
-				if flags.vmsArgs.serverURL != "" {
-					vmsConfig.A8Registry.URL = flags.vmsArgs.serverURL
+				if vmsArgs.serverURL != "" {
+					vmsConfig.A8Registry.URL = vmsArgs.serverURL
 				}
-				if flags.vmsArgs.authToken != "" {
-					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
+				if vmsArgs.authToken != "" {
+					vmsConfig.A8Registry.Token = vmsArgs.authToken
 				}
 
 				mesh := &(proxy.DefaultMeshConfig())
@@ -156,7 +158,6 @@ var (
 
 				sidecar.IPAddress = strings.Split(id.Endpoint.Value, ":")[0]
 				sidecar.Registration = regAgent
-				sidecar.MeshConfig = mesh
 
 				var role proxy.Role = sidecar
 				watcher := envoy.NewWatcher(mesh, role)
@@ -184,13 +185,13 @@ func init() {
 		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
-	proxyCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "config", "",
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "config", "",
 		"Config file for sidecar")
 
-	proxyCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.serverURL, "serverURL", "",
 		"URL for the registry server")
 
-	proxyCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "authToken", "",
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "authToken", "",
 		"Authorization token used to access the registry server")
 
 	cmd.AddFlags(rootCmd)

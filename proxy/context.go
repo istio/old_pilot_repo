@@ -32,6 +32,7 @@ type Adapter string
 const (
 	KubernetesAdapter Adapter = "Kubernetes"
 	VMsAdapter        Adapter = "VMs"
+	NilAdapter	  Adapter = ""
 )
 
 // Environment provides an aggregate environmental API for Pilot
@@ -61,10 +62,10 @@ type Role interface {
 	ServiceNode() string
 
 	// Adapter prints out the platform this proxy is running on
-	Platform() Adapter
+	GetPlatform() Adapter
 
 	// Retrieve the registration agent  
-	getRegistrationAgent() *register.RegistrationAgent
+	GetRegistrationAgent() *register.RegistrationAgent
 }
 
 // Sidecar defines the sidecar proxy role
@@ -93,11 +94,11 @@ func (role Sidecar) ServiceNode() string {
 	return fmt.Sprintf("%s|%s|%s", role.IPAddress, role.ID, role.Domain)
 }
 
-func (role Sidecar) Platform() Adapter {
+func (role Sidecar) GetPlatform() Adapter {
 	return role.Platform
 }
 
-func (role Sidecar) getRegistrationAgent() string {
+func (role Sidecar) GetRegistrationAgent() *register.RegistrationAgent {
 	return role.Registration
 }
 
@@ -137,6 +138,13 @@ func (EgressRole) ServiceNode() string {
 	return EgressNode
 }
 
+func (EgressRole) GetPlatform() Adapter {
+	return NilAdapter
+}
+
+func (EgressRole) GetRegistrationAgent() *register.RegistrationAgent {
+	return nil
+}
 // IngressRole defines the egress proxy role
 type IngressRole struct{}
 
@@ -145,9 +153,15 @@ func (IngressRole) isProxyRole() {}
 // ServiceNode for ingress
 func (IngressRole) ServiceNode() string {
 	return IngressNode
->>>>>>> master
 }
 
+func (IngressRole) GetPlatform() Adapter {
+	return NilAdapter
+}
+
+func (IngressRole) GetRegistrationAgent() *register.RegistrationAgent {
+	return nil
+}
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 	return proxyconfig.ProxyMeshConfig{

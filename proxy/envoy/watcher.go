@@ -82,8 +82,9 @@ func (w *watcher) Run(ctx context.Context) {
 	go w.agent.Run(ctx)
 
 	// Start running registration agent if proxy is running on VMs
-	if w.role.Platform() == proxy.VMsAdapter {
-		w.role.getRegistration.Start()
+	if w.role.GetPlatform() == proxy.VMsAdapter {
+	//	regAgent := w.role.GetRegistrationAgent
+	//	regAgent.Start()
 	}
 
 	// kickstart the proxy with partial state (in case there are no notifications coming)
@@ -119,8 +120,9 @@ func (w *watcher) Run(ctx context.Context) {
 	<-ctx.Done()
 
 	// Stop running registration agent if proxy is running on VMs
-	if w.role.Platform() == proxy.VMsAdapter {
-		w.role.getRegistration.Stop()
+	if w.role.GetPlatform() == proxy.VMsAdapter {
+	//	regAgent := w.role.GetRegistrationAgent
+	//	regAgent.Stop()
 	}
 }
 
