@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
 
-# Building with Bazel
-bazel build //...
+# Building and testing with Bazel
+bazel test //...
 
 # Clean up vendor dir
 rm -rf $(pwd)/vendor
