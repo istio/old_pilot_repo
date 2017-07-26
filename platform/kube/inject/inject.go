@@ -59,10 +59,11 @@ const (
 	enableCoreDumpContainerName        = "enable-core-dump"
 	enableCoreDumpImage                = "alpine"
 
-	istioCertVolumeName   = "istio-certs"
 	istioCertSecretPrefix = "istio."
 
-	istioConfigVolumeName = "istio-config"
+	istioCertVolumeName        = "istio-certs"
+	istioConfigVolumeName      = "istio-config"
+	istioEnvoyConfigVolumeName = "istio-envoy"
 
 	// ConfigMapKey should match the expected MeshConfig file name
 	ConfigMapKey = "mesh"
@@ -166,6 +167,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			"capabilities": map[string]interface{}{
 				"add": []string{"NET_ADMIN"},
 			},
+			// TODO: temporary option due to issues with SELinux (NET_ADMIN is insufficient)
 			"privileged": true,
 		},
 	})
@@ -197,22 +199,37 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		}
 	*/
 
-	volumeMounts := []v1.VolumeMount{{
-		Name:      istioConfigVolumeName,
-		ReadOnly:  true,
-		MountPath: "/etc/istio/config",
-	}}
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      istioConfigVolumeName,
+			ReadOnly:  true,
+			MountPath: "/etc/istio/config",
+		},
+		{
+			Name:      istioEnvoyConfigVolumeName,
+			MountPath: proxy.ConfigPath,
+		},
+	}
 
-	t.Spec.Volumes = append(t.Spec.Volumes, v1.Volume{
-		Name: istioConfigVolumeName,
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{
-				LocalObjectReference: v1.LocalObjectReference{
-					Name: p.MeshConfigMapName,
+	t.Spec.Volumes = append(t.Spec.Volumes,
+		v1.Volume{
+			Name: istioConfigVolumeName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: p.MeshConfigMapName,
+					},
 				},
 			},
 		},
-	})
+		v1.Volume{
+			Name: istioEnvoyConfigVolumeName,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium: v1.StorageMediumMemory,
+				},
+			},
+		})
 
 	if p.Mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
 		volumeMounts = append(volumeMounts, v1.VolumeMount{
@@ -235,6 +252,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		})
 	}
 
+	readOnly := true
 	sidecar := v1.Container{
 		Name:  proxyContainerName,
 		Image: p.ProxyImage,
@@ -263,7 +281,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		}},
 		ImagePullPolicy: v1.PullAlways,
 		SecurityContext: &v1.SecurityContext{
-			RunAsUser: &p.SidecarProxyUID,
+			RunAsUser:              &p.SidecarProxyUID,
+			ReadOnlyRootFilesystem: &readOnly,
 		},
 		VolumeMounts: volumeMounts,
 	}

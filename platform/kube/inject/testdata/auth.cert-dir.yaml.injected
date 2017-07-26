@@ -47,11 +47,14 @@ spec:
         name: proxy
         resources: {}
         securityContext:
+          readOnlyRootFilesystem: true
           runAsUser: 1337
         volumeMounts:
         - mountPath: /etc/istio/config
           name: istio-config
           readOnly: true
+        - mountPath: /etc/istio/proxy/
+          name: istio-envoy
         - mountPath: /etc/non-default-dir/
           name: istio-certs
           readOnly: true
@@ -59,6 +62,9 @@ spec:
       - configMap:
           name: istio
         name: istio-config
+      - emptyDir:
+          medium: Memory
+        name: istio-envoy
       - name: istio-certs
         secret:
           secretName: istio.default

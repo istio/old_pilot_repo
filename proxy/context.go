@@ -97,6 +97,12 @@ const (
 
 	// IngressNode is the service node for ingress proxies
 	IngressNode = "ingress"
+
+	// IngressCertsPath is the path location for ingress certificates
+	IngressCertsPath = "/etc/istio/ingress-certs/"
+
+	// ConfigPath is the directory to hold proxy configurations
+	ConfigPath = "/etc/istio/proxy/"
 )
 
 // EgressRole defines the egress proxy role
