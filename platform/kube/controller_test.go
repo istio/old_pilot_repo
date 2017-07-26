@@ -156,12 +156,12 @@ func TestController_getPodAZByIP(t *testing.T) {
 				generatePod("pod2", "nsB", "", "node2", map[string]string{"app": "prod-app"}),
 			},
 			nodes: []*v1.Node{
-				generateNode("node1", map[string]string{NodeAZLabel: "az1"}),
-				generateNode("node2", map[string]string{NodeAZLabel: "az2"}),
+				generateNode("node1", map[string]string{NodeZoneLabel: "zone1", NodeRegionLabel: "region1"}),
+				generateNode("node2", map[string]string{NodeZoneLabel: "zone2", NodeRegionLabel: "region2"}),
 			},
 			wantAZ: map[string]string{
-				"128.0.0.1": "az1",
-				"128.0.0.2": "az2",
+				"128.0.0.1": "region1/zone1",
+				"128.0.0.2": "region2/zone2",
 			},
 		},
 		{
@@ -183,14 +183,29 @@ func TestController_getPodAZByIP(t *testing.T) {
 			},
 		},
 		{
-			name: "should return false and empty string if node doesnt have az label",
+			name: "should return false and empty string if node doesnt have zone label",
 			pods: []*v1.Pod{
 				generatePod("pod1", "nsA", "", "node1", map[string]string{"app": "prod-app"}),
 				generatePod("pod2", "nsB", "", "node2", map[string]string{"app": "prod-app"}),
 			},
 			nodes: []*v1.Node{
-				generateNode("node1", map[string]string{}),
-				generateNode("node2", map[string]string{}),
+				generateNode("node1", map[string]string{NodeRegionLabel: "region1"}),
+				generateNode("node2", map[string]string{NodeRegionLabel: "region2"}),
+			},
+			wantAZ: map[string]string{
+				"128.0.0.1": "",
+				"128.0.0.2": "",
+			},
+		},
+		{
+			name: "should return false and empty string if node doesnt have region label",
+			pods: []*v1.Pod{
+				generatePod("pod1", "nsA", "", "node1", map[string]string{"app": "prod-app"}),
+				generatePod("pod2", "nsB", "", "node2", map[string]string{"app": "prod-app"}),
+			},
+			nodes: []*v1.Node{
+				generateNode("node1", map[string]string{NodeZoneLabel: "zone1"}),
+				generateNode("node2", map[string]string{NodeZoneLabel: "zone2"}),
 			},
 			wantAZ: map[string]string{
 				"128.0.0.1": "",
@@ -244,8 +259,8 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	addPods(t, controller, pods...)
 
 	nodes := []*v1.Node{
-		generateNode("node1", map[string]string{NodeAZLabel: "az1"}),
-		generateNode("node2", map[string]string{NodeAZLabel: "az2"}),
+		generateNode("node1", map[string]string{NodeZoneLabel: "az1"}),
+		generateNode("node2", map[string]string{NodeZoneLabel: "az2"}),
 	}
 	addNodes(t, controller, nodes...)
 

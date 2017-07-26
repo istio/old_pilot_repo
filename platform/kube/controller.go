@@ -33,8 +33,12 @@ import (
 	"istio.io/pilot/model"
 )
 
-// NodeAZLabel is the well-known label for kubernetes node AZs
-const NodeAZLabel = "failure-domain.beta.kubernetes.io/zone"
+const (
+	// NodeRegionLabel is the well-known label for kubernetes node region
+	NodeRegionLabel = "failure-domain.beta.kubernetes.io/region"
+	// NodeZoneLabel is the well-known label for kubernetes node zone
+	NodeZoneLabel = "failure-domain.beta.kubernetes.io/zone"
+)
 
 // ControllerOptions stores the configurable attributes of a Controller.
 type ControllerOptions struct {
@@ -232,8 +236,16 @@ func (c *Controller) getPodAZByIP(addr string) (string, bool) {
 	if !exists || err != nil {
 		return "", false
 	}
-	az, exists := node.(*v1.Node).Labels[NodeAZLabel]
-	return az, exists
+	region, exists := node.(*v1.Node).Labels[NodeRegionLabel]
+	if !exists {
+		return "", false
+	}
+	zone, exists := node.(*v1.Node).Labels[NodeZoneLabel]
+	if !exists {
+		return "", false
+	}
+
+	return fmt.Sprintf("%v/%v", region, zone), true
 }
 
 // Instances implements a service catalog operation
