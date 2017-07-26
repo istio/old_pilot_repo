@@ -48,6 +48,14 @@ pkg_tar(
     tags = ["manual"],
 )
 
+filegroup(
+    name = "prepare_proxy",
+    srcs = [
+        "prepare_proxy.sh",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 pkg_tar(
     name = "prepare_proxy_tar",
     extension = "tar.gz",
