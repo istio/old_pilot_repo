@@ -42,6 +42,7 @@ cd "./${ISTIO_TMP_DIR}"
 HUB="gcr.io/istio-testing"
 BUCKET="istio-artifacts"
 ISTIOCTL_URL="https://storage.googleapis.com/${BUCKET}/pilot/${GIT_SHA}/artifacts/istioctl"
+ARTIFACTS_DIR="${GOPATH}/src/istio.io/pilot/_artifacts"
 
 echo "=== Smoke Test ==="
 # Note: These tests use the default ~/.kube/config file. The prow container mounts the test cluster
@@ -54,7 +55,7 @@ echo "=== Smoke Test ==="
     --pilot_hub="${HUB}" \
     --pilot_tag="${GIT_SHA}" \
     --istioctl_url="${ISTIOCTL_URL}" \
-    --test_logs_path='../_artifacts' \
+    --test_logs_path="${ARTIFACTS_DIR}" \
     --log_provider='stackdriver' \
     --project_id='istio-testing'
 
