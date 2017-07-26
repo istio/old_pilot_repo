@@ -31,7 +31,7 @@ if [[ "$hub" =~ ^gcr\.io ]]; then
   gcloud docker --authorize-only
 fi
 
-for image in app init pilot proxy_debug; do
+for image in app proxy_init pilot proxy_debug; do
   bazel $BAZEL_ARGS run //docker:${image}
   docker tag istio/docker:${image} $hub/$image:$tag
   docker push $hub/$image:$tag

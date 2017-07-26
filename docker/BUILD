@@ -38,7 +38,7 @@ docker_build(
 ## Marking these rules as manual as the base image is large
 
 docker_build(
-    name = "init",
+    name = "proxy_init",
     base = "@istio_iptables//image",
     entrypoint = ["/usr/local/bin/prepare_proxy.sh"],
     repository = "istio",
