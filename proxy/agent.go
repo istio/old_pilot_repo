@@ -15,13 +15,13 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"time"
 
-	"k8s.io/client-go/util/flowcontrol"
-
 	"github.com/golang/glog"
+	"golang.org/x/time/rate"
 )
 
 // Agent manages the restarts and the life cycle of a proxy binary.  Agent
@@ -65,7 +65,7 @@ type Agent interface {
 
 	// Run starts the agent control loop and awaits for a signal on the input
 	// channel to exit the loop.
-	Run(stop <-chan struct{})
+	Run(ctx context.Context)
 }
 
 var (
@@ -160,15 +160,19 @@ func (a *agent) ScheduleConfigUpdate(config interface{}) {
 	a.configCh <- config
 }
 
-func (a *agent) Run(stop <-chan struct{}) {
+func (a *agent) Run(ctx context.Context) {
 	glog.V(2).Info("Starting proxy agent")
 
 	// Throttle processing up to smoothed 1 qps with bursts up to 10 qps.
 	// High QPS is needed to process messages on all channels.
-	rateLimiter := flowcontrol.NewTokenBucketRateLimiter(float32(1), 10)
+	rateLimiter := rate.NewLimiter(1, 10)
 
 	for {
-		rateLimiter.Accept()
+		err := rateLimiter.Wait(ctx)
+		if err != nil {
+			a.terminate()
+			return
+		}
 
 		// maximum duration or duration till next restart
 		var delay time.Duration = 1<<63 - 1
@@ -230,14 +234,18 @@ func (a *agent) Run(stop <-chan struct{}) {
 		case <-time.After(delay):
 			a.reconcile()
 
-		case _, more := <-stop:
+		case _, more := <-ctx.Done():
 			if !more {
-				glog.V(2).Info("Agent terminating")
-				a.abortAll()
+				a.terminate()
 				return
 			}
 		}
 	}
+}
+
+func (a *agent) terminate() {
+	glog.V(2).Info("Agent terminating")
+	a.abortAll()
 }
 
 func (a *agent) reconcile() {

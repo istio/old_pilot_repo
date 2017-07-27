@@ -1,45 +1,46 @@
 #!/bin/bash
-
-# This script is a workaround due to inability to invoke bazel run targets from within bazel sandboxes.
+#
+# Copyright 2017 Istio Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+################################################################################
+#
+# Run integration tests
+#
 # It is a simple shim over test/integration/driver.go that accepts the same set of flags.
 # Please add new flags to the Go test driver directly instead of extending this file.
 # The additional steps that the script performs are:
 # - set default docker tag based on a timestamp and user name
 # - build and push docker images, including this repo pieces and proxy.
 
+set -ex
+set -o errexit
+set -o nounset
+set -o pipefail
+
 args=""
 hub="gcr.io/istio-testing"
-tag=""
+tag=$(whoami)_$(date +%y%m%d_%h%m%s)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -tag) tag="$2"; shift ;;
-        -hub) hub="$2"; args=$args" -hub $hub"; shift ;;
+        -hub) hub="$2"; shift ;;
         *) args=$args" $1" ;;
     esac
     shift
 done
 
-set -ex
-
-if [[ -z $tag ]]; then
-  tag=$(whoami)_$(date +%Y%m%d_%H%M%S)
-fi
-args=$args" -tag $tag"
-
-if [[ "$hub" =~ ^gcr\.io ]]; then
-  gcloud docker --authorize-only
-fi
-
-for image in app init pilot; do
-  bazel $BAZEL_ARGS run //docker:${image}
-  docker tag istio/docker:${image} $hub/$image:$tag
-  docker push $hub/$image:$tag
-done
-
-# Always use debug images
-bazel $BAZEL_ARGS run //docker:proxy_debug
-docker tag istio/docker:proxy_debug $hub/proxy_debug:$tag
-docker push $hub/proxy_debug:$tag
-
-bazel $BAZEL_ARGS run //test/integration -- --logtostderr $args
+bin/push-docker -hub $hub -tag $tag
+bazel run //test/integration -- --logtostderr $args -hub $hub -tag $tag
