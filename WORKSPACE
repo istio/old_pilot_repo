@@ -332,47 +332,8 @@ go_repository(
 )
 
 ##
-## Docker rules
+## Proxy image
 ##
-
-git_repository(
-    name = "io_bazel_rules_docker",
-    commit = "146c9b946159a8fafbf81723c40652f192ee56ac",  # Jul 21, 2017
-    remote = "https://github.com/bazelbuild/rules_docker.git",
-)
-
-load(
-    "@io_bazel_rules_docker//docker:docker.bzl",
-    "docker_repositories",
-    "docker_pull",
-)
-
-docker_repositories()
-
-ISTIO_IPTABLES_TAG = "20170725-5a9fbbf"
-
-docker_pull(
-    name = "istio_iptables",
-    registry = "gcr.io",
-    repository = "istio-testing/iptables",
-    tag = ISTIO_IPTABLES_TAG,
-)
-
-ISTIO_PROXY_TAG = "20170725-b3d04d6"
-
-docker_pull(
-    name = "istio_proxy",
-    registry = "gcr.io",
-    repository = "istio-testing/envoy",
-    tag = ISTIO_PROXY_TAG,
-)
-
-docker_pull(
-    name = "istio_proxy_debug",
-    registry = "gcr.io",
-    repository = "istio-testing/envoy-debug",
-    tag = ISTIO_PROXY_TAG,
-)
 
 ISTIO_PROXY_BUCKET = "9a1bae7a5d947bb81a4898fbd171d129aeb04c52"
 

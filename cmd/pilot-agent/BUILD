@@ -23,12 +23,3 @@ go_binary(
     linkstamp = "istio.io/pilot/tools/version",
     visibility = ["//visibility:private"],
 )
-
-pkg_tar(
-    name = "pilot-agent-tar",
-    extension = "tar.gz",
-    files = [":pilot-agent"],
-    mode = "0755",
-    package_dir = "/usr/local/bin/",
-    visibility = ["//visibility:public"],
-)

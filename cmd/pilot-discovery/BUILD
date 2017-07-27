@@ -29,12 +29,3 @@ go_binary(
     linkstamp = "istio.io/pilot/tools/version",
     visibility = ["//visibility:private"],
 )
-
-pkg_tar(
-    name = "pilot-discovery-tar",
-    extension = "tar.gz",
-    files = [":pilot-discovery"],
-    mode = "0755",
-    package_dir = "/usr/local/bin/",
-    visibility = ["//visibility:public"],
-)
