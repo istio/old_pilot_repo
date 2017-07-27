@@ -54,10 +54,15 @@ const (
 	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationSidecarValue = "injected"
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
-	InitContainerName                  = "istio-init"
-	ProxyContainerName                 = "istio-proxy"
-	enableCoreDumpContainerName        = "enable-core-dump"
-	enableCoreDumpImage                = "alpine"
+
+	// InitContainerName is the name for init container
+	InitContainerName = "istio-init"
+
+	// ProxyContainerName is the name for sidecar proxy container
+	ProxyContainerName = "istio-proxy"
+
+	enableCoreDumpContainerName = "enable-core-dump"
+	enableCoreDumpImage         = "alpine"
 
 	istioCertSecretPrefix = "istio."
 
