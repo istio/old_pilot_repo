@@ -54,8 +54,8 @@ const (
 	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationSidecarValue = "injected"
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
-	initContainerName                  = "istio-init"
-	proxyContainerName                 = "istio-proxy"
+	InitContainerName                  = "istio-init"
+	ProxyContainerName                 = "istio-proxy"
 	enableCoreDumpContainerName        = "enable-core-dump"
 	enableCoreDumpImage                = "alpine"
 
@@ -159,7 +159,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
 	}
 	annotations = append(annotations, map[string]interface{}{
-		"name":            initContainerName,
+		"name":            InitContainerName,
 		"image":           p.InitImage,
 		"args":            initArgs,
 		"imagePullPolicy": "Always",
@@ -254,7 +254,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 
 	readOnly := true
 	sidecar := v1.Container{
-		Name:  proxyContainerName,
+		Name:  ProxyContainerName,
 		Image: p.ProxyImage,
 		Args:  args,
 		Env: []v1.EnvVar{{

@@ -41,7 +41,6 @@ go_test(
     size = "small",
     srcs = [
         "config_test.go",
-        "mock_config_gen_test.go",
         "service_test.go",
         "validation_test.go",
     ],
