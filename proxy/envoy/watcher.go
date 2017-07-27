@@ -50,7 +50,7 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) Watcher {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath string) Watcher {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
@@ -62,7 +62,7 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) Watcher {
 		}
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode()), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
 	out := &watcher{
 		agent: agent,
 		role:  role,
@@ -194,7 +194,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -203,7 +203,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			}
 
 			// attempt to write file
-			fname := configFile(proxy.ConfigPath, epoch)
+			fname := configFile(configpath, epoch)
 			if err := envoyConfig.WriteFile(fname); err != nil {
 				return err
 			}
@@ -245,7 +245,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			}
 		},
 		Cleanup: func(epoch int) {
-			path := configFile(proxy.ConfigPath, epoch)
+			path := configFile(configpath, epoch)
 			if err := os.Remove(path); err != nil {
 				glog.Warningf("Failed to delete config file %s for %d, %v", path, epoch, err)
 			}

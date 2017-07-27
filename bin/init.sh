@@ -2,7 +2,7 @@
 set -ex
 
 # Building and testing with Bazel
-bazel test //...
+bazel build //...
 
 # Clean up vendor dir
 rm -rf $(pwd)/vendor

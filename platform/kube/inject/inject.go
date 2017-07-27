@@ -212,7 +212,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		},
 		{
 			Name:      istioEnvoyConfigVolumeName,
-			MountPath: proxy.ConfigPath,
+			MountPath: "/etc/istio/proxy",
 		},
 	}
 
