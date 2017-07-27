@@ -28,6 +28,7 @@ import (
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/ingress"
 	"istio.io/pilot/adapter/config/tpr"
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
@@ -38,8 +39,6 @@ import (
 
 	vmsclient "github.com/amalgam8/amalgam8/registry/client"
 	vmsconfig "github.com/amalgam8/amalgam8/sidecar/config"
-	"github.com/amalgam8/amalgam8/sidecar/identity"
-	"github.com/amalgam8/amalgam8/sidecar/register"
 )
 
 // Adapter defines options for underlying platform
@@ -153,8 +152,8 @@ var (
 				go discovery.Run()
 				go ingressSyncer.Run(stop)
 				cmd.WaitSignal(stop)
-			} else if falgs.adapter == VMsAdapter {
-				vmsConfig = *&vmsconfig.DefaultConfig
+			} else if flags.adapter == VMsAdapter {
+				vmsConfig := *&vmsconfig.DefaultConfig
 				if flags.vmsArgs.config != "" {
 					err := vmsConfig.LoadFromFile(flags.vmsArgs.config)
 					if err != nil {
@@ -168,7 +167,7 @@ var (
 					vmsConfig.A8Registry.Token = flags.vmsArgs.authToken
 				}
 
-				mesh := &(proxy.DefaultMeshConfig())
+				mesh := proxy.DefaultMeshConfig()
 
 				vmsClient, err := vmsclient.New(vmsclient.Config{
 					URL:       vmsConfig.A8Registry.URL,
@@ -179,7 +178,7 @@ var (
 				}
 				serviceController := vms.NewController(vms.ControllerConfig{
 					Discovery: vmsClient,
-					Mesh:      mesh,
+					Mesh:      &mesh,
 				})
 				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
 					model.RouteRuleDescriptor,
@@ -190,7 +189,7 @@ var (
 					ServiceDiscovery: serviceController,
 					ServiceAccounts:  serviceController,
 					IstioConfigStore: model.MakeIstioStore(configController),
-					Mesh:             mesh,
+					Mesh:             &mesh,
 				}
 				discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
 				if err != nil {
@@ -230,8 +229,8 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "config", "",
-		"Config file for discovery")
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "vmsconfig", "",
+		"VMs Config file for discovery")
 	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
 		"URL for the registry server")
 

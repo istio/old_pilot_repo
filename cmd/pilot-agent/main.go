@@ -129,7 +129,7 @@ var (
 					vmsConfig.A8Registry.Token = vmsArgs.authToken
 				}
 
-				mesh := &(proxy.DefaultMeshConfig())
+				mesh := proxy.DefaultMeshConfig()
 				vmsClient, err := vmsclient.New(vmsclient.Config{
 					URL:       vmsConfig.A8Registry.URL,
 					AuthToken: vmsConfig.A8Registry.Token,
@@ -147,6 +147,7 @@ var (
 				if err != nil {
 					return multierror.Prefix(err, "failed to get identity.")
 				}
+				glog.Infof("service: %s", id.ServiceName)
 				// Create a registration agent for vms platform
 				regAgent, err := register.NewRegistrationAgent(register.RegistrationConfig{
 					Registry: vmsClient,
@@ -160,7 +161,7 @@ var (
 				sidecar.Registration = regAgent
 
 				var role proxy.Role = sidecar
-				watcher := envoy.NewWatcher(mesh, role)
+				watcher := envoy.NewWatcher(&mesh, role)
 				ctx, cancel := context.WithCancel(context.Background())
 				go watcher.Run(ctx)
 
@@ -185,8 +186,8 @@ func init() {
 		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
-	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "config", "",
-		"Config file for sidecar")
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "vmsconfig", "",
+		"VMs config file for sidecar")
 
 	proxyCmd.PersistentFlags().StringVar(&vmsArgs.serverURL, "serverURL", "",
 		"URL for the registry server")
