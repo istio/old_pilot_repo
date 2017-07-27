@@ -71,7 +71,7 @@ spec:
         - mountPath: /etc/istio/config
           name: istio-config
           readOnly: true
-        - mountPath: /etc/istio/proxy/
+        - mountPath: /etc/istio/proxy
           name: istio-envoy
       volumes:
       - configMap:
