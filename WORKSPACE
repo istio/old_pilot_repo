@@ -195,6 +195,12 @@ new_go_repository(
 )
 
 new_go_repository(
+    name = "org_golang_x_time",
+    commit = "8be79e1e0910c292df4e79c241bb7e8f7e725959",
+    importpath = "golang.org/x/time",
+)
+
+new_go_repository(
     name = "org_golang_x_sys",
     commit = "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9",
     importpath = "golang.org/x/sys",
@@ -329,7 +335,7 @@ new_go_repository(
 ## Proxy build rules
 ##
 
-PROXY = "466a7346f3c2c2f3cbcb0f1a74d2cd9ac6a565fe"  # Jun 2, 2017
+PROXY = "9a1bae7a5d947bb81a4898fbd171d129aeb04c52"
 
 http_file(
     name = "istio_proxy",
