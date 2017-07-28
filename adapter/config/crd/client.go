@@ -47,7 +47,7 @@ import (
 
 const (
 	// IstioAPIGroup defines Kubernetes API group for TPR
-	IstioAPIGroup = "istio.io"
+	IstioAPIGroup = "crd.istio.io"
 
 	// IstioResourceVersion defines Kubernetes API group version
 	IstioResourceVersion = "v1alpha1"

@@ -25,7 +25,6 @@ go_library(
         "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
         "@io_k8s_apimachinery//pkg/watch:go_default_library",
         "@io_k8s_client_go//kubernetes:go_default_library",
-        "@io_k8s_client_go//kubernetes/scheme:go_default_library",
         "@io_k8s_client_go//plugin/pkg/client/auth/gcp:go_default_library",
         "@io_k8s_client_go//plugin/pkg/client/auth/oidc:go_default_library",
         "@io_k8s_client_go//rest:go_default_library",
