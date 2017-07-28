@@ -46,6 +46,7 @@ func (e *Config) GetObjectMeta() meta_v1.Object {
 	return &e.Metadata
 }
 
+// DeepCopyObject implements a mandatory interface
 func (e *Config) DeepCopyObject() runtime.Object {
 	if e == nil {
 		return nil
@@ -63,11 +64,12 @@ func (el *ConfigList) GetListMeta() meta_v1.List {
 	return &el.Metadata
 }
 
-func (e *ConfigList) DeepCopyObject() runtime.Object {
-	if e == nil {
+// DeepCopyObject implements a mandatory interface
+func (el *ConfigList) DeepCopyObject() runtime.Object {
+	if el == nil {
 		return nil
 	}
-	return e
+	return el
 }
 
 // The code below is used only to work around a known problem with third-party
