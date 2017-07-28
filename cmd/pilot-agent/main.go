@@ -69,6 +69,7 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			if adapter == KubernetesAdapter {
+				sidecar.Platform = proxy.KubernetesAdapter
 				// set values from environment variables
 				if sidecar.IPAddress == "" {
 					sidecar.IPAddress = os.Getenv("INSTANCE_IP")
@@ -115,6 +116,7 @@ var (
 				<-stop
 				cancel()
 			} else if adapter == VMsAdapter {
+				sidecar.Platform = proxy.VMsAdapter
 				vmsConfig := *&vmsconfig.DefaultConfig
 				if vmsArgs.config != "" {
 					err := vmsConfig.LoadFromFile(vmsArgs.config)

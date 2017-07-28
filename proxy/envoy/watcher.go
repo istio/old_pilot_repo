@@ -83,7 +83,6 @@ func (w *watcher) Run(ctx context.Context) {
 
 	// Start running registration agent if proxy is running on VMs
 	if w.role.GetPlatform() == proxy.VMsAdapter {
-		glog.Infof("Start registration")
 		w.role.GetRegistrationAgent().Start()
 	}
 

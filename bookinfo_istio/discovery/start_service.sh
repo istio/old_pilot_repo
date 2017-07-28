@@ -1,1 +1,1 @@
-/opt/istio/pilot --adapter VMs discovery -v 2 --config /etc/config.yaml
+/opt/istio/pilot-discovery discovery --adapter VMs -v 2 --vmsconfig /etc/config.yaml
