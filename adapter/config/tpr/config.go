@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -45,6 +46,13 @@ func (e *Config) GetObjectMeta() meta_v1.Object {
 	return &e.Metadata
 }
 
+func (e *Config) DeepCopyObject() runtime.Object {
+	if e == nil {
+		return nil
+	}
+	return e
+}
+
 // GetObjectKind adapts to Object
 func (el *ConfigList) GetObjectKind() schema.ObjectKind {
 	return &el.TypeMeta
@@ -53,6 +61,13 @@ func (el *ConfigList) GetObjectKind() schema.ObjectKind {
 // GetListMeta adapts to ListMetaAccessor
 func (el *ConfigList) GetListMeta() meta_v1.List {
 	return &el.Metadata
+}
+
+func (e *ConfigList) DeepCopyObject() runtime.Object {
+	if e == nil {
+		return nil
+	}
+	return e
 }
 
 // The code below is used only to work around a known problem with third-party
