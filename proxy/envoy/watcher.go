@@ -15,107 +15,173 @@
 package envoy
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 )
 
-// Watcher observes service registry and triggers a reload on a change
+// Watcher triggers reloads on changes to the proxy config
 type Watcher interface {
-	Run(stop <-chan struct{})
+	// Run the watcher loop (blocking call)
+	Run(context.Context)
+
+	// Reload the agent with the latest configuration
+	Reload()
 }
 
 type watcher struct {
-	agent   proxy.Agent
-	context *proxy.Context
-	ctl     model.Controller
+	agent proxy.Agent
+	role  proxy.Role
+	mesh  *proxyconfig.ProxyMeshConfig
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(ctl model.Controller, configCache model.ConfigStoreCache, proxyCtx *proxy.Context) (Watcher, error) {
-	glog.V(2).Infof("Local instance address: %s", proxyCtx.IPAddress)
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath string) Watcher {
+	glog.V(2).Infof("Proxy role: %#v", role)
 
-	if proxyCtx.MeshConfig.StatsdUdpAddress != "" {
-		if addr, err := resolveStatsdAddr(proxyCtx.MeshConfig.StatsdUdpAddress); err == nil {
-			proxyCtx.MeshConfig.StatsdUdpAddress = addr
+	if mesh.StatsdUdpAddress != "" {
+		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
+			mesh.StatsdUdpAddress = addr
 		} else {
 			glog.Warningf("Error resolving statsd address; clearing to prevent bad config: %v", err)
-			proxyCtx.MeshConfig.StatsdUdpAddress = ""
+			mesh.StatsdUdpAddress = ""
 		}
 	}
 
-	// Use proxy node IP as the node name
-	// This parameter is used as the value for "service-node"
-	agent := proxy.NewAgent(runEnvoy(proxyCtx.MeshConfig, proxyCtx.IPAddress), proxy.DefaultRetry)
-
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
 	out := &watcher{
-		agent:   agent,
-		context: proxyCtx,
-		ctl:     ctl,
+		agent: agent,
+		role:  role,
+		mesh:  mesh,
 	}
 
-	if err := ctl.AppendServiceHandler(func(*model.Service, model.Event) { out.reload() }); err != nil {
-		return nil, err
-	}
-
-	// TODO: notification granularity: restrict the notification callback to co-located instances (e.g. with the same IP)
-	// TODO: editing pod tags directly does not trigger instance handlers, we need to listen on pod resources.
-	if err := ctl.AppendInstanceHandler(func(*model.ServiceInstance, model.Event) { out.reload() }); err != nil {
-		return nil, err
-	}
-
-	if configCache != nil {
-		handler := func(model.Config, model.Event) { out.reload() }
-		configCache.RegisterEventHandler(model.RouteRule, handler)
-		configCache.RegisterEventHandler(model.DestinationPolicy, handler)
-	}
-
-	return out, nil
+	return out
 }
 
-func (w *watcher) Run(stop <-chan struct{}) {
+func (w *watcher) Run(ctx context.Context) {
 	// agent consumes notifications from the controllerr
-	go w.agent.Run(stop)
+	go w.agent.Run(ctx)
 
 	// kickstart the proxy with partial state (in case there are no notifications coming)
-	w.reload()
+	w.Reload()
 
-	// monitor certificates
-	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		go watchCerts(mesh.AuthCertsPath, stop, w.reload)
+	// monitor auth certificates
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		go watchCerts(ctx, w.mesh.AuthCertsPath, w.Reload)
 	}
 
-	<-stop
+	// monitor ingress certificates
+	if w.role.ServiceNode() == proxy.IngressNode {
+		go watchCerts(ctx, proxy.IngressCertsPath, w.Reload)
+
+		// update secrets with polling
+		go func() {
+			for {
+				err := w.UpdateIngressSecret(ctx)
+				if err != nil {
+					glog.Warning(err)
+				}
+
+				select {
+				case <-time.After(convertDuration(w.mesh.DiscoveryRefreshDelay)):
+					// try again
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	<-ctx.Done()
 }
 
-func (w *watcher) reload() {
-	config := Generate(w.context)
-	if mesh := w.context.MeshConfig; mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		config.Hash = generateCertHash(mesh.AuthCertsPath)
+func (w *watcher) Reload() {
+	config := buildConfig(Listeners{}, Clusters{}, true, w.mesh)
+
+	h := sha256.New()
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		generateCertHash(h, w.mesh.AuthCertsPath, authFiles)
 	}
+	if w.role.ServiceNode() == proxy.IngressNode {
+		generateCertHash(h, proxy.IngressCertsPath, []string{"tls.crt", "tls.key"})
+	}
+	config.Hash = h.Sum(nil)
+
 	w.agent.ScheduleConfigUpdate(config)
+}
+
+// UpdateIngressSecret fetches the TLS secret from discovery and secret storage
+// and writes to well-known location
+func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
+	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
+	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
+		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, w.role.ServiceNode())
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return multierror.Prefix(err, "failed to create a request to "+url)
+	}
+
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return multierror.Prefix(err, "failed to fetch "+url)
+	}
+
+	tlsData, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close() // nolint: errcheck
+	if err != nil {
+		return multierror.Prefix(err, "failed to read request body")
+	}
+	if len(tlsData) == 0 {
+		return nil
+	}
+
+	var tls model.TLSSecret
+	if err = json.Unmarshal(tlsData, &tls); err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(proxy.IngressCertsPath); os.IsNotExist(err) {
+		err = os.Mkdir(proxy.IngressCertsPath, 0755)
+		if err != nil {
+			return multierror.Prefix(err, "cannot create parent directory")
+		}
+	}
+
+	if err := ioutil.WriteFile(path.Join(proxy.IngressCertsPath, "tls.crt"), tls.Certificate, 0755); err != nil {
+		return multierror.Prefix(err, "failed to write cert file")
+	}
+	if err := ioutil.WriteFile(path.Join(proxy.IngressCertsPath, "tls.key"), tls.PrivateKey, 0755); err != nil {
+		return multierror.Prefix(err, "failed to write key file")
+	}
+
+	return nil
 }
 
 const (
 	// EpochFileTemplate is a template for the root config JSON
-	EpochFileTemplate = "%s/envoy-rev%d.json"
+	EpochFileTemplate = "envoy-rev%d.json"
 
 	// BinaryPath is the path to envoy binary
 	BinaryPath = "/usr/local/bin/envoy"
-
-	// ConfigPath is the directory to hold enovy epoch configurations
-	ConfigPath = "/etc/envoy"
 )
 
 func configFile(config string, epoch int) string {
-	return fmt.Sprintf(EpochFileTemplate, config, epoch)
+	return path.Join(config, fmt.Sprintf(EpochFileTemplate, epoch))
 }
 
 func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node string) []string {
@@ -128,7 +194,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -137,7 +203,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			}
 
 			// attempt to write file
-			fname := configFile(ConfigPath, epoch)
+			fname := configFile(configpath, epoch)
 			if err := envoyConfig.WriteFile(fname); err != nil {
 				return err
 			}
@@ -179,7 +245,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node string) proxy.Proxy {
 			}
 		},
 		Cleanup: func(epoch int) {
-			path := configFile(ConfigPath, epoch)
+			path := configFile(configpath, epoch)
 			if err := os.Remove(path); err != nil {
 				glog.Warningf("Failed to delete config file %s for %d, %v", path, epoch, err)
 			}

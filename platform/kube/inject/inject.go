@@ -32,11 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	batch "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // Defaults values for injecting istio proxy into kubernetes
@@ -50,18 +54,29 @@ const (
 	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
 	istioSidecarAnnotationSidecarValue = "injected"
 	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
-	initContainerName                  = "init"
-	proxyContainerName                 = "proxy"
-	enableCoreDumpContainerName        = "enable-core-dump"
-	enableCoreDumpImage                = "alpine"
 
-	istioCertVolumeName   = "istio-certs"
+	// InitContainerName is the name for init container
+	InitContainerName = "istio-init"
+
+	// ProxyContainerName is the name for sidecar proxy container
+	ProxyContainerName = "istio-proxy"
+
+	enableCoreDumpContainerName = "enable-core-dump"
+	enableCoreDumpImage         = "alpine"
+
 	istioCertSecretPrefix = "istio."
+
+	istioCertVolumeName        = "istio-certs"
+	istioConfigVolumeName      = "istio-config"
+	istioEnvoyConfigVolumeName = "istio-envoy"
+
+	// ConfigMapKey should match the expected MeshConfig file name
+	ConfigMapKey = "mesh"
 )
 
 // InitImageName returns the fully qualified image name for the istio
 // init image given a docker hub and tag
-func InitImageName(hub, tag string) string { return hub + "/init:" + tag }
+func InitImageName(hub, tag string) string { return hub + "/proxy_init:" + tag }
 
 // ProxyImageName returns the fully qualified image name for the istio
 // proxy image given a docker hub and tag.
@@ -82,6 +97,32 @@ type Params struct {
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
 	IncludeIPRanges string
+}
+
+// GetMeshConfig fetches configuration from a config map
+func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxyconfig.ProxyMeshConfig, error) {
+	config, err := kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// values in the data are strings, while proto might use a different data type.
+	// therefore, we have to get a value by a key
+	yaml, exists := config.Data[ConfigMapKey]
+	if !exists {
+		return nil, fmt.Errorf("missing configuration map key %q", ConfigMapKey)
+	}
+
+	mesh := proxy.DefaultMeshConfig()
+	if err = model.ApplyYAML(yaml, &mesh); err != nil {
+		return nil, multierror.Prefix(err, "failed to convert to proto.")
+	}
+
+	if err = model.ValidateProxyMeshConfig(&mesh); err != nil {
+		return nil, err
+	}
+
+	return &mesh, nil
 }
 
 var enableCoreDumpContainer = map[string]interface{}{
@@ -123,7 +164,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
 	}
 	annotations = append(annotations, map[string]interface{}{
-		"name":            initContainerName,
+		"name":            InitContainerName,
 		"image":           p.InitImage,
 		"args":            initArgs,
 		"imagePullPolicy": "Always",
@@ -131,6 +172,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			"capabilities": map[string]interface{}{
 				"add": []string{"NET_ADMIN"},
 			},
+			// TODO: temporary option due to issues with SELinux (NET_ADMIN is insufficient)
+			"privileged": true,
 		},
 	})
 
@@ -145,27 +188,54 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	t.Annotations["pod.beta.kubernetes.io/init-containers"] = string(initAnnotationValue)
 
 	// sidecar proxy container
-	args := []string{
-		"proxy",
-		"sidecar",
-	}
+	args := []string{"proxy"}
 
 	if p.Verbosity > 0 {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
-	if p.MeshConfigMapName != "" {
-		args = append(args, "--meshConfig", p.MeshConfigMapName)
-	}
 
-	ports, err := healthPorts(t)
+	_, _ = healthPorts(t)
+	/* See issue https://github.com/istio/pilot/issues/953
 	if err != nil {
 		return err
 	}
-	for _, port := range ports {
-		args = append(args, "--passthrough", strconv.Itoa(port))
+		for _, port := range ports {
+			args = append(args, "--passthrough", strconv.Itoa(port))
+		}
+	*/
+
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      istioConfigVolumeName,
+			ReadOnly:  true,
+			MountPath: "/etc/istio/config",
+		},
+		{
+			Name:      istioEnvoyConfigVolumeName,
+			MountPath: "/etc/istio/proxy",
+		},
 	}
 
-	var volumeMounts []v1.VolumeMount
+	t.Spec.Volumes = append(t.Spec.Volumes,
+		v1.Volume{
+			Name: istioConfigVolumeName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: p.MeshConfigMapName,
+					},
+				},
+			},
+		},
+		v1.Volume{
+			Name: istioEnvoyConfigVolumeName,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium: v1.StorageMediumMemory,
+				},
+			},
+		})
+
 	if p.Mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
 		volumeMounts = append(volumeMounts, v1.VolumeMount{
 			Name:      istioCertVolumeName,
@@ -187,8 +257,9 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		})
 	}
 
+	readOnly := true
 	sidecar := v1.Container{
-		Name:  proxyContainerName,
+		Name:  ProxyContainerName,
 		Image: p.ProxyImage,
 		Args:  args,
 		Env: []v1.EnvVar{{
@@ -206,7 +277,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 				},
 			},
 		}, {
-			Name: "POD_IP",
+			Name: "INSTANCE_IP",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
 					FieldPath: "status.podIP",
@@ -215,7 +286,8 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		}},
 		ImagePullPolicy: v1.PullAlways,
 		SecurityContext: &v1.SecurityContext{
-			RunAsUser: &p.SidecarProxyUID,
+			RunAsUser:              &p.SidecarProxyUID,
+			ReadOnlyRootFilesystem: &readOnly,
 		},
 		VolumeMounts: volumeMounts,
 	}
@@ -315,6 +387,12 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 				typ: &v1.ReplicationController{},
 				inject: func(typ interface{}) error {
 					return injectIntoPodTemplateSpec(p, ((typ.(*v1.ReplicationController)).Spec.Template))
+				},
+			},
+			"StatefulSet": {
+				typ: &appsv1beta1.StatefulSet{},
+				inject: func(typ interface{}) error {
+					return injectIntoPodTemplateSpec(p, &((typ.(*appsv1beta1.StatefulSet)).Spec.Template))
 				},
 			},
 		}
