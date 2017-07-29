@@ -26,41 +26,43 @@ set -u
 # Print commands
 set -x
 
-if [ "${CI:-}" == "bootstrap" ]; then
+if [ "${CI:-}" == 'bootstrap' ]; then
     # Test harness will checkout code to directory $GOPATH/src/github.com/istio/istio
     # but we depend on being at path $GOPATH/src/istio.io/istio for imports.
-    mkdir -p $GOPATH/src/istio.io
-    ln -s $GOPATH/src/github.com/istio/pilot $GOPATH/src/istio.io
-    cd $GOPATH/src/istio.io/pilot/
+    ln -s ${GOPATH}/src/github.com/istio ${GOPATH}/src/istio.io
 
     # Use the provided base sha, from prow.
-    GIT_SHA=$PULL_BASE_SHA
+    GIT_SHA="${PULL_BASE_SHA}"
 
     # Use volume mount from pilot-presubmit job's pod spec.
     ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
 else
     # Use the current commit.
-    GIT_SHA=$(git rev-parse --verify HEAD)
+    GIT_SHA="$(git rev-parse --verify HEAD)"
 fi
 
-echo "=== Prerequisites ==="
+echo '=== Prerequisites ==='
 ./bin/install-prereqs.sh
 
-echo "=== Go Build ==="
+echo '=== Go Build ==='
 ./bin/init.sh
 
-echo "=== Bazel Tests ==="
+echo '=== Bazel Tests ==='
 bazel test //...
 
-echo  "=== Code Coverage ==="
+echo  '=== Code Coverage ==='
 ./bin/codecov.sh | tee codecov.report
-if [ "${CI:-}" == "bootstrap" ]; then
-    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME="pilot/postsubmit" ./bin/toolbox/presubmit/pkg_coverage.sh
+if [ "${CI:-}" == 'bootstrap' ]; then
+    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME='pilot/postsubmit' \
+      bazel run @com_github_istio_test_infra/toolbox/pkg_check \
+        || echo 'Failed to run pkg_check'
 
-    curl -s https://codecov.io/bash | bash /dev/stdin -K -B ${PULL_BASE_REF} -C ${PULL_BASE_SHA} -t @/etc/codecov/pilot.token
+    curl -s https://codecov.io/bash \
+      | CI_JOB_ID="${JOB_NAME}" CI_BUILD_ID="${BUILD_NUMBER}" bash /dev/stdin \
+        -K -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}" -t @/etc/codecov/pilot.token
 else
-    echo "Not in bootstrap environment, skipping code coverage publishing"
+    echo 'Not in bootstrap environment, skipping code coverage publishing'
 fi
 
-echo "=== Running e2e Tests ==="
-bin/e2e.sh -count 10 -logs=false -tag $GIT_SHA
+echo '=== Running e2e Tests ==='
+bin/e2e.sh -count 10 -logs=false -tag "${GIT_SHA}"
