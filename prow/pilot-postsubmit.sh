@@ -29,14 +29,13 @@ set -x
 if [ "${CI:-}" == 'bootstrap' ]; then
     # Test harness will checkout code to directory $GOPATH/src/github.com/istio/istio
     # but we depend on being at path $GOPATH/src/istio.io/istio for imports.
-    ln -s ${GOPATH}/src/github.com/istio ${GOPATH}/src/istio.io
-    cd ${GOPATH}/src/istio.io/pilot
+    ln -sf ${GOPATH}/src/github.com/istio ${GOPATH}/src/istio.io
 
-    # Use the provided base sha, from prow.
+    t# Use the provided base sha, from prow.
     GIT_SHA="${PULL_BASE_SHA}"
 
     # Use volume mount from pilot-presubmit job's pod spec.
-    ln -s /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
+    ln -sf /etc/e2e-testing-kubeconfig/e2e-testing-kubeconfig platform/kube/config
 else
     # Use the current commit.
     GIT_SHA="$(git rev-parse --verify HEAD)"
@@ -48,7 +47,7 @@ echo '=== Prerequisites ==='
 echo '=== Go Build ==='
 ./bin/init.sh
 
-echo '=== Bazel Tests ==='
+echo q'=== Bazel Tests ==='
 bazel test //...
 
 echo  '=== Code Coverage ==='
