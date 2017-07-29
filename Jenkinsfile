@@ -80,7 +80,7 @@ def presubmit(gitUtils, bazel, utils) {
     }
     stage('Code Coverage') {
       sh('bin/codecov.sh | tee codecov.report')
-      sh('bazel run @com_github_istio_test_infra/toolbox/pkg_check || echo "Failed to run pkg_check"')
+      sh('bin/toolbox/pkg_coverage.sh')
       utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     stage('Integration Tests') {
@@ -135,7 +135,7 @@ def postsubmit(gitUtils, bazel, utils) {
       bazel.test('//...')
       sh('bin/init.sh')
       sh('bin/codecov.sh | tee codecov.report')
-      sh('bazel run @com_github_istio_test_infra/toolbox/pkg_check || echo "Failed to run pkg_check"')
+      sh('bin/toolbox/pkg_coverage.sh')
       utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     utils.fastForwardStable('pilot')
