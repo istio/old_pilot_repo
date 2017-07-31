@@ -20,14 +20,3 @@ go_library(
         "@io_istio_api//:go_default_library",
     ],
 )
-
-go_test(
-    name = "go_default_test",
-    srcs = ["controller_test.go"],
-    library = ":go_default_library",
-    deps = [
-        "//model:go_default_library",
-        "@com_github_amalgam8_amalgam8//registry/client:go_default_library",
-        "@com_github_stretchr_testify//assert:go_default_library",
-    ],
-)
