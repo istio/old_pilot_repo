@@ -311,7 +311,7 @@ func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
 		Cluster:    cluster.Name,
 		clusterRef: cluster,
 	}
-	sort.Sort(sort.StringSlice(addresses))
+	sort.Strings(addresses)
 	for _, addr := range addresses {
 		route.DestinationIPList = append(route.DestinationIPList, addr+"/32")
 	}

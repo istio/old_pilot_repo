@@ -6,6 +6,9 @@ metadata:
   labels:
     app: {{.service}}
 spec:
+{{if eq .headless "true"}}
+  clusterIP: None
+{{end}}
   ports:
   - port: 80
     targetPort: {{.port1}}

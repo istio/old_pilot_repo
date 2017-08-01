@@ -257,10 +257,10 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
 func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
-	config model.IstioConfigStore, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
-	listeners, clusters := buildOutboundTCPListeners(mesh, services)
+	env proxy.Environment, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
+	listeners, clusters := buildOutboundTCPListeners(mesh, env, services)
 
-	httpOutbound := buildOutboundHTTPRoutes(instances, services, mesh, config)
+	httpOutbound := buildOutboundHTTPRoutes(instances, services, mesh, env.IstioConfigStore)
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners, buildHTTPListener(mesh, routeConfig, WildcardAddress, port, true, false))
 		clusters = append(clusters, routeConfig.clusters()...)
@@ -393,26 +393,62 @@ func buildOutboundHTTPRoutes(
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*model.Service) (Listeners, Clusters) {
+func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment, services []*model.Service) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
+
+
+	// TODO: canonical ordering
+	routes := make(map[int][]*TCPRoute) // TODO: nils?
+
 	for _, service := range services {
 		if service.External() {
 			continue // TODO TCP external services not currently supported
 		}
+
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				// TODO: Enable SSL context for TCP and HTTPS services.
+				instances := env.Instances(service.Hostname, []string{servicePort.Name}, nil)
+				if len(instances) == 0 {
+					continue
+				}
+
+				addrs := make([]string, 0, len(instances))
+				for _, instance := range instances {
+					addrs = append(addrs, instance.Endpoint.Address)
+				}
+
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				route := buildTCPRoute(cluster, []string{service.Address})
-				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-				listener := buildTCPListener(config, service.Address, servicePort.Port)
+				route := buildTCPRoute(cluster, addrs) // TODO: instance ports may differ from service port
+				routes[servicePort.Port] = append(routes[servicePort.Port], route)
 				tcpClusters = append(tcpClusters, cluster)
-				tcpListeners = append(tcpListeners, listener)
 			}
 		}
 	}
+
+	for port, routes := range routes {
+		config := &TCPRouteConfig{Routes: routes}
+		listener := buildTCPListener(config, "0.0.0.0", port)
+		tcpListeners = append(tcpListeners, listener)
+	}
+
+
+
+	//for _, service := range services {
+	//	for _, servicePort := range service.Ports {
+	//		switch servicePort.Protocol {
+	//		case model.ProtocolTCP, model.ProtocolHTTPS:
+	//			// TODO: Enable SSL context for TCP and HTTPS services.
+	//			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+	//			route := buildTCPRoute(cluster, service.Address)
+	//			config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
+	//			listener := buildTCPListener(config, service.Address, servicePort.Port)
+	//			tcpClusters = append(tcpClusters, cluster)
+	//			tcpListeners = append(tcpListeners, listener)
+	//		}
+	//	}
+	//}
 	return tcpListeners, tcpClusters
 }
 
