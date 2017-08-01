@@ -76,6 +76,11 @@ func (w *watcher) Run(ctx context.Context) {
 	// agent consumes notifications from the controllerr
 	go w.agent.Run(ctx)
 
+	// Start running registration agent if proxy is running on VMs
+	if w.role.GetPlatform() == proxy.VMsAdapter {
+		w.role.GetRegistrationAgent().Start()
+	}
+
 	// kickstart the proxy with partial state (in case there are no notifications coming)
 	w.Reload()
 
@@ -107,6 +112,11 @@ func (w *watcher) Run(ctx context.Context) {
 	}
 
 	<-ctx.Done()
+
+	// Stop running registration agent if proxy is running on VMs
+	if w.role.GetPlatform() == proxy.VMsAdapter {
+		w.role.GetRegistrationAgent().Stop()
+	}
 }
 
 func (w *watcher) Reload() {

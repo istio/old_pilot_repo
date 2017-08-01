@@ -260,6 +260,96 @@ go_repository(
 ##
 
 go_repository(
+    name = "com_github_xeipuuv_gojsonschema",
+    commit = "0c8571ac0ce161a5feb57375a9cdf148c98c0f70",
+    importpath = "github.com/xeipuuv/gojsonschema",
+)
+
+go_repository(
+    name = "com_github_pborman_uuid",
+    commit = "1b00554d822231195d1babd97ff4a781231955c9",
+    importpath = "github.com/pborman/uuid",
+)
+
+go_repository(
+    name = "com_github_blang_semver",
+    commit = "4a1e882c79dcf4ec00d2e29fac74b9c8938d5052",
+    importpath = "github.com/blang/semver",
+)
+
+go_repository(
+    name = "com_github_pelletier_go_buffruneio",
+    commit = "c37440a7cf42ac63b919c752ca73a85067e05992",
+    importpath = "github.com/pelletier/go-buffruneio",
+)
+
+go_repository(
+    name = "com_github_pelletier_go_toml",
+    commit = "fe7536c3dee2596cdd23ee9976a17c22bdaae286",
+    importpath = "github.com/pelletier/go-toml",
+)
+
+go_repository(
+    name = "com_github_dgrijalva_jwt_go",
+    commit = "8c45ba33b0a495057cba9985cd5dd1a3803ac7b4",
+    importpath = "github.com/dgrijalva/jwt-go",
+)
+
+go_repository(
+    name = "com_github_nicksnyder_go_i18n",
+    commit = "3e70a1a463008cea6726380c908b1a6a8bdf7b24",
+    importpath = "github.com/nicksnyder/go-i18n",
+)
+
+go_repository(
+    name = "com_github_rcrowley_go_metrics",
+    commit = "1f30fe9094a513ce4c700b9a54458bbb0c96996c",
+    importpath = "github.com/rcrowley/go-metrics",
+)
+
+go_repository(
+    name = "com_github_garyburd_redigo",
+    commit = "95d11dba2d44531bdb8022752b98912baafae03a",
+    importpath = "github.com/garyburd/redigo",
+)
+
+go_repository(
+    name = "com_github_xeipuuv_gojsonpointer",
+    commit = "6fe8760cad3569743d51ddbb243b26f8456742dc",
+    importpath = "github.com/xeipuuv/gojsonpointer",
+)
+
+go_repository(
+    name = "com_github_xeipuuv_gojsonreference",
+    commit = "e02fc20de94c78484cd5ffb007f8af96be030a45",
+    importpath = "github.com/xeipuuv/gojsonreference",
+)
+
+go_repository(
+    name = "com_github_ant0ine_go_json_rest",
+    commit = "4602b00d2caab423578a3094c68137dcc1eb2051",
+    importpath = "github.com/ant0ine/go-json-rest",
+)
+
+go_repository(
+    name = "com_github_miekg_dns",
+    commit = "e78414ef75607394ad7d917824f07f381df2eafa",
+    importpath = "github.com/miekg/dns",
+)
+
+go_repository(
+    name = "com_github_urfave_cli",
+    commit = "cf33a9befefdd6c6ea1a236ab6d546e797a62cbf",
+    importpath = "github.com/urfave/cli",
+)
+
+go_repository(
+    name = "com_github_Sirupsen_logrus",
+    commit = "418b41d23a1bf978c06faea5313ba194650ac088",
+    importpath = "github.com/Sirupsen/logrus",
+)
+
+go_repository(
     name = "com_github_satori_go_uuid",
     commit = "5bf94b69c6b68ee1b541973bb8e1144db23a194b",
     importpath = "github.com/satori/go.uuid",
@@ -367,6 +457,7 @@ go_repository(
     importpath = "google.golang.org/grpc",
 )
 
+
 new_git_repository(
     name = "io_istio_api",
     build_file_content = """
@@ -415,6 +506,14 @@ new_git_repository(
     build_file_content = GOOGLEAPIS_BUILD_FILE,
     commit = "13ac2436c5e3d568bd0e938f6ed58b77a48aba15",  # Oct 21, 2016 (only release pre-dates sha)
     remote = "https://github.com/googleapis/googleapis.git",
+)
+
+go_repository(
+    name = "com_github_amalgam8_amalgam8",
+    commit = "7fb7317dbb3fe61570e9811418ee53a7184e523a",
+    importpath = "github.com/amalgam8/amalgam8",
+    vcs = "git",
+    remote = "https://github.com/kimikowang/istio_vms.git",
 )
 
 ##

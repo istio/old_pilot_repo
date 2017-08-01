@@ -349,7 +349,6 @@ func buildOutboundHTTPRoutes(
 			}
 
 			routes := buildDestinationHTTPRoutes(service, servicePort, rules)
-
 			if len(routes) > 0 {
 				// must use egress proxy to route external name services
 				if service.External() {

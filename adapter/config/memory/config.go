@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/glog"
 
 	"istio.io/pilot/model"
+	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 // Make creates an in-memory config store from a config descriptor
@@ -35,6 +37,19 @@ func Make(descriptor model.ConfigDescriptor) model.ConfigStore {
 		out.data[typ] = make(map[string]proto.Message)
 		out.revs[typ] = make(map[string]string)
 	}
+
+	testRouteRule := &proxyconfig.RouteRule{
+                Name:        "test-rule",
+                Destination: "reviews",
+                Route: []*proxyconfig.DestinationWeight{
+                        {Weight: 50, Tags: map[string]string{"version": "v3"}},
+                        {Weight: 50, Tags: map[string]string{"version": "v1"}},
+                },
+        }
+	if _, err := out.Post(testRouteRule); err != nil {
+                glog.Infof("Error from Post(RouteRule): %v", err)
+        }
+
 	return &out
 }
 

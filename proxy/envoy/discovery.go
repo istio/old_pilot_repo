@@ -503,7 +503,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
 			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Missing route config for port %d", port))
+				fmt.Sprintf("Missing route config for port %d, node: %s, key: %s", port, node, key))
 			return
 		}
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {

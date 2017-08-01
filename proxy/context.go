@@ -24,6 +24,15 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"github.com/amalgam8/amalgam8/sidecar/register"
+)
+
+type Adapter string
+
+const (
+	KubernetesAdapter Adapter = "Kubernetes"
+	VMsAdapter        Adapter = "VMs"
+	NilAdapter	  Adapter = ""
 )
 
 // Environment provides an aggregate environmental API for Pilot
@@ -51,13 +60,25 @@ type Role interface {
 
 	// ServiceNode encodes the role information into a string
 	ServiceNode() string
+
+	// Adapter prints out the platform this proxy is running on
+	GetPlatform() Adapter
+
+	// Retrieve the registration agent  
+	GetRegistrationAgent() *register.RegistrationAgent
 }
 
 // Sidecar defines the sidecar proxy role
 type Sidecar struct {
+	// Adapter indicates indicates the underlying platform name
+	Platform Adapter
+
 	// IPAddress is the IP address of the proxy used to identify it and its
 	// co-located service instances. Example: "10.60.1.6"
 	IPAddress string
+
+	// Registration contains the service information and Registry APIs for the VMs platform
+	Registration *register.RegistrationAgent
 
 	// ID is the unique platform-specific sidecar proxy ID
 	ID string
@@ -71,6 +92,14 @@ func (Sidecar) isProxyRole() {}
 // ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
 	return fmt.Sprintf("%s|%s|%s", role.IPAddress, role.ID, role.Domain)
+}
+
+func (role Sidecar) GetPlatform() Adapter {
+	return role.Platform
+}
+
+func (role Sidecar) GetRegistrationAgent() *register.RegistrationAgent {
+	return role.Registration
 }
 
 // DecodeServiceNode is the inverse of sidecar service node
@@ -112,6 +141,13 @@ func (EgressRole) ServiceNode() string {
 	return EgressNode
 }
 
+func (EgressRole) GetPlatform() Adapter {
+	return NilAdapter
+}
+
+func (EgressRole) GetRegistrationAgent() *register.RegistrationAgent {
+	return nil
+}
 // IngressRole defines the egress proxy role
 type IngressRole struct{}
 
@@ -122,6 +158,13 @@ func (IngressRole) ServiceNode() string {
 	return IngressNode
 }
 
+func (IngressRole) GetPlatform() Adapter {
+	return NilAdapter
+}
+
+func (IngressRole) GetRegistrationAgent() *register.RegistrationAgent {
+	return nil
+}
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 	return proxyconfig.ProxyMeshConfig{
