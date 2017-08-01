@@ -511,7 +511,9 @@ new_git_repository(
 go_repository(
     name = "com_github_amalgam8_amalgam8",
     commit = "7fb7317dbb3fe61570e9811418ee53a7184e523a",
-    importpath = "github.com/kimikowang/istio_vms",
+    importpath = "github.com/amalgam8/amalgam8",
+    vcs = "git",
+    remote = "git@github.com:kimikowang/istio_vms.git"
 )
 
 ##
