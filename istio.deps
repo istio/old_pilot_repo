@@ -1,0 +1,9 @@
+[
+	{
+		"name": "ISTIO_PROXY_BUCKET",
+		"repoName": "proxy",
+		"prodBranch": "stable",
+		"file": "WORKSPACE",
+		"lastStableSHA": "62755c63d9c80c043ece26504c4288845a929cc4"
+	}
+]
