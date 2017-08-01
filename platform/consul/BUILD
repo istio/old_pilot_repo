@@ -23,6 +23,7 @@ go_test(
     size = "small",
     srcs = [
         "conversion_test.go",
+        "controller_test.go"
     ],
     library = ":go_default_library",
     deps = [

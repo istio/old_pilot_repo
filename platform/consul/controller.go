@@ -71,7 +71,6 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 	}
 
 	out := convertService(endpoints)
-	glog.V(1).Info(out)
 
 	return out, true
 }
@@ -116,8 +115,6 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 		}
 	}
 
-	glog.V(1).Info(instances)
-
 	return instances
 }
 
@@ -151,7 +148,6 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 		}
 	}
 
-	glog.V(1).Info(out)
 	return out
 }
 
