@@ -331,25 +331,25 @@ go_repository(
     importpath = "google.golang.org/genproto",
 )
 
-new_go_repository(
+go_repository(
     name = "com_github_hashicorp_go_rootcerts",
     commit = "6bb64b370b90e7ef1fa532be9e591a81c3493e00",
     importpath = "github.com/hashicorp/go-rootcerts",
 )
 
-new_go_repository(
+go_repository(
     name = "com_github_hashicorp_go_cleanhttp",
     commit = "3573b8b52aa7b37b9358d966a898feb387f62437",
     importpath = "github.com/hashicorp/go-cleanhttp",
 )
 
-new_go_repository(
+go_repository(
     name = "com_github_hashicorp_serf",
     commit = "d6574a5bb1226678d7010325fb6c985db20ee458",
     importpath = "github.com/hashicorp/serf",
 )
 
-new_go_repository(
+go_repository(
     name = "com_github_hashicorp_consul",
     commit = "f4360770d8e7b852e2d05835b583d20799e58133",
     importpath = "github.com/hashicorp/consul",

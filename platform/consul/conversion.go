@@ -31,22 +31,18 @@ func convertTags(tags []string) model.Tags {
 	out := make(model.Tags, len(tags))
 	for _, tag := range tags {
 		vals := strings.Split(tag, "=")
+
+		// Tags not of form "key=value" are ignored to avoid possible collisions
 		if len(vals) > 1 {
 			out[vals[0]] = vals[1]
-		} else {
-			// TODO safe to assume all tags are of form "key=value"?
-			out[tag] = ""
 		}
 	}
 	return out
 }
 
 func convertPort(port int, name string) *model.Port {
-
-	// TODO default HTTP/TCP?
-	defaultName := "tcp"
 	if name == "" {
-		name = defaultName
+		name = "http"
 	}
 
 	return &model.Port{
@@ -58,7 +54,6 @@ func convertPort(port int, name string) *model.Port {
 
 func convertService(endpoints []*api.CatalogService) *model.Service {
 	name, addr, external := "", "", ""
-
 	node, datacenter := "", ""
 
 	ports := model.PortList{}
@@ -76,12 +71,6 @@ func convertService(endpoints []*api.CatalogService) *model.Service {
 		node = endpoint.Node
 		datacenter = endpoint.Datacenter
 
-		// TODO where should the loadbalancer IP be stored in consul?
-		// - Address: IP of consul node for service
-		// - ServiceAddress: IP of service
-		// - TaggedAddresses: list of explicit LAN and WAN IP addresses for the agent
-		// - NodeMetadata
-		addr = endpoint.Address
 	}
 
 	out := &model.Service{
@@ -98,15 +87,21 @@ func convertInstance(inst *api.CatalogService) *model.ServiceInstance {
 	tags := convertTags(inst.ServiceTags)
 	port := convertPort(inst.ServicePort, inst.NodeMeta[protocolTagName])
 
+	addr := inst.ServiceAddress
+	if addr == "" {
+		addr = inst.Address
+	}
+
 	return &model.ServiceInstance{
 		Endpoint: model.NetworkEndpoint{
-			Address:     inst.Address,
+			Address:     addr,
 			Port:        inst.ServicePort,
 			ServicePort: port,
 		},
+
 		Service: &model.Service{
 			Hostname: serviceHostname(inst.ServiceName, "TODO", inst.Datacenter),
-			Address:  inst.Address,
+			Address:  inst.ServiceAddress,
 			Ports:    model.PortList{port},
 			// TODO ExternalName come from metadata?
 			ExternalName: inst.NodeMeta[externalTagName],
@@ -119,37 +114,34 @@ func convertInstance(inst *api.CatalogService) *model.ServiceInstance {
 func serviceHostname(name, node, datacenter string) string {
 	// TODO include consul node in Hostname?
 	// consul DNS uses "redis.service.us-east-1.consul" -> "[<optional_tag>].<svc>.service.[<optional_datacenter>].consul"
-	return fmt.Sprintf("%s.service.%s.consul", name, datacenter)
+	return fmt.Sprintf("%s.service.consul", name)
 }
 
-// parseHostname extracts service name and namespace from the service hostnamei
-func parseHostname(hostname string) (name, datacenter string, err error) {
+// parseHostname extracts service name from the service hostname
+func parseHostname(hostname string) (name string, err error) {
 	parts := strings.Split(hostname, ".")
-	if len(parts) < 3 {
-		err = fmt.Errorf("missing service name and datacenter from the service hostname %q", hostname)
+	if len(parts) < 1 {
+		err = fmt.Errorf("missing service name from the service hostname %q", hostname)
 		return
 	}
 	name = parts[0]
-	datacenter = parts[2]
 	return
 }
 
 func convertProtocol(name string) model.Protocol {
-	// TODO default TCP or HTTP?
-	out := model.ProtocolTCP
-
 	switch name {
 	case "udp":
-		out = model.ProtocolUDP
+		return model.ProtocolUDP
 	case "grpc":
-		out = model.ProtocolGRPC
+		return model.ProtocolGRPC
 	case "http":
-		out = model.ProtocolHTTP
+		return model.ProtocolHTTP
 	case "http2":
-		out = model.ProtocolHTTP2
+		return model.ProtocolHTTP2
 	case "https":
-		out = model.ProtocolHTTPS
+		return model.ProtocolHTTPS
+	default:
+		return model.ProtocolHTTP
 	}
 
-	return out
 }

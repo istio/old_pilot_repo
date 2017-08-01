@@ -16,13 +16,16 @@ package consul
 
 import (
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/consul/api"
 	"istio.io/pilot/model"
+	"time"
 )
 
 type Controller struct {
-	client *api.Client
+	client     *api.Client
 	dataCenter string
+	monitor    Monitor
 }
 
 func NewController(addr, datacenter string) (*Controller, error) {
@@ -31,14 +34,14 @@ func NewController(addr, datacenter string) (*Controller, error) {
 
 	client, err := api.NewClient(conf)
 	return &Controller{
-		client: client,
+		monitor:    NewConsulMonitor(client, time.Second*3),
+		client:     client,
 		dataCenter: datacenter,
 	}, err
 }
 
 // Services list declarations of all services in the system
 func (c *Controller) Services() []*model.Service {
-
 	data := c.getServices()
 
 	services := make([]*model.Service, 0, len(data))
@@ -53,7 +56,7 @@ func (c *Controller) Services() []*model.Service {
 // GetService retrieves a service by host name if it exists
 func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 	// Get actual service by name
-	name, _, err := parseHostname(hostname)
+	name, err := parseHostname(hostname)
 	if err != nil {
 		glog.V(2).Infof("parseHostname(%s) => error %v", hostname, err)
 		return nil, false
@@ -71,27 +74,22 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 }
 
 func (c *Controller) getServices() map[string][]string {
-	data, meta, err := c.client.Catalog().Services(nil)
+	data, _, err := c.client.Catalog().Services(nil)
 	if err != nil {
 		glog.Warningf("Could not retrieve services from consul: %v", err)
 		return make(map[string][]string, 0)
 	}
 
-	//TODO log or process query metadata?
-	glog.V(4).Infof("Response time: %v", meta.RequestTime)
-
 	return data
 }
 
 func (c *Controller) getCatalogService(name string, q *api.QueryOptions) []*api.CatalogService {
-	endpoints, meta, err := c.client.Catalog().Service(name, "", q)
+	endpoints, _, err := c.client.Catalog().Service(name, "", q)
 	if err != nil {
 		glog.Warningf("Could not retrieve service catalogue from consul: %v", err)
 		return []*api.CatalogService{}
 	}
 
-	//TODO log or process query metadata info?
-	glog.V(4).Infof("Response time: %v", meta.RequestTime)
 	return endpoints
 }
 
@@ -99,7 +97,7 @@ func (c *Controller) getCatalogService(name string, q *api.QueryOptions) []*api.
 // any of the supplied tags. All instances match an empty tag list.
 func (c *Controller) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
 	// Get actual service by name
-	name, _, err := parseHostname(hostname)
+	name, err := parseHostname(hostname)
 	if err != nil {
 		glog.V(2).Infof("parseHostname(%s) => error %v", hostname, err)
 		return nil
@@ -137,15 +135,13 @@ func portMatch(inst *model.ServiceInstance, ports []string) bool {
 
 // HostInstances lists service instances for a given set of IPv4 addresses.
 func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
-
 	data := c.getServices()
 	out := make([]*model.ServiceInstance, 0)
 	for svcName := range data {
 		for addr := range addrs {
-			// TODO assume provided address is a datacenter name?
 			endpoints := c.getCatalogService(svcName, nil)
 			for _, endpoint := range endpoints {
-				if addr == endpoint.Address {
+				if addr == endpoint.ServiceAddress {
 					out = append(out, convertInstance(endpoint))
 				}
 			}
@@ -153,6 +149,61 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 	}
 
 	glog.V(1).Info(out)
-
 	return out
+}
+
+// Run all controllers until a signal is received
+func (c *Controller) Run(stop <-chan struct{}) {
+	c.monitor.Start(stop)
+}
+
+func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
+	return nil
+}
+
+func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
+	c.monitor.AppendServiceHandler(func(obj interface{}, event model.Event) error {
+		f(convertService(*obj.(*[]*api.CatalogService)), event)
+		return nil
+	})
+	return nil
+}
+
+func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
+	c.monitor.AppendInstanceHandler(func(obj interface{}, event model.Event) error {
+		f(convertInstance(&(*obj.(*api.CatalogService))), event)
+		return nil
+	})
+	return nil
+}
+
+func (c *Controller) HasSynced() bool {
+	return false
+}
+
+func (c *Controller) ConfigDescriptor() model.ConfigDescriptor {
+	return nil
+}
+
+func (c *Controller) Get(typ, key string) (config proto.Message, exists bool, revision string) {
+	return nil, false, ""
+}
+
+func (c *Controller) List(typ string) ([]model.Config, error) {
+	return nil, nil
+}
+
+func (c *Controller) Post(config proto.Message) (revision string, err error) {
+	return "", nil
+}
+
+func (c *Controller) Put(config proto.Message, oldRevision string) (newRevision string, err error) {
+	return "", nil
+}
+
+func (c *Controller) Delete(typ, key string) error {
+	return nil
+}
+
+func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
 }
