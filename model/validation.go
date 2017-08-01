@@ -755,6 +755,26 @@ func ValidateIngressRule(msg proto.Message) error {
 	return errs
 }
 
+// ValidateEgressRule checks egress rules
+func ValidateEgressRule(msg proto.Message) error {
+	value, ok := msg.(*proxyconfig.EgressRule)
+	if !ok {
+		return fmt.Errorf("cannot cast to egress rule")
+	}
+
+	var errs error
+	if value.Name == "" {
+		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a name"))
+	}
+
+	if value.Domains == nil {
+		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a domains list"))
+	}
+
+	// TODO: complete validation for egress
+	return errs
+}
+
 // ValidateDestinationPolicy checks proxy policies
 func ValidateDestinationPolicy(msg proto.Message) error {
 	value, ok := msg.(*proxyconfig.DestinationPolicy)

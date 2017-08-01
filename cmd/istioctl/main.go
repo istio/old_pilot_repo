@@ -72,6 +72,7 @@ istioctl mixer command documentation.
 			configClient, err = crd.NewClient(kubeconfig, model.ConfigDescriptor{
 				model.RouteRuleDescriptor,
 				model.DestinationPolicyDescriptor,
+				model.EgressRuleDescriptor,
 			}, istioSystem)
 
 			return
@@ -164,6 +165,9 @@ istioctl mixer command documentation.
 
 		# List all destination policies
 		istioctl get destination-policies
+
+		# List all egress rules
+		istioctl get egress-rules
 
 		# Get a specific rule named productpage-default
 		istioctl get route-rule productpage-default
@@ -332,6 +336,7 @@ func schema(typ string) (model.ProtoSchema, error) {
 	var singularForm = map[string]string{
 		"route-rules":          "route-rule",
 		"destination-policies": "destination-policy",
+                "egress-rules": "egress-rule",
 	}
 	if singular, ok := singularForm[typ]; ok {
 		typ = singular
@@ -348,7 +353,7 @@ func schema(typ string) (model.ProtoSchema, error) {
 
 // Config is the complete configuration including a parsed spec
 type Config struct {
-	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, or destination-policy
+	// Type SHOULD be one of the kinds in model.IstioConfig; a route-rule, ingress-rule, egress-rule or destination-policy
 	Type string `json:"type,omitempty"`
 	// Key is the unique key per type
 	Key string `json:"key,omitempty"`

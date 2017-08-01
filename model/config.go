@@ -196,6 +196,9 @@ type IstioConfigStore interface {
 	// IngressRules lists all ingress rules
 	IngressRules() map[string]*proxyconfig.IngressRule
 
+	// EgressRules lists all egress rules
+	EgressRules() map[string]*proxyconfig.EgressRule
+
 	// DestinationPolicies lists all destination rules
 	DestinationPolicies() []*proxyconfig.DestinationPolicy
 
@@ -219,6 +222,11 @@ const (
 	IngressRule = "ingress-rule"
 	// IngressRuleProto message name
 	IngressRuleProto = "istio.proxy.v1.config.IngressRule"
+
+	// EgressRule type
+	EgressRule = "egress-rule"
+	// EgressRuleProto message name
+	EgressRuleProto = "istio.proxy.v1.config.EgressRule"
 
 	// DestinationPolicy defines the type for the destination policy configuration
 	DestinationPolicy = "destination-policy"
@@ -255,6 +263,17 @@ var (
 		},
 	}
 
+	// EgressRuleDescriptor describes ingress rules
+	EgressRuleDescriptor = ProtoSchema{
+		Type:        EgressRule,
+		MessageName: EgressRuleProto,
+		Validate:    ValidateEgressRule,
+		Key: func(config proto.Message) string {
+			rule := config.(*proxyconfig.EgressRule)
+			return rule.Name
+		},
+	}
+
 	// DestinationPolicyDescriptor describes destination rules
 	DestinationPolicyDescriptor = ProtoSchema{
 		Type:        DestinationPolicy,
@@ -269,6 +288,7 @@ var (
 	IstioConfigTypes = ConfigDescriptor{
 		RouteRuleDescriptor,
 		IngressRuleDescriptor,
+		EgressRuleDescriptor,
 		DestinationPolicyDescriptor,
 	}
 )
@@ -345,6 +365,20 @@ func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.IngressRule {
 	}
 	for _, r := range rs {
 		if rule, ok := r.Content.(*proxyconfig.IngressRule); ok {
+			out[r.Key] = rule
+		}
+	}
+	return out
+}
+
+func (i *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
+	out := make(map[string]*proxyconfig.EgressRule)
+	rs, err := i.List(EgressRule)
+	if err != nil {
+		glog.V(2).Infof("EgressRules => %v", err)
+	}
+	for _, r := range rs {
+		if rule, ok := r.Content.(*proxyconfig.EgressRule); ok {
 			out[r.Key] = rule
 		}
 	}
