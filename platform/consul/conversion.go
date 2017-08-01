@@ -130,6 +130,8 @@ func parseHostname(hostname string) (name string, err error) {
 
 func convertProtocol(name string) model.Protocol {
 	switch name {
+	case "tcp":
+		return model.ProtocolTCP
 	case "udp":
 		return model.ProtocolUDP
 	case "grpc":

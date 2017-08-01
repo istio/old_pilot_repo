@@ -21,6 +21,12 @@ go_library(
 go_test(
     name = "go_default_test",
     size = "small",
-    srcs = [],
+    srcs = [
+        "conversion_test.go",
+    ],
     library = ":go_default_library",
+    deps = [
+        "//model:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+    ],
 )
