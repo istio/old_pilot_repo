@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_pilot")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "ec640f0c017a04594695f76bb4531d8769b2c27b",  # Jul 21, 2017
+    commit = "eba68677493422112dd25f6a0b4bbdb02387e5a4",  # Aug 1, 2017
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
