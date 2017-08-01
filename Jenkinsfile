@@ -40,13 +40,9 @@ mainFlow(utils) {
   if (utils.runStage('POSTSUBMIT')) {
     postsubmit(gitUtils, bazel, utils)
   }
-  // PR from master to stable branch for qualification
-  if (utils.runStage('STABLE_PRESUBMIT')) {
-    stablePresubmit(gitUtils, bazel, utils)
-  }
-  // Postsubmit form stable branch, post qualification
-  if (utils.runStage('STABLE_POSTSUBMIT')) {
-    stablePostsubmit(gitUtils, bazel, utils)
+  // Creating release artifacts
+  if (utils.runStage('RELEASE')) {
+    release(gitUtils, bazel)
   }
   // Regression test to run for modules managed depends on
   if (utils.runStage('REGRESSION')) {
@@ -91,11 +87,19 @@ def presubmit(gitUtils, bazel, utils) {
   }
 }
 
-def stablePresubmit(gitUtils, bazel, utils) {
+def postsubmit(gitUtils, bazel, utils) {
   goBuildNode(gitUtils, 'istio.io/pilot') {
     bazel.updateBazelRc()
     utils.initTestingCluster()
     sh('ln -s ~/.kube/config platform/kube/')
+    stage('Code Coverage') {
+      sh('bin/install-prereqs.sh')
+      bazel.test('//...')
+      sh('bin/init.sh')
+      sh('bin/codecov.sh | tee codecov.report')
+      sh('bin/toolbox/pkg_coverage.sh')
+      utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
+    }
     stage('Build istioctl') {
       def remotePath = gitUtils.artifactsPath('istioctl')
       sh("bin/upload-istioctl -p ${remotePath}")
@@ -108,7 +112,7 @@ def stablePresubmit(gitUtils, bazel, utils) {
   }
 }
 
-def stablePostsubmit(gitUtils, bazel, utils) {
+def release(gitUtils, bazel) {
   goBuildNode(gitUtils, 'istio.io/pilot') {
     bazel.updateBazelRc()
     sh('touch platform/kube/config')
@@ -128,23 +132,6 @@ def stablePostsubmit(gitUtils, bazel, utils) {
       }
       sh("bin/push-docker -tag ${tags} -hub gcr.io/istio-io")
     }
-  }
-}
-
-def postsubmit(gitUtils, bazel, utils) {
-  goBuildNode(gitUtils, 'istio.io/pilot') {
-    bazel.updateBazelRc()
-    utils.initTestingCluster()
-    sh('ln -s ~/.kube/config platform/kube/')
-    stage('Code Coverage') {
-      sh('bin/install-prereqs.sh')
-      bazel.test('//...')
-      sh('bin/init.sh')
-      sh('bin/codecov.sh | tee codecov.report')
-      sh('bin/toolbox/pkg_coverage.sh')
-      utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
-    }
-    utils.fastForwardStable('pilot')
   }
 }
 
