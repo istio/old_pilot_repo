@@ -25,7 +25,7 @@ import (
 )
 
 func TestImageName(t *testing.T) {
-	want := "docker.io/istio/init:latest"
+	want := "docker.io/istio/proxy_init:latest"
 	if got := InitImageName("docker.io/istio", "latest"); got != want {
 		t.Errorf("InitImageName() failed: got %q want %q", got, want)
 	}
@@ -89,6 +89,10 @@ func TestIntoResourceFile(t *testing.T) {
 			want: "testdata/multi-init.yaml.injected",
 		},
 		{
+			in:   "testdata/statefulset.yaml",
+			want: "testdata/statefulset.yaml.injected",
+		},
+		{
 			in:             "testdata/enable-core-dump.yaml",
 			want:           "testdata/enable-core-dump.yaml.injected",
 			enableCoreDump: true,
@@ -121,13 +125,14 @@ func TestIntoResourceFile(t *testing.T) {
 		}
 
 		params := Params{
-			InitImage:       InitImageName(unitTestHub, unitTestTag),
-			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag),
-			Verbosity:       DefaultVerbosity,
-			SidecarProxyUID: DefaultSidecarProxyUID,
-			Version:         "12345678",
-			EnableCoreDump:  c.enableCoreDump,
-			Mesh:            &mesh,
+			InitImage:         InitImageName(unitTestHub, unitTestTag),
+			ProxyImage:        ProxyImageName(unitTestHub, unitTestTag),
+			Verbosity:         DefaultVerbosity,
+			SidecarProxyUID:   DefaultSidecarProxyUID,
+			Version:           "12345678",
+			EnableCoreDump:    c.enableCoreDump,
+			Mesh:              &mesh,
+			MeshConfigMapName: "istio",
 		}
 		if c.configMapName != "" {
 			params.MeshConfigMapName = c.configMapName

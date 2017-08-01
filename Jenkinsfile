@@ -65,6 +65,10 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.fetch('-k //...')
       bazel.build('//...')
     }
+    stage('Build istioctl') {
+      def remotePath = gitUtils.artifactsPath('istioctl')
+      sh("bin/upload-istioctl -p ${remotePath}")
+    }
     stage('Go Build') {
       sh('bin/init.sh')
     }
@@ -75,8 +79,8 @@ def presubmit(gitUtils, bazel, utils) {
       bazel.test('//...')
     }
     stage('Code Coverage') {
-      sh('bin/codecov.sh > codecov.report')
-      sh('bazel-bin/bin/toolbox/presubmit/package_coverage_check')
+      sh('bin/codecov.sh | tee codecov.report')
+      sh('bin/toolbox/pkg_coverage.sh')
       utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     stage('Integration Tests') {
@@ -130,7 +134,8 @@ def postsubmit(gitUtils, bazel, utils) {
       sh('bin/install-prereqs.sh')
       bazel.test('//...')
       sh('bin/init.sh')
-      sh('bin/codecov.sh')
+      sh('bin/codecov.sh | tee codecov.report')
+      sh('bin/toolbox/pkg_coverage.sh')
       utils.publishCodeCoverage('PILOT_CODECOV_TOKEN')
     }
     utils.fastForwardStable('pilot')
