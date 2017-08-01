@@ -15,11 +15,12 @@
 package consul
 
 import (
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/consul/api"
 	"istio.io/pilot/model"
-	"time"
 )
 
 // Controller communicates with Consul and monitors for changes
@@ -79,7 +80,7 @@ func (c *Controller) getServices() map[string][]string {
 	data, _, err := c.client.Catalog().Services(nil)
 	if err != nil {
 		glog.Warningf("Could not retrieve services from consul: %v", err)
-		return make(map[string][]string, 0)
+		return make(map[string][]string)
 	}
 
 	return data

@@ -15,10 +15,11 @@
 package consul
 
 import (
-	"github.com/golang/glog"
 	"reflect"
 	"sort"
 	"time"
+
+	"github.com/golang/glog"
 
 	"github.com/hashicorp/consul/api"
 	"istio.io/pilot/model"
@@ -40,13 +41,11 @@ type Monitor interface {
 
 type consulMonitor struct {
 	discovery            *api.Client
-	ticker               time.Ticker
 	instanceCachedRecord consulServiceInstances
 	serviceCachedRecord  consulServices
 	instanceHandlers     []Handler
 	serviceHandlers      []Handler
 	period               time.Duration
-	stop                 <-chan struct{}
 	tickChan             <-chan time.Time
 	isStopped            bool
 }
@@ -57,7 +56,7 @@ func NewConsulMonitor(client *api.Client, period time.Duration) Monitor {
 		discovery:            client,
 		period:               period,
 		instanceCachedRecord: make(consulServiceInstances, 0),
-		serviceCachedRecord:  make(consulServices, 0),
+		serviceCachedRecord:  make(consulServices),
 		instanceHandlers:     make([]Handler, 0),
 		serviceHandlers:      make([]Handler, 0),
 		isStopped:            true,

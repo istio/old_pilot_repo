@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"fmt"
+
 	"github.com/hashicorp/consul/api"
 	"istio.io/pilot/model"
 )
