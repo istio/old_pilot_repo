@@ -1,3 +1,17 @@
+// Copyright 2017 Istio Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package consul
 
 import (
@@ -10,14 +24,13 @@ import (
 	"istio.io/pilot/model"
 )
 
-const ()
-
-type ConsulServices map[string][]string
-type ConsulServiceInstances []*api.CatalogService
+type consulServices map[string][]string
+type consulServiceInstances []*api.CatalogService
 
 // Handler specifies a function to apply on an object for a given event type
 type Handler func(obj interface{}, event model.Event) error
 
+// Monitor handles service and instance changes
 type Monitor interface {
 	Start(<-chan struct{})
 	Stop()
@@ -28,8 +41,8 @@ type Monitor interface {
 type consulMonitor struct {
 	discovery            *api.Client
 	ticker               time.Ticker
-	instanceCachedRecord ConsulServiceInstances
-	serviceCachedRecord  ConsulServices
+	instanceCachedRecord consulServiceInstances
+	serviceCachedRecord  consulServices
 	instanceHandlers     []Handler
 	serviceHandlers      []Handler
 	period               time.Duration
@@ -38,12 +51,13 @@ type consulMonitor struct {
 	isStopped            bool
 }
 
+// NewConsulMonitor polls for changes in Consul Services and CatalogServices
 func NewConsulMonitor(client *api.Client, period time.Duration) Monitor {
 	return &consulMonitor{
 		discovery:            client,
 		period:               period,
-		instanceCachedRecord: make(ConsulServiceInstances, 0),
-		serviceCachedRecord:  make(ConsulServices, 0),
+		instanceCachedRecord: make(consulServiceInstances, 0),
+		serviceCachedRecord:  make(consulServices, 0),
 		instanceHandlers:     make([]Handler, 0),
 		serviceHandlers:      make([]Handler, 0),
 		isStopped:            true,
@@ -83,7 +97,7 @@ func (m *consulMonitor) UpdateServiceRecord() error {
 		glog.Warningf("Error:%s in fetching service result", err)
 		return err
 	}
-	newRecord := ConsulServices(svcs)
+	newRecord := consulServices(svcs)
 	if !reflect.DeepEqual(newRecord, m.serviceCachedRecord) {
 		// This is only a work-around solution currently
 		// Since Handler functions generally act as a refresher
@@ -111,7 +125,7 @@ func (m *consulMonitor) UpdateInstanceRecord() error {
 	}
 
 	insts := []*api.CatalogService{}
-	for name, _ := range svcs {
+	for name := range svcs {
 		endpoints, _, err := m.discovery.Catalog().Service(name, "", nil)
 		if err != nil {
 			glog.Warningf("Could not retrieve service catalogue from consul: %v", err)
@@ -121,7 +135,7 @@ func (m *consulMonitor) UpdateInstanceRecord() error {
 
 	}
 
-	newRecord := ConsulServiceInstances(insts)
+	newRecord := consulServiceInstances(insts)
 	newRecord.normalize()
 	if !reflect.DeepEqual(newRecord, m.instanceCachedRecord) {
 		// This is only a work-around solution currently
@@ -149,6 +163,6 @@ func (m *consulMonitor) AppendInstanceHandler(h Handler) {
 	m.instanceHandlers = append(m.instanceHandlers, h)
 }
 
-func (list ConsulServiceInstances) normalize() {
+func (list consulServiceInstances) normalize() {
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 }

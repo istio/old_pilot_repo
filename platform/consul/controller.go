@@ -22,12 +22,14 @@ import (
 	"time"
 )
 
+// Controller communicates with Consul and monitors for changes
 type Controller struct {
 	client     *api.Client
 	dataCenter string
 	monitor    Monitor
 }
 
+// NewController creates a new Consul controller
 func NewController(addr, datacenter string) (*Controller, error) {
 	conf := api.DefaultConfig()
 	conf.Address = addr
@@ -157,10 +159,12 @@ func (c *Controller) Run(stop <-chan struct{}) {
 	c.monitor.Start(stop)
 }
 
+// GetIstioServiceAccounts implements model.ServiceAccounts interface TODO
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
 	return nil
 }
 
+// AppendServiceHandler implements a service catalog operation
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
 	c.monitor.AppendServiceHandler(func(obj interface{}, event model.Event) error {
 		f(convertService(*obj.(*[]*api.CatalogService)), event)
@@ -169,6 +173,7 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 	return nil
 }
 
+// AppendInstanceHandler implements a service catalog operation
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
 	c.monitor.AppendInstanceHandler(func(obj interface{}, event model.Event) error {
 		f(convertInstance(&(*obj.(*api.CatalogService))), event)
@@ -177,33 +182,41 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 	return nil
 }
 
+// HasSynced implements model.ConfigStoreCache operation TODO
 func (c *Controller) HasSynced() bool {
 	return false
 }
 
+// ConfigDescriptor implements model.ConfigStore operation TODO
 func (c *Controller) ConfigDescriptor() model.ConfigDescriptor {
 	return nil
 }
 
+// Get implements model.ConfigStore operation TODO
 func (c *Controller) Get(typ, key string) (config proto.Message, exists bool, revision string) {
 	return nil, false, ""
 }
 
+// List implements model.ConfigStore operation TODO
 func (c *Controller) List(typ string) ([]model.Config, error) {
 	return nil, nil
 }
 
+// Post implements model.ConfigStore operation TODO
 func (c *Controller) Post(config proto.Message) (revision string, err error) {
 	return "", nil
 }
 
+// Put implements model.ConfigStore operation TODO
 func (c *Controller) Put(config proto.Message, oldRevision string) (newRevision string, err error) {
 	return "", nil
 }
 
+// Delete implements model.ConfigStore operation TODO
 func (c *Controller) Delete(typ, key string) error {
 	return nil
 }
 
+// RegisterEventHandler implements model.ConfigStoreCache operation TODO
 func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
 }
