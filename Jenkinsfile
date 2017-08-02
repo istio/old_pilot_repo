@@ -102,7 +102,7 @@ def postsubmit(gitUtils, bazel, utils) {
     }
     stage('Build istioctl') {
       def remotePath = gitUtils.artifactsPath('istioctl')
-      sh("bin/upload-istioctl -p ${remotePath}")
+      sh("bin/upload-istioctl -r -p ${remotePath}")
     }
     stage('Integration Tests') {
       timeout(60) {
@@ -118,7 +118,7 @@ def release(gitUtils, bazel) {
     sh('touch platform/kube/config')
     stage('Build istioctl') {
       def remotePath = gitUtils.artifactsPath('istioctl')
-      sh("bin/upload-istioctl -p ${remotePath}")
+      sh("bin/upload-istioctl -r -p ${remotePath}")
     }
     stage('Docker Push') {
       def tags = "${env.GIT_SHORT_SHA},${env.ISTIO_VERSION}-${env.GIT_SHORT_SHA}"
