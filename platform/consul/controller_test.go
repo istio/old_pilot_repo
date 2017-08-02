@@ -183,7 +183,7 @@ func TestServices(t *testing.T) {
 
 	services := controller.Services()
 
-	serviceMap := make(map[string]*model.Service, 0)
+	serviceMap := make(map[string]*model.Service)
 	for _, svc := range services {
 		name, err := parseHostname(svc.Hostname)
 		if err != nil {
