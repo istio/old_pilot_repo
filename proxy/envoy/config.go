@@ -23,6 +23,8 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
+	"sort"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
@@ -397,10 +399,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 
-
-	// TODO: canonical ordering
-	routes := make(map[int][]*TCPRoute) // TODO: nils?
-
+	routes := make(map[int][]*TCPRoute)
 	for _, service := range services {
 		if service.External() {
 			continue // TODO TCP external services not currently supported
@@ -427,19 +426,19 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 		}
 	}
 
+	// create a listener per port
 	for port, routes := range routes {
+		sort.Sort(TCPRouteByRoute(routes))
 		config := &TCPRouteConfig{Routes: routes}
 		listener := buildTCPListener(config, "0.0.0.0", port)
 		tcpListeners = append(tcpListeners, listener)
 	}
 
-
-
 	//for _, service := range services {
 	//	for _, servicePort := range service.Ports {
 	//		switch servicePort.Protocol {
 	//		case model.ProtocolTCP, model.ProtocolHTTPS:
-	//			// TODO: Enable SSL context for TCP and HTTPS services.
+	//
 	//			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 	//			route := buildTCPRoute(cluster, service.Address)
 	//			config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
