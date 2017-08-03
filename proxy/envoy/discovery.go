@@ -431,6 +431,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 
 		// service-node holds the IP address
 		node := request.PathParameter(ServiceNode)
+		glog.V(2).Info("ANDRA LDS request for service_node:%s", node)
 		_, clusters := ds.getListeners(node)
 
 		var err error
@@ -666,6 +667,7 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	default:
 		sidecar, err := proxy.DecodeServiceNode(node)
 		if err != nil {
+			glog.Error("ANDRA LDS Error decoding service_node:%s", err)
 			return Listeners{}, Clusters{}
 		}
 		listeners, clusters = buildListeners(ds.Environment, sidecar)
