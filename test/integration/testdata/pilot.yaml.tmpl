@@ -32,11 +32,16 @@ spec:
       containers:
       - name: discovery
         image: {{.Hub}}/pilot:{{.Tag}}
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         args: ["discovery", "-v", "{{.Verbosity}}"]
         ports:
         - containerPort: 8080
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
