@@ -193,7 +193,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configPath, customConfig string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath, customConfig string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -207,7 +207,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configPath, customConfig 
 				fname = customConfig
 			} else {
 				// attempt to write file
-				fname = configFile(configPath, epoch)
+				fname = configFile(configpath, epoch)
 				if err := envoyConfig.WriteFile(fname); err != nil {
 					return err
 				}
