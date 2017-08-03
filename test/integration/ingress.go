@@ -117,9 +117,9 @@ func (t *ingress) run() error {
 		funcs[name] = (func(dst, path string, tls bool, host string) func() status {
 			var url string
 			if tls {
-				url = fmt.Sprintf("https://%s:443%s", ingressServiceName, path)
+				url = fmt.Sprintf("https://%s.%s:443%s", ingressServiceName, t.IstioNamespace, path)
 			} else {
-				url = fmt.Sprintf("http://%s%s", ingressServiceName, path)
+				url = fmt.Sprintf("http://%s.%s%s", ingressServiceName, t.IstioNamespace, path)
 			}
 			extra := ""
 			if host != "" {
@@ -158,7 +158,7 @@ func (t *ingress) run() error {
 
 // checkRouteRule verifies that version splitting is applied to ingress paths
 func (t *ingress) checkRouteRule() status {
-	url := fmt.Sprintf("http://%s/c", ingressServiceName)
+	url := fmt.Sprintf("http://%s.%s/c", ingressServiceName, t.IstioNamespace)
 	resp := t.clientRequest("t", url, 100, "")
 	count := counts(resp.version)
 	glog.V(2).Infof("counts: %v", count)

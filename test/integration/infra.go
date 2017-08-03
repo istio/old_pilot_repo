@@ -210,8 +210,8 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 
 func (infra *infra) teardown() {
 	if infra.namespaceCreated {
-//		util.DeleteNamespace(client, infra.Namespace)
-//		infra.Namespace = ""
+		util.DeleteNamespace(client, infra.Namespace)
+		infra.Namespace = ""
 	}
 }
 
