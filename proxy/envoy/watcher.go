@@ -110,24 +110,17 @@ func (w *watcher) Run(ctx context.Context) {
 }
 
 func (w *watcher) Reload() {
-	config := BuildConfig(w.mesh, w.role)
-	w.agent.ScheduleConfigUpdate(config)
-}
-
-// BuildConfig generates the config object, based on mesh config and role
-// The main difference is auth policy and ingress role, which affect the cert hashes.
-func BuildConfig(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) *Config {
-	config := buildConfig(Listeners{}, Clusters{}, true, mesh)
+	config := buildConfig(Listeners{}, Clusters{}, true, w.mesh)
 
 	h := sha256.New()
-	if mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		generateCertHash(h, mesh.AuthCertsPath, authFiles)
+	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		generateCertHash(h, w.mesh.AuthCertsPath, authFiles)
 	}
-	if role.ServiceNode() == proxy.IngressNode {
-		generateCertHash(h, IngressCertsPath, []string{"tls.crt", "tls.key"})
+	if w.role.ServiceNode() == proxy.IngressNode {
+		generateCertHash(h, proxy.IngressCertsPath, []string{"tls.crt", "tls.key"})
 	}
 	config.Hash = h.Sum(nil)
-	return config
+	w.agent.ScheduleConfigUpdate(config)
 }
 
 // UpdateIngressSecret fetches the TLS secret from discovery and secret storage
