@@ -44,7 +44,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         image: docker.io/istio/proxy_debug:unittest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: istio-proxy
         resources: {}
         securityContext:
@@ -62,6 +62,7 @@ spec:
         name: istio-config
       - emptyDir:
           medium: Memory
+          sizeLimit: "0"
         name: istio-envoy
 status: {}
 ---
@@ -111,7 +112,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         image: docker.io/istio/proxy_debug:unittest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: istio-proxy
         resources: {}
         securityContext:
@@ -129,6 +130,7 @@ spec:
         name: istio-config
       - emptyDir:
           medium: Memory
+          sizeLimit: "0"
         name: istio-envoy
 status: {}
 ---
