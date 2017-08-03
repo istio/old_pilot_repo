@@ -50,7 +50,7 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath string) Watcher {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath, customConfig string) Watcher {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
@@ -62,7 +62,7 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath s
 		}
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath, customConfig), proxy.DefaultRetry)
 	out := &watcher{
 		agent: agent,
 		role:  role,
@@ -110,18 +110,24 @@ func (w *watcher) Run(ctx context.Context) {
 }
 
 func (w *watcher) Reload() {
-	config := buildConfig(Listeners{}, Clusters{}, true, w.mesh)
+	config := BuildConfig(w.mesh, w.role)
+	w.agent.ScheduleConfigUpdate(config)
+}
+
+// BuildConfig generates the config object, based on mesh config and role
+// The main difference is auth policy and ingress role, which affect the cert hashes.
+func BuildConfig(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role) *Config {
+	config := buildConfig(Listeners{}, Clusters{}, true, mesh)
 
 	h := sha256.New()
-	if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		generateCertHash(h, w.mesh.AuthCertsPath, authFiles)
+	if mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		generateCertHash(h, mesh.AuthCertsPath, authFiles)
 	}
-	if w.role.ServiceNode() == proxy.IngressNode {
-		generateCertHash(h, proxy.IngressCertsPath, []string{"tls.crt", "tls.key"})
+	if role.ServiceNode() == proxy.IngressNode {
+		generateCertHash(h, IngressCertsPath, []string{"tls.crt", "tls.key"})
 	}
 	config.Hash = h.Sum(nil)
-
-	w.agent.ScheduleConfigUpdate(config)
+	return config
 }
 
 // UpdateIngressSecret fetches the TLS secret from discovery and secret storage
@@ -194,7 +200,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configPath, customConfig string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -202,10 +208,16 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 				return fmt.Errorf("Unexpected config type: %#v", config)
 			}
 
-			// attempt to write file
-			fname := configFile(configpath, epoch)
-			if err := envoyConfig.WriteFile(fname); err != nil {
-				return err
+			var fname string
+			if len(customConfig) > 0 {
+				// user has a custom configuration. Don't write our own config - but keep watching the certs.
+				fname = customConfig
+			} else {
+				// attempt to write file
+				fname = configFile(configPath, epoch)
+				if err := envoyConfig.WriteFile(fname); err != nil {
+					return err
+				}
 			}
 
 			// spin up a new Envoy process
