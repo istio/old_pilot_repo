@@ -24,6 +24,8 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
+	"flag"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/proxy"
@@ -32,9 +34,10 @@ import (
 )
 
 var (
-	configpath string
-	meshconfig string
-	sidecar    proxy.Sidecar
+	configpath   string
+	meshconfig   string
+	sidecar      proxy.Sidecar
+	customConfig string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -63,8 +66,10 @@ var (
 			glog.V(2).Infof("sidecar %#v", sidecar)
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
-			if err = os.MkdirAll(configpath, 0700); err != nil {
-				return multierror.Prefix(err, "failed to create directory for proxy configuration")
+			if len(customConfig) == 0 {
+				if err = os.MkdirAll(configpath, 0700); err != nil {
+					return multierror.Prefix(err, "failed to create directory for proxy configuration")
+				}
 			}
 
 			var role proxy.Role = sidecar
@@ -87,10 +92,9 @@ var (
 				}
 			}
 
-			watcher := envoy.NewWatcher(mesh, role, configpath)
+			watcher := envoy.NewWatcher(mesh, role, configpath, customConfig)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
-
 			stop := make(chan struct{})
 			cmd.WaitSignal(stop)
 			<-stop
@@ -111,8 +115,12 @@ func init() {
 		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
+	proxyCmd.PersistentFlags().StringVar(&customConfig, "envoyconfig", "",
+		"Custom envoy config")
 
 	cmd.AddFlags(rootCmd)
+
+	rootCmd.Flags().AddGoFlagSet(flag.CommandLine)
 
 	rootCmd.AddCommand(proxyCmd)
 	rootCmd.AddCommand(cmd.VersionCmd)

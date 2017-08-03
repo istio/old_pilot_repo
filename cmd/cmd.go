@@ -34,6 +34,11 @@ import (
 
 // ReadMeshConfig gets mesh configuration from a config file
 func ReadMeshConfig(filename string) (*proxyconfig.ProxyMeshConfig, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		glog.Info("Using default configuration")
+		mesh := proxy.DefaultMeshConfig()
+		return &mesh, nil
+	}
 	yaml, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, multierror.Prefix(err, "cannot read mesh config file")
