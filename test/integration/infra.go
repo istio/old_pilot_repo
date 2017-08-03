@@ -43,6 +43,7 @@ type infra struct {
 	CaImage    string
 
 	Namespace string
+	IstioNamespace string
 	Verbosity int
 
 	// map from app to pods
@@ -60,6 +61,7 @@ type infra struct {
 	checkLogs bool
 
 	namespaceCreated bool
+	istioNamespaceCreated bool
 }
 
 func (infra *infra) setup() error {
@@ -75,43 +77,60 @@ func (infra *infra) setup() error {
 		}
 	}
 
-	deploy := func(name string) error {
+	if infra.IstioNamespace == "" {
+		var err error
+		if infra.IstioNamespace, err = util.CreateNamespace(client); err != nil {
+			return err
+		}
+		infra.istioNamespaceCreated = true
+	} else {
+		if _, err := client.Core().Namespaces().Get(infra.IstioNamespace, meta_v1.GetOptions{}); err != nil {
+			return err
+		}
+	}
+
+	deploy := func(name, namespace string) error {
 		if yaml, err := fill(name, infra); err != nil {
 			return err
-		} else if err = infra.kubeApply(yaml); err != nil {
+		} else if err = infra.kubeApply(yaml, namespace); err != nil {
 			return err
 		}
 		return nil
 	}
-	if err := deploy("rbac-beta.yaml.tmpl"); err != nil {
+	if err := deploy("rbac-beta.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("config.yaml.tmpl"); err != nil {
+	if err := deploy("config.yaml.tmpl", infra.Namespace); err != nil {
 		return err
 	}
-	if err := deploy("pilot.yaml.tmpl"); err != nil {
+
+	if err := deploy("config.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("mixer.yaml.tmpl"); err != nil {
+
+	if err := deploy("pilot.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
+	}
+	if err := deploy("mixer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
 	if infra.Auth != proxyconfig.ProxyMeshConfig_NONE {
-		if err := deploy("ca.yaml.tmpl"); err != nil {
+		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Ingress {
-		if err := deploy("ingress-proxy.yaml.tmpl"); err != nil {
+		if err := deploy("ingress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Egress {
-		if err := deploy("egress-proxy.yaml.tmpl"); err != nil {
+		if err := deploy("egress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Zipkin {
-		if err := deploy("zipkin.yaml"); err != nil {
+		if err := deploy("zipkin.yaml", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
@@ -153,6 +172,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		"port5":      strconv.Itoa(port5),
 		"port6":      strconv.Itoa(port6),
 		"version":    version,
+		"istioNamespace": infra.IstioNamespace,
 	})
 	if err != nil {
 		return err
@@ -185,19 +205,19 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		}
 	}
 
-	return infra.kubeApply(writer.String())
+	return infra.kubeApply(writer.String(), infra.Namespace)
 }
 
 func (infra *infra) teardown() {
 	if infra.namespaceCreated {
-		util.DeleteNamespace(client, infra.Namespace)
-		infra.Namespace = ""
+//		util.DeleteNamespace(client, infra.Namespace)
+//		infra.Namespace = ""
 	}
 }
 
-func (infra *infra) kubeApply(yaml string) error {
+func (infra *infra) kubeApply(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
-		kubeconfig, infra.Namespace), yaml)
+		kubeconfig, namespace), yaml)
 }
 
 type response struct {

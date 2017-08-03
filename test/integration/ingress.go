@@ -70,7 +70,7 @@ func (t *ingress) setup() error {
 	if err != nil {
 		return err
 	}
-	if err = t.kubeApply(string(yamlFile)); err != nil {
+	if err = t.kubeApply(string(yamlFile), t.Namespace); err != nil {
 		return err
 	}
 

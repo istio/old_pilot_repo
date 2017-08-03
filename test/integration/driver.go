@@ -73,8 +73,10 @@ func init() {
 		"CA Docker image")
 	flag.StringVar(&params.MixerImage, "mixer", "gcr.io/istio-testing/mixer:"+mixerTag,
 		"Mixer Docker image")
+	flag.StringVar(&params.IstioNamespace, "ns", "",
+		"Namespace in which to install Istio components (empty to create/delete temporary one)")
 	flag.StringVar(&params.Namespace, "n", "",
-		"Namespace to use for testing (empty to create/delete temporary one)")
+		"Namespace in which to install the applications (empty to create/delete temporary one)")
 	flag.BoolVar(&verbose, "verbose", false, "Debug level noise from proxies")
 	flag.BoolVar(&params.checkLogs, "logs", true, "Validate pod logs (expensive in long-running tests)")
 

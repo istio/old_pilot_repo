@@ -38,6 +38,8 @@ const (
 	NodeRegionLabel = "failure-domain.beta.kubernetes.io/region"
 	// NodeZoneLabel is the well-known label for kubernetes node zone
 	NodeZoneLabel = "failure-domain.beta.kubernetes.io/zone"
+	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
+	IstioNamespace string = "istio-system"
 )
 
 // ControllerOptions stores the configurable attributes of a Controller.
