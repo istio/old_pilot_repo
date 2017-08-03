@@ -413,15 +413,25 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 					continue
 				}
 
-				addrs := make([]string, 0, len(instances))
+				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 				for _, instance := range instances {
-					addrs = append(addrs, instance.Endpoint.Address)
+					// TODO: could reduce number of TCPRoutes by grouping them together by port
+					route := buildTCPRoute(cluster,
+						[]string{instance.Endpoint.Address}, fmt.Sprint(instance.Endpoint.Port))
+					routes[servicePort.Port] = append(routes[servicePort.Port], route)
 				}
 
-				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				route := buildTCPRoute(cluster, addrs) // TODO: instance ports may differ from service port
-				routes[servicePort.Port] = append(routes[servicePort.Port], route)
 				tcpClusters = append(tcpClusters, cluster)
+
+				//addrs := make([]string, 0, len(instances))
+				//for _, instance := range instances {
+				//	addrs = append(addrs, instance.Endpoint.Address)
+				//}
+				//
+				//cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+				//route := buildTCPRoute(cluster, addrs) // TODO: instance ports may differ from service port
+				//routes[servicePort.Port] = append(routes[servicePort.Port], route)
+				//tcpClusters = append(tcpClusters, cluster)
 			}
 		}
 	}
@@ -502,7 +512,7 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address}, "")},
 			}, endpoint.Address, endpoint.Port))
 
 		default:

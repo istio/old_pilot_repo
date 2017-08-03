@@ -118,7 +118,7 @@ type NetworkEndpoint struct {
 	// Address of the network endpoint, typically an IPv4 address
 	Address string `json:"ip_address,omitempty"`
 
-	// Port number where this instance is listening for connections This
+	// Port number where this instance is listening for connections. This
 	// need not be the same as the port where the service is accessed.
 	// e.g., catalog.mystore.com:8080 -> 172.16.0.1:55446
 	Port int `json:"port"`
