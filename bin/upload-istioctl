@@ -53,6 +53,6 @@ if [[ ${RELEASE} == true ]]; then
   mv istioctl.exe "${BIN_DIR}/istioctl-win.exe"
 fi
 if [[ -n "${BUCKET_PATH}" ]]; then
-  gsutil -m cp -r "${BIN_DIR}"/istioctl-* "${BUCKET_PATH}" \
+  gsutil -m cp -r "${BIN_DIR}"/istioctl-* "${BUCKET_PATH}/" \
     || { echo "Failed to upload binaries to ${BUCKET_PATH}"; exit 1; }
 fi
