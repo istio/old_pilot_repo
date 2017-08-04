@@ -72,7 +72,7 @@ func (m *consulMonitor) run(stop <-chan struct{}) {
 		select {
 		case <-stop:
 			ticker.Stop()
-			return //?
+			return
 		case <-ticker.C:
 			m.updateServiceRecord()
 			m.updateInstanceRecord()
@@ -83,7 +83,7 @@ func (m *consulMonitor) run(stop <-chan struct{}) {
 func (m *consulMonitor) updateServiceRecord() {
 	svcs, _, err := m.discovery.Catalog().Services(nil)
 	if err != nil {
-		glog.Warningf("Error:%s in fetching service result", err)
+		glog.Warningf("Could not fetch services: %v", err)
 		return
 	}
 	newRecord := consulServices(svcs)
@@ -109,11 +109,11 @@ func (m *consulMonitor) updateServiceRecord() {
 func (m *consulMonitor) updateInstanceRecord() {
 	svcs, _, err := m.discovery.Catalog().Services(nil)
 	if err != nil {
-		glog.Warningf("Error:%s in fetching instance result", err)
+		glog.Warningf("Could not fetch instances: %v", err)
 		return
 	}
 
-	instances := []*api.CatalogService{}
+	instances := make([]*api.CatalogService, 0)
 	for name := range svcs {
 		endpoints, _, err := m.discovery.Catalog().Service(name, "", nil)
 		if err != nil {

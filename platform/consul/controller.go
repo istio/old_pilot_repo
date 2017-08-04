@@ -103,12 +103,17 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 		return nil
 	}
 
+	portMap := make(map[string]bool)
+	for _, port := range ports {
+		portMap[port] = true
+	}
+
 	endpoints := c.getCatalogService(name, nil)
 
 	instances := []*model.ServiceInstance{}
 	for _, endpoint := range endpoints {
 		instance := convertInstance(endpoint)
-		if tags.HasSubsetOf(instance.Tags) && portMatch(instance, ports) {
+		if tags.HasSubsetOf(instance.Tags) && portMatch(instance, portMap) {
 			instances = append(instances, instance)
 		}
 	}
@@ -117,15 +122,13 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 }
 
 // returns true if an instance's port matches with any in the provided list
-func portMatch(instance *model.ServiceInstance, ports []string) bool {
-	if len(ports) == 0 {
+func portMatch(instance *model.ServiceInstance, portMap map[string]bool) bool {
+	if len(portMap) == 0 {
 		return true
 	}
 
-	for _, port := range ports {
-		if instance.Endpoint.ServicePort.Name == port {
-			return true
-		}
+	if portMap[instance.Endpoint.ServicePort.Name] {
+		return true
 	}
 
 	return false

@@ -29,8 +29,8 @@ import (
 
 var (
 	services = map[string][]string{
-		"productpage": {"version=v1"},
-		"reviews":     {"version=v1", "version=v2", "version=v3"},
+		"productpage": {"version|v1"},
+		"reviews":     {"version|v1", "version|v2", "version|v3"},
 	}
 	productpage = []*api.CatalogService{
 		{
@@ -38,7 +38,7 @@ var (
 			Address:        "172.19.0.5",
 			ServiceID:      "111-111-111",
 			ServiceName:    "productpage",
-			ServiceTags:    []string{"version=v1"},
+			ServiceTags:    []string{"version|v1"},
 			ServiceAddress: "172.19.0.11",
 			ServicePort:    9080,
 		},
@@ -49,7 +49,7 @@ var (
 			Address:        "172.19.0.5",
 			ServiceID:      "222-222-222",
 			ServiceName:    "reviews",
-			ServiceTags:    []string{"version=v1"},
+			ServiceTags:    []string{"version|v1"},
 			ServiceAddress: "172.19.0.6",
 			ServicePort:    9080,
 		},
@@ -58,7 +58,7 @@ var (
 			Address:        "172.19.0.5",
 			ServiceID:      "333-333-333",
 			ServiceName:    "reviews",
-			ServiceTags:    []string{"version=v2"},
+			ServiceTags:    []string{"version|v2"},
 			ServiceAddress: "172.19.0.7",
 			ServicePort:    9080,
 		},
@@ -67,7 +67,7 @@ var (
 			Address:        "172.19.0.5",
 			ServiceID:      "444-444-444",
 			ServiceName:    "reviews",
-			ServiceTags:    []string{"version=v3"},
+			ServiceTags:    []string{"version|v3"},
 			ServiceAddress: "172.19.0.8",
 			ServicePort:    9080,
 			NodeMeta:       map[string]string{protocolTagName: "tcp"},

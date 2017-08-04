@@ -39,13 +39,13 @@ var (
 	}
 
 	goodTags = []string{
-		"key1=val1",
-		"version=v1",
+		"key1|val1",
+		"version|v1",
 	}
 
 	badTags = []string{
 		"badtag",
-		"goodtag=goodvalue",
+		"goodtag|goodvalue",
 	}
 )
 
@@ -85,8 +85,8 @@ func TestConvertInstance(t *testing.T) {
 		ServiceID:   "1111-22-3333-444",
 		ServiceName: name,
 		ServiceTags: []string{
-			fmt.Sprintf("%v=%v", tagKey1, tagVal1),
-			fmt.Sprintf("%v=%v", tagKey2, tagVal2),
+			fmt.Sprintf("%v|%v", tagKey1, tagVal1),
+			fmt.Sprintf("%v|%v", tagKey2, tagVal2),
 		},
 		ServiceAddress: ip,
 		ServicePort:    port,

@@ -32,12 +32,12 @@ const (
 func convertTags(tags []string) model.Tags {
 	out := make(model.Tags, len(tags))
 	for _, tag := range tags {
-		vals := strings.Split(tag, "=")
-		// Tags not of form "key=value" are ignored to avoid possible collisions
+		vals := strings.Split(tag, "|")
+		// Tags not of form "key|value" are ignored to avoid possible collisions
 		if len(vals) > 1 {
 			out[vals[0]] = vals[1]
 		} else {
-			glog.Warningf("Tag %v ignored since it is not of form key=value", tag)
+			glog.Warningf("Tag %v ignored since it is not of form key|value", tag)
 		}
 	}
 	return out
@@ -65,7 +65,6 @@ func convertService(endpoints []*api.CatalogService) *model.Service {
 		port := convertPort(endpoint.ServicePort, endpoint.NodeMeta[protocolTagName])
 
 		if svcPort, exists := ports[port.Port]; exists && svcPort.Protocol != port.Protocol {
-			// TODO Warn in this case?
 			glog.Warningf("Service %v has two instances on same port %v but different protocols (%v, %v)",
 				name, port.Port, svcPort.Protocol, port.Protocol)
 		} else {
