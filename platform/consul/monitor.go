@@ -112,6 +112,9 @@ func (m *consulMonitor) updateInstanceRecord() {
 		glog.Warningf("Could not fetch instances: %v", err)
 		return
 	}
+	for _, tags := range svcs {
+		sort.Strings(tags)
+	}
 
 	instances := make([]*api.CatalogService, 0)
 	for name := range svcs {
