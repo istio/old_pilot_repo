@@ -35,8 +35,8 @@ tag=$(whoami)_$(date +%y%m%d_%h%m%s)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -tag) tag="$2"; shift ;;
-        -hub) hub="$2"; shift ;;
+        --tag|-tag) tag="$2"; shift ;;
+        --hub|-hub) hub="$2"; shift ;;
         *) args=$args" $1" ;;
     esac
     shift

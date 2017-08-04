@@ -15,6 +15,8 @@ spec:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
+  annotations:
+    status.sidecar.istio.io: injected-version-TODO
   creationTimestamp: null
   name: frontend
 spec:
@@ -22,9 +24,6 @@ spec:
   strategy: {}
   template:
     metadata:
-      annotations:
-        alpha.istio.io/sidecar: injected
-        alpha.istio.io/version: "12345678"
       creationTimestamp: null
       labels:
         app: hello
