@@ -105,9 +105,6 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 			if versionStr == "" {
 				versionStr = version.Line()
 			}
-			if tag == "" {
-				tag = versionStr
-			}
 
 			client, err := kube.CreateInterface(kubeconfig)
 			if err != nil {
@@ -140,7 +137,7 @@ func init() {
 	rootCmd.AddCommand(injectCmd)
 
 	injectCmd.PersistentFlags().StringVar(&hub, "hub", "docker.io/istio", "Docker hub")
-	injectCmd.PersistentFlags().StringVar(&tag, "tag", "", "Docker tag, defaults to same as version")
+	injectCmd.PersistentFlags().StringVar(&tag, "tag", version.Info.Version, "Docker tag")
 
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
 		"", "Input Kubernetes resource filename")
