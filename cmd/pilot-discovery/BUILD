@@ -28,5 +28,5 @@ go_binary(
     name = "pilot-discovery",
     library = ":go_default_library",
     linkstamp = "istio.io/pilot/tools/version",
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
