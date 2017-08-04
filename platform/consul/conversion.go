@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hashicorp/consul/api"
+
 	"istio.io/pilot/model"
 )
 
@@ -31,10 +33,11 @@ func convertTags(tags []string) model.Tags {
 	out := make(model.Tags, len(tags))
 	for _, tag := range tags {
 		vals := strings.Split(tag, "=")
-
 		// Tags not of form "key=value" are ignored to avoid possible collisions
 		if len(vals) > 1 {
 			out[vals[0]] = vals[1]
+		} else {
+			glog.Warningf("Tag %v ignored since it is not of form key=value", tag)
 		}
 	}
 	return out
@@ -54,28 +57,36 @@ func convertPort(port int, name string) *model.Port {
 
 func convertService(endpoints []*api.CatalogService) *model.Service {
 	name, addr, external := "", "", ""
-	node, datacenter := "", ""
 
-	ports := model.PortList{}
+	ports := make(map[int]*model.Port)
 	for _, endpoint := range endpoints {
 		name = endpoint.ServiceName
-		ports = append(ports, convertPort(endpoint.ServicePort, endpoint.NodeMeta[protocolTagName]))
+
+		port := convertPort(endpoint.ServicePort, endpoint.NodeMeta[protocolTagName])
+
+		if svcPort, exists := ports[port.Port]; exists && svcPort.Protocol != port.Protocol {
+			// TODO Warn in this case?
+			glog.Warningf("Service %v has two instances on same port %v but different protocols (%v, %v)",
+				name, port.Port, svcPort.Protocol, port.Protocol)
+		} else {
+			ports[port.Port] = port
+		}
 
 		// TODO This will not work if service is a mix of external and local services
 		// or if a service has more than one external name
 		if endpoint.NodeMeta[externalTagName] != "" {
 			external = endpoint.NodeMeta[externalTagName]
 		}
+	}
 
-		// TODO how to handle if a service spans datacenters/nodes?
-		node = endpoint.Node
-		datacenter = endpoint.Datacenter
-
+	svcPorts := make(model.PortList, 0, len(ports))
+	for _, port := range ports {
+		svcPorts = append(svcPorts, port)
 	}
 
 	out := &model.Service{
-		Hostname:     serviceHostname(name, node, datacenter),
-		Ports:        ports,
+		Hostname:     serviceHostname(name),
+		Ports:        svcPorts,
 		Address:      addr,
 		ExternalName: external,
 	}
@@ -83,36 +94,36 @@ func convertService(endpoints []*api.CatalogService) *model.Service {
 	return out
 }
 
-func convertInstance(inst *api.CatalogService) *model.ServiceInstance {
-	tags := convertTags(inst.ServiceTags)
-	port := convertPort(inst.ServicePort, inst.NodeMeta[protocolTagName])
+func convertInstance(instance *api.CatalogService) *model.ServiceInstance {
+	tags := convertTags(instance.ServiceTags)
+	port := convertPort(instance.ServicePort, instance.NodeMeta[protocolTagName])
 
-	addr := inst.ServiceAddress
+	addr := instance.ServiceAddress
 	if addr == "" {
-		addr = inst.Address
+		addr = instance.Address
 	}
 
 	return &model.ServiceInstance{
 		Endpoint: model.NetworkEndpoint{
 			Address:     addr,
-			Port:        inst.ServicePort,
+			Port:        instance.ServicePort,
 			ServicePort: port,
 		},
 
 		Service: &model.Service{
-			Hostname: serviceHostname(inst.ServiceName, "TODO", inst.Datacenter),
-			Address:  inst.ServiceAddress,
+			Hostname: serviceHostname(instance.ServiceName),
+			Address:  instance.ServiceAddress,
 			Ports:    model.PortList{port},
 			// TODO ExternalName come from metadata?
-			ExternalName: inst.NodeMeta[externalTagName],
+			ExternalName: instance.NodeMeta[externalTagName],
 		},
 		Tags: tags,
 	}
 }
 
 // serviceHostname produces FQDN for a consul service
-func serviceHostname(name, node, datacenter string) string {
-	// TODO include consul node in Hostname?
+func serviceHostname(name string) string {
+	// TODO include datacenter in Hostname?
 	// consul DNS uses "redis.service.us-east-1.consul" -> "[<optional_tag>].<svc>.service.[<optional_datacenter>].consul"
 	return fmt.Sprintf("%s.service.consul", name)
 }

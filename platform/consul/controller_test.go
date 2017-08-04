@@ -20,8 +20,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
+
 	"istio.io/pilot/model"
 )
 
@@ -30,7 +32,6 @@ var (
 		"productpage": {"version=v1"},
 		"reviews":     {"version=v1", "version=v2", "version=v3"},
 	}
-
 	productpage = []*api.CatalogService{
 		{
 			Node:           "istio",
@@ -76,7 +77,6 @@ var (
 
 func newServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		if r.URL.Path == "/v1/catalog/services" {
 			data, _ := json.Marshal(&services)
 			w.Header().Set("Content-Type", "application/json")
@@ -98,13 +98,12 @@ func newServer() *httptest.Server {
 func TestInstances(t *testing.T) {
 	ts := newServer()
 	defer ts.Close()
-	controller, err := NewController(ts.URL, "datacenter")
-
+	controller, err := NewController(ts.URL, "datacenter", 3*time.Second)
 	if err != nil {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
-	hostname := serviceHostname("reviews", "node", "datacenter")
+	hostname := serviceHostname("reviews")
 	instances := controller.Instances(hostname, []string{}, model.TagsList{})
 	if len(instances) != 3 {
 		t.Errorf("Instances() returned wrong # of service instances => %q, want 3", len(instances))
@@ -151,38 +150,33 @@ func TestInstances(t *testing.T) {
 }
 
 func TestGetService(t *testing.T) {
-
 	ts := newServer()
 	defer ts.Close()
-	controller, err := NewController(ts.URL, "datacenter")
-
+	controller, err := NewController(ts.URL, "datacenter", 3*time.Second)
 	if err != nil {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
 	service, exists := controller.GetService("productpage.service.consul")
-
 	if !exists {
 		t.Error("service should exist")
 	}
 
-	if service.Hostname != serviceHostname("productpage", "node", "datacenter") {
+	if service.Hostname != serviceHostname("productpage") {
 		t.Errorf("GetService() incorrect service returned => %q, want %q",
-			service.Hostname, serviceHostname("productpage", "node", "datacenter"))
+			service.Hostname, serviceHostname("productpage"))
 	}
 }
 
 func TestServices(t *testing.T) {
 	ts := newServer()
 	defer ts.Close()
-	controller, err := NewController(ts.URL, "datacenter")
-
+	controller, err := NewController(ts.URL, "datacenter", 3*time.Second)
 	if err != nil {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
 	services := controller.Services()
-
 	serviceMap := make(map[string]*model.Service)
 	for _, svc := range services {
 		name, err := parseHostname(svc.Hostname)
@@ -195,25 +189,22 @@ func TestServices(t *testing.T) {
 	if serviceMap["productpage"] == nil || serviceMap["reviews"] == nil || len(services) != 2 {
 		t.Errorf("Services() missing or incorrect # of services returned: %q", services)
 	}
-
 }
 
 func TestHostInstances(t *testing.T) {
 	ts := newServer()
 	defer ts.Close()
-	controller, err := NewController(ts.URL, "datacenter")
-
+	controller, err := NewController(ts.URL, "datacenter", 3*time.Second)
 	if err != nil {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
 	services := controller.HostInstances(map[string]bool{"172.19.0.11": true})
-
 	if len(services) != 1 {
 		t.Errorf("HostInstances() returned wrong # of endpoints => %q, want 1", len(services))
 	}
 
-	if services[0].Service.Hostname != serviceHostname("productpage", "node", "datacenter") {
+	if services[0].Service.Hostname != serviceHostname("productpage") {
 		t.Errorf("HostInstances() wrong service instance returned => %q, want productpage", services[0])
 	}
 }

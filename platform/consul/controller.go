@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/consul/api"
+
 	"istio.io/pilot/model"
 )
 
@@ -31,13 +31,13 @@ type Controller struct {
 }
 
 // NewController creates a new Consul controller
-func NewController(addr, datacenter string) (*Controller, error) {
+func NewController(addr, datacenter string, interval time.Duration) (*Controller, error) {
 	conf := api.DefaultConfig()
 	conf.Address = addr
 
 	client, err := api.NewClient(conf)
 	return &Controller{
-		monitor:    NewConsulMonitor(client, time.Second*3),
+		monitor:    NewConsulMonitor(client, interval),
 		client:     client,
 		dataCenter: datacenter,
 	}, err
@@ -70,9 +70,7 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 		return nil, false
 	}
 
-	out := convertService(endpoints)
-
-	return out, true
+	return convertService(endpoints), true
 }
 
 func (c *Controller) getServices() map[string][]string {
@@ -109,9 +107,9 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 
 	instances := []*model.ServiceInstance{}
 	for _, endpoint := range endpoints {
-		inst := convertInstance(endpoint)
-		if tags.HasSubsetOf(inst.Tags) && portMatch(inst, ports) {
-			instances = append(instances, inst)
+		instance := convertInstance(endpoint)
+		if tags.HasSubsetOf(instance.Tags) && portMatch(instance, ports) {
+			instances = append(instances, instance)
 		}
 	}
 
@@ -119,13 +117,13 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 }
 
 // returns true if an instance's port matches with any in the provided list
-func portMatch(inst *model.ServiceInstance, ports []string) bool {
+func portMatch(instance *model.ServiceInstance, ports []string) bool {
 	if len(ports) == 0 {
 		return true
 	}
 
 	for _, port := range ports {
-		if inst.Endpoint.ServicePort.Name == port {
+		if instance.Endpoint.ServicePort.Name == port {
 			return true
 		}
 	}
@@ -138,12 +136,10 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 	data := c.getServices()
 	out := make([]*model.ServiceInstance, 0)
 	for svcName := range data {
-		for addr := range addrs {
-			endpoints := c.getCatalogService(svcName, nil)
-			for _, endpoint := range endpoints {
-				if addr == endpoint.ServiceAddress {
-					out = append(out, convertInstance(endpoint))
-				}
+		endpoints := c.getCatalogService(svcName, nil)
+		for _, endpoint := range endpoints {
+			if addrs[endpoint.ServiceAddress] {
+				out = append(out, convertInstance(endpoint))
 			}
 		}
 	}
@@ -156,15 +152,10 @@ func (c *Controller) Run(stop <-chan struct{}) {
 	c.monitor.Start(stop)
 }
 
-// GetIstioServiceAccounts implements model.ServiceAccounts interface TODO
-func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
-	return nil
-}
-
 // AppendServiceHandler implements a service catalog operation
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
-	c.monitor.AppendServiceHandler(func(obj interface{}, event model.Event) error {
-		f(convertService(*obj.(*[]*api.CatalogService)), event)
+	c.monitor.AppendServiceHandler(func(instances []*api.CatalogService, event model.Event) error {
+		f(convertService(instances), event)
 		return nil
 	})
 	return nil
@@ -172,48 +163,9 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 
 // AppendInstanceHandler implements a service catalog operation
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
-	c.monitor.AppendInstanceHandler(func(obj interface{}, event model.Event) error {
-		f(convertInstance(&(*obj.(*api.CatalogService))), event)
+	c.monitor.AppendInstanceHandler(func(instance *api.CatalogService, event model.Event) error {
+		f(convertInstance(instance), event)
 		return nil
 	})
 	return nil
-}
-
-// HasSynced implements model.ConfigStoreCache operation TODO
-func (c *Controller) HasSynced() bool {
-	return false
-}
-
-// ConfigDescriptor implements model.ConfigStore operation TODO
-func (c *Controller) ConfigDescriptor() model.ConfigDescriptor {
-	return nil
-}
-
-// Get implements model.ConfigStore operation TODO
-func (c *Controller) Get(typ, key string) (config proto.Message, exists bool, revision string) {
-	return nil, false, ""
-}
-
-// List implements model.ConfigStore operation TODO
-func (c *Controller) List(typ string) ([]model.Config, error) {
-	return nil, nil
-}
-
-// Post implements model.ConfigStore operation TODO
-func (c *Controller) Post(config proto.Message) (revision string, err error) {
-	return "", nil
-}
-
-// Put implements model.ConfigStore operation TODO
-func (c *Controller) Put(config proto.Message, oldRevision string) (newRevision string, err error) {
-	return "", nil
-}
-
-// Delete implements model.ConfigStore operation TODO
-func (c *Controller) Delete(typ, key string) error {
-	return nil
-}
-
-// RegisterEventHandler implements model.ConfigStoreCache operation TODO
-func (c *Controller) RegisterEventHandler(typ string, handler func(model.Config, model.Event)) {
 }

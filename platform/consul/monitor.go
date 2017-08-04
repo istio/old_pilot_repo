@@ -20,34 +20,34 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	"github.com/hashicorp/consul/api"
+
 	"istio.io/pilot/model"
 )
 
 type consulServices map[string][]string
 type consulServiceInstances []*api.CatalogService
 
-// Handler specifies a function to apply on an object for a given event type
-type Handler func(obj interface{}, event model.Event) error
-
 // Monitor handles service and instance changes
 type Monitor interface {
 	Start(<-chan struct{})
-	Stop()
-	AppendServiceHandler(Handler)
-	AppendInstanceHandler(Handler)
+	AppendServiceHandler(ServiceHandler)
+	AppendInstanceHandler(InstanceHandler)
 }
+
+// InstanceHandler processes service instance change events
+type InstanceHandler func(instance *api.CatalogService, event model.Event) error
+
+// ServiceHandler processes service change events
+type ServiceHandler func(instances []*api.CatalogService, event model.Event) error
 
 type consulMonitor struct {
 	discovery            *api.Client
 	instanceCachedRecord consulServiceInstances
 	serviceCachedRecord  consulServices
-	instanceHandlers     []Handler
-	serviceHandlers      []Handler
+	instanceHandlers     []InstanceHandler
+	serviceHandlers      []ServiceHandler
 	period               time.Duration
-	tickChan             <-chan time.Time
-	isStopped            bool
 }
 
 // NewConsulMonitor polls for changes in Consul Services and CatalogServices
@@ -57,44 +57,34 @@ func NewConsulMonitor(client *api.Client, period time.Duration) Monitor {
 		period:               period,
 		instanceCachedRecord: make(consulServiceInstances, 0),
 		serviceCachedRecord:  make(consulServices),
-		instanceHandlers:     make([]Handler, 0),
-		serviceHandlers:      make([]Handler, 0),
-		isStopped:            true,
+		instanceHandlers:     make([]InstanceHandler, 0),
+		serviceHandlers:      make([]ServiceHandler, 0),
 	}
 }
 
 func (m *consulMonitor) Start(stop <-chan struct{}) {
-	m.isStopped = false
-	m.tickChan = time.NewTicker(m.period).C
 	m.run(stop)
 }
 
-func (m *consulMonitor) Stop() {
-	m.isStopped = true
-}
-
 func (m *consulMonitor) run(stop <-chan struct{}) {
-	var err error
+	ticker := time.NewTicker(m.period)
 	for {
 		select {
 		case <-stop:
-			m.Stop()
-		case <-m.tickChan:
-			if err = m.UpdateServiceRecord(); err != nil {
-				m.Stop()
-			}
-			if err = m.UpdateInstanceRecord(); err != nil {
-				m.Stop()
-			}
+			ticker.Stop()
+			return //?
+		case <-ticker.C:
+			m.updateServiceRecord()
+			m.updateInstanceRecord()
 		}
 	}
 }
 
-func (m *consulMonitor) UpdateServiceRecord() error {
+func (m *consulMonitor) updateServiceRecord() {
 	svcs, _, err := m.discovery.Catalog().Services(nil)
 	if err != nil {
 		glog.Warningf("Error:%s in fetching service result", err)
-		return err
+		return
 	}
 	newRecord := consulServices(svcs)
 	if !reflect.DeepEqual(newRecord, m.serviceCachedRecord) {
@@ -103,65 +93,76 @@ func (m *consulMonitor) UpdateServiceRecord() error {
 		// regardless of the input, thus passing in meaningless
 		// input should make functionalities work
 		//TODO
-		obj := &[]*api.CatalogService{}
+		obj := []*api.CatalogService{}
 		var event model.Event
 		for _, f := range m.serviceHandlers {
-			if err := f(obj, event); err != nil {
-				glog.Warningf("Error:%s in executing handler function", err)
-				return err
-			}
+			go func(handler ServiceHandler) {
+				if err := handler(obj, event); err != nil {
+					glog.Warningf("Error executing service handler function: %v", err)
+				}
+			}(f)
 		}
 		m.serviceCachedRecord = newRecord
 	}
-	return nil
 }
 
-func (m *consulMonitor) UpdateInstanceRecord() error {
+func (m *consulMonitor) updateInstanceRecord() {
 	svcs, _, err := m.discovery.Catalog().Services(nil)
 	if err != nil {
 		glog.Warningf("Error:%s in fetching instance result", err)
-		return err
+		return
 	}
 
-	insts := []*api.CatalogService{}
+	instances := []*api.CatalogService{}
 	for name := range svcs {
 		endpoints, _, err := m.discovery.Catalog().Service(name, "", nil)
 		if err != nil {
 			glog.Warningf("Could not retrieve service catalogue from consul: %v", err)
 			continue
 		}
-		insts = append(insts, endpoints...)
-
+		instances = append(instances, endpoints...)
 	}
 
-	newRecord := consulServiceInstances(insts)
-	newRecord.normalize()
+	newRecord := consulServiceInstances(instances)
+	sort.Sort(newRecord)
 	if !reflect.DeepEqual(newRecord, m.instanceCachedRecord) {
 		// This is only a work-around solution currently
 		// Since Handler functions generally act as a refresher
 		// regardless of the input, thus passing in meaningless
 		// input should make functionalities work
+		// TODO
 		obj := &api.CatalogService{}
 		var event model.Event
 		for _, f := range m.instanceHandlers {
-			if err := f(obj, event); err != nil {
-				glog.Warningf("Error:%s in executing handler function", err)
-				return err
-			}
+			go func(handler InstanceHandler) {
+				if err := handler(obj, event); err != nil {
+					glog.Warningf("Error executing instance handler function: %v", err)
+				}
+			}(f)
 		}
 		m.instanceCachedRecord = newRecord
 	}
-	return nil
 }
 
-func (m *consulMonitor) AppendServiceHandler(h Handler) {
+func (m *consulMonitor) AppendServiceHandler(h ServiceHandler) {
 	m.serviceHandlers = append(m.serviceHandlers, h)
 }
 
-func (m *consulMonitor) AppendInstanceHandler(h Handler) {
+func (m *consulMonitor) AppendInstanceHandler(h InstanceHandler) {
 	m.instanceHandlers = append(m.instanceHandlers, h)
 }
 
-func (list consulServiceInstances) normalize() {
-	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
+// Len of the array
+func (a consulServiceInstances) Len() int {
+	return len(a)
+}
+
+// Swap i and j
+func (a consulServiceInstances) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+// Less i and j
+func (a consulServiceInstances) Less(i, j int) bool {
+	return a[i].ID < a[j].ID
 }

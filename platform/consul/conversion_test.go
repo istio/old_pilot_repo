@@ -119,9 +119,9 @@ func TestConvertInstance(t *testing.T) {
 		t.Errorf("convertInstance() => missing or incorrect tag in %q", out.Tags)
 	}
 
-	if out.Service.Hostname != serviceHostname(name, "datacenter", "node") {
+	if out.Service.Hostname != serviceHostname(name) {
 		t.Errorf("convertInstance() bad service hostname => %q, want %q",
-			out.Service.Hostname, serviceHostname(name, "datacenter", "node"))
+			out.Service.Hostname, serviceHostname(name))
 	}
 
 	if out.Service.Address != ip {
@@ -142,7 +142,7 @@ func TestConvertInstance(t *testing.T) {
 }
 
 func TestServiceHostname(t *testing.T) {
-	out := serviceHostname("productpage", "datacenter", "node")
+	out := serviceHostname("productpage")
 
 	if out != "productpage.service.consul" {
 		t.Errorf("serviceHostname() => %q, want %q", out, "productpage.service.consul")
@@ -181,9 +181,9 @@ func TestConvertService(t *testing.T) {
 
 	out := convertService(consulServiceInsts)
 
-	if out.Hostname != serviceHostname(name, "datacenter", "node") {
+	if out.Hostname != serviceHostname(name) {
 		t.Errorf("convertService() bad hostname => %q, want %q",
-			out.Hostname, serviceHostname(name, "datacenter", "node"))
+			out.Hostname, serviceHostname(name))
 	}
 
 	if out.External() {
