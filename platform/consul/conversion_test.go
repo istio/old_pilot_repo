@@ -190,8 +190,8 @@ func TestConvertService(t *testing.T) {
 		t.Error("convertService() should not be an external service")
 	}
 
-	if len(out.Ports) != len(consulServiceInsts) {
-		t.Errorf("covnertService() incorrect # of ports => %q, want %q",
-			len(out.Ports), len(consulServiceInsts))
+	if len(out.Ports) != 1 {
+		t.Errorf("covnertService() incorrect # of ports => %v, want %v",
+			len(out.Ports), 1)
 	}
 }
