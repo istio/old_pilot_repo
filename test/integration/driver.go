@@ -165,12 +165,12 @@ func runTests(envs ...infra) {
 
 		tests := []test{
 			&http{infra: &istio},
-			&grpc{infra: &istio},
+			//&grpc{infra: &istio},
 			//&tcp{infra: &istio},
 			&ingress{infra: &istio},
 			//&egress{infra: &istio},
-			&routing{infra: &istio},
-			&zipkin{infra: &istio},
+			//&routing{infra: &istio},
+			//&zipkin{infra: &istio},
 		}
 
 		for _, test := range tests {

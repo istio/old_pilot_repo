@@ -431,7 +431,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 
 		// service-node holds the IP address
 		node := request.PathParameter(ServiceNode)
-		glog.V(2).Info("ANDRA LDS request for service_node:%s", node)
+		glog.V(2).Info("LDS request for service_node: ", node)
 		_, clusters := ds.getListeners(node)
 
 		var err error
@@ -545,21 +545,26 @@ func (ds *DiscoveryService) ListListeners(request *restful.Request, response *re
 // ListSecret responds to TLS secret registration
 func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restful.Response) {
 	// caching is disabled due to lack of secret watch notifications
-	if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
+	sc := ""
+	if sc = request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
 		errorResponse(response, http.StatusNotFound,
 			fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
 		return
 	}
 
-	if sc := request.PathParameter(ServiceNode); sc != proxy.IngressNode {
+	sn := ""
+	if sn := request.PathParameter(ServiceNode); sn != proxy.IngressNode {
 		errorResponse(response, http.StatusNotFound,
-			fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
+			fmt.Sprintf("Unexpected %s %q", ServiceNode, sn))
 		return
 	}
+	glog.V(3).Infof("Discovery request to List Secret for service_cluster %s, service_node %s",
+		sc, sn)
 
 	_, secret := buildIngressRoutes(ds.IngressRules(), ds, ds)
 
 	if secret == "" {
+		glog.V(3).Infof("Secret is not set")
 		writeResponse(response, nil)
 		return
 	}
@@ -667,7 +672,7 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 	default:
 		sidecar, err := proxy.DecodeServiceNode(node)
 		if err != nil {
-			glog.Error("ANDRA LDS Error decoding service_node:%s", err)
+			glog.Error("LDS Error decoding service_node: ", err)
 			return Listeners{}, Clusters{}
 		}
 		listeners, clusters = buildListeners(ds.Environment, sidecar)
