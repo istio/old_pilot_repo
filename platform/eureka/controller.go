@@ -19,6 +19,7 @@ type controller struct {
 	client           Client
 }
 
+// NewController instantiates a new Eureka controller
 func NewController(client Client) model.Controller {
 	return &controller{
 		interval:         1 * time.Second,
@@ -39,7 +40,7 @@ func (c *controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 }
 
 func (c *controller) Run(stop <-chan struct{}) {
-	var cachedApps []*Application
+	var cachedApps []*application
 	ticker := time.NewTicker(c.interval)
 	for {
 		select {
@@ -53,8 +54,9 @@ func (c *controller) Run(stop <-chan struct{}) {
 			if !reflect.DeepEqual(apps, cachedApps) {
 				cachedApps = apps
 				// TODO: feed with real events.
-				// The handlers are being feed dummy events. This is sufficient with simplistic handlers
-				// that invalidate the cache on any event but will not work with smarter handlers.
+				// The handlers are being feed dummy events. This is sufficient with simplistic
+				// handlers that invalidate the cache on any event but will not work with smarter
+				// handlers.
 				for _, h := range c.serviceHandlers {
 					go h(&model.Service{}, model.EventAdd)
 				}

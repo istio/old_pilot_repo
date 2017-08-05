@@ -9,7 +9,7 @@ import (
 	"istio.io/pilot/model"
 )
 
-func convertServices(apps []*Application, hostnames map[string]bool) map[string]*model.Service {
+func convertServices(apps []*application, hostnames map[string]bool) map[string]*model.Service {
 	services := make(map[string]*model.Service)
 	for _, app := range apps {
 		for _, instance := range app.Instances {
@@ -32,7 +32,10 @@ func convertServices(apps []*Application, hostnames map[string]bool) map[string]
 			for _, port := range convertPorts(instance) {
 				if port, exists := service.Ports.GetByPort(port.Port); exists {
 					if port.Protocol != protocol {
-						glog.Warningf("invalid Eureka instance configuration for %s: port %d has conflicting protocol definitions %s, %s", instance.Hostname, port.Port, port.Protocol, protocol)
+						glog.Warningf(
+							"invalid Eureka config: "+
+							"%s:%d has conflicting protocol definitions %s, %s",
+							instance.Hostname, port.Port, port.Protocol, protocol)
 					}
 					continue
 				}
@@ -44,7 +47,7 @@ func convertServices(apps []*Application, hostnames map[string]bool) map[string]
 	return services
 }
 
-func convertServiceInstances(services map[string]*model.Service, apps []*Application) []*model.ServiceInstance {
+func convertServiceInstances(services map[string]*model.Service, apps []*application) []*model.ServiceInstance {
 	out := make([]*model.ServiceInstance, 0)
 	for _, app := range apps {
 		for _, instance := range app.Instances {
@@ -68,10 +71,10 @@ func convertServiceInstances(services map[string]*model.Service, apps []*Applica
 	return out
 }
 
-func convertPorts(instance *Instance) model.PortList {
+func convertPorts(instance *instance) model.PortList {
 	out := make(model.PortList, 0, 2)
 	protocol := convertProtocol(instance)
-	for _, port := range []*Port{instance.Port, instance.SecurePort} {
+	for _, port := range []*port{instance.Port, instance.SecurePort} {
 		if port == nil || !port.Enabled {
 			continue
 		}
@@ -97,7 +100,7 @@ const (
 	metadataGRPC  = "grpc"
 )
 
-func convertProtocol(instance *Instance) model.Protocol {
+func convertProtocol(instance *instance) model.Protocol {
 	if instance != nil && instance.Metadata != nil {
 		protocol := strings.ToLower(instance.Metadata[protocolMetadata])
 		switch protocol {
@@ -122,7 +125,7 @@ func convertProtocol(instance *Instance) model.Protocol {
 	return model.ProtocolTCP // default protocol
 }
 
-func convertTags(metadata Metadata) model.Tags {
+func convertTags(metadata metadata) model.Tags {
 	tags := make(model.Tags)
 	for k, v := range metadata {
 		tags[k] = v

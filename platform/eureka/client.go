@@ -8,44 +8,50 @@ import (
 	"time"
 )
 
-type GetApplications struct {
-	Applications Applications `json:"applications"`
+type getApplications struct {
+	Applications applications `json:"applications"`
 }
 
-type Applications struct {
-	Applications []*Application `json:"application"`
+type applications struct {
+	Applications []*application `json:"application"`
 }
 
-type Application struct {
+type application struct {
 	Name      string      `json:"name"`
-	Instances []*Instance `json:"instance"`
+	Instances []*instance `json:"instance"`
 }
 
-type Instance struct {
+type instance struct {
 	Hostname   string   `json:"hostName"`
 	App        string   `json:"app"`
 	IPAddress  string   `json:"ipAddr"`
-	Port       *Port    `json:"port,omitempty"`
-	SecurePort *Port    `json:"securePort,omitempty"`
-	Metadata   Metadata `json:"metadata,omitempty"`
+	Port       *port    `json:"port,omitempty"`
+	SecurePort *port    `json:"securePort,omitempty"`
+	Metadata   metadata `json:"metadata,omitempty"`
 }
 
-type Port struct {
+type port struct {
 	Port    int  `json:"$"`
 	Enabled bool `json:"@enabled,string"`
 }
 
-type Metadata map[string]string
+type metadata map[string]string
 
+// Client for Eureka
 type Client interface {
-	Applications() ([]*Application, error)
+	// Applications registered on the Eureka server
+	Applications() ([]*application, error)
 }
 
+// Minimal client for Eureka server's REST APIs.
+// TODO: support multiple Eureka servers
+// TODO: caching
 type client struct {
 	client http.Client
 	url    string
 }
 
+// NewClient instantiates a new Eureka client
 func NewClient(url string) Client {
 	return &client{
 		client: http.Client{Timeout: 30 * time.Second},
@@ -53,7 +59,7 @@ func NewClient(url string) Client {
 	}
 }
 
-func (c *client) Applications() ([]*Application, error) {
+func (c *client) Applications() ([]*application, error) {
 	req, err := http.NewRequest("GET", c.url+"/eureka/v2/apps", nil)
 	if err != nil {
 		return nil, err
@@ -74,7 +80,7 @@ func (c *client) Applications() ([]*Application, error) {
 		return nil, err
 	}
 
-	var apps GetApplications
+	var apps getApplications
 	if err = json.Unmarshal(data, &apps); err != nil {
 		return nil, err
 	}

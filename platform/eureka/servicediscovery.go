@@ -5,6 +5,7 @@ import (
 	"istio.io/pilot/model"
 )
 
+// NewServiceDiscovery instantiates an implementation of service discovery for Eureka
 func NewServiceDiscovery(client Client) model.ServiceDiscovery {
 	return &serviceDiscovery{
 		client: client,
@@ -15,13 +16,13 @@ type serviceDiscovery struct {
 	client Client
 }
 
+// Services implements a service catalog operation
 func (sd *serviceDiscovery) Services() []*model.Service {
 	apps, err := sd.client.Applications()
 	if err != nil {
 		glog.Warningf("could not list Eureka instances: %v", err)
 		return nil
 	}
-
 	services := convertServices(apps, nil)
 
 	// TODO: canonical ordering?
@@ -32,6 +33,7 @@ func (sd *serviceDiscovery) Services() []*model.Service {
 	return out
 }
 
+// GetService implements a service catalog operation
 func (sd *serviceDiscovery) GetService(hostname string) (*model.Service, bool) {
 	apps, err := sd.client.Applications()
 	if err != nil {
@@ -44,18 +46,17 @@ func (sd *serviceDiscovery) GetService(hostname string) (*model.Service, bool) {
 	return service, service != nil
 }
 
+// Instances implements a service catalog operation
 func (sd *serviceDiscovery) Instances(hostname string, ports []string, tagsList model.TagsList) []*model.ServiceInstance {
 	apps, err := sd.client.Applications()
 	if err != nil {
 		glog.Warningf("could not list Eureka instances: %v", err)
 		return nil
 	}
-
 	portSet := make(map[string]bool)
 	for _, port := range ports {
 		portSet[port] = true
 	}
-
 	services := convertServices(apps, map[string]bool{hostname: true})
 
 	out := make([]*model.ServiceInstance, 0)
@@ -73,13 +74,13 @@ func (sd *serviceDiscovery) Instances(hostname string, ports []string, tagsList 
 	return out
 }
 
+// HostInstances implements a service catalog operation
 func (sd *serviceDiscovery) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	apps, err := sd.client.Applications()
 	if err != nil {
 		glog.Warningf("could not list Eureka instances: %v", err)
 		return nil
 	}
-
 	services := convertServices(apps, nil)
 
 	out := make([]*model.ServiceInstance, 0)
