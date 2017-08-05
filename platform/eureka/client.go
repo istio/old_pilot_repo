@@ -70,7 +70,7 @@ func (c *client) Applications() ([]*application, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code from Eureka server: %v", resp.Status)
 	}

@@ -36,7 +36,7 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 					if servicePort.Protocol != protocol {
 						glog.Warningf(
 							"invalid Eureka config: "+
-							"%s:%d has conflicting protocol definitions %s, %s",
+								"%s:%d has conflicting protocol definitions %s, %s",
 							instance.Hostname, servicePort.Port,
 							servicePort.Protocol, protocol)
 					}

@@ -66,7 +66,7 @@ func (c *controller) Run(stop <-chan struct{}) {
 			}
 		case <-stop:
 			ticker.Stop()
-			break
+			return
 		}
 	}
 }

@@ -47,7 +47,9 @@ func (sd *serviceDiscovery) GetService(hostname string) (*model.Service, bool) {
 }
 
 // Instances implements a service catalog operation
-func (sd *serviceDiscovery) Instances(hostname string, ports []string, tagsList model.TagsList) []*model.ServiceInstance {
+func (sd *serviceDiscovery) Instances(hostname string, ports []string,
+	tagsList model.TagsList) []*model.ServiceInstance {
+
 	apps, err := sd.client.Applications()
 	if err != nil {
 		glog.Warningf("could not list Eureka instances: %v", err)
