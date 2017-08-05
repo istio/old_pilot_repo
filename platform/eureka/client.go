@@ -1,14 +1,13 @@
 package eureka
 
 import (
-	"net/http"
 	"encoding/json"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"time"
 )
 
-// TODO: supposedly Eureka uses the key 'application' for 1, or 'applications' for 2+
 type GetApplications struct {
 	Applications Applications `json:"applications"`
 }
@@ -18,32 +17,25 @@ type Applications struct {
 }
 
 type Application struct {
-	Name string `json:"name"`
+	Name      string      `json:"name"`
 	Instances []*Instance `json:"instance"`
 }
 
 type Instance struct {
-	Hostname string `json:"hostName"`
-	App string `json:"app"`
-	IPAddress string `json:"ipAddr"`
-	Port *Port `json:"port,omitempty"`
-	SecurePort *Port `json:"securePort,omitempty"`
-	Metadata Metadata `json:"metadata,omitempty"`
+	Hostname   string   `json:"hostName"`
+	App        string   `json:"app"`
+	IPAddress  string   `json:"ipAddr"`
+	Port       *Port    `json:"port,omitempty"`
+	SecurePort *Port    `json:"securePort,omitempty"`
+	Metadata   Metadata `json:"metadata,omitempty"`
 }
 
 type Port struct {
-	Port int `json:"$"`
+	Port    int  `json:"$"`
 	Enabled bool `json:"@enabled,string"`
 }
 
 type Metadata map[string]string
-
-func NewClient(url string) Client {
-	return &client{
-		client: http.Client{Timeout: 30 * time.Second},
-		url: url,
-	}
-}
 
 type Client interface {
 	Applications() ([]*Application, error)
@@ -51,11 +43,18 @@ type Client interface {
 
 type client struct {
 	client http.Client
-	url string
+	url    string
+}
+
+func NewClient(url string) Client {
+	return &client{
+		client: http.Client{Timeout: 30 * time.Second},
+		url:    url,
+	}
 }
 
 func (c *client) Applications() ([]*Application, error) {
-	req, err := http.NewRequest("GET", c.url + "/eureka/v2/apps", nil)
+	req, err := http.NewRequest("GET", c.url+"/eureka/v2/apps", nil)
 	if err != nil {
 		return nil, err
 	}

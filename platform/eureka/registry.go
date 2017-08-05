@@ -39,7 +39,7 @@ func (sd *serviceDiscovery) GetService(hostname string) (*model.Service, bool) {
 		return nil, false
 	}
 
-	services := convertServices(apps, map[string]bool{hostname:true})
+	services := convertServices(apps, map[string]bool{hostname: true})
 	service := services[hostname]
 	return service, service != nil
 }
@@ -56,7 +56,7 @@ func (sd *serviceDiscovery) Instances(hostname string, ports []string, tagsList 
 		portSet[port] = true
 	}
 
-	services := convertServices(apps, map[string]bool{hostname:true})
+	services := convertServices(apps, map[string]bool{hostname: true})
 
 	out := make([]*model.ServiceInstance, 0)
 	for _, instance := range convertServiceInstances(services, apps) {

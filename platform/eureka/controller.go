@@ -3,9 +3,10 @@ package eureka
 import (
 	"time"
 
+	"reflect"
+
 	"github.com/golang/glog"
 	"istio.io/pilot/model"
-	"reflect"
 )
 
 type serviceHandler func(*model.Service, model.Event)
