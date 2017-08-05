@@ -28,7 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
-
+	"github.com/golang/protobuf/ptypes"
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
@@ -127,7 +127,10 @@ func (w *watcher) Reload() {
 // UpdateIngressSecret fetches the TLS secret from discovery and secret storage
 // and writes to well-known location
 func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
-	client := &http.Client{Timeout: convertDuration(w.mesh.ConnectTimeout)}
+
+	glog.V(3).Infof("Connect timeout %l", convertDuration(w.mesh.ConnectTimeout))
+
+	client := &http.Client{Timeout: convertDuration(ptypes.DurationProto(3 * time.Second))}
 	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
 		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, w.role.ServiceNode())
 	req, err := http.NewRequest("GET", url, nil)
