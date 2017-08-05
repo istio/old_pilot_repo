@@ -9,6 +9,8 @@ import (
 	"istio.io/pilot/model"
 )
 
+// Convert Eureka applications to services. If provided, only convert applications in the hostnames whitelist,
+// otherwise convert all.
 func convertServices(apps []*application, hostnames map[string]bool) map[string]*model.Service {
 	services := make(map[string]*model.Service)
 	for _, app := range apps {
@@ -47,6 +49,8 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 	return services
 }
 
+// Convert Eureka applications to service instances. The services argument must contain a map of hostnames to
+// services. Only service instances with a corresponding service are converted.
 func convertServiceInstances(services map[string]*model.Service, apps []*application) []*model.ServiceInstance {
 	out := make([]*model.ServiceInstance, 0)
 	for _, app := range apps {

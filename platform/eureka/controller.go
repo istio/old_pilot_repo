@@ -47,7 +47,7 @@ func (c *controller) Run(stop <-chan struct{}) {
 		case <-ticker.C:
 			apps, err := c.client.Applications()
 			if err != nil {
-				glog.Warningf("Periodic Eureka poll failed: %v", err)
+				glog.Warningf("periodic Eureka poll failed: %v", err)
 				continue
 			}
 
