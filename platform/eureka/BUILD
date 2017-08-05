@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -6,8 +6,7 @@ go_library(
         "client.go",
         "controller.go",
         "conversion.go",
-        "registry.go",
-        "util.go",
+        "servicediscovery.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
