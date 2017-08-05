@@ -6,7 +6,7 @@ data:
   mesh: |-
     discoveryAddress: istio-pilot.{{.IstioNamespace}}.svc.cluster.local:8080
     discoveryRefreshDelay: 60s
-    connectTimeoutMax: 30s
+    connectTimeout: 30s
 {{if .Mixer}}
     mixerAddress: istio-mixer.{{.IstioNamespace}}.svc.cluster.local:9091
 {{end}}
