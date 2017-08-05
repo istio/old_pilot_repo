@@ -130,7 +130,7 @@ func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
 
 	glog.V(3).Infof("Connect timeout %l", convertDuration(w.mesh.ConnectTimeout))
 
-	client := &http.Client{Timeout: convertDuration(ptypes.DurationProto(3 * time.Second))}
+	client := &http.Client{Timeout: convertDuration(ptypes.DurationProto(30 * time.Second))}
 	url := fmt.Sprintf("http://%s/v1alpha/secret/%s/%s",
 		w.mesh.DiscoveryAddress, w.mesh.IstioServiceCluster, w.role.ServiceNode())
 	req, err := http.NewRequest("GET", url, nil)
