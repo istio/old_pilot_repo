@@ -30,7 +30,7 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 				services[instance.Hostname] = service
 			}
 
-			protocol := convertProtocol(instance)
+			protocol := convertProtocol(instance.Metadata)
 			for _, port := range convertPorts(instance) {
 				if servicePort, exists := service.Ports.GetByPort(port.Port); exists {
 					if servicePort.Protocol != protocol {
@@ -78,7 +78,7 @@ func convertServiceInstances(services map[string]*model.Service, apps []*applica
 
 func convertPorts(instance *instance) model.PortList {
 	out := make(model.PortList, 0, 2)
-	protocol := convertProtocol(instance)
+	protocol := convertProtocol(instance.Metadata)
 	for _, port := range []*port{instance.Port, instance.SecurePort} {
 		if port == nil || !port.Enabled {
 			continue
@@ -105,9 +105,9 @@ const (
 	metadataGRPC  = "grpc"
 )
 
-func convertProtocol(instance *instance) model.Protocol {
-	if instance != nil && instance.Metadata != nil {
-		protocol := strings.ToLower(instance.Metadata[protocolMetadata])
+func convertProtocol(md metadata) model.Protocol {
+	if md != nil {
+		protocol := strings.ToLower(md[protocolMetadata])
 		switch protocol {
 		case metadataUDP:
 			return model.ProtocolUDP
@@ -138,6 +138,7 @@ func convertTags(metadata metadata) model.Tags {
 
 	// filter out special tags
 	delete(tags, protocolMetadata)
+	delete(tags, "@class")
 
 	return tags
 }
