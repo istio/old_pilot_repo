@@ -109,7 +109,6 @@ func (t *ingress) run() error {
 		{"a", fmt.Sprintf("http://%s/bar", ingressServiceName), "foo.baz.com"},
 		{"a", fmt.Sprintf("grpc://%s:80", ingressServiceName), "api.company.com"},
 		{"a", fmt.Sprintf("grpcs://%s:443", ingressServiceName), "api.company.com"},
-		{"", fmt.Sprintf("https://%s:443/notfound", ingressServiceName), ""},
 		{"", fmt.Sprintf("http://%s/notfound", ingressServiceName), ""},
 		{"", fmt.Sprintf("http://%s/foo", ingressServiceName), ""},
 	}
