@@ -143,9 +143,9 @@ func runGRPC(port int) {
 	var grpcServer *grpc.Server
 	if crt != "" && key != "" {
 		// Create the TLS credentials
-		creds, err := credentials.NewServerTLSFromFile(crt, key)
-		if err != nil {
-			log.Fatalf("could not load TLS keys: %s", err)
+		creds, errCreds := credentials.NewServerTLSFromFile(crt, key)
+		if errCreds != nil {
+			log.Fatalf("could not load TLS keys: %s", errCreds)
 		}
 		grpcServer = grpc.NewServer(grpc.Creds(creds))
 	} else {
