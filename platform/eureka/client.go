@@ -8,14 +8,6 @@ import (
 	"time"
 )
 
-type getApplications struct {
-	Applications applications `json:"applications"`
-}
-
-type applications struct {
-	Applications []*application `json:"application"`
-}
-
 type application struct {
 	Name      string      `json:"name"`
 	Instances []*instance `json:"instance"`
@@ -59,8 +51,21 @@ func NewClient(url string) Client {
 	}
 }
 
+const (
+	basePath = "/eureka/v2"
+	appsPath = basePath + "/apps"
+)
+
+type getApplications struct {
+	Applications applications `json:"applications"`
+}
+
+type applications struct {
+	Applications []*application `json:"application"`
+}
+
 func (c *client) Applications() ([]*application, error) {
-	req, err := http.NewRequest("GET", c.url+"/eureka/v2/apps", nil)
+	req, err := http.NewRequest("GET", c.url+appsPath, nil)
 	if err != nil {
 		return nil, err
 	}
