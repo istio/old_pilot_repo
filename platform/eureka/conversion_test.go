@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"istio.io/pilot/model"
 	"encoding/json"
+
+	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"
 )
 
@@ -20,7 +21,7 @@ func TestConvertService(t *testing.T) {
 			// single instance with multiple ports
 			apps: []*application{
 				{
-					Name:      "foo_bar_local",
+					Name: "foo_bar_local",
 					Instances: []*instance{
 						makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443, nil),
 					},
@@ -111,9 +112,9 @@ func TestConvertService(t *testing.T) {
 	}
 
 	hostnameTests := []map[string]bool{
-		map[string]bool{"foo.bar.local": true},
-		map[string]bool{"foo.biz.local": true},
-		map[string]bool{"foo.bar.local": true, "foo.biz.local": true},
+		{"foo.bar.local": true},
+		{"foo.biz.local": true},
+		{"foo.bar.local": true, "foo.biz.local": true},
 	}
 	for _, tt := range serviceTests {
 		for _, hostnames := range hostnameTests {
@@ -203,7 +204,7 @@ func TestConvertTags(t *testing.T) {
 		if !exists {
 			t.Errorf("converted tags has missing key %q", tag)
 		} else if tags[tag] != md[tag] {
-			t.Errorf("converted tags has mismatch for key %q, &q want %q", tag, tags[tag], md[tag])
+			t.Errorf("converted tags has mismatch for key %q, %q want %q", tag, tags[tag], md[tag])
 		}
 	}
 
@@ -221,12 +222,12 @@ func makeInstance(hostname, ip string, portNum, securePort int, md metadata) *in
 		App:       appName(hostname),
 		Hostname:  hostname,
 		IPAddress: ip,
-		Port:      &port{
-			Port: 7002,
+		Port: &port{
+			Port:    7002,
 			Enabled: false,
 		},
 		SecurePort: &port{
-			Port: 7002,
+			Port:    7002,
 			Enabled: false,
 		},
 		Metadata: md,

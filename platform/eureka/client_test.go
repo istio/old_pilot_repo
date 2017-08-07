@@ -71,7 +71,7 @@ func TestClient(t *testing.T) {
 		if !tt.shouldErr && err != nil {
 			t.Errorf("unexpected error retrieving Eureka applications for %s context: %v", tt.context, err)
 		} else if tt.shouldErr && err == nil {
-			t.Error("expected error, got nil when retrieving Eureka applications for %s context")
+			t.Errorf("expected error, got nil when retrieving Eureka applications for %s context", tt.context)
 		}
 
 		if err := compare(apps, tt.apps, t); err != nil {
