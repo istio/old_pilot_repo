@@ -106,7 +106,7 @@ func TestConvertService(t *testing.T) {
 
 	for _, tt := range serviceTests {
 		services := convertServices(tt.apps, nil)
-		if err := compare(services, tt.services, t); err != nil {
+		if err := compare(t, services, tt.services); err != nil {
 			t.Error(err)
 		}
 	}
@@ -159,7 +159,7 @@ func TestConvertServiceInstances(t *testing.T) {
 
 	for _, tt := range serviceInstanceTests {
 		instances := convertServiceInstances(tt.services, tt.apps)
-		if err := compare(instances, tt.out, t); err != nil {
+		if err := compare(t, instances, tt.out); err != nil {
 			t.Error(err)
 		}
 	}
@@ -278,11 +278,11 @@ func makeServiceInstance(service *model.Service, ip string, port int, tags model
 	}
 }
 
-func compare(actual, expected interface{}, t *testing.T) error {
-	return util.Compare(jsonBytes(actual, t), jsonBytes(expected, t))
+func compare(t *testing.T, actual, expected interface{}) error {
+	return util.Compare(jsonBytes(t, actual), jsonBytes(t, expected))
 }
 
-func jsonBytes(v interface{}, t *testing.T) []byte {
+func jsonBytes(t *testing.T, v interface{}) []byte {
 	data, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
 		t.Fatal(t)

@@ -19,8 +19,9 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
-        "conversion_test.go",
         "client_test.go",
+        "conversion_test.go",
+        "servicediscovery_test.go",
     ],
     data = glob(["testdata/*"]),
     library = ":go_default_library",
