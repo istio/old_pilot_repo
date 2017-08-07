@@ -36,6 +36,21 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
+// Adapter defines options for underlying platform
+type Adapter string
+
+const (
+	KubernetesAdapter Adapter = "Kubernetes"
+	VMsAdapter        Adapter = "VMs"
+)
+
+// store the args related to VMs configuration
+type VMsArgs struct {
+	config    string
+	serverURL string
+	authToken string
+}
+
 type args struct {
 	kubeconfig string
 	meshconfig string
@@ -43,6 +58,9 @@ type args struct {
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
+
+	adapter Adapter
+	vmsArgs VMsArgs
 }
 
 var (
@@ -58,72 +76,82 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
-			client, err := kube.CreateInterface(flags.kubeconfig)
-			if err != nil {
-				return multierror.Prefix(err, "failed to connect to Kubernetes API.")
+			if flags.adapter == "" {
+				flags.adapter = KubernetesAdapter
 			}
 
-			if flags.controllerOptions.Namespace == "" {
-				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-			}
-
-			glog.V(2).Infof("version %s", version.Line())
-			glog.V(2).Infof("flags %s", spew.Sdump(flags))
-
-			// receive mesh configuration
-			mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
-			if err != nil {
-				return multierror.Prefix(err, "failed to read mesh configuration.")
-			}
-
-			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
-
-			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-				model.RouteRuleDescriptor,
-				model.DestinationPolicyDescriptor,
-			}, flags.controllerOptions.Namespace)
-			if err != nil {
-				return multierror.Prefix(err, "failed to open a config client.")
-			}
-
-			if err = configClient.RegisterResources(); err != nil {
-				return multierror.Prefix(err, "failed to register custom resources.")
-			}
-
-			serviceController := kube.NewController(client, mesh, flags.controllerOptions)
-			var configController model.ConfigStoreCache
-			if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-				configController = crd.NewController(configClient, flags.controllerOptions.ResyncPeriod)
-			} else {
-				configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
-					crd.NewController(configClient, flags.controllerOptions.ResyncPeriod),
-					ingress.NewController(client, mesh, flags.controllerOptions),
-				})
+			if flags.adapter == KubernetesAdapter {
+				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
-					return err
+					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 				}
-			}
 
-			environment := proxy.Environment{
-				ServiceDiscovery: serviceController,
-				ServiceAccounts:  serviceController,
-				IstioConfigStore: model.MakeIstioStore(configController),
-				SecretRegistry:   kube.MakeSecretRegistry(client),
-				Mesh:             mesh,
-			}
-			discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
-			if err != nil {
-				return fmt.Errorf("failed to create discovery service: %v", err)
-			}
+				if flags.controllerOptions.Namespace == "" {
+					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
+				}
 
-			ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+				glog.V(2).Infof("version %s", version.Line())
+				glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
-			stop := make(chan struct{})
-			go serviceController.Run(stop)
-			go configController.Run(stop)
-			go discovery.Run()
-			go ingressSyncer.Run(stop)
-			cmd.WaitSignal(stop)
+				// receive mesh configuration
+				mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
+				if err != nil {
+					return multierror.Prefix(err, "failed to read mesh configuration.")
+				}
+
+				glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+
+				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+					model.RouteRuleDescriptor,
+					model.DestinationPolicyDescriptor,
+				}, flags.controllerOptions.Namespace)
+				if err != nil {
+					return multierror.Prefix(err, "failed to open a config client.")
+				}
+
+				if err = configClient.RegisterResources(); err != nil {
+					return multierror.Prefix(err, "failed to register custom resources.")
+				}
+
+				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
+				var configController model.ConfigStoreCache
+				if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
+					configController = crd.NewController(configClient, flags.controllerOptions.ResyncPeriod)
+				} else {
+					configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
+						crd.NewController(configClient, flags.controllerOptions.ResyncPeriod),
+						ingress.NewController(client, mesh, flags.controllerOptions),
+					})
+					if err != nil {
+						return err
+					}
+				}
+
+				environment := proxy.Environment{
+					ServiceDiscovery: serviceController,
+					ServiceAccounts:  serviceController,
+					IstioConfigStore: model.MakeIstioStore(configController),
+					SecretRegistry:   kube.MakeSecretRegistry(client),
+					Mesh:             mesh,
+				}
+				discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
+				if err != nil {
+					return fmt.Errorf("failed to create discovery service: %v", err)
+				}
+
+				ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+
+				stop := make(chan struct{})
+				go serviceController.Run(stop)
+				go configController.Run(stop)
+				go discovery.Run()
+				go ingressSyncer.Run(stop)
+				cmd.WaitSignal(stop)
+
+				return nil
+			} else if flags.adapter == VMsAdapter {
+
+			}
 
 			return nil
 		},
@@ -131,6 +159,8 @@ var (
 )
 
 func init() {
+	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(KubernetesAdapter),
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter), string(VMsAdapter)))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
@@ -149,6 +179,13 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "vmsconfig", "",
+		"VMs Config file for discovery")
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
+		"URL for the registry server")
+
+	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "authToken", "",
+		"Authorization token used to access the registry server")
 	cmd.AddFlags(rootCmd)
 
 	rootCmd.AddCommand(discoveryCmd)

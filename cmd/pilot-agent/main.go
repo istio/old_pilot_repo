@@ -31,10 +31,27 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
+// Adapter defines options for underlying platform
+type Adapter string
+
+const (
+	KubernetesAdapter Adapter = "Kubernetes"
+	VMsAdapter        Adapter = "VMs"
+)
+
+// store the args related to VMs configuration
+type VMsArgs struct {
+	config    string
+	serverURL string
+	authToken string
+}
+
 var (
 	configpath string
 	meshconfig string
 	sidecar    proxy.Sidecar
+	adapter    Adapter
+	vmsArgs    VMsArgs
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -47,60 +64,68 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			// set values from environment variables
-			if sidecar.IPAddress == "" {
-				sidecar.IPAddress = os.Getenv("INSTANCE_IP")
-			}
-			if sidecar.ID == "" {
-				sidecar.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
-			}
-			// receive mesh configuration
-			mesh, err := cmd.ReadMeshConfig(meshconfig)
-			if err != nil {
-				return multierror.Prefix(err, "failed to read mesh configuration.")
-			}
-
-			glog.V(2).Infof("version %s", version.Line())
-			glog.V(2).Infof("sidecar %#v", sidecar)
-			glog.V(2).Infof("mesh configuration %#v", mesh)
-
-			if err = os.MkdirAll(configpath, 0700); err != nil {
-				return multierror.Prefix(err, "failed to create directory for proxy configuration")
-			}
-
-			var role proxy.Role = sidecar
-			if len(args) > 0 {
-				switch args[0] {
-				case proxy.EgressNode:
-					if mesh.EgressProxyAddress == "" {
-						return errors.New("egress proxy requires address configuration")
-					}
-					role = proxy.EgressRole{}
-
-				case proxy.IngressNode:
-					if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-						return errors.New("ingress proxy is disabled")
-					}
-					role = proxy.IngressRole{}
-
-				default:
-					return fmt.Errorf("failed to recognize proxy role %s", args[0])
+			if adapter == KubernetesAdapter {
+				// set values from environment variables
+				if sidecar.IPAddress == "" {
+					sidecar.IPAddress = os.Getenv("INSTANCE_IP")
 				}
+				if sidecar.ID == "" {
+					sidecar.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
+				}
+				// receive mesh configuration
+				mesh, err := cmd.ReadMeshConfig(meshconfig)
+				if err != nil {
+					return multierror.Prefix(err, "failed to read mesh configuration.")
+				}
+
+				glog.V(2).Infof("version %s", version.Line())
+				glog.V(2).Infof("sidecar %#v", sidecar)
+				glog.V(2).Infof("mesh configuration %#v", mesh)
+
+				if err = os.MkdirAll(configpath, 0700); err != nil {
+					return multierror.Prefix(err, "failed to create directory for proxy configuration")
+				}
+
+				var role proxy.Role = sidecar
+				if len(args) > 0 {
+					switch args[0] {
+					case proxy.EgressNode:
+						if mesh.EgressProxyAddress == "" {
+							return errors.New("egress proxy requires address configuration")
+						}
+						role = proxy.EgressRole{}
+
+					case proxy.IngressNode:
+						if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
+							return errors.New("ingress proxy is disabled")
+						}
+						role = proxy.IngressRole{}
+
+					default:
+						return fmt.Errorf("failed to recognize proxy role %s", args[0])
+					}
+				}
+
+				watcher := envoy.NewWatcher(mesh, role, configpath)
+				ctx, cancel := context.WithCancel(context.Background())
+				go watcher.Run(ctx)
+
+				stop := make(chan struct{})
+				cmd.WaitSignal(stop)
+				<-stop
+				cancel()
+				return nil
+
+			} else if adapter == VMsAdapter {
 			}
-
-			watcher := envoy.NewWatcher(mesh, role, configpath)
-			ctx, cancel := context.WithCancel(context.Background())
-			go watcher.Run(ctx)
-
-			stop := make(chan struct{})
-			cmd.WaitSignal(stop)
-			<-stop
-			cancel()
 			return nil
 		},
 	}
 )
 
 func init() {
+	proxyCmd.PersistentFlags().StringVar((*string)(&adapter), "adapter", string(KubernetesAdapter),
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter), string(VMsAdapter)))
 	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
@@ -111,6 +136,14 @@ func init() {
 		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "vmsconfig", "",
+		"VMs config file for sidecar")
+
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.serverURL, "serverURL", "",
+		"URL for the registry server")
+
+	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "authToken", "",
+		"Authorization token used to access the registry server")
 
 	cmd.AddFlags(rootCmd)
 
