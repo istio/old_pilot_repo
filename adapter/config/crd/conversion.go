@@ -79,6 +79,7 @@ func (cl *Client) convertConfig(item *IstioKind) (model.Config, error) {
 }
 
 // camelCaseToKabobCase converts "MyName" to "my-name"
+// nolint: deadcode
 func camelCaseToKabobCase(s string) string {
 	var out bytes.Buffer
 	for i := range s {
@@ -92,9 +93,4 @@ func camelCaseToKabobCase(s string) string {
 		}
 	}
 	return out.String()
-}
-
-// kindToAPIName converts Kind name to 3rd party API group
-func kindToAPIName(s string) string {
-	return camelCaseToKabobCase(s) + "." + IstioAPIGroup
 }

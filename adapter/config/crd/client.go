@@ -46,12 +46,12 @@ import (
 
 const (
 	// IstioAPIGroup defines Kubernetes API group for CRD
-	IstioAPIGroup = "crd.istio.io"
+	IstioAPIGroup = "config.istio.io"
 
 	// IstioResourceVersion defines Kubernetes API group version
 	IstioResourceVersion = "v1alpha1"
 
-	// IstioKind defines the shared CRD kind to avoid boilerplate
+	// IstioKindName defines the shared CRD kind to avoid boilerplate
 	// code for each custom kind
 	IstioKindName = "IstioKind"
 )
@@ -136,6 +136,7 @@ func NewClient(config string, descriptor model.ConfigDescriptor, namespace strin
 	return out, nil
 }
 
+// RegisterResources sends a request to create CRDs and waits for them to initialize
 func (cl *Client) RegisterResources() error {
 	clientset, err := apiextensionsclient.NewForConfig(cl.restconfig)
 	if err != nil {
