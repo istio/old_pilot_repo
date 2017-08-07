@@ -19,7 +19,6 @@ func TestClient(t *testing.T) {
 	clientTests := []struct {
 		context    string
 		data       []byte
-		filename   string
 		statusCode int
 		apps       []*application
 		shouldErr  bool
@@ -63,7 +62,7 @@ func TestClient(t *testing.T) {
 	for _, tt := range clientTests {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(tt.statusCode)
-			w.Write(tt.data)
+			w.Write(tt.data) // nolint: errcheck
 		}))
 		cl := NewClient(ts.URL)
 
