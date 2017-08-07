@@ -52,13 +52,7 @@ func NewClient(url string) Client {
 	}
 }
 
-const (
-	statusUp           = "UP"
-	statusDown         = "DOWN"
-	statusStarting     = "STARTING"
-	statusOutOfService = "OUT_OF_SERVICE"
-	statusUnknown      = "UNKNOWN"
-)
+const statusUp = "UP"
 
 const (
 	basePath = "/eureka/v2"
