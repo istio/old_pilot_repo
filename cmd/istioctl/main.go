@@ -26,10 +26,10 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/pkg/api"
 
-	"istio.io/pilot/adapter/config/tpr"
+	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/tools/version"
@@ -69,7 +69,7 @@ More information on the mixer API configuration can be found under the
 istioctl mixer command documentation.
 `, model.IstioConfigTypes.Types()),
 		PersistentPreRunE: func(*cobra.Command, []string) (err error) {
-			configClient, err = tpr.NewClient(kubeconfig, model.ConfigDescriptor{
+			configClient, err = crd.NewClient(kubeconfig, model.ConfigDescriptor{
 				model.RouteRuleDescriptor,
 				model.DestinationPolicyDescriptor,
 			}, istioSystem)
@@ -301,7 +301,7 @@ func init() {
 	}
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", defaultKubeconfig,
 		"Kubernetes configuration file")
-	rootCmd.PersistentFlags().StringVarP(&istioSystem, "namespace", "n", api.NamespaceDefault,
+	rootCmd.PersistentFlags().StringVarP(&istioSystem, "namespace", "n", v1.NamespaceDefault,
 		"Kubernetes Istio system namespace")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",

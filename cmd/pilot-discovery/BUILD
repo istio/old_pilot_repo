@@ -7,8 +7,8 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//adapter/config/aggregate:go_default_library",
+        "//adapter/config/crd:go_default_library",
         "//adapter/config/ingress:go_default_library",
-        "//adapter/config/tpr:go_default_library",
         "//cmd:go_default_library",
         "//model:go_default_library",
         "//platform/kube:go_default_library",
@@ -27,5 +27,5 @@ go_binary(
     name = "pilot-discovery",
     library = ":go_default_library",
     linkstamp = "istio.io/pilot/tools/version",
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )

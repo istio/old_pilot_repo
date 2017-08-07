@@ -22,8 +22,8 @@ import (
 	"istio.io/pilot/model"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 type ingress struct {
@@ -33,6 +33,7 @@ type ingress struct {
 
 const (
 	ingressServiceName = "istio-ingress"
+	ingressSecretName  = "ingress"
 )
 
 func (t *ingress) String() string {
@@ -46,16 +47,16 @@ func (t *ingress) setup() error {
 	t.logs = makeAccessLogs()
 
 	// send secrets
-	key, err := ioutil.ReadFile("test/integration/testdata/cert.key")
+	key, err := ioutil.ReadFile("docker/certs/cert.key")
 	if err != nil {
 		return err
 	}
-	crt, err := ioutil.ReadFile("test/integration/testdata/cert.crt")
+	crt, err := ioutil.ReadFile("docker/certs/cert.crt")
 	if err != nil {
 		return err
 	}
 	_, err = client.CoreV1().Secrets(t.Namespace).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "ingress"},
+		ObjectMeta: metav1.ObjectMeta{Name: ingressSecretName},
 		Data: map[string][]byte{
 			"tls.key": key,
 			"tls.crt": crt,
@@ -74,7 +75,7 @@ func (t *ingress) setup() error {
 		return err
 	}
 
-	// send route rules
+	// send route rules for "c" only
 	if err = t.applyConfig("rule-default-route.yaml.tmpl", map[string]string{
 		"Destination": "c",
 		"Namespace":   t.Namespace,
@@ -96,31 +97,25 @@ func (t *ingress) run() error {
 	funcs["Route rule for /c"] = t.checkRouteRule
 
 	cases := []struct {
+		// empty destination to expect 404
 		dst  string
-		path string
-		tls  bool
+		url  string
 		host string
 	}{
-		{"a", "/", true, ""},
-		{"b", "/pasta", true, ""},
-		{"a", "/lucky", false, ""},
-		{"b", "/lol", false, ""},
-		{"a", "/foo", false, "foo.bar.com"},
-		{"a", "/bar", false, "foo.baz.com"},
-		// empty destination makes it expect 404
-		{"", "/notfound", true, ""},
-		{"", "/notfound", false, ""},
-		{"", "/foo", false, ""},
+		{"a", fmt.Sprintf("https://%s:443/http", ingressServiceName), ""},
+		{"b", fmt.Sprintf("https://%s:443/pasta", ingressServiceName), ""},
+		{"a", fmt.Sprintf("http://%s/lucky", ingressServiceName), ""},
+		{"b", fmt.Sprintf("http://%s/lol", ingressServiceName), ""},
+		{"a", fmt.Sprintf("http://%s/foo", ingressServiceName), "foo.bar.com"},
+		{"a", fmt.Sprintf("http://%s/bar", ingressServiceName), "foo.baz.com"},
+		{"a", fmt.Sprintf("grpc://%s:80", ingressServiceName), "api.company.com"},
+		{"a", fmt.Sprintf("grpcs://%s:443", ingressServiceName), "api.company.com"},
+		{"", fmt.Sprintf("http://%s/notfound", ingressServiceName), ""},
+		{"", fmt.Sprintf("http://%s/foo", ingressServiceName), ""},
 	}
 	for _, req := range cases {
 		name := fmt.Sprintf("Ingress request to %+v", req)
-		funcs[name] = (func(dst, path string, tls bool, host string) func() status {
-			var url string
-			if tls {
-				url = fmt.Sprintf("https://%s:443%s", ingressServiceName, path)
-			} else {
-				url = fmt.Sprintf("http://%s%s", ingressServiceName, path)
-			}
+		funcs[name] = (func(dst, url, host string) func() status {
 			extra := ""
 			if host != "" {
 				extra = "-key Host -val " + host
@@ -132,8 +127,9 @@ func (t *ingress) run() error {
 						return nil
 					}
 				} else if len(resp.id) > 0 {
-					if !strings.Contains(resp.body, "X-Forwarded-For") {
-						glog.Warning("Missing X-Forwarded-For")
+					if !strings.Contains(resp.body, "X-Forwarded-For") &&
+						!strings.Contains(resp.body, "x-forwarded-for") {
+						glog.Warningf("Missing X-Forwarded-For in the body: %s", resp.body)
 						return errAgain
 					}
 
@@ -144,7 +140,7 @@ func (t *ingress) run() error {
 				}
 				return errAgain
 			}
-		})(req.dst, req.path, req.tls, req.host)
+		})(req.dst, req.url, req.host)
 	}
 
 	if err := parallel(funcs); err != nil {
@@ -198,6 +194,10 @@ func (t *ingress) teardown() {
 	}
 	if err := client.Extensions().Ingresses(t.Namespace).
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		glog.Warning(err)
+	}
+	if err := client.CoreV1().Secrets(t.Namespace).
+		Delete(ingressSecretName, &metav1.DeleteOptions{}); err != nil {
 		glog.Warning(err)
 	}
 	if err := t.deleteAllConfigs(); err != nil {

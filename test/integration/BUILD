@@ -16,8 +16,9 @@ go_library(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        "//adapter/config/tpr:go_default_library",
+        "//adapter/config/crd:go_default_library",
         "//model:go_default_library",
+        "//platform/kube:go_default_library",
         "//platform/kube/inject:go_default_library",
         "//test/util:go_default_library",
         "@com_github_davecgh_go_spew//spew:go_default_library",
@@ -26,15 +27,18 @@ go_library(
         "@com_github_hashicorp_go_multierror//:go_default_library",
         "@com_github_satori_go_uuid//:go_default_library",
         "@io_istio_api//:go_default_library",
+        "@io_k8s_api//core/v1:go_default_library",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
         "@io_k8s_client_go//kubernetes:go_default_library",
-        "@io_k8s_client_go//pkg/api/v1:go_default_library",
     ],
 )
 
 go_binary(
     name = "integration",
-    data = glob(["testdata/*"]) + ["//platform/kube:kubeconfig"],
+    data = glob(["testdata/*"]) + [
+        "//platform/kube:kubeconfig",
+        "//docker:certs",
+    ],
     library = ":go_default_library",
     tags = ["manual"],
     visibility = ["//visibility:public"],
