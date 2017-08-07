@@ -36,7 +36,6 @@ import (
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/test/util"
 )
 
