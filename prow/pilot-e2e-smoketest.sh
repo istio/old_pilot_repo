@@ -19,6 +19,8 @@
 # Smoketest script triggered by Prow. #
 #######################################
 
+exit 1
+
 # Exit immediately for non zero status
 set -e
 # Check unset variables
