@@ -19,6 +19,10 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 				continue
 			}
 
+			if instance.Status != statusUp {
+				continue
+			}
+
 			service := services[instance.Hostname]
 			if service == nil {
 				service = &model.Service{
