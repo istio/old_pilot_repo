@@ -30,40 +30,29 @@ func TestClient(t *testing.T) {
 			statusCode: http.StatusOK,
 			apps:       make([]*application, 0),
 		},
-		//{
-		//	context: "single application",
-		//	data:    readFile(t, "testdata/eureka-single-app.json"),
-		//	apps: []*application{
-		//		{
-		//			Name: appName("hello.world.local"),
-		//			Instances: []*instance{
-		//				makeInstance("hello.world.local", "10.0.0.1", 5000, 5443),
-		//				makeInstance("hello.world.local", "10.0.0.2", 6000, -1),
-		//			},
-		//		},
-		//	},
-		//	statusCode: http.StatusOK,
-		//},
-		//{
-		//	context: "multiple applications",
-		//	data:    readFile(t, "testdata/eureka-apps.json"),
-		//	apps: []*application{
-		//		{
-		//			Name: appName("foo.bar.local"),
-		//			Instances: []*instance{
-		//				makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443),
-		//				makeInstance("foo.bar.local", "10.0.0.2", 6000, -1),
-		//			},
-		//		},
-		//		{
-		//			Name: appName("foo.biz.local"),
-		//			Instances: []*instance{
-		//				makeInstance("foo.biz.local", "10.0.0.3", 8080, -1),
-		//			},
-		//		},
-		//	},
-		//	statusCode: http.StatusOK,
-		//},
+		{
+			context: "multiple applications",
+			data:    readFile(t, "testdata/eureka-apps.json"),
+			apps: []*application{
+				{
+					Name: appName("foo.bar.local"),
+					Instances: []*instance{
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443,
+							metadata{protocolMetadata: "HTTP"}),
+						makeInstance("foo.bar.local", "10.0.0.2", 6000, -1,
+							metadata{protocolMetadata: "HTTP"}),
+					},
+				},
+				{
+					Name: appName("foo.biz.local"),
+					Instances: []*instance{
+						makeInstance("foo.biz.local", "10.0.0.3", 8080, -1,
+							metadata{protocolMetadata: "HTTP2"}),
+					},
+				},
+			},
+			statusCode: http.StatusOK,
+		},
 		{
 			context:    "non-200 response",
 			statusCode: http.StatusNotFound,

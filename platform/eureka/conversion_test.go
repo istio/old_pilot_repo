@@ -21,7 +21,9 @@ func TestConvertService(t *testing.T) {
 			apps: []*application{
 				{
 					Name:      "foo_bar_local",
-					Instances: []*instance{makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443)},
+					Instances: []*instance{
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443, nil),
+					},
 				},
 			},
 			services: map[string]*model.Service{
@@ -34,8 +36,8 @@ func TestConvertService(t *testing.T) {
 				{
 					Name: "foo_bar_local",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1),
-						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1),
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1, nil),
+						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1, nil),
 					},
 				},
 			},
@@ -49,8 +51,8 @@ func TestConvertService(t *testing.T) {
 				{
 					Name: "foo_bar_local",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1),
-						makeInstance("foo.bar.local", "10.0.0.1", 6000, -1),
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1, nil),
+						makeInstance("foo.bar.local", "10.0.0.1", 6000, -1, nil),
 					},
 				},
 			},
@@ -64,13 +66,13 @@ func TestConvertService(t *testing.T) {
 				{
 					Name: "foo_bar_local",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1),
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1, nil),
 					},
 				},
 				{
 					Name: "foo_bar_local2",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1),
+						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1, nil),
 					},
 				},
 			},
@@ -84,13 +86,13 @@ func TestConvertService(t *testing.T) {
 				{
 					Name: "foo_bar_local",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1),
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, -1, nil),
 					},
 				},
 				{
 					Name: "foo_biz_local",
 					Instances: []*instance{
-						makeInstance("foo.biz.local", "10.0.0.2", 5000, -1),
+						makeInstance("foo.biz.local", "10.0.0.2", 5000, -1, nil),
 					},
 				},
 			},
@@ -141,8 +143,8 @@ func TestConvertServiceInstances(t *testing.T) {
 				{
 					Name: "foo_bar_local",
 					Instances: []*instance{
-						makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443),
-						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1),
+						makeInstance("foo.bar.local", "10.0.0.1", 5000, 5443, nil),
+						makeInstance("foo.bar.local", "10.0.0.2", 5000, -1, nil),
 					},
 				},
 			},
@@ -214,23 +216,28 @@ func appName(hostname string) string {
 	return strings.ToUpper(strings.Replace(hostname, ".", "_", -1))
 }
 
-func makeInstance(hostname, ip string, portNum, securePort int) *instance {
+func makeInstance(hostname, ip string, portNum, securePort int, md metadata) *instance {
 	inst := &instance{
 		App:       appName(hostname),
 		Hostname:  hostname,
 		IPAddress: ip,
+		Port:      &port{
+			Port: 7002,
+			Enabled: false,
+		},
+		SecurePort: &port{
+			Port: 7002,
+			Enabled: false,
+		},
+		Metadata: md,
 	}
 	if portNum > 0 {
-		inst.Port = &port{
-			Port:    portNum,
-			Enabled: true,
-		}
+		inst.Port.Port = portNum
+		inst.Port.Enabled = true
 	}
 	if securePort > 0 {
-		inst.SecurePort = &port{
-			Port:    securePort,
-			Enabled: true,
-		}
+		inst.SecurePort.Port = securePort
+		inst.SecurePort.Enabled = true
 	}
 	return inst
 }
