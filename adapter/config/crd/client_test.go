@@ -54,7 +54,7 @@ func makeClient(namespace string, t *testing.T) *Client {
 		t.Fatal(err)
 	}
 
-	// TODO(kuat) initial watch always fails, takes time to register TPR, keep
+	// TODO(kuat) initial watch always fails, takes time to register, keep
 	// around as a work-around
 	// kr.DeregisterResources()
 
@@ -74,7 +74,7 @@ func makeTempClient(t *testing.T) (*Client, func()) {
 	cl := makeClient(ns, t)
 
 	// the rest of the test can run in parallel
-	//t.Parallel()
+	t.Parallel()
 	return cl, func() { util.DeleteNamespace(client, ns) }
 }
 

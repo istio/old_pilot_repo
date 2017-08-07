@@ -25,7 +25,7 @@ import (
 	"istio.io/pilot/model"
 )
 
-// configKey assigns k8s TPR name to Istio config
+// configKey assigns k8s CRD name to Istio config
 func configKey(typ, key string) string {
 	switch typ {
 	case model.RouteRule, model.IngressRule:
@@ -59,7 +59,7 @@ func modelToKube(schema model.ProtoSchema, namespace string, config proto.Messag
 	return out, nil
 }
 
-// convertConfig extracts Istio config data from k8s TPRs
+// convertConfig extracts Istio config data from k8s CRD
 func (cl *Client) convertConfig(item *IstioKind) (model.Config, error) {
 	for _, schema := range cl.ConfigDescriptor() {
 		if strings.HasPrefix(item.ObjectMeta.Name, schema.Type) {

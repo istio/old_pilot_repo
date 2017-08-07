@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package tpr provides an implementation of the config store and cache
-// using Kubernetes Third-Party Resources and the informer framework from Kubernetes
+// Package crd provides an implementation of the config store and cache
+// using Kubernetes Custom Resources and the informer framework from Kubernetes
 package crd
 
 import (
@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	// import GKE cluster authentication plugin
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	// import OIDC cluster authentication plugin, e.g. for Tectonic
@@ -46,43 +45,39 @@ import (
 )
 
 const (
-	// IstioAPIGroup defines Kubernetes API group for TPR
+	// IstioAPIGroup defines Kubernetes API group for CRD
 	IstioAPIGroup = "crd.istio.io"
 
 	// IstioResourceVersion defines Kubernetes API group version
 	IstioResourceVersion = "v1alpha1"
 
-	// IstioKind defines the shared TPR kind to avoid boilerplate
+	// IstioKind defines the shared CRD kind to avoid boilerplate
 	// code for each custom kind
 	IstioKindName = "IstioKind"
 )
 
-// Client is a basic REST client for TPRs implementing config store
+// Client is a basic REST client for CRDs implementing config store
 type Client struct {
 	descriptor model.ConfigDescriptor
-	client     kubernetes.Interface
-	clientset  *apiextensionsclient.Clientset
 
-	// dynamic REST client for accessing config TPRs
+	// restconfig for REST type descriptors
+	restconfig *rest.Config
+
+	// dynamic REST client for accessing config CRDs
 	dynamic *rest.RESTClient
 
-	// namespace is the namespace for storing TPRs
+	// namespace is the namespace for storing CRDs
 	namespace string
 }
 
 // CreateRESTConfig for cluster API server, pass empty config file for in-cluster
-func CreateRESTConfig(kubeconfig string) (config *rest.Config, clientset *apiextensionsclient.Clientset, err error) {
+func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	if kubeconfig == "" {
 		config, err = rest.InClusterConfig()
 	} else {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 
-	if err != nil {
-		return
-	}
-
-	clientset, err = apiextensionsclient.NewForConfig(config)
 	if err != nil {
 		return
 	}
@@ -112,7 +107,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, clientset *apiext
 }
 
 // NewClient creates a client to Kubernetes API using a kubeconfig file.
-// namespace argument provides the namespace to store TPRs
+// namespace argument provides the namespace to store CRDs
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
 func NewClient(config string, descriptor model.ConfigDescriptor, namespace string) (*Client, error) {
@@ -120,11 +115,8 @@ func NewClient(config string, descriptor model.ConfigDescriptor, namespace strin
 	if err != nil {
 		return nil, err
 	}
-	restconfig, clientset, err := CreateRESTConfig(kubeconfig)
-	if err != nil {
-		return nil, err
-	}
-	client, err := kubernetes.NewForConfig(restconfig)
+
+	restconfig, err := CreateRESTConfig(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +128,7 @@ func NewClient(config string, descriptor model.ConfigDescriptor, namespace strin
 
 	out := &Client{
 		descriptor: descriptor,
-		client:     client,
-		clientset:  clientset,
+		restconfig: restconfig,
 		dynamic:    dynamic,
 		namespace:  namespace,
 	}
@@ -146,6 +137,11 @@ func NewClient(config string, descriptor model.ConfigDescriptor, namespace strin
 }
 
 func (cl *Client) RegisterResources() error {
+	clientset, err := apiextensionsclient.NewForConfig(cl.restconfig)
+	if err != nil {
+		return err
+	}
+
 	name := strings.ToLower(IstioKindName) + "s." + IstioAPIGroup
 
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
@@ -162,14 +158,14 @@ func (cl *Client) RegisterResources() error {
 			},
 		},
 	}
-	_, err := cl.clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	// wait for CRD being established
 	err = wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
-		crd, err = cl.clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
+		crd, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -181,31 +177,33 @@ func (cl *Client) RegisterResources() error {
 				}
 			case apiextensionsv1beta1.NamesAccepted:
 				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					fmt.Printf("Name conflict: %v\n", cond.Reason)
+					glog.Warningf("name conflict: %v", cond.Reason)
 				}
 			}
 		}
 		return false, err
 	})
+
 	if err != nil {
-		deleteErr := cl.clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
+		deleteErr := cl.DeregisterResources()
 		if deleteErr != nil {
 			return multierror.Append(err, deleteErr)
 		}
 		return err
 	}
+
 	return nil
 }
 
 // DeregisterResources removes third party resources
 func (cl *Client) DeregisterResources() error {
-	name := strings.ToLower(IstioKindName) + "s." + IstioAPIGroup
-	return cl.clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
-}
+	clientset, err := apiextensionsclient.NewForConfig(cl.restconfig)
+	if err != nil {
+		return err
+	}
 
-// GetKubernetesInterface returns a static Kubernetes interface
-func (cl *Client) GetKubernetesInterface() kubernetes.Interface {
-	return cl.client
+	name := strings.ToLower(IstioKindName) + "s." + IstioAPIGroup
+	return clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
 }
 
 // ConfigDescriptor for the store

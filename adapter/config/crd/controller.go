@@ -46,7 +46,7 @@ type cacheHandler struct {
 	handler  *kube.ChainHandler
 }
 
-// NewController creates a new Kubernetes controller for TPRs
+// NewController creates a new Kubernetes controller for CRDs
 func NewController(client *Client, resyncPeriod time.Duration) model.ConfigStoreCache {
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &controller{
@@ -55,7 +55,7 @@ func NewController(client *Client, resyncPeriod time.Duration) model.ConfigStore
 		kinds:  make(map[string]cacheHandler),
 	}
 
-	// add stores for TPR kinds
+	// add stores for CRD kinds
 	out.kinds[IstioKindName] = out.createInformer(&IstioKind{}, resyncPeriod,
 		func(opts meta_v1.ListOptions) (result runtime.Object, err error) {
 			result = &IstioKindList{}
@@ -128,9 +128,9 @@ func (c *controller) createInformer(
 
 func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) {
 	c.kinds[IstioKindName].handler.Append(func(obj interface{}, ev model.Event) error {
-		tpr, ok := obj.(*IstioKind)
+		config, ok := obj.(*IstioKind)
 		if ok {
-			config, err := c.client.convertConfig(tpr)
+			config, err := c.client.convertConfig(config)
 			if config.Type == typ {
 				if err == nil {
 					f(config, ev)
