@@ -49,3 +49,11 @@ func TestSharedHost(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildListenerSSLContext(t *testing.T) {
+	const dir = "/some/testing/dir"
+	context := buildListenerSSLContext(dir)
+	if !context.RequireClientCertificate {
+		t.Errorf("buildListenerSSLContext(%v) => Got RequireClientCertificate: true, expected false.", dir)
+	}
+}

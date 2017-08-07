@@ -43,6 +43,7 @@ func buildListenerSSLContext(certsDir string) *SSLContext {
 		CertChainFile:  certsDir + "/" + certChainFilename,
 		PrivateKeyFile: certsDir + "/" + keyFilename,
 		CaCertFile:     certsDir + "/" + rootCertFilename,
+		RequireClientCertificate: true,
 	}
 }
 

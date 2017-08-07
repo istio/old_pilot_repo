@@ -510,6 +510,7 @@ type SSLContext struct {
 	CertChainFile  string `json:"cert_chain_file"`
 	PrivateKeyFile string `json:"private_key_file"`
 	CaCertFile     string `json:"ca_cert_file,omitempty"`
+	RequireClientCertificate bool `json:"require_client_certificate"`
 }
 
 // SSLContextExternal definition
