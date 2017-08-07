@@ -222,6 +222,7 @@ func makeInstance(hostname, ip string, portNum, securePort int, md metadata) *in
 		App:       appName(hostname),
 		Hostname:  hostname,
 		IPAddress: ip,
+		Status:    statusUp,
 		Port: &port{
 			Port:    7002,
 			Enabled: false,

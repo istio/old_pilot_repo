@@ -60,6 +60,10 @@ func convertServiceInstances(services map[string]*model.Service, apps []*applica
 				continue
 			}
 
+			if instance.Status != statusUp {
+				continue
+			}
+
 			for _, port := range convertPorts(instance) {
 				out = append(out, &model.ServiceInstance{
 					Endpoint: model.NetworkEndpoint{

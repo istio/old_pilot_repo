@@ -17,6 +17,7 @@ type instance struct {
 	Hostname   string   `json:"hostName"`
 	App        string   `json:"app"`
 	IPAddress  string   `json:"ipAddr"`
+	Status     string   `json:"status"`
 	Port       *port    `json:"port,omitempty"`
 	SecurePort *port    `json:"securePort,omitempty"`
 	Metadata   metadata `json:"metadata,omitempty"`
@@ -50,6 +51,14 @@ func NewClient(url string) Client {
 		url:    url,
 	}
 }
+
+const (
+	statusUp           = "UP"
+	statusDown         = "DOWN"
+	statusStarting     = "STARTING"
+	statusOutOfService = "OUT_OF_SERVICE"
+	statusUnknown      = "UNKNOWN"
+)
 
 const (
 	basePath = "/eureka/v2"
