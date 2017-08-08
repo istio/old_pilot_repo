@@ -1,0 +1,118 @@
+{
+	"ImportPath": "istio.io/pilot/cmd/pilot-agent",
+	"GoVersion": "go1.9",
+	"GodepVersion": "v79",
+	"Deps": [
+		{
+			"ImportPath": "github.com/emicklei/go-restful",
+			"Comment": "2.2.0-17-g68c9750",
+			"Rev": "68c9750c36bb8cb433f1b88c807b4b30df4acc40"
+		},
+		{
+			"ImportPath": "github.com/emicklei/go-restful/log",
+			"Comment": "2.2.0-17-g68c9750",
+			"Rev": "68c9750c36bb8cb433f1b88c807b4b30df4acc40"
+		},
+		{
+			"ImportPath": "github.com/ghodss/yaml",
+			"Comment": "v1.0.0",
+			"Rev": "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
+		},
+		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/jsonpb",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/any",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/struct",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
+			"Rev": "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/errwrap",
+			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-multierror",
+			"Rev": "83588e72410abfbe4df460eeb6f30841ae47d4c4"
+		},
+		{
+			"ImportPath": "github.com/howeyc/fsnotify",
+			"Comment": "v0.9.0-16-gf0c08ee",
+			"Rev": "f0c08ee9c60704c1879025f2ae0ff3e000082c13"
+		},
+		{
+			"ImportPath": "github.com/inconshreveable/mousetrap",
+			"Comment": "v1.0",
+			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
+		},
+		{
+			"ImportPath": "github.com/spf13/cobra",
+			"Rev": "b26b538f693051ac6518e65672de3144ce3fbedc"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Comment": "v1.0.0",
+			"Rev": "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
+		},
+		{
+			"ImportPath": "golang.org/x/time/rate",
+			"Rev": "8be79e1e0910c292df4e79c241bb7e8f7e725959"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "25c4ec802a7d637f88d584ab26798e94ad14c13b"
+		},
+		{
+			"ImportPath": "istio.io/api/proxy/v1/config",
+			"Rev": "3a1b144389d0bb933d7aa50c8171da988faad9e1"
+		},
+		{
+			"ImportPath": "istio.io/pilot/cmd",
+			"Comment": "stable-e35f5d1-7-gf4e7295",
+			"Rev": "f4e7295afaa8f7a6a2831d5c1a2338604fb642fa"
+		},
+		{
+			"ImportPath": "istio.io/pilot/model",
+			"Comment": "stable-e35f5d1-7-gf4e7295",
+			"Rev": "f4e7295afaa8f7a6a2831d5c1a2338604fb642fa"
+		},
+		{
+			"ImportPath": "istio.io/pilot/proxy",
+			"Comment": "stable-e35f5d1-7-gf4e7295",
+			"Rev": "f4e7295afaa8f7a6a2831d5c1a2338604fb642fa"
+		},
+		{
+			"ImportPath": "istio.io/pilot/proxy/envoy",
+			"Comment": "stable-e35f5d1-7-gf4e7295",
+			"Rev": "f4e7295afaa8f7a6a2831d5c1a2338604fb642fa"
+		},
+		{
+			"ImportPath": "istio.io/pilot/tools/version",
+			"Comment": "stable-e35f5d1-7-gf4e7295",
+			"Rev": "f4e7295afaa8f7a6a2831d5c1a2338604fb642fa"
+		}
+	]
+}
