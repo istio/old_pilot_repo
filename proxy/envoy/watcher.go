@@ -202,6 +202,9 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath, customConfig 
 			}
 
 			var fname string
+			// Note: the cert checking still works, the generated file is updated if certs are changed.
+			// We just don't save the generated file, but use a custom one instead. Pilot will keep
+			// monitoring the certs and restart if the content of the certs changes.
 			if len(customConfig) > 0 {
 				// user has a custom configuration. Don't write our own config - but keep watching the certs.
 				fname = customConfig
