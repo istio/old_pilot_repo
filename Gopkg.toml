@@ -47,7 +47,7 @@
 
 [[constraint]]
   name = "github.com/googleapis/googleapis"
-  source = "git@github.com:costinm/googleapis.git"
+  source = "https://github.com/costinm/googleapis.git"
 
 [[constraint]]
   name = "github.com/hashicorp/go-multierror"
