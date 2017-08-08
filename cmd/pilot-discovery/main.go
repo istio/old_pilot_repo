@@ -28,27 +28,20 @@ import (
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/adapter/config/ingress"
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
 )
 
-// Adapter defines options for underlying platform
-type Adapter string
-
-const (
-	KubernetesAdapter Adapter = "Kubernetes"
-	VMsAdapter        Adapter = "VMs"
-)
-
-// store the args related to VMs configuration
+// VMsArgs store the args related to VMs configuration
 type VMsArgs struct {
 	config    string
 	serverURL string
-	authToken string
 }
 
 type args struct {
@@ -59,7 +52,7 @@ type args struct {
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
-	adapter Adapter
+	adapter proxy.Adapter
 	vmsArgs VMsArgs
 }
 
@@ -77,10 +70,10 @@ var (
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
 			if flags.adapter == "" {
-				flags.adapter = KubernetesAdapter
+				flags.adapter = proxy.KubernetesAdapter
 			}
 
-			if flags.adapter == KubernetesAdapter {
+			if flags.adapter == proxy.KubernetesAdapter {
 				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
@@ -134,7 +127,11 @@ var (
 					SecretRegistry:   kube.MakeSecretRegistry(client),
 					Mesh:             mesh,
 				}
-				discovery, err := envoy.NewDiscoveryService(serviceController, configController, environment, flags.discoveryOptions)
+				discovery, err := envoy.NewDiscoveryService(
+					serviceController,
+					configController,
+					environment,
+					flags.discoveryOptions)
 				if err != nil {
 					return fmt.Errorf("failed to create discovery service: %v", err)
 				}
@@ -149,8 +146,43 @@ var (
 				cmd.WaitSignal(stop)
 
 				return nil
-			} else if flags.adapter == VMsAdapter {
+			} else if flags.adapter == proxy.VMsAdapter {
+				mesh := proxy.DefaultMeshConfig()
 
+				glog.V(2).Infof("Consul url: %v", flags.vmsArgs.serverURL)
+
+				serviceController, err := consul.NewController(
+					flags.vmsArgs.serverURL, "dc1", 2*time.Second)
+				if err != nil {
+					return fmt.Errorf("failed to create Consul controller: %v", err)
+				}
+
+				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
+					model.RouteRuleDescriptor,
+					model.DestinationPolicyDescriptor,
+				}))
+
+				environment := proxy.Environment{
+					ServiceDiscovery: serviceController,
+					ServiceAccounts:  serviceController,
+					IstioConfigStore: model.MakeIstioStore(configController),
+					Mesh:             &mesh,
+				}
+
+				discovery, err := envoy.NewDiscoveryService(
+					serviceController,
+					configController,
+					environment,
+					flags.discoveryOptions)
+				if err != nil {
+					return fmt.Errorf("failed to create discovery service: %v", err)
+				}
+
+				stop := make(chan struct{})
+				go serviceController.Run(stop)
+				go configController.Run(stop)
+				go discovery.Run()
+				cmd.WaitSignal(stop)
 			}
 
 			return nil
@@ -159,8 +191,9 @@ var (
 )
 
 func init() {
-	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(KubernetesAdapter),
-		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter), string(VMsAdapter)))
+	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(proxy.KubernetesAdapter),
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}",
+			string(proxy.KubernetesAdapter), string(proxy.VMsAdapter)))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",

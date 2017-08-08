@@ -26,31 +26,23 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/cmd"
+	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
 )
 
-// Adapter defines options for underlying platform
-type Adapter string
-
-const (
-	KubernetesAdapter Adapter = "Kubernetes"
-	VMsAdapter        Adapter = "VMs"
-)
-
-// store the args related to VMs configuration
+// VMsArgs store the args related to VMs configuration
 type VMsArgs struct {
 	config    string
 	serverURL string
-	authToken string
 }
 
 var (
 	configpath string
 	meshconfig string
 	sidecar    proxy.Sidecar
-	adapter    Adapter
+	adapter    proxy.Adapter
 	vmsArgs    VMsArgs
 
 	rootCmd = &cobra.Command{
@@ -64,7 +56,7 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			// set values from environment variables
-			if adapter == KubernetesAdapter {
+			if adapter == proxy.KubernetesAdapter {
 				// set values from environment variables
 				if sidecar.IPAddress == "" {
 					sidecar.IPAddress = os.Getenv("INSTANCE_IP")
@@ -116,7 +108,25 @@ var (
 				cancel()
 				return nil
 
-			} else if adapter == VMsAdapter {
+			} else if adapter == proxy.VMsAdapter {
+				mesh := proxy.DefaultMeshConfig()
+
+				ipAddr := "127.0.0.1"
+				available := consul.WaitForPrivateNetwork()
+				if available {
+					ipAddr = consul.GetPrivateIP().String()
+					glog.V(2).Infof("obtained private IP %v", ipAddr)
+				}
+
+				sidecar.IPAddress = ipAddr
+				var role proxy.Role = sidecar
+				watcher := envoy.NewWatcher(&mesh, role, configpath)
+				ctx, cancel := context.WithCancel(context.Background())
+				go watcher.Run(ctx)
+				stop := make(chan struct{})
+				cmd.WaitSignal(stop)
+				<-stop
+				cancel()
 			}
 			return nil
 		},
@@ -124,8 +134,9 @@ var (
 )
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar((*string)(&adapter), "adapter", string(KubernetesAdapter),
-		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}", string(KubernetesAdapter), string(VMsAdapter)))
+	proxyCmd.PersistentFlags().StringVar((*string)(&adapter), "adapter", string(proxy.KubernetesAdapter),
+		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}",
+			string(proxy.KubernetesAdapter), string(proxy.VMsAdapter)))
 	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",

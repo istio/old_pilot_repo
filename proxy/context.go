@@ -53,6 +53,16 @@ type Role interface {
 	ServiceNode() string
 }
 
+// Adapter defines options for underlying platform
+type Adapter string
+
+const (
+	// KubernetesAdapter Kubernetes environment flag
+	KubernetesAdapter Adapter = "Kubernetes"
+	// VMsAdapter VM environment flag
+	VMsAdapter Adapter = "VMs"
+)
+
 // Sidecar defines the sidecar proxy role
 type Sidecar struct {
 	// IPAddress is the IP address of the proxy used to identify it and its

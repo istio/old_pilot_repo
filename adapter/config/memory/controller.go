@@ -1,6 +1,6 @@
 package memory
 
-import(
+import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -8,14 +8,15 @@ import(
 )
 
 type controller struct {
-	monitor Monitor
+	monitor     Monitor
 	configStore model.ConfigStore
 }
 
+// NewController TODO
 func NewController(cs model.ConfigStore) model.ConfigStoreCache {
 	out := &controller{
 		configStore: cs,
-		monitor: NewConfigsMonitor(cs, time.Second * 1),
+		monitor:     NewConfigsMonitor(cs, time.Second*1),
 	}
 	return out
 }
@@ -34,7 +35,7 @@ func (c *controller) Run(stop <-chan struct{}) {
 }
 
 func (c *controller) ConfigDescriptor() model.ConfigDescriptor {
-        return c.configStore.ConfigDescriptor()
+	return c.configStore.ConfigDescriptor()
 }
 
 func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
@@ -42,18 +43,17 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 }
 
 func (c *controller) Post(val proto.Message) (string, error) {
-        return c.configStore.Post(val)
+	return c.configStore.Post(val)
 }
 
 func (c *controller) Put(val proto.Message, revision string) (string, error) {
-        return c.configStore.Put(val, revision)
+	return c.configStore.Put(val, revision)
 }
 
 func (c *controller) Delete(typ, key string) error {
-        return c.configStore.Delete(typ, key)
+	return c.configStore.Delete(typ, key)
 }
 
 func (c *controller) List(typ string) ([]model.Config, error) {
-        return c.configStore.List(typ)
+	return c.configStore.List(typ)
 }
-
