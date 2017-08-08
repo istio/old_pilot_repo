@@ -16,8 +16,9 @@ go_library(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        "//adapter/config/tpr:go_default_library",
+        "//adapter/config/crd:go_default_library",
         "//model:go_default_library",
+        "//platform/kube:go_default_library",
         "//platform/kube/inject:go_default_library",
         "//test/util:go_default_library",
         "@com_github_davecgh_go_spew//spew:go_default_library",
@@ -34,7 +35,10 @@ go_library(
 
 go_binary(
     name = "integration",
-    data = glob(["testdata/*"]) + ["//platform/kube:kubeconfig"],
+    data = glob(["testdata/*"]) + [
+        "//platform/kube:kubeconfig",
+        "//docker:certs",
+    ],
     library = ":go_default_library",
     tags = ["manual"],
     visibility = ["//visibility:public"],
