@@ -1,0 +1,13 @@
+destination: {{.Destination}}.{{.Namespace}}.svc.cluster.local
+name: content-route
+precedence: 2
+match:
+  source: {{.Source}}.{{.Namespace}}.svc.cluster.local
+  sourceTags:
+    version: v1
+  httpHeaders:
+    version:
+      exact: v2
+route:
+  - tags:
+       version: v2

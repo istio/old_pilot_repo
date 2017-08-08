@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: istio
+data:
+  mesh: |-
+    discoveryAddress: istio-pilot:8080
+{{if .Mixer}}
+    mixerAddress: istio-mixer:9091
+{{end}}
+    authPolicy: {{ .Auth }}
+    authCertsPath: /etc/certs
+{{if .Zipkin}}
+    zipkinAddress: zipkin:9411
+{{end}}

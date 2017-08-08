@@ -1,0 +1,42 @@
+# Mixer
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-mixer
+  labels:
+    app: mixer
+spec:
+  ports:
+  - name: grpc
+    port: 9091
+  selector:
+    app: mixer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-mixer-service-account
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-mixer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mixer
+    spec:
+      serviceAccountName: istio-mixer-service-account
+      containers:
+      - name: mixer
+        image: {{.MixerImage}}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9091
+        args:
+          - --configStoreURL=fs:///etc/opt/mixer/configroot
+          - --logtostderr
+          - --v=4
+---

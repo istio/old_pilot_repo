@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-egress
+spec:
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: istio-egress
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-egress-service-account
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-egress
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: istio-egress
+    spec:
+      serviceAccountName: istio-egress-service-account
+      containers:
+      - name: istio-proxy
+        image: {{.Hub}}/proxy_debug:{{.Tag}}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        args: ["proxy", "egress", "-v", "{{.Verbosity}}"]
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/istio/config
+          readOnly: true
+        - mountPath: /etc/istio/proxy/
+          name: istio-envoy
+{{if eq .Auth 1}}
+        - mountPath: /etc/certs
+          name: istio-certs
+          readOnly: true
+{{end}}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: istio
+      - emptyDir:
+          medium: Memory
+        name: istio-envoy
+{{if eq .Auth 1}}
+      - name: istio-certs
+        secret:
+          secretName: istio.default
+{{end}}
+---

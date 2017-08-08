@@ -1,0 +1,7 @@
+destination: "{{.Destination}}.{{.Namespace}}.svc.cluster.local"
+name: default-route
+precedence: 1
+route:
+  - tags:
+       version: v1
+    weight: 100
