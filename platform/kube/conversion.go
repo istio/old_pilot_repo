@@ -28,6 +28,10 @@ const (
 	// IngressClassAnnotation is the annotation on ingress resources for the class of controllers
 	// responsible for it
 	IngressClassAnnotation = "kubernetes.io/ingress.class"
+
+	// The service accounts that are allowed to run this service, explicitly set for services run
+	// by non-K8s VMs.
+	ServiceAccountsOnVmAnnotation = "beta.istio.io/serviceaccountsonvm"
 )
 
 func convertTags(obj meta_v1.ObjectMeta) model.Tags {
@@ -66,11 +70,17 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		ports = append(ports, convertPort(port))
 	}
 
+	serviceaccounts := ""
+	if svc.Annotations != nil {
+		serviceaccounts, _ = svc.Annotations[ServiceAccountsOnVmAnnotation]
+	}
+
 	return &model.Service{
-		Hostname:     serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:        ports,
-		Address:      addr,
-		ExternalName: external,
+		Hostname:            serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:               ports,
+		Address:             addr,
+		ExternalName:        external,
+		ServiceAccountsOnVm: serviceaccounts,
 	}
 }
 

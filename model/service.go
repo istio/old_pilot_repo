@@ -54,6 +54,11 @@ type Service struct {
 	// service DNS name.  External services are name-based solution to represent
 	// external service instances as a service inside the cluster.
 	ExternalName string `json:"external"`
+
+	// For the service that runs on VMs, ServiceAccountsOnVm specifies the service
+	// accounts provisioned to these VMs. When multiple service accounts are
+	// specified, use comma as the delimiter.
+	ServiceAccountsOnVm string `json:"serviceaccountsonvm,omitempty"`
 }
 
 // Port represents a network port where a service is listening for
@@ -267,6 +272,13 @@ func (ports PortList) GetByPort(num int) (*Port, bool) {
 // External predicate checks whether the service is external
 func (s *Service) External() bool {
 	return s.ExternalName != ""
+}
+
+func (s *Service) GetServiceAccountsOnVm() []string {
+	if len(s.ServiceAccountsOnVm) > 0 {
+		return strings.Split(s.ServiceAccountsOnVm, ",")
+	}
+	return make([]string, 0)
 }
 
 // Key generates a unique string referencing service instances for a given port and tags.

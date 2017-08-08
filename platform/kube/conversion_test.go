@@ -15,6 +15,7 @@
 package kube
 
 import (
+	"strings"
 	"testing"
 
 	"istio.io/pilot/model"
@@ -56,12 +57,20 @@ func TestConvertProtocol(t *testing.T) {
 func TestServiceConversion(t *testing.T) {
 	serviceName := "service1"
 	namespace := "default"
+	saA := "serviceaccountA"
+	saB := "serviceaccountB"
+	annotation := saA + "," + saB
+
 	ip := "10.0.0.1"
 
 	localSvc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				ServiceAccountsOnVmAnnotation: annotation,
+				"other/annotation":            "test",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: ip,
@@ -101,6 +110,16 @@ func TestServiceConversion(t *testing.T) {
 
 	if service.Address != ip {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
+	}
+
+	sa := service.GetServiceAccountsOnVm()
+	if sa == nil || len(sa) != 2 {
+		t.Errorf("number of service accounts is incorrect")
+	}
+	if !((strings.Compare(sa[0], saA) == 0 && strings.Compare(sa[1], saB) == 0) ||
+		(strings.Compare(sa[0], saB) == 0 && strings.Compare(sa[1], saA) == 0)) {
+		t.Errorf("service accounts do not match: %s,%s VS %s,%s",
+			sa[0], sa[1], saA, saB)
 	}
 }
 
