@@ -36,34 +36,32 @@ func TestServiceDiscoveryServices(t *testing.T) {
 }
 
 func TestServiceDiscoveryGetService(t *testing.T) {
-	hostA := "a.default.svc.local"
-	hostB := "b.default.svc.local"
-	hostC := "c.default.svc.local"
+	host := "hello.world.local"
+	hostAlt := "foo.bar.local"
+	hostDNE := "does.not.exist.local"
 
 	cl := &mockClient{
 		{
-			Name: appName(hostA),
+			Name: "APP",
 			Instances: []*instance{
-				makeInstance(hostA, "10.0.0.1", 9090, 8080, nil),
-				makeInstance(hostB, "10.0.0.2", 7070, -1, nil),
+				makeInstance(host, "10.0.0.1", 9090, 8080, nil),
+				makeInstance(hostAlt, "10.0.0.2", 7070, -1, nil),
 			},
 		},
 	}
 	sd := NewServiceDiscovery(cl)
 
-	_, exists := sd.GetService(hostC)
+	_, exists := sd.GetService(hostDNE)
 	if exists {
-		t.Errorf("GetService() retrieved non-existent service %s", hostC)
+		t.Errorf("GetService(%q) => %t, want false", hostDNE, exists)
 	}
 
-	expected := makeService(hostA, []int{9090, 8080}, nil)
-	actual, exists := sd.GetService(hostA)
+	service, exists := sd.GetService(host)
 	if !exists {
-		t.Errorf("GetService() could not retrieve %s", hostA)
+		t.Errorf("GetService(%q) => %t, want true", host, exists)
 	}
-
-	if err := compare(t, actual, expected); err != nil {
-		t.Error(err)
+	if service.Hostname != host {
+		t.Errorf("GetService(%q) => %q, want %q", host, service.Hostname, host)
 	}
 }
 

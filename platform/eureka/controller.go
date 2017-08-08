@@ -20,9 +20,9 @@ type controller struct {
 }
 
 // NewController instantiates a new Eureka controller
-func NewController(client Client) model.Controller {
+func NewController(client Client, interval time.Duration) model.Controller {
 	return &controller{
-		interval:         1 * time.Second,
+		interval:         interval,
 		serviceHandlers:  make([]serviceHandler, 0),
 		instanceHandlers: make([]instanceHandler, 0),
 		client:           client,
@@ -40,7 +40,7 @@ func (c *controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 }
 
 func (c *controller) Run(stop <-chan struct{}) {
-	var cachedApps []*application
+	cachedApps := make([]*application, 0)
 	ticker := time.NewTicker(c.interval)
 	for {
 		select {

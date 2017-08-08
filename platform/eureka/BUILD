@@ -20,6 +20,7 @@ go_test(
     size = "small",
     srcs = [
         "client_test.go",
+        "controller_test.go",
         "conversion_test.go",
         "servicediscovery_test.go",
     ],
