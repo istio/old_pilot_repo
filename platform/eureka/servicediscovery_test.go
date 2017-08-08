@@ -14,7 +14,7 @@ func (apps *mockClient) Applications() ([]*application, error) {
 
 var _ Client = (*mockClient)(nil)
 
-func TestControllerServices(t *testing.T) {
+func TestServiceDiscoveryServices(t *testing.T) {
 	cl := &mockClient{
 		{
 			Name: appName("a.default.svc.local"),
@@ -33,10 +33,41 @@ func TestControllerServices(t *testing.T) {
 	if err := compare(t, sd.Services(), services); err != nil {
 		t.Error(err)
 	}
-
 }
 
-func TestControllerHostInstances(t *testing.T) {
+func TestServiceDiscoveryGetService(t *testing.T) {
+	hostA := "a.default.svc.local"
+	hostB := "b.default.svc.local"
+	hostC := "c.default.svc.local"
+
+	cl := &mockClient{
+		{
+			Name: appName(hostA),
+			Instances: []*instance{
+				makeInstance(hostA, "10.0.0.1", 9090, 8080, nil),
+				makeInstance(hostB, "10.0.0.2", 7070, -1, nil),
+			},
+		},
+	}
+	sd := NewServiceDiscovery(cl)
+
+	_, exists := sd.GetService(hostC)
+	if exists {
+		t.Errorf("GetService() retrieved non-existent service %s", hostC)
+	}
+
+	expected := makeService(hostA, []int{9090, 8080}, nil)
+	actual, exists := sd.GetService(hostA)
+	if !exists {
+		t.Errorf("GetService() could not retrieve %s", hostA)
+	}
+
+	if err := compare(t, actual, expected); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestServiceDiscoveryHostInstances(t *testing.T) {
 	cl := &mockClient{
 		{
 			Name: appName("a.default.svc.local"),
@@ -74,7 +105,7 @@ func TestControllerHostInstances(t *testing.T) {
 	}
 }
 
-func TestControllerInstances(t *testing.T) {
+func TestServiceDiscoveryInstances(t *testing.T) {
 	cl := &mockClient{
 		{
 			Name: appName("a.default.svc.local"),

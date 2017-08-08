@@ -166,15 +166,25 @@ func TestConvertServiceInstances(t *testing.T) {
 }
 
 func TestConvertProtocol(t *testing.T) {
+	makeMetadata := func(protocol string) metadata {
+		return metadata{
+			protocolMetadata: protocol,
+			"kit":            "kat",
+		}
+	}
+
 	protocolTests := []struct {
 		in  metadata
 		out model.Protocol
 	}{
 		{in: nil, out: model.ProtocolTCP},
-		{in: metadata{protocolMetadata: "", "kit": "kat"}, out: model.ProtocolTCP},
-		{in: metadata{protocolMetadata: "HTCPCP", "kit": "kat", "roast": "dark"}, out: model.ProtocolTCP},
-		{in: metadata{protocolMetadata: metadataHTTP, "kit": "kat"}, out: model.ProtocolHTTP},
-		{in: metadata{protocolMetadata: metadataHTTP2, "kit": "kat"}, out: model.ProtocolHTTP2},
+		{in: makeMetadata(""), out: model.ProtocolTCP},
+		{in: makeMetadata("HTCPCP"), out: model.ProtocolTCP},
+		{in: makeMetadata(metadataUDP), out: model.ProtocolUDP},
+		{in: makeMetadata(metadataHTTP), out: model.ProtocolHTTP},
+		{in: makeMetadata(metadataHTTP2), out: model.ProtocolHTTP2},
+		{in: makeMetadata(metadataHTTPS), out: model.ProtocolHTTPS},
+		{in: makeMetadata(metadataGRPC), out: model.ProtocolGRPC},
 	}
 
 	for _, tt := range protocolTests {
