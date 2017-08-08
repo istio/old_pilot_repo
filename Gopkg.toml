@@ -88,6 +88,7 @@
 
 [[constraint]]
   name = "k8s.io/client-go"
+  revision = "7c69e980210777a6292351ac6873de083526f08e"
 
 [[constraint]]
   name = "k8s.io/ingress"
