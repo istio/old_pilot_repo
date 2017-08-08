@@ -44,7 +44,7 @@ func TestController(t *testing.T) {
 
 	incrementCount := func() {
 		countMutex.Lock()
-		countMutex.Unlock()
+		defer countMutex.Unlock()
 		count++
 	}
 	getCountAndReset := func() int {
@@ -56,12 +56,15 @@ func TestController(t *testing.T) {
 	}
 
 	ctl := NewController(cl, resync)
-	ctl.AppendInstanceHandler(func(instance *model.ServiceInstance, event model.Event) {
-		incrementCount()
-	})
-	ctl.AppendServiceHandler(func(service *model.Service, event model.Event) {
-		incrementCount()
-	})
+	err := ctl.AppendInstanceHandler(func(instance *model.ServiceInstance, event model.Event) { incrementCount() })
+	if err != nil {
+		t.Errorf("AppendInstanceHandler() => %q", err)
+	}
+
+	err = ctl.AppendServiceHandler(func(service *model.Service, event model.Event) { incrementCount() })
+	if err != nil {
+		t.Errorf("AppendServiceHandler() => %q", err)
+	}
 
 	stop := make(chan struct{})
 	go ctl.Run(stop)
