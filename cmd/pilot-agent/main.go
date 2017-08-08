@@ -66,10 +66,8 @@ var (
 			glog.V(2).Infof("sidecar %#v", sidecar)
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
-			if len(customConfig) == 0 {
-				if err = os.MkdirAll(configpath, 0700); err != nil {
-					return multierror.Prefix(err, "failed to create directory for proxy configuration")
-				}
+			if err = os.MkdirAll(configpath, 0700); err != nil {
+				return multierror.Prefix(err, "failed to create directory for proxy configuration")
 			}
 
 			var role proxy.Role = sidecar
