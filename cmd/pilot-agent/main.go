@@ -32,18 +32,18 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
-// VMsArgs store the args related to VMs configuration
-type VMsArgs struct {
+// ConsulArgs store the args related to Consul configuration
+type ConsulArgs struct {
 	config    string
 	serverURL string
 }
 
 var (
-	configpath string
-	meshconfig string
-	sidecar    proxy.Sidecar
-	adapter    proxy.Adapter
-	vmsArgs    VMsArgs
+	configpath      string
+	meshconfig      string
+	sidecar         proxy.Sidecar
+	serviceregistry proxy.ServiceRegistry
+	consulargs      ConsulArgs
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -56,7 +56,7 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			// set values from environment variables
-			if adapter == proxy.KubernetesAdapter {
+			if serviceregistry == proxy.KubernetesRegistry {
 				// set values from environment variables
 				if sidecar.IPAddress == "" {
 					sidecar.IPAddress = os.Getenv("INSTANCE_IP")
@@ -108,7 +108,7 @@ var (
 				cancel()
 				return nil
 
-			} else if adapter == proxy.VMsAdapter {
+			} else if serviceregistry == proxy.ConsulRegistry {
 				mesh := proxy.DefaultMeshConfig()
 
 				ipAddr := "127.0.0.1"
@@ -134,9 +134,9 @@ var (
 )
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar((*string)(&adapter), "adapter", string(proxy.KubernetesAdapter),
-		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}",
-			string(proxy.KubernetesAdapter), string(proxy.VMsAdapter)))
+	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry", string(proxy.KubernetesRegistry),
+		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
+			string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
 	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
@@ -147,14 +147,11 @@ func init() {
 		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
-	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "vmsconfig", "",
-		"VMs config file for sidecar")
+	proxyCmd.PersistentFlags().StringVar(&consulargs.config, "consulconfig", "",
+		"Consul config file for sidecar")
 
-	proxyCmd.PersistentFlags().StringVar(&vmsArgs.serverURL, "serverURL", "",
-		"URL for the registry server")
-
-	proxyCmd.PersistentFlags().StringVar(&vmsArgs.config, "authToken", "",
-		"Authorization token used to access the registry server")
+	proxyCmd.PersistentFlags().StringVar(&consulargs.serverURL, "consulserverURL", "",
+		"URL for the Consul registry server")
 
 	cmd.AddFlags(rootCmd)
 

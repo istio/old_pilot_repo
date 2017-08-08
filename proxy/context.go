@@ -53,14 +53,14 @@ type Role interface {
 	ServiceNode() string
 }
 
-// Adapter defines options for underlying platform
-type Adapter string
+// ServiceRegistry defines underlying platform supporting service regisgtry
+type ServiceRegistry string
 
 const (
-	// KubernetesAdapter Kubernetes environment flag
-	KubernetesAdapter Adapter = "Kubernetes"
-	// VMsAdapter VM environment flag
-	VMsAdapter Adapter = "VMs"
+	// KubernetesRegistry environment flag
+	KubernetesRegistry ServiceRegistry = "Kubernetes"
+	// ConsulRegistry  environment flag
+	ConsulRegistry ServiceRegistry = "Consul"
 )
 
 // Sidecar defines the sidecar proxy role

@@ -38,8 +38,8 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
-// VMsArgs store the args related to VMs configuration
-type VMsArgs struct {
+// ConsulArgs store the args related to Consul configuration
+type ConsulArgs struct {
 	config    string
 	serverURL string
 }
@@ -52,8 +52,8 @@ type args struct {
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
-	adapter proxy.Adapter
-	vmsArgs VMsArgs
+	serviceregistry proxy.ServiceRegistry
+	consulargs      ConsulArgs
 }
 
 var (
@@ -69,11 +69,7 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
-			if flags.adapter == "" {
-				flags.adapter = proxy.KubernetesAdapter
-			}
-
-			if flags.adapter == proxy.KubernetesAdapter {
+			if flags.serviceregistry == proxy.KubernetesRegistry {
 				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
@@ -146,13 +142,13 @@ var (
 				cmd.WaitSignal(stop)
 
 				return nil
-			} else if flags.adapter == proxy.VMsAdapter {
+			} else if flags.serviceregistry == proxy.ConsulRegistry {
 				mesh := proxy.DefaultMeshConfig()
 
-				glog.V(2).Infof("Consul url: %v", flags.vmsArgs.serverURL)
+				glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
 				serviceController, err := consul.NewController(
-					flags.vmsArgs.serverURL, "dc1", 2*time.Second)
+					flags.consulargs.serverURL, "dc1", 2*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to create Consul controller: %v", err)
 				}
@@ -191,9 +187,10 @@ var (
 )
 
 func init() {
-	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.adapter), "adapter", string(proxy.KubernetesAdapter),
-		fmt.Sprintf("Select the underlying running platform, options are {%s, %s}",
-			string(proxy.KubernetesAdapter), string(proxy.VMsAdapter)))
+	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.serviceregistry), "serviceregistry",
+		string(proxy.KubernetesRegistry),
+		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
+		string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
@@ -212,13 +209,11 @@ func init() {
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
 
-	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "vmsconfig", "",
-		"VMs Config file for discovery")
-	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.serverURL, "serverURL", "",
-		"URL for the registry server")
+	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.config, "consulconfig", "",
+		"Consul Config file for discovery")
+	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.serverURL, "consulserverURL", "",
+		"URL for the consul server")
 
-	discoveryCmd.PersistentFlags().StringVar(&flags.vmsArgs.config, "authToken", "",
-		"Authorization token used to access the registry server")
 	cmd.AddFlags(rootCmd)
 
 	rootCmd.AddCommand(discoveryCmd)
