@@ -24,11 +24,12 @@ import (
 	"istio.io/pilot/model"
 )
 
-type Configs []model.Config
+type configs []model.Config
 
 // Handler specifies a function to apply on a Config for a given event type
 type Handler func(model.Config, model.Event)
 
+// Monitor interface checks for changes to model.Configs
 type Monitor interface {
 	Start(<-chan struct{})
 	AppendEventHandler(string, Handler)
@@ -36,21 +37,18 @@ type Monitor interface {
 
 type configsMonitor struct {
 	store              model.ConfigStore
-	configCachedRecord map[string]Configs
+	configCachedRecord map[string]configs
 	handlers           map[string][]Handler
-
-	ticker   *time.Ticker
-	period   time.Duration
-
-	stop <-chan struct{}
+	period             time.Duration
 }
 
+// NewConfigsMonitor returns new Monitor implementation
 func NewConfigsMonitor(store model.ConfigStore, period time.Duration) Monitor {
-	cache := make(map[string]Configs, 0)
-	handlers := make(map[string][]Handler, 0)
+	cache := make(map[string]configs)
+	handlers := make(map[string][]Handler)
 
 	for _, conf := range model.IstioConfigTypes {
-		cache[conf.Type] = make(Configs, 0)
+		cache[conf.Type] = make(configs, 0)
 		handlers[conf.Type] = make([]Handler, 0)
 	}
 
@@ -63,16 +61,16 @@ func NewConfigsMonitor(store model.ConfigStore, period time.Duration) Monitor {
 }
 
 func (m *configsMonitor) Start(stop <-chan struct{}) {
-	m.ticker = time.NewTicker(m.period)
 	m.run(stop)
 }
 
 func (m *configsMonitor) run(stop <-chan struct{}) {
+	ticker := time.NewTicker(m.period)
 	for {
 		select {
 		case <-stop:
-			m.ticker.Stop()
-		case <-m.ticker.C:
+			ticker.Stop()
+		case <-ticker.C:
 			m.UpdateConfigRecord()
 		}
 	}
@@ -80,19 +78,19 @@ func (m *configsMonitor) run(stop <-chan struct{}) {
 
 func (m *configsMonitor) UpdateConfigRecord() {
 	for _, conf := range model.IstioConfigTypes {
-		configs, err := m.store.List(conf.Type)
+		newConfigs, err := m.store.List(conf.Type)
 		if err != nil {
 			glog.Warningf("Unable to fetch configs of type: %s", conf.Type)
 			return
 		}
-		newRecord := Configs(configs)
+		newRecord := configs(newConfigs)
 		newRecord.normalize()
 		m.compareToCache(conf.Type, m.configCachedRecord[conf.Type], newRecord)
 		m.configCachedRecord[conf.Type] = newRecord
 	}
 }
 
-func (m *configsMonitor) compareToCache(typ string, oldRec, newRec Configs) {
+func (m *configsMonitor) compareToCache(typ string, oldRec, newRec configs) {
 	io, in := 0, 0
 	for io < len(oldRec) && in < len(newRec) {
 		if reflect.DeepEqual(oldRec[io], newRec[in]) {
@@ -127,10 +125,10 @@ func (m *configsMonitor) AppendEventHandler(typ string, h Handler) {
 
 func (m *configsMonitor) applyHandlers(typ string, config model.Config, e model.Event) {
 	for _, f := range m.handlers[typ] {
-		f(config, e)
+		go f(config, e)
 	}
 }
 
-func (list Configs) normalize() {
+func (list configs) normalize() {
 	sort.Slice(list, func(i, j int) bool { return list[i].Key < list[j].Key })
 }

@@ -190,7 +190,7 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.serviceregistry), "serviceregistry",
 		string(proxy.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
-		string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
+			string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
