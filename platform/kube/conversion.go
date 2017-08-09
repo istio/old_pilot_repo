@@ -70,18 +70,21 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		ports = append(ports, convertPort(port))
 	}
 
-	serviceaccounts := ""
-	if svc.Annotations != nil {
-		serviceaccounts, _ = svc.Annotations[ServiceAccountsOnVmAnnotation]
-	}
-
 	return &model.Service{
-		Hostname:            serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:               ports,
-		Address:             addr,
-		ExternalName:        external,
-		ServiceAccountsOnVm: serviceaccounts,
+		Hostname:     serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:        ports,
+		Address:      addr,
+		ExternalName: external,
+		Annotations:  svc.Annotations,
 	}
+}
+
+func getServiceAccountsOnVm(svc *model.Service) []string {
+	if svc.Annotations == nil {
+		return make([]string, 0)
+	}
+	serviceaccounts, _ := svc.Annotations[ServiceAccountsOnVmAnnotation]
+	return strings.Split(serviceaccounts, ",")
 }
 
 // serviceHostname produces FQDN for a k8s service

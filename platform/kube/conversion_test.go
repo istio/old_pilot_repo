@@ -112,7 +112,7 @@ func TestServiceConversion(t *testing.T) {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
 	}
 
-	sa := service.GetServiceAccountsOnVm()
+	sa := getServiceAccountsOnVm(service)
 	if sa == nil || len(sa) != 2 {
 		t.Errorf("number of service accounts is incorrect")
 	}
