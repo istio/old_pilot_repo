@@ -1,8 +1,0 @@
-destination: hello.default.svc.cluster.local
-destinationPort: 81
-name: foo
-tlsSecret: my-secret.default
-match:
-  http_headers:
-    uri:
-      prefix: "/bar"
