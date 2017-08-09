@@ -376,7 +376,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 		glog.V(2).Infof("GetService(%s) => error %v", hostname, err)
 		return nil
 	}
-	for _, serviceAccountName := range getServiceAccountsOnVm(svc) {
+	for _, serviceAccountName := range getServiceAccountsOnVM(svc) {
 		sa := generateServiceAccountID(serviceAccountName, namespace, c.domainSuffix)
 		saSet[sa] = true
 	}

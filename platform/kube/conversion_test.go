@@ -68,7 +68,7 @@ func TestServiceConversion(t *testing.T) {
 			Name:      serviceName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				ServiceAccountsOnVmAnnotation: annotation,
+				ServiceAccountsOnVMAnnotation: annotation,
 				"other/annotation":            "test",
 			},
 		},
@@ -112,7 +112,7 @@ func TestServiceConversion(t *testing.T) {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
 	}
 
-	sa := getServiceAccountsOnVm(service)
+	sa := getServiceAccountsOnVM(service)
 	if sa == nil || len(sa) != 2 {
 		t.Errorf("number of service accounts is incorrect")
 	}

@@ -29,9 +29,9 @@ const (
 	// responsible for it
 	IngressClassAnnotation = "kubernetes.io/ingress.class"
 
-	// The service accounts that are allowed to run this service, explicitly set for services run
-	// by non-K8s VMs.
-	ServiceAccountsOnVmAnnotation = "beta.istio.io/serviceaccountsonvm"
+	// ServiceAccountsOnVMAnnotation is to specify the service accounts that are allowed to run this
+	// service on non-K8s VMs.
+	ServiceAccountsOnVMAnnotation = "beta.istio.io/serviceaccountsonvm"
 )
 
 func convertTags(obj meta_v1.ObjectMeta) model.Tags {
@@ -79,11 +79,11 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 	}
 }
 
-func getServiceAccountsOnVm(svc *model.Service) []string {
+func getServiceAccountsOnVM(svc *model.Service) []string {
 	if svc.Annotations == nil {
 		return make([]string, 0)
 	}
-	serviceaccounts, _ := svc.Annotations[ServiceAccountsOnVmAnnotation]
+	serviceaccounts := svc.Annotations[ServiceAccountsOnVMAnnotation]
 	return strings.Split(serviceaccounts, ",")
 }
 

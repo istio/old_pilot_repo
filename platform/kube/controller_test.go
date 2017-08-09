@@ -252,7 +252,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	serviceAccount1 := "acct1"
 	serviceAccount2 := "acct2"
 	serviceAccount3 := "acct3"
-	serviceAccountOnVm := "acctvm"
+	serviceAccountOnVM := "acctvm"
 
 	pods := []*v1.Pod{
 		generatePod("pod1", "nsA", serviceAccount1, "node1", map[string]string{"app": "test-app"}),
@@ -272,7 +272,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	controller.pods.keys["128.0.0.2"] = "nsA/pod2"
 	controller.pods.keys["128.0.0.3"] = "nsB/pod3"
 
-	createService(controller, "svc1", "nsA", map[string]string{ServiceAccountsOnVmAnnotation: serviceAccountOnVm},
+	createService(controller, "svc1", "nsA", map[string]string{ServiceAccountsOnVMAnnotation: serviceAccountOnVM},
 		[]int32{8080}, map[string]string{"app": "prod-app"}, t)
 	createService(controller, "svc2", "nsA", nil, []int32{8081}, map[string]string{"app": "staging-app"}, t)
 
@@ -289,7 +289,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	sort.Sort(sort.StringSlice(sa))
 	expected := []string{
 		"spiffe://company.com/ns/nsA/sa/" + serviceAccount2,
-		"spiffe://company.com/ns/nsA/sa/" + serviceAccountOnVm,
+		"spiffe://company.com/ns/nsA/sa/" + serviceAccountOnVM,
 	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
