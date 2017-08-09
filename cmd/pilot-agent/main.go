@@ -114,7 +114,7 @@ func init() {
 	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
 		"DNS domain suffix")
 	proxyCmd.PersistentFlags().StringVar(&customConfig, "envoyconfig", "",
-		"Custom envoy config")
+		"Custom envoy config. The meshconfig options and auto-generated envoy configs will not be used.")
 
 	cmd.AddFlags(rootCmd)
 
