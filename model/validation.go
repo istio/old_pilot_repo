@@ -793,7 +793,7 @@ func ValidateEgressRule(msg proto.Message) error {
 			errs = multierror.Append(errs, fmt.Errorf("duplicate port: %d", port.Port))
 		}
 		ports[port.Port] = true
-	        
+
 		if err := ValidateEgressRulePort(port); err != nil {
 			errs = multierror.Append(errs, err)
 		}

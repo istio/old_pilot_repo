@@ -336,7 +336,7 @@ func schema(typ string) (model.ProtoSchema, error) {
 	var singularForm = map[string]string{
 		"route-rules":          "route-rule",
 		"destination-policies": "destination-policy",
-                "egress-rules": "egress-rule",
+		"egress-rules":         "egress-rule",
 	}
 	if singular, ok := singularForm[typ]; ok {
 		typ = singular
