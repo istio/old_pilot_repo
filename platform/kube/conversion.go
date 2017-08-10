@@ -70,11 +70,17 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		ports = append(ports, convertPort(port))
 	}
 
+	serviceaccounts := make([]string, 0)
+	if svc.Annotations != nil {
+		serviceaccounts = strings.Split(svc.Annotations[ServiceAccountsOnVMAnnotation], ",")
+	}
+
 	return &model.Service{
-		Hostname:     serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:        ports,
-		Address:      addr,
-		ExternalName: external,
+		Hostname:        serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:           ports,
+		Address:         addr,
+		ExternalName:    external,
+		ServiceAccounts: serviceaccounts,
 	}
 }
 

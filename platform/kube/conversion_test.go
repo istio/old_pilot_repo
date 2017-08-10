@@ -15,6 +15,8 @@
 package kube
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 
 	"istio.io/pilot/model"
@@ -109,6 +111,16 @@ func TestServiceConversion(t *testing.T) {
 
 	if service.Address != ip {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
+	}
+
+	sa := service.ServiceAccounts
+	if sa == nil || len(sa) != 2 {
+		t.Errorf("number of service accounts is incorrect")
+	}
+	sort.Sort(sort.StringSlice(sa))
+	expected := []string{saA, saB}
+	if !reflect.DeepEqual(sa, expected) {
+		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
 	}
 }
 
