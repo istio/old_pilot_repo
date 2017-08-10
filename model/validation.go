@@ -757,22 +757,91 @@ func ValidateIngressRule(msg proto.Message) error {
 
 // ValidateEgressRule checks egress rules
 func ValidateEgressRule(msg proto.Message) error {
-	value, ok := msg.(*proxyconfig.EgressRule)
+	rule, ok := msg.(*proxyconfig.EgressRule)
 	if !ok {
 		return fmt.Errorf("cannot cast to egress rule")
 	}
 
 	var errs error
-	if value.Name == "" {
+	if rule.Name == "" {
 		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a name"))
 	}
 
-	if value.Domains == nil {
-		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a domains list"))
+	if rule.Domains == nil || len(rule.Domains) == 0 {
+		return fmt.Errorf("egress rule must have a domains list")
 	}
 
-	// TODO: complete validation for egress
+	domains := make(map[string]bool)
+	for _, domain := range rule.Domains {
+		if _, exists := domains[domain]; exists {
+			errs = multierror.Append(errs, fmt.Errorf("duplicate domain: %s", domain))
+		}
+		domains[domain] = true
+
+		if err := ValidateEgressRuleDomain(domain); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	if rule.Ports == nil || len(rule.Ports) == 0 {
+		return fmt.Errorf("egress rule must have a ports list")
+	}
+
+	ports := make(map[int32]bool)
+	for _, port := range rule.Ports {
+		if _, exists := ports[port.Port]; exists {
+			errs = multierror.Append(errs, fmt.Errorf("duplicate port: %d", port.Port))
+		}
+		ports[port.Port] = true
+	        
+		if err := ValidateEgressRulePort(port); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
 	return errs
+}
+
+// domains are according to the definion of Envoy's domain of virtual hosts.
+// See https://lyft.github.io/envoy/docs/configuration/http_conn_man/route_config/vhost.html#config-http-conn-man-route-table-vhost
+//
+// Wildcard hosts are supported in the form of “*.foo.com” or “*-bar.foo.com”.
+// Note that the wildcard will not match the empty string. e.g. “*-bar.foo.com” will match “baz-bar.foo.com”
+// but not “-bar.foo.com”.  Additionally, a special entry “*” is allowed which will match any host/authority header.
+
+func ValidateEgressRuleDomain(domain string) error {
+	if len(domain) < 1 {
+		return fmt.Errorf("domain must not be empty string")
+	}
+
+	if domain[0] == '*' {
+		domain = domain[1:]   // wildcard * is allowed only at the first position
+		if len(domain) == 0 { // the domain was just * and it is OK
+			return nil
+		}
+		if domain[0] == '.' {
+			domain = domain[1:] // the domain started with '*.' - the rest of the domain should be validate FDQN
+		}
+	}
+	if err := ValidateFQDN(domain); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ValidateEgressRulePort(port *proxyconfig.EgressRule_Port) error {
+
+	if err := ValidatePort(int(port.Port)); err != nil {
+		return err
+	}
+
+	protocol := Protocol(strings.ToUpper(port.Protocol))
+	if protocol != ProtocolHTTP && protocol != ProtocolHTTPS {
+		return fmt.Errorf("currently, only %s and %s protocols are supported", ProtocolHTTP, ProtocolHTTPS)
+	}
+
+	return nil
 }
 
 // ValidateDestinationPolicy checks proxy policies
