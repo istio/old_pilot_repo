@@ -15,7 +15,6 @@
 package kube
 
 import (
-	"strings"
 	"testing"
 
 	"istio.io/pilot/model"
@@ -110,16 +109,6 @@ func TestServiceConversion(t *testing.T) {
 
 	if service.Address != ip {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
-	}
-
-	sa := getServiceAccountsOnVM(service)
-	if sa == nil || len(sa) != 2 {
-		t.Errorf("number of service accounts is incorrect")
-	}
-	if !((strings.Compare(sa[0], saA) == 0 && strings.Compare(sa[1], saB) == 0) ||
-		(strings.Compare(sa[0], saB) == 0 && strings.Compare(sa[1], saA) == 0)) {
-		t.Errorf("service accounts do not match: %s,%s VS %s,%s",
-			sa[0], sa[1], saA, saB)
 	}
 }
 

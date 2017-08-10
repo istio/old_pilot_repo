@@ -54,9 +54,6 @@ type Service struct {
 	// service DNS name.  External services are name-based solution to represent
 	// external service instances as a service inside the cluster.
 	ExternalName string `json:"external"`
-
-	// Annotations on the service.
-	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Port represents a network port where a service is listening for

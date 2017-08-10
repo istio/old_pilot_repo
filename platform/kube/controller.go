@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -364,25 +365,27 @@ const (
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
 	saSet := make(map[string]bool)
 
-	// Get the service accounts allowed for the service running on VMs, specified by the Service
-	// object's annotation.
-	_, namespace, err := parseHostname(hostname)
+	name, namespace, err := parseHostname(hostname)
 	if err != nil {
-		glog.V(2).Infof("GetHostname(%s) => error %v", hostname, err)
+		glog.V(2).Infof("Error parsing hostname: %v", err)
 		return nil
 	}
-	svc, exists := c.GetService(hostname)
+	svc, exists := c.serviceByKey(name, namespace)
 	if !exists {
-		glog.V(2).Infof("GetService(%s) => error %v", hostname, err)
 		return nil
-	}
-	for _, serviceAccountName := range getServiceAccountsOnVM(svc) {
-		sa := generateServiceAccountID(serviceAccountName, namespace, c.domainSuffix)
-		saSet[sa] = true
 	}
 
-	// Get the service accounts that are already running the service within Kubernetes. This is
-	// reflected by the pods that the service is deployed on, and the service accounts of the pods.
+	// Get the service accounts running the service, if it is deployed on VMs. This is retrieved
+	// from the service annotation explicitly set by the operators.
+	if svc.Annotations != nil {
+		for _, serviceAccountName := range strings.Split(svc.Annotations[ServiceAccountsOnVMAnnotation], ",") {
+			sa := generateServiceAccountID(serviceAccountName, namespace, c.domainSuffix)
+			saSet[sa] = true
+		}
+	}
+
+	// Get the service accounts running service within Kubernetes. This is reflected by the pods that
+	// the service is deployed on, and the service accounts of the pods.
 	for _, si := range c.Instances(hostname, ports, model.TagsList{}) {
 		key, exists := c.pods.keys[si.Endpoint.Address]
 		if !exists {

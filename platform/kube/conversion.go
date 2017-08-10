@@ -75,16 +75,7 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		Ports:        ports,
 		Address:      addr,
 		ExternalName: external,
-		Annotations:  svc.Annotations,
 	}
-}
-
-func getServiceAccountsOnVM(svc *model.Service) []string {
-	if svc.Annotations == nil {
-		return make([]string, 0)
-	}
-	serviceaccounts := svc.Annotations[ServiceAccountsOnVMAnnotation]
-	return strings.Split(serviceaccounts, ",")
 }
 
 // serviceHostname produces FQDN for a k8s service
