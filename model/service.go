@@ -55,8 +55,7 @@ type Service struct {
 	// external service instances as a service inside the cluster.
 	ExternalName string `json:"external"`
 
-	// ServiceAccounts specifies the the service accounts that run the service.
-	// When multiple service accounts are specified, use comma as the delimiter.
+	// ServiceAccounts specifies the service accounts that run the service.
 	ServiceAccounts []string `json:"serviceaccounts,omitempty"`
 }
 

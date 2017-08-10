@@ -366,18 +366,13 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 
 	// Get the service accounts running the service, if it is deployed on VMs. This is retrieved
 	// from the service annotation explicitly set by the operators.
-	_, namespace, err := parseHostname(hostname)
-	if err != nil {
-		glog.V(2).Infof("GetHostname(%s) => error %v", hostname, err)
-		return nil
-	}
 	svc, exists := c.GetService(hostname)
 	if !exists {
-		glog.V(2).Infof("GetService(%s) => error %v", hostname, err)
+		glog.V(2).Infof("GetService(%s) error: service does not exist", hostname)
 		return nil
 	}
-	for _, serviceAccountName := range svc.ServiceAccounts {
-		sa := generateServiceAccountID(serviceAccountName, namespace, c.domainSuffix)
+	for _, serviceAccount := range svc.ServiceAccounts {
+		sa := serviceAccount
 		saSet[sa] = true
 	}
 

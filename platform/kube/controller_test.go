@@ -252,7 +252,7 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	serviceAccount1 := "acct1"
 	serviceAccount2 := "acct2"
 	serviceAccount3 := "acct3"
-	serviceAccountOnVM := "acctvm"
+	serviceAccountOnVM := "spiffe://acctvm@gserviceaccount.com"
 
 	pods := []*v1.Pod{
 		generatePod("pod1", "nsA", serviceAccount1, "node1", map[string]string{"app": "test-app"}),
@@ -288,8 +288,8 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 	sa := controller.GetIstioServiceAccounts(hostname, []string{"test-port"})
 	sort.Sort(sort.StringSlice(sa))
 	expected := []string{
+		serviceAccountOnVM,
 		"spiffe://company.com/ns/nsA/sa/" + serviceAccount2,
-		"spiffe://company.com/ns/nsA/sa/" + serviceAccountOnVM,
 	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
