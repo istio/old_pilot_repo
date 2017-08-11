@@ -40,6 +40,5 @@ go_binary(
         "//docker:certs",
     ],
     library = ":go_default_library",
-    tags = ["manual"],
     visibility = ["//visibility:public"],
 )

@@ -51,7 +51,7 @@ done
 bin=$(bazel info bazel-bin)
 bazel build --output_groups=static //cmd/... //test/...
 \cp -f  "${bin}/test/client/client.static" docker/client
-\cp -f  "${bin}/test/server/server.static" docker/server
+\cp -f  "${bin}/test/server/main/main.static" docker/server
 \cp -f  "${bin}/cmd/pilot-agent/pilot-agent.static" docker/pilot-agent
 \cp -f  "${bin}/cmd/pilot-discovery/pilot-discovery.static" docker/pilot-discovery
 

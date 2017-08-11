@@ -22,7 +22,7 @@
 // For example, ?codes=501:999,401:1 returns 500 99.9% of times and 401 0.1% of times.
 // For example, ?codes=500,200 returns 500 50% of times and 200 50% of times
 
-package main
+package server
 
 import (
 	"bytes"
@@ -32,12 +32,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 
-	flag "github.com/spf13/pflag"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -45,24 +42,9 @@ import (
 	pb "istio.io/pilot/test/grpcecho"
 )
 
-var (
-	ports     []int
-	grpcPorts []int
-	version   string
-
-	crt, key string
-)
-
-func init() {
-	flag.IntSliceVar(&ports, "port", []int{8080}, "HTTP/1.1 ports")
-	flag.IntSliceVar(&grpcPorts, "grpc", []int{7070}, "GRPC ports")
-	flag.StringVar(&version, "version", "", "Version string")
-	flag.StringVar(&crt, "crt", "", "gRPC TLS server-side certificate")
-	flag.StringVar(&key, "key", "", "gRPC TLS server-side key")
-}
-
 type handler struct {
-	port int
+	port    int
+	version string
 }
 
 // Imagine a pie of different flavors.
@@ -87,7 +69,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		body.WriteString("codes error: " + err.Error() + "\n")
 	}
 
-	body.WriteString("ServiceVersion=" + version + "\n")
+	body.WriteString("ServiceVersion=" + h.version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Method=" + r.Method + "\n")
 	body.WriteString("URL=" + r.URL.String() + "\n")
@@ -118,27 +100,29 @@ func (h handler) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRespons
 			body.WriteString(key + "=" + strings.Join(vals, " ") + "\n")
 		}
 	}
-	body.WriteString("ServiceVersion=" + version + "\n")
+	body.WriteString("ServiceVersion=" + h.version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Echo=" + req.GetMessage())
 	return &pb.EchoResponse{Message: body.String()}, nil
 }
 
-func runHTTP(port int) {
+// RunHTTP opens HTTP/1.1 echo server port
+func RunHTTP(port int, version string) {
 	fmt.Printf("Listening HTTP1.1 on %v\n", port)
-	h := handler{port: port}
+	h := handler{port: port, version: version}
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), h); err != nil {
 		log.Println(err.Error())
 	}
 }
 
-func runGRPC(port int) {
+// RunGRPC opens gRPC echo server port
+func RunGRPC(port int, version string, crt, key string) {
 	fmt.Printf("Listening GRPC on %v\n", port)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	h := handler{port: port}
+	h := handler{port: port, version: version}
 
 	var grpcServer *grpc.Server
 	if crt != "" && key != "" {
@@ -155,19 +139,6 @@ func runGRPC(port int) {
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Println(err.Error())
 	}
-}
-
-func main() {
-	flag.Parse()
-	for _, port := range ports {
-		go runHTTP(port)
-	}
-	for _, grpcPort := range grpcPorts {
-		go runGRPC(grpcPort)
-	}
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
 }
 
 func setResponseFromCodes(request *http.Request, response http.ResponseWriter) error {
