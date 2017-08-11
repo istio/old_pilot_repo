@@ -22,8 +22,29 @@ import (
 	"istio.io/pilot/model"
 )
 
-// insertDestinationPolicy assumes an outbound cluster and inserts custom configuration for the cluster
-func insertDestinationPolicy(config model.IstioConfigStore, cluster *Cluster) {
+// applyClusterPolicy assumes an outbound cluster and inserts custom configuration for the cluster
+func applyClusterPolicy(cluster *Cluster, config model.IstioConfigStore,
+	mesh *proxyconfig.ProxyMeshConfig, accounts model.ServiceAccounts) {
+	duration := protoDurationToMS(mesh.ConnectTimeout)
+	cluster.ConnectTimeoutMs = duration
+
+	// skip remaining policies for non mesh-local outbound clusters
+	if !cluster.outbound {
+		return
+	}
+
+	// apply auth policies
+	switch mesh.AuthPolicy {
+	case proxyconfig.ProxyMeshConfig_NONE:
+		// do nothing
+	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+		// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
+		ports := model.PortList{cluster.port}.GetNames()
+		serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
+		cluster.SSLContext = buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
+	}
+
+	// apply destination policies
 	policy := config.DestinationPolicy(cluster.hostname, cluster.tags)
 
 	if policy == nil {

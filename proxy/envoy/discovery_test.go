@@ -323,7 +323,7 @@ func TestRouteDiscoveryEgress(t *testing.T) {
 	compareResponse(response, "testdata/rds-egress.json", t)
 }
 
-func TestListenerDiscovery(t *testing.T) {
+func TestSidecarListenerDiscovery(t *testing.T) {
 	testCases := []struct {
 		name string
 		typ  string
@@ -401,6 +401,35 @@ func TestListenerDiscovery(t *testing.T) {
 			compareResponse(response, fmt.Sprintf("testdata/lds-v1-%s-auth.json", testCase.name), t)
 		})
 	}
+}
+
+func TestListenerDiscoveryIngress(t *testing.T) {
+	mesh := makeMeshConfig()
+	registry := memory.Make(model.IstioConfigTypes)
+	addIngressRoutes(registry, t)
+	ds := makeDiscoveryService(t, registry, &mesh)
+	url := fmt.Sprintf("/v1/listeners/%s/%s", ds.Mesh.IstioServiceCluster, mock.Ingress.ServiceNode())
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/lds-ingress.json", t)
+
+	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	ds = makeDiscoveryService(t, registry, &mesh)
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/lds-ingress.json", t)
+}
+
+func TestListenerDiscoveryEgress(t *testing.T) {
+	mesh := makeMeshConfig()
+	registry := memory.Make(model.IstioConfigTypes)
+	ds := makeDiscoveryService(t, registry, &mesh)
+	url := fmt.Sprintf("/v1/listeners/%s/%s", ds.Mesh.IstioServiceCluster, mock.Egress.ServiceNode())
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/lds-egress.json", t)
+
+	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	ds = makeDiscoveryService(t, registry, &mesh)
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/lds-egress-auth.json", t)
 }
 
 func TestSecretDiscovery(t *testing.T) {

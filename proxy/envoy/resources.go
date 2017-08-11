@@ -549,7 +549,8 @@ type Cluster struct {
 	CircuitBreaker           *CircuitBreaker   `json:"circuit_breakers,omitempty"`
 	OutlierDetection         *OutlierDetection `json:"outlier_detection,omitempty"`
 
-	// special values used by the post-processing passes for outbound clusters
+	// special values used by the post-processing passes for outbound mesh-local clusters
+	outbound bool
 	hostname string
 	port     *model.Port
 	tags     model.Tags
@@ -593,13 +594,6 @@ func (clusters Clusters) normalize() Clusters {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
-}
-
-func (clusters Clusters) setTimeout(timeout *duration.Duration) {
-	duration := protoDurationToMS(timeout)
-	for _, cluster := range clusters {
-		cluster.ConnectTimeoutMs = duration
-	}
 }
 
 // RoutesByPath sorts routes by their path and/or prefix, such that:

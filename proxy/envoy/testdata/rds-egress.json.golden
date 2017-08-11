@@ -8,7 +8,7 @@
     "routes": [
      {
       "prefix": "/",
-      "cluster": "out.ae8d3361601f8293abe6ac5e4d807124612cf42e",
+      "cluster": "ae8d3361601f8293abe6ac5e4d807124612cf42e",
       "opaque_config": {
        "mixer_control": "on",
        "mixer_forward": "off"
@@ -25,7 +25,7 @@
     "routes": [
      {
       "prefix": "/",
-      "cluster": "out.242bc3028e0f3fe0682e6d972e167ab415b2321d",
+      "cluster": "242bc3028e0f3fe0682e6d972e167ab415b2321d",
       "opaque_config": {
        "mixer_control": "on",
        "mixer_forward": "off"

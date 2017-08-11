@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"path"
 	"sort"
 	"strconv"
 	"sync"
@@ -29,7 +28,6 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 )
@@ -437,7 +435,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			return
 		}
 
-		_, clusters := ds.buildConfig(role)
+		clusters := buildClusters(ds.Environment, role)
 		if out, err = json.MarshalIndent(ClusterManager{Clusters: clusters}, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
@@ -458,7 +456,7 @@ func (ds *DiscoveryService) ListListeners(request *restful.Request, response *re
 			return
 		}
 
-		listeners, _ := ds.buildConfig(role)
+		listeners := buildListeners(ds.Environment, role)
 		out, err = json.MarshalIndent(ldsResponse{Listeners: listeners}, " ", " ")
 		if err != nil {
 			errorResponse(response, http.StatusInternalServerError, err.Error())
@@ -491,7 +489,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
-		httpRouteConfigs := ds.getRouteConfigs(role)
+		httpRouteConfigs := buildRDSRoutes(ds.Mesh, role, ds, ds)
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
 			errorResponse(response, http.StatusNotFound,
@@ -521,7 +519,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 		return
 	}
 
-	_, secret := buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
+	_, secret := buildIngressRoutes(ds.Mesh, ds, ds)
 
 	if secret == "" {
 		writeResponse(response, nil)
@@ -554,82 +552,4 @@ func writeResponse(r *restful.Response, data []byte) {
 	if _, err := r.Write(data); err != nil {
 		glog.Warning(err)
 	}
-}
-
-func (ds *DiscoveryService) getRouteConfigs(role proxy.Role) (httpRouteConfigs HTTPRouteConfigs) {
-	switch role.Type {
-	case proxy.Ingress:
-		httpRouteConfigs, _ = buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
-
-	case proxy.Egress:
-		httpRouteConfigs = buildEgressRoutes(ds.Mesh, ds)
-
-	case proxy.Sidecar:
-		instances := ds.HostInstances(map[string]bool{role.IPAddress: true})
-		services := ds.Services()
-		httpRouteConfigs = buildOutboundHTTPRoutes(ds.Mesh, role, instances, services, ds)
-	}
-
-	return
-}
-
-func (ds *DiscoveryService) buildConfig(role proxy.Role) (listeners Listeners, clusters Clusters) {
-	// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
-	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
-	// skip computing the actual HTTP routes
-	switch role.Type {
-	case proxy.Ingress:
-		httpRouteConfigs, _ := buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
-		clusters = httpRouteConfigs.clusters().normalize()
-
-		listener := buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, 443, true, true)
-		listener.SSLContext = &SSLContext{
-			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
-			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
-		}
-
-		listeners = Listeners{
-			buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, 80, true, true),
-			listener}
-
-	case proxy.Egress:
-		httpRouteConfigs := buildEgressRoutes(ds.Mesh, ds)
-		clusters = httpRouteConfigs.clusters().normalize()
-
-		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)
-
-		listener := buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, port, true, false)
-		applyInboundAuth(listener, ds.Mesh)
-		listeners = Listeners{listener}
-
-	case proxy.Sidecar:
-		listeners, clusters = buildListeners(ds.Environment, role)
-	}
-
-	// set connect timeout
-	clusters.setTimeout(ds.Mesh.ConnectTimeout)
-
-	// egress proxy clusters reference external destinations
-	if role.Type != proxy.Egress {
-		// apply custom policies for outbound clusters
-		for _, cluster := range clusters {
-			if cluster.port == nil {
-				continue
-			}
-
-			insertDestinationPolicy(ds, cluster)
-
-			// apply auth policies
-			switch ds.Mesh.AuthPolicy {
-			case proxyconfig.ProxyMeshConfig_NONE:
-			case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-				// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
-				ports := model.PortList{cluster.port}.GetNames()
-				serviceAccounts := ds.GetIstioServiceAccounts(cluster.hostname, ports)
-				cluster.SSLContext = buildClusterSSLContext(ds.Mesh.AuthCertsPath, serviceAccounts)
-			}
-		}
-	}
-
-	return
 }

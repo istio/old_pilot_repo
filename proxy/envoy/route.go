@@ -90,6 +90,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		ServiceName: key,
 		Type:        SDSName,
 		LbType:      DefaultLbType,
+		outbound:    true,
 		hostname:    hostname,
 		port:        port,
 		tags:        tags,

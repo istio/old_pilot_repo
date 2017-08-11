@@ -17,17 +17,35 @@ package envoy
 import (
 	"errors"
 	"fmt"
+	"path"
 	"sort"
 
 	"github.com/golang/glog"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
-func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig, ingressRules map[string]*proxyconfig.IngressRule,
+func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig, ingress proxy.Role) Listeners {
+	listener := buildHTTPListener(mesh, ingress, nil, WildcardAddress, 443, true, true)
+	listener.SSLContext = &SSLContext{
+		CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
+		PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
+	}
+
+	listeners := Listeners{
+		buildHTTPListener(mesh, ingress, nil, WildcardAddress, 80, true, true),
+		listener}
+
+	return listeners
+}
+
+func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) (HTTPRouteConfigs, string) {
+	ingressRules := config.IngressRules()
+
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
 	vhostsTLS := make(map[string][]*HTTPRoute)
