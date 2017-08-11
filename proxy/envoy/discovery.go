@@ -582,16 +582,14 @@ func (ds *DiscoveryService) buildConfig(role proxy.Role) (listeners Listeners, c
 		httpRouteConfigs, _ := buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
 		clusters = httpRouteConfigs.clusters().normalize()
 
-		// TODO: sidecar
-		listener := buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, 443, true, true)
+		listener := buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, 443, true, true)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
 		}
 
-		// TODO: sidecar
 		listeners = Listeners{
-			buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, 80, true, true),
+			buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, 80, true, true),
 			listener}
 
 	case proxy.Egress:
@@ -600,8 +598,7 @@ func (ds *DiscoveryService) buildConfig(role proxy.Role) (listeners Listeners, c
 
 		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)
 
-		// TODO: sidecar
-		listener := buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, port, true, false)
+		listener := buildHTTPListener(ds.Mesh, role, nil, WildcardAddress, port, true, false)
 		applyInboundAuth(listener, ds.Mesh)
 		listeners = Listeners{listener}
 
