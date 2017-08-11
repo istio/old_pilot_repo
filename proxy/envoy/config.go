@@ -149,17 +149,8 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 
 	// inject static Mixer filter with proxy identities for all HTTP filters
 	if env.Mesh.MixerAddress != "" {
-		mixerCluster := buildCluster(env.Mesh.MixerAddress, MixerCluster, env.Mesh.ConnectTimeout)
-		mixerCluster.CircuitBreaker = &CircuitBreaker{
-			Default: DefaultCBPriority{
-				MaxPendingRequests: 10000,
-				MaxRequests:        10000,
-			},
-		}
-		mixerCluster.Features = ClusterFeatureHTTP2
-
-		clusters = append(clusters, mixerCluster)
-		insertMixerFilter(listeners, instances, sidecar)
+		clusters = append(clusters, buildMixerCluster(env.Mesh))
+		insertMixerFilter(listeners, sidecar)
 	}
 
 	// set bind to port values for port redirection
@@ -449,10 +440,7 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 
 			// set server-side mixer filter config for inbound routes
 			if mesh.MixerAddress != "" {
-				route.OpaqueConfig = map[string]string{
-					"mixer_control": "on",
-					"mixer_forward": "off",
-				}
+				route.OpaqueConfig = buildMixerInboundOpaqueConfig()
 			}
 
 			host := &VirtualHost{

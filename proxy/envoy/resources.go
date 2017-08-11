@@ -57,6 +57,12 @@ const (
 	// LbTypeRoundRobin is the name for roundrobin LB
 	LbTypeRoundRobin = "round_robin"
 
+	// LbTypeLeastRequest is the name for least request LB
+	LbTypeLeastRequest = "least_request"
+
+	// LbTypeRandom is the name for random LB
+	LbTypeRandom = "random"
+
 	// ClusterFeatureHTTP2 is the feature to use HTTP/2 for a cluster
 	ClusterFeatureHTTP2 = "http2"
 
@@ -80,9 +86,6 @@ const (
 
 	// ZipkinCollectorEndpoint denotes the REST endpoint where Envoy posts Zipkin spans
 	ZipkinCollectorEndpoint = "/api/v1/spans"
-
-	// MixerCluster is the name of the mixer cluster
-	MixerCluster = "mixer_server"
 
 	router  = "router"
 	auto    = "auto"
@@ -164,21 +167,6 @@ type Header struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 	Regex bool   `json:"regex,omitempty"`
-}
-
-// FilterMixerConfig definition
-type FilterMixerConfig struct {
-	// MixerAttributes specifies the static list of attributes that are sent with
-	// each request to Mixer.
-	MixerAttributes map[string]string `json:"mixer_attributes,omitempty"`
-
-	// ForwardAttributes specifies the list of attribute keys and values that
-	// are forwarded as an HTTP header to the server side proxy
-	ForwardAttributes map[string]string `json:"forward_attributes,omitempty"`
-
-	// QuotaName specifies the name of the quota bucket to withdraw tokens from;
-	// an empty name means no quota will be charged.
-	QuotaName string `json:"quota_name,omitempty"`
 }
 
 // FilterFaultConfig definition

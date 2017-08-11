@@ -70,12 +70,12 @@ func (Sidecar) isProxyRole() {}
 
 // ServiceNode for sidecar
 func (role Sidecar) ServiceNode() string {
-	return fmt.Sprintf("%s|%s|%s", role.IPAddress, role.ID, role.Domain)
+	return fmt.Sprintf("%s#%s#%s", role.IPAddress, role.ID, role.Domain)
 }
 
 // DecodeServiceNode is the inverse of sidecar service node
 func DecodeServiceNode(s string) (Sidecar, error) {
-	parts := strings.Split(s, "|")
+	parts := strings.Split(s, "#")
 	out := Sidecar{}
 
 	if len(parts) > 0 {
