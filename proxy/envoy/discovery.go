@@ -562,7 +562,7 @@ func (ds *DiscoveryService) getRouteConfigs(role proxy.Role) (httpRouteConfigs H
 		httpRouteConfigs, _ = buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
 
 	case proxy.Egress:
-		httpRouteConfigs = buildEgressRoutes(ds, ds.Mesh)
+		httpRouteConfigs = buildEgressRoutes(ds.Mesh, ds)
 
 	case proxy.Sidecar:
 		instances := ds.HostInstances(map[string]bool{role.IPAddress: true})
@@ -595,7 +595,7 @@ func (ds *DiscoveryService) buildConfig(role proxy.Role) (listeners Listeners, c
 			listener}
 
 	case proxy.Egress:
-		httpRouteConfigs := buildEgressRoutes(ds, ds.Mesh)
+		httpRouteConfigs := buildEgressRoutes(ds.Mesh, ds)
 		clusters = httpRouteConfigs.clusters().normalize()
 
 		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)

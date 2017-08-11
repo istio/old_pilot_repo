@@ -25,7 +25,7 @@ import (
 	"istio.io/pilot/model"
 )
 
-func buildIngressRoutes(env *proxyconfig.ProxyMeshConfig, ingressRules map[string]*proxyconfig.IngressRule,
+func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig, ingressRules map[string]*proxyconfig.IngressRule,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) (HTTPRouteConfigs, string) {
 	// build vhosts
@@ -37,7 +37,7 @@ func buildIngressRoutes(env *proxyconfig.ProxyMeshConfig, ingressRules map[strin
 	rules := config.RouteRulesBySource(nil)
 
 	for _, rule := range ingressRules {
-		routes, tls, err := buildIngressRoute(env, rule, discovery, rules)
+		routes, tls, err := buildIngressRoute(mesh, rule, discovery, rules)
 		if err != nil {
 			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
 			continue
@@ -97,7 +97,7 @@ func buildIngressRoutes(env *proxyconfig.ProxyMeshConfig, ingressRules map[strin
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(env *proxyconfig.ProxyMeshConfig, ingress *proxyconfig.IngressRule,
+func buildIngressRoute(mesh *proxyconfig.ProxyMeshConfig, ingress *proxyconfig.IngressRule,
 	discovery model.ServiceDiscovery, rules []*proxyconfig.RouteRule) ([]*HTTPRoute, string, error) {
 	service, exists := discovery.GetService(ingress.Destination)
 	if !exists {
@@ -128,7 +128,7 @@ func buildIngressRoute(env *proxyconfig.ProxyMeshConfig, ingress *proxyconfig.In
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
 		// enable mixer check on the route
-		if env.MixerAddress != "" {
+		if mesh.MixerAddress != "" {
 			route.OpaqueConfig = buildMixerInboundOpaqueConfig()
 		}
 

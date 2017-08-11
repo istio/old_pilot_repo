@@ -318,7 +318,7 @@ func TestRouteDiscoveryEgress(t *testing.T) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)
 	ds := makeDiscoveryService(t, registry, &mesh)
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, mock.Egress.ServiceNode())
+	url := fmt.Sprintf("/v1/routes/8888/%s/%s", ds.Mesh.IstioServiceCluster, mock.Egress.ServiceNode())
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-egress.json", t)
 }

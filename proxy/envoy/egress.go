@@ -25,12 +25,12 @@ import (
 )
 
 // buildEgressRoutes lists all HTTP route configs on the egress proxy
-func buildEgressRoutes(services model.ServiceDiscovery, mesh *proxyconfig.ProxyMeshConfig) HTTPRouteConfigs {
+func buildEgressRoutes(mesh *proxyconfig.ProxyMeshConfig, services model.ServiceDiscovery) HTTPRouteConfigs {
 	// Create a VirtualHost for each external service
 	vhosts := make([]*VirtualHost, 0)
 	for _, service := range services.Services() {
 		if service.External() {
-			if host := buildEgressHTTPRoute(service); host != nil {
+			if host := buildEgressHTTPRoute(mesh, service); host != nil {
 				vhosts = append(vhosts, host)
 			}
 		}
@@ -42,7 +42,7 @@ func buildEgressRoutes(services model.ServiceDiscovery, mesh *proxyconfig.ProxyM
 }
 
 // buildEgressRoute translates an egress rule to an Envoy route
-func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
+func buildEgressHTTPRoute(mesh *proxyconfig.ProxyMeshConfig, svc *model.Service) *VirtualHost {
 	var host *VirtualHost
 
 	for _, servicePort := range svc.Ports {
@@ -67,6 +67,11 @@ func buildEgressHTTPRoute(svc *model.Service) *VirtualHost {
 				Cluster:         cluster.Name,
 				AutoHostRewrite: true,
 				clusters:        []*Cluster{cluster},
+			}
+
+			// enable mixer check on the route
+			if mesh.MixerAddress != "" {
+				route.OpaqueConfig = buildMixerInboundOpaqueConfig()
 			}
 
 			host = &VirtualHost{
