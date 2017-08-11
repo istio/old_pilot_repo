@@ -29,10 +29,11 @@ type configs []model.Config
 // Handler specifies a function to apply on a Config for a given event type
 type Handler func(model.Config, model.Event)
 
-// Monitor interface checks for changes to model.Configs
+// Monitor provides methods of manipulating changes in the config store
 type Monitor interface {
 	Start(<-chan struct{})
 	AppendEventHandler(string, Handler)
+	UpdateConfigRecord()
 }
 
 type configsMonitor struct {
@@ -47,9 +48,9 @@ func NewConfigsMonitor(store model.ConfigStore, period time.Duration) Monitor {
 	cache := make(map[string]configs)
 	handlers := make(map[string][]Handler)
 
-	for _, conf := range model.IstioConfigTypes {
-		cache[conf.Type] = make(configs, 0)
-		handlers[conf.Type] = make([]Handler, 0)
+	for _, typ := range store.ConfigDescriptor().Types() {
+		cache[typ] = make(configs, 0)
+		handlers[typ] = make([]Handler, 0)
 	}
 
 	return &configsMonitor{
@@ -77,16 +78,16 @@ func (m *configsMonitor) run(stop <-chan struct{}) {
 }
 
 func (m *configsMonitor) UpdateConfigRecord() {
-	for _, conf := range model.IstioConfigTypes {
-		newConfigs, err := m.store.List(conf.Type)
+	for _, typ := range m.store.ConfigDescriptor().Types() {
+		newConfigs, err := m.store.List(typ)
 		if err != nil {
-			glog.Warningf("Unable to fetch configs of type: %s", conf.Type)
+			glog.Warningf("Unable to fetch configs of type: %s", typ)
 			return
 		}
 		newRecord := configs(newConfigs)
 		newRecord.normalize()
-		m.compareToCache(conf.Type, m.configCachedRecord[conf.Type], newRecord)
-		m.configCachedRecord[conf.Type] = newRecord
+		m.compareToCache(typ, m.configCachedRecord[typ], newRecord)
+		m.configCachedRecord[typ] = newRecord
 	}
 }
 
@@ -125,7 +126,7 @@ func (m *configsMonitor) AppendEventHandler(typ string, h Handler) {
 
 func (m *configsMonitor) applyHandlers(typ string, config model.Config, e model.Event) {
 	for _, f := range m.handlers[typ] {
-		go f(config, e)
+		f(config, e)
 	}
 }
 

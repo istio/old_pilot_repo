@@ -20,6 +20,7 @@ go_test(
     size = "small",
     srcs = [
         "config_test.go",
+        "monitor_test.go",
     ],
     deps = [
         ":go_default_library",
