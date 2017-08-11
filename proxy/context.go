@@ -44,10 +44,10 @@ type Environment struct {
 	Mesh *proxyconfig.ProxyMeshConfig
 }
 
-// Role defines the proxy role
-type Role struct {
-	// Type specifies the role type
-	Type RoleType
+// Node defines the proxy attributes used by xDS identification
+type Node struct {
+	// Type specifies the node type
+	Type NodeType
 
 	// IPAddress is the IP address of the proxy used to identify its co-located
 	// service instances. Example: "10.60.1.6"
@@ -61,38 +61,38 @@ type Role struct {
 	Domain string
 }
 
-// RoleType decides what role the proxy serves in the mesh
-type RoleType string
+// NodeType decides the responsibility of the proxy serves in the mesh
+type NodeType string
 
 const (
 	// Sidecar type is used for sidecar proxies in the application containers
-	Sidecar RoleType = "sidecar"
+	Sidecar NodeType = "sidecar"
 
 	// Ingress type is used for cluster ingress proxies
-	Ingress RoleType = "ingress"
+	Ingress NodeType = "ingress"
 
 	// Egress type is used for cluster egress proxies
-	Egress RoleType = "egress"
+	Egress NodeType = "egress"
 )
 
-// ServiceNode encodes the role into a URI-acceptable string
-func (role Role) ServiceNode() string {
+// ServiceNode encodes the proxy node attributes into a URI-acceptable string
+func (node Node) ServiceNode() string {
 	return strings.Join([]string{
-		string(role.Type), role.IPAddress, role.ID, role.Domain,
+		string(node.Type), node.IPAddress, node.ID, node.Domain,
 	}, serviceNodeSeparator)
 
 }
 
 // ParseServiceNode is the inverse of service node function
-func ParseServiceNode(s string) (Role, error) {
+func ParseServiceNode(s string) (Node, error) {
 	parts := strings.Split(s, serviceNodeSeparator)
-	out := Role{}
+	out := Node{}
 
 	if len(parts) != 4 {
-		return out, errors.New("missing parts in the role service node")
+		return out, errors.New("missing parts in the service node")
 	}
 
-	out.Type = RoleType(parts[0])
+	out.Type = NodeType(parts[0])
 	out.IPAddress = parts[1]
 	out.ID = parts[2]
 	out.Domain = parts[3]

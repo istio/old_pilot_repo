@@ -31,7 +31,7 @@ import (
 var (
 	configpath string
 	meshconfig string
-	role       proxy.Role
+	role       proxy.Node
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -56,7 +56,7 @@ var (
 
 			role.Type = proxy.Sidecar
 			if len(args) > 0 {
-				role.Type = proxy.RoleType(args[0])
+				role.Type = proxy.NodeType(args[0])
 			}
 
 			// receive mesh configuration

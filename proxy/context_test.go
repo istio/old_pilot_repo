@@ -25,7 +25,7 @@ import (
 
 func TestServiceNode(t *testing.T) {
 	nodes := []struct {
-		in  proxy.Role
+		in  proxy.Node
 		out string
 	}{
 		{
@@ -33,7 +33,7 @@ func TestServiceNode(t *testing.T) {
 			out: "sidecar~10.1.1.0~v0.default~default.svc.cluster.local",
 		},
 		{
-			in: proxy.Role{
+			in: proxy.Node{
 				Type:   proxy.Ingress,
 				ID:     "random",
 				Domain: "local",

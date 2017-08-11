@@ -25,7 +25,7 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func buildEgressListeners(mesh *proxyconfig.ProxyMeshConfig, egress proxy.Role) Listeners {
+func buildEgressListeners(mesh *proxyconfig.ProxyMeshConfig, egress proxy.Node) Listeners {
 	port := proxy.ParsePort(mesh.EgressProxyAddress)
 	listener := buildHTTPListener(mesh, egress, nil, WildcardAddress, port, true, false)
 	applyInboundAuth(listener, mesh)

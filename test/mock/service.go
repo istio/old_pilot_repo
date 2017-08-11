@@ -43,25 +43,25 @@ var (
 	}
 	HostInstanceV0 = MakeIP(HelloService, 0)
 	HostInstanceV1 = MakeIP(HelloService, 1)
-	ProxyV0        = proxy.Role{
+	ProxyV0        = proxy.Node{
 		Type:      proxy.Sidecar,
 		IPAddress: HostInstanceV0,
 		ID:        "v0.default",
 		Domain:    "default.svc.cluster.local",
 	}
-	ProxyV1 = proxy.Role{
+	ProxyV1 = proxy.Node{
 		Type:      proxy.Sidecar,
 		IPAddress: HostInstanceV1,
 		ID:        "v1.default",
 		Domain:    "default.svc.cluster.local",
 	}
-	Ingress = proxy.Role{
+	Ingress = proxy.Node{
 		Type:      proxy.Ingress,
 		IPAddress: "10.3.3.3",
 		ID:        "ingress.default",
 		Domain:    "default.svc.cluster.local",
 	}
-	Egress = proxy.Role{
+	Egress = proxy.Node{
 		Type:      proxy.Egress,
 		IPAddress: "10.3.3.4",
 		ID:        "egress.default",

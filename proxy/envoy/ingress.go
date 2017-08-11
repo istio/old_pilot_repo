@@ -27,7 +27,7 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig, ingress proxy.Role) Listeners {
+func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig, ingress proxy.Node) Listeners {
 	listener := buildHTTPListener(mesh, ingress, nil, WildcardAddress, 443, true, true)
 	listener.SSLContext = &SSLContext{
 		CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),

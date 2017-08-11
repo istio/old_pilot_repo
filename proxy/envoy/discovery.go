@@ -404,9 +404,9 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	writeResponse(response, out)
 }
 
-func (ds *DiscoveryService) parseRole(request *restful.Request) (proxy.Role, error) {
+func (ds *DiscoveryService) parseRole(request *restful.Request) (proxy.Node, error) {
 	if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
-		return proxy.Role{}, fmt.Errorf("unexpected %s %q", ServiceCluster, sc)
+		return proxy.Node{}, fmt.Errorf("unexpected %s %q", ServiceCluster, sc)
 	}
 
 	node := request.PathParameter(ServiceNode)

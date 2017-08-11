@@ -86,7 +86,7 @@ func buildMixerInboundOpaqueConfig() map[string]string {
 
 // Mixer filter uses outbound configuration by default (forward attributes,
 // but not invoke check calls)
-func mixerHTTPRouteConfig(role proxy.Role) *FilterMixerConfig {
+func mixerHTTPRouteConfig(role proxy.Node) *FilterMixerConfig {
 	return &FilterMixerConfig{
 		MixerAttributes: map[string]string{
 			AttrTargetIP:  role.IPAddress,
