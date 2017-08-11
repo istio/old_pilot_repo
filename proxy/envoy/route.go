@@ -259,15 +259,6 @@ func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string, rou
 	}
 }
 
-// sharedInstanceHost computes the shared subdomain suffix for co-located instances
-func sharedInstanceHost(instances []*model.ServiceInstance) []string {
-	hostnames := make([][]string, 0)
-	for _, instance := range instances {
-		hostnames = append(hostnames, strings.Split(instance.Service.Hostname, "."))
-	}
-	return sharedHost(hostnames...)
-}
-
 // sharedHost computes the shared host name suffix for instances.
 // Each host name is split into its domains.
 func sharedHost(parts ...[]string) []string {

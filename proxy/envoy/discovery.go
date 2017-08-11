@@ -172,13 +172,6 @@ type keyAndService struct {
 	Hosts []*host `json:"hosts"`
 }
 
-type routeConfigAndMetadata struct {
-	RouteConfigName string         `json:"route-config-name"`
-	ServiceCluster  string         `json:"service-cluster"`
-	ServiceNode     string         `json:"service-node"`
-	VirtualHosts    []*VirtualHost `json:"virtual_hosts"`
-}
-
 // Request parameters for discovery services
 const (
 	ServiceKey      = "service-key"

@@ -25,11 +25,22 @@ const (
 	// MixerCluster is the name of the mixer cluster
 	MixerCluster = "mixer_server"
 
-	MixerFilter       = "mixer"
-	AttrSourceIP      = "source.ip"
-	AttrSourceUID     = "source.uid"
-	AttrTargetIP      = "target.ip"
-	AttrTargetUID     = "target.uid"
+	// MixerFilter name and its attributes
+	MixerFilter = "mixer"
+
+	// AttrSourceIP is client source IP
+	AttrSourceIP = "source.ip"
+
+	// AttrSourceUID is platform-specific unique identifier for the client instance of the source service
+	AttrSourceUID = "source.uid"
+
+	// AttrTargetIP is the server source IP
+	AttrTargetIP = "target.ip"
+
+	// AttrTargetUID is latform-specific unique identifier for the server instance of the target service
+	AttrTargetUID = "target.uid"
+
+	// MixerRequestCount is the quota bucket name
 	MixerRequestCount = "RequestCount"
 
 	// MixerControl switches Check call on and off
