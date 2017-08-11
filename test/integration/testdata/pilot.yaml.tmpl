@@ -1,4 +1,35 @@
 # pilot service for discovery
+
+{{if .DlvPort}}
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: dlv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/delve"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: dlv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+{{end}}
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,9 +37,16 @@ metadata:
   labels:
     infra: pilot
 spec:
+{{if .DlvPort}}
+  type: LoadBalancer
+{{end}}
   ports:
   - port: 8080
     name: http-discovery
+{{if .DlvPort}}
+  - port: {{.DlvPort}}
+    name: tcp-dlv
+{{end}}
   selector:
     infra: pilot
 ---
@@ -32,10 +70,16 @@ spec:
       containers:
       - name: discovery
         image: {{.Hub}}/pilot:{{.Tag}}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         args: ["discovery", "-v", "{{.Verbosity}}"]
         ports:
         - containerPort: 8080
+{{if .DlvPort}}
+        - containerPort: {{.DlvPort}}
+        volumeMounts:
+          - mountPath: "/data/delve"
+            name: dlv
+{{end}}
         env:
         - name: POD_NAME
           valueFrom:
@@ -50,8 +94,17 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/istio/config
+{{if .DlvPort}}
+        - mountPath: "/data/delve"
+          name: dlv
+{{end}}
       volumes:
       - name: config-volume
         configMap:
           name: istio
+{{if .DlvPort}}
+      - name: dlv
+        persistentVolumeClaim:
+          claimName: dlv-claim
+{{end}}
 ---

@@ -56,6 +56,7 @@ type infra struct {
 	Ingress bool
 	Egress  bool
 	Zipkin  bool
+	DlvPort int
 
 	// check proxy logs
 	checkLogs bool
@@ -212,6 +213,10 @@ func (infra *infra) teardown() {
 	if infra.namespaceCreated {
 		util.DeleteNamespace(client, infra.Namespace)
 		infra.Namespace = ""
+	}
+	if infra.istioNamespaceCreated {
+		util.DeleteNamespace(client, infra.IstioNamespace)
+		infra.IstioNamespace = ""
 	}
 }
 

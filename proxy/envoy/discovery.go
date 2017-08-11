@@ -553,7 +553,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 	}
 
 	sn := ""
-	if sn := request.PathParameter(ServiceNode); sn != proxy.IngressNode {
+	if sn = request.PathParameter(ServiceNode); sn != proxy.IngressNode {
 		errorResponse(response, http.StatusNotFound,
 			fmt.Sprintf("Unexpected %s %q", ServiceNode, sn))
 		return
