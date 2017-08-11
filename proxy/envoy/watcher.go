@@ -227,7 +227,11 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 			}
 
 			logWriter := bufio.NewWriter(logFile)
-			defer logWriter.Flush()
+			defer func() {
+				if err := logWriter.Flush(); err != nil {
+					glog.Warning(err)
+				}
+			}()
 
 			/* #nosec */
 			cmd := exec.Command(BinaryPath, args...)
