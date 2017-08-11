@@ -31,6 +31,12 @@ const (
 	AttrTargetIP      = "target.ip"
 	AttrTargetUID     = "target.uid"
 	MixerRequestCount = "RequestCount"
+
+	// MixerControl switches Check call on and off
+	MixerControl = "mixer_control"
+
+	// MixerForward switches attribute forwarding on and off
+	MixerForward = "mixer_forward"
 )
 
 // FilterMixerConfig definition
@@ -62,37 +68,23 @@ func buildMixerCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
 
 func buildMixerInboundOpaqueConfig() map[string]string {
 	return map[string]string{
-		"mixer_control": "on",
-		"mixer_forward": "off",
+		MixerControl: "on",
+		MixerForward: "off",
 	}
 }
 
-func mixerHTTPRouteConfig(sidecar proxy.Sidecar) *FilterMixerConfig {
+// Mixer filter uses outbound configuration by default (forward attributes,
+// but not invoke check calls)
+func mixerHTTPRouteConfig(role proxy.Role) *FilterMixerConfig {
 	return &FilterMixerConfig{
 		MixerAttributes: map[string]string{
-			AttrTargetIP:  sidecar.IPAddress,
-			AttrTargetUID: "kubernetes://" + sidecar.ID,
+			AttrTargetIP:  role.IPAddress,
+			AttrTargetUID: "kubernetes://" + role.ID,
 		},
 		ForwardAttributes: map[string]string{
-			AttrTargetIP:  sidecar.IPAddress,
-			AttrTargetUID: "kubernetes://" + sidecar.ID,
+			AttrTargetIP:  role.IPAddress,
+			AttrTargetUID: "kubernetes://" + role.ID,
 		},
 		QuotaName: MixerRequestCount,
-	}
-}
-
-func insertMixerFilter(listeners []*Listener, sidecar proxy.Sidecar) {
-	config := mixerHTTPRouteConfig(sidecar)
-	for _, l := range listeners {
-		for _, f := range l.Filters {
-			if f.Name == HTTPConnectionManager {
-				http := (f.Config).(*HTTPFilterConfig)
-				http.Filters = append([]HTTPFilter{{
-					Type:   decoder,
-					Name:   MixerFilter,
-					Config: config,
-				}}, http.Filters...)
-			}
-		}
 	}
 }

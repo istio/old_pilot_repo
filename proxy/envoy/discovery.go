@@ -27,6 +27,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
@@ -266,12 +267,6 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
 
-	// List all known routes (informational, not invoked by Envoy)
-	ws.Route(ws.
-		GET("/v1/routes").
-		To(ds.ListAllRoutes).
-		Doc("Routes in CDS"))
-
 	// This route makes discovery act as an Envoy Route discovery service (RDS).
 	// See https://lyft.github.io/envoy/docs/configuration/http_conn_man/rds.html
 	ws.Route(ws.
@@ -418,22 +413,31 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	writeResponse(response, out)
 }
 
+func (ds *DiscoveryService) parseRole(request *restful.Request) (proxy.Role, error) {
+	if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
+		return proxy.Role{}, fmt.Errorf("unexpected %s %q", ServiceCluster, sc)
+	}
+
+	node := request.PathParameter(ServiceNode)
+	role, err := proxy.ParseServiceNode(node)
+	if err != nil {
+		return role, multierror.Prefix(err, fmt.Sprintf("unexpected %s: ", ServiceNode))
+	}
+	return role, nil
+}
+
 // ListClusters responds to CDS requests for all outbound clusters
 func (ds *DiscoveryService) ListClusters(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
 	if !cached {
-		if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
+		role, err := ds.parseRole(request)
+		if err != nil {
+			errorResponse(response, http.StatusNotFound, err.Error())
 			return
 		}
 
-		// service-node holds the IP address
-		node := request.PathParameter(ServiceNode)
-		_, clusters := ds.getListeners(node)
-
-		var err error
+		_, clusters := ds.buildConfig(role)
 		if out, err = json.MarshalIndent(ClusterManager{Clusters: clusters}, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return
@@ -443,35 +447,26 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	writeResponse(response, out)
 }
 
-// ListAllRoutes responds to RDS requests that are not limited by a route-config, service-cluster, nor service-node
-func (ds *DiscoveryService) ListAllRoutes(request *restful.Request, response *restful.Response) {
-	allRoutes := make([]routeConfigAndMetadata, 0)
-
-	for _, ip := range ds.allServiceNodes() {
-		for port, httpRouteConfig := range ds.getRouteConfigs(ip) {
-			allRoutes = append(allRoutes, routeConfigAndMetadata{
-				RouteConfigName: strconv.Itoa(port),
-				ServiceCluster:  ds.Mesh.IstioServiceCluster,
-				ServiceNode:     ip,
-				VirtualHosts:    httpRouteConfig.VirtualHosts,
-			})
+// ListListeners responds to LDS requests
+func (ds *DiscoveryService) ListListeners(request *restful.Request, response *restful.Response) {
+	key := request.Request.URL.String()
+	out, cached := ds.ldsCache.cachedDiscoveryResponse(key)
+	if !cached {
+		role, err := ds.parseRole(request)
+		if err != nil {
+			errorResponse(response, http.StatusNotFound, err.Error())
+			return
 		}
-	}
 
-	// This sort is not needed, but discovery_test excepts consistent output and sorting achieves it
-	// Primary sort key RouteConfigName, secondary ServiceNode, tertiary ServiceCluster
-	sort.Slice(allRoutes, func(i, j int) bool {
-		if allRoutes[i].RouteConfigName != allRoutes[j].RouteConfigName {
-			return allRoutes[i].RouteConfigName < allRoutes[j].RouteConfigName
-		} else if allRoutes[i].ServiceNode != allRoutes[j].ServiceNode {
-			return allRoutes[i].ServiceNode < allRoutes[j].ServiceNode
+		listeners, _ := ds.buildConfig(role)
+		out, err = json.MarshalIndent(ldsResponse{Listeners: listeners}, " ", " ")
+		if err != nil {
+			errorResponse(response, http.StatusInternalServerError, err.Error())
+			return
 		}
-		return allRoutes[i].ServiceCluster < allRoutes[j].ServiceCluster
-	})
-
-	if err := response.WriteEntity(allRoutes); err != nil {
-		glog.Warning(err)
+		ds.ldsCache.updateCachedDiscoveryResponse(key, out)
 	}
+	writeResponse(response, out)
 }
 
 // ListRoutes responds to RDS requests, used by HTTP routes
@@ -481,14 +476,11 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 	key := request.Request.URL.String()
 	out, cached := ds.rdsCache.cachedDiscoveryResponse(key)
 	if !cached {
-		if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
+		role, err := ds.parseRole(request)
+		if err != nil {
+			errorResponse(response, http.StatusNotFound, err.Error())
 			return
 		}
-
-		// service-node holds the IP address
-		node := request.PathParameter(ServiceNode)
 
 		// route-config-name holds the listener port
 		routeConfigName := request.PathParameter(RouteConfigName)
@@ -499,7 +491,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
-		httpRouteConfigs := ds.getRouteConfigs(node)
+		httpRouteConfigs := ds.getRouteConfigs(role)
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
 			errorResponse(response, http.StatusNotFound,
@@ -515,48 +507,21 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 	writeResponse(response, out)
 }
 
-// ListListeners responds to LDS requests
-func (ds *DiscoveryService) ListListeners(request *restful.Request, response *restful.Response) {
-	key := request.Request.URL.String()
-	out, cached := ds.ldsCache.cachedDiscoveryResponse(key)
-	if !cached {
-		if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
-			return
-		}
-
-		// service-node holds the IP address
-		node := request.PathParameter(ServiceNode)
-		listeners, _ := ds.getListeners(node)
-
-		var err error
-		out, err = json.MarshalIndent(ldsResponse{Listeners: listeners}, " ", " ")
-		if err != nil {
-			errorResponse(response, http.StatusInternalServerError, err.Error())
-			return
-		}
-		ds.ldsCache.updateCachedDiscoveryResponse(key, out)
-	}
-	writeResponse(response, out)
-}
-
 // ListSecret responds to TLS secret registration
 func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restful.Response) {
 	// caching is disabled due to lack of secret watch notifications
-	if sc := request.PathParameter(ServiceCluster); sc != ds.Mesh.IstioServiceCluster {
-		errorResponse(response, http.StatusNotFound,
-			fmt.Sprintf("Unexpected %s %q", ServiceCluster, sc))
+	role, err := ds.parseRole(request)
+	if err != nil {
+		errorResponse(response, http.StatusNotFound, err.Error())
 		return
 	}
 
-	if sc := request.PathParameter(ServiceNode); sc != proxy.IngressNode {
-		errorResponse(response, http.StatusNotFound,
-			fmt.Sprintf("Unexpected %s %q", ServiceNode, sc))
+	if role.Type != proxy.Ingress {
+		writeResponse(response, nil)
 		return
 	}
 
-	_, secret := buildIngressRoutes(ds.IngressRules(), ds, ds)
+	_, secret := buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
 
 	if secret == "" {
 		writeResponse(response, nil)
@@ -591,91 +556,64 @@ func writeResponse(r *restful.Response, data []byte) {
 	}
 }
 
-// List all service nodes (typically proxy IPv4 addresses)
-func (ds *DiscoveryService) allServiceNodes() []string {
-	// Gather service nodes
-	endpoints := make(map[string]bool)
-	for _, service := range ds.Services() {
-		if !service.External() {
-			// service has Hostname, Address, Ports
-			for _, port := range service.Ports {
-				for _, instance := range ds.Instances(service.Hostname, []string{port.Name}, nil) {
-					endpoints[instance.Endpoint.Address] = true
-				}
-			}
-		}
-	}
+func (ds *DiscoveryService) getRouteConfigs(role proxy.Role) (httpRouteConfigs HTTPRouteConfigs) {
+	switch role.Type {
+	case proxy.Ingress:
+		httpRouteConfigs, _ = buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
 
-	serviceNodes := make([]string, 0, len(endpoints))
-	for ip := range endpoints {
-		serviceNodes = append(serviceNodes, ip)
-	}
-
-	return serviceNodes
-}
-
-func (ds *DiscoveryService) getRouteConfigs(node string) (httpRouteConfigs HTTPRouteConfigs) {
-	switch node {
-	case proxy.IngressNode:
-		httpRouteConfigs, _ = buildIngressRoutes(ds.IngressRules(), ds, ds)
-
-	case proxy.EgressNode:
+	case proxy.Egress:
 		httpRouteConfigs = buildEgressRoutes(ds, ds.Mesh)
 
-	default:
-		sidecar, err := proxy.DecodeServiceNode(node)
-		if err != nil {
-			glog.Warning(err)
-		}
-		instances := ds.HostInstances(map[string]bool{sidecar.IPAddress: true})
+	case proxy.Sidecar:
+		instances := ds.HostInstances(map[string]bool{role.IPAddress: true})
 		services := ds.Services()
-		httpRouteConfigs = buildOutboundHTTPRoutes(instances, services, ds.Mesh, ds)
+		httpRouteConfigs = buildOutboundHTTPRoutes(ds.Mesh, role, instances, services, ds)
 	}
 
 	return
 }
 
-func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clusters Clusters) {
+func (ds *DiscoveryService) buildConfig(role proxy.Role) (listeners Listeners, clusters Clusters) {
 	// TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 	// There is a lot of potential to cache and reuse cluster definitions across proxies and also
 	// skip computing the actual HTTP routes
-	switch node {
-	case proxy.IngressNode:
-		httpRouteConfigs, _ := buildIngressRoutes(ds.IngressRules(), ds, ds)
+	switch role.Type {
+	case proxy.Ingress:
+		httpRouteConfigs, _ := buildIngressRoutes(ds.Mesh, ds.IngressRules(), ds, ds)
 		clusters = httpRouteConfigs.clusters().normalize()
 
-		listener := buildHTTPListener(ds.Mesh, nil, WildcardAddress, 443, true, true)
+		// TODO: sidecar
+		listener := buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, 443, true, true)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
 		}
 
+		// TODO: sidecar
 		listeners = Listeners{
-			buildHTTPListener(ds.Mesh, nil, WildcardAddress, 80, true, true),
+			buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, 80, true, true),
 			listener}
 
-	case proxy.EgressNode:
+	case proxy.Egress:
 		httpRouteConfigs := buildEgressRoutes(ds, ds.Mesh)
 		clusters = httpRouteConfigs.clusters().normalize()
 
 		port := proxy.ParsePort(ds.Mesh.EgressProxyAddress)
-		listener := buildHTTPListener(ds.Mesh, nil, WildcardAddress, port, true, false)
+
+		// TODO: sidecar
+		listener := buildHTTPListener(ds.Mesh, proxy.Role{}, nil, WildcardAddress, port, true, false)
 		applyInboundAuth(listener, ds.Mesh)
 		listeners = Listeners{listener}
 
-	default:
-		sidecar, err := proxy.DecodeServiceNode(node)
-		if err != nil {
-			return Listeners{}, Clusters{}
-		}
-		listeners, clusters = buildListeners(ds.Environment, sidecar)
+	case proxy.Sidecar:
+		listeners, clusters = buildListeners(ds.Environment, role)
 	}
 
 	// set connect timeout
 	clusters.setTimeout(ds.Mesh.ConnectTimeout)
 
 	// egress proxy clusters reference external destinations
-	if node != proxy.EgressNode {
+	if role.Type != proxy.Egress {
 		// apply custom policies for outbound clusters
 		for _, cluster := range clusters {
 			if cluster.port == nil {

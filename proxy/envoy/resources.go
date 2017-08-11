@@ -90,6 +90,7 @@ const (
 	router  = "router"
 	auto    = "auto"
 	decoder = "decoder"
+	read    = "read"
 )
 
 // convertDuration converts to golang duration and logs errors
@@ -376,6 +377,8 @@ type HTTPFilterConfig struct {
 	AccessLog         []AccessLog            `json:"access_log"`
 }
 
+func (*HTTPFilterConfig) isNetworkFilterConfig() {}
+
 // HTTPFilterTraceConfig definition
 type HTTPFilterTraceConfig struct {
 	OperationName string `json:"operation_name"`
@@ -444,6 +447,8 @@ type TCPProxyFilterConfig struct {
 	RouteConfig *TCPRouteConfig `json:"route_config"`
 }
 
+func (*TCPProxyFilterConfig) isNetworkFilterConfig() {}
+
 // TCPRouteConfig (or generalize as RouteConfig or L4RouteConfig for TCP/UDP?)
 type TCPRouteConfig struct {
 	Routes []*TCPRoute `json:"routes"`
@@ -451,9 +456,14 @@ type TCPRouteConfig struct {
 
 // NetworkFilter definition
 type NetworkFilter struct {
-	Type   string      `json:"type"`
-	Name   string      `json:"name"`
-	Config interface{} `json:"config"`
+	Type   string              `json:"type"`
+	Name   string              `json:"name"`
+	Config NetworkFilterConfig `json:"config"`
+}
+
+// NetworkFilterConfig is a marker interface
+type NetworkFilterConfig interface {
+	isNetworkFilterConfig()
 }
 
 // Listener definition
