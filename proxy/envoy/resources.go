@@ -27,9 +27,6 @@ import (
 )
 
 const (
-	// DefaultAccessLog is the name of the log channel (stdout in docker environment)
-	DefaultAccessLog = "/dev/stdout"
-
 	// DefaultLbType defines the default load balancer policy
 	DefaultLbType = LbTypeRoundRobin
 

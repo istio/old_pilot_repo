@@ -15,6 +15,7 @@
 package envoy
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -220,10 +221,18 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 
 			glog.V(2).Infof("Envoy command: %v", args)
 
+			logFile, errLogFile := os.OpenFile(mesh.ErrorLogFile, os.O_RDWR|os.O_APPEND, 0666)
+			if errLogFile != nil {
+				return errLogFile
+			}
+
+			logWriter := bufio.NewWriter(logFile)
+			defer logWriter.Flush()
+
 			/* #nosec */
 			cmd := exec.Command(BinaryPath, args...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
+			cmd.Stdout = logWriter
+			cmd.Stderr = logWriter
 			if err := cmd.Start(); err != nil {
 				return err
 			}

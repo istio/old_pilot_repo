@@ -100,7 +100,7 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyco
 	out := &Config{
 		Listeners: listeners,
 		Admin: Admin{
-			AccessLogPath: DefaultAccessLog,
+			AccessLogPath: mesh.AccessLogFile,
 			Address:       fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
@@ -198,7 +198,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, routeConfig *HTTPRoute
 		UseRemoteAddress:  useRemoteAddress,
 		StatPrefix:        "http",
 		AccessLog: []AccessLog{{
-			Path: DefaultAccessLog,
+			Path: mesh.AccessLogFile,
 		}},
 		Filters: filters,
 	}
