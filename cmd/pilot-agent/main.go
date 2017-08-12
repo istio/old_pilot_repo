@@ -32,6 +32,7 @@ import (
 )
 
 var (
+	binarypath string
 	configpath string
 	meshconfig string
 	sidecar    proxy.Sidecar
@@ -87,7 +88,7 @@ var (
 				}
 			}
 
-			watcher := envoy.NewWatcher(mesh, role, configpath)
+			watcher := envoy.NewWatcher(mesh, role, binarypath, configpath)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
 
@@ -103,6 +104,8 @@ var (
 func init() {
 	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		"File name for Istio mesh configuration")
+	proxyCmd.PersistentFlags().StringVar(&binarypath, "binarypath", "/usr/local/bin/envoy",
+		"Path to proxy binary")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
 		"Path to generated proxy configuration directory")
 	proxyCmd.PersistentFlags().StringVar(&sidecar.IPAddress, "ip", "",

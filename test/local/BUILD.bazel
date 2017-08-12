@@ -6,6 +6,8 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//model:go_default_library",
+        "//proxy:go_default_library",
+        "//proxy/envoy:go_default_library",
         "//test/server:go_default_library",
     ],
 )

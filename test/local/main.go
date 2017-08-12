@@ -19,10 +19,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
@@ -41,7 +43,27 @@ var (
 	n             int
 	host          string
 	discoveryPort int
+	configpath    string
+	binarypath    string
+	service       *model.Service
+)
 
+func init() {
+	flag.IntVar(&baseHTTPPort, http, 9000, "Base HTTP/1.1 port")
+	flag.IntVar(&baseGRPCPort, grpc, 9100, "Base gRPC port")
+	flag.IntVar(&n, "n", 10, "Number of instances")
+	flag.IntVar(&discoveryPort, "xds", 7000, "xDS server port")
+	flag.StringVar(&host, "host", "dev.local", "Service hostname")
+	flag.StringVar(&configpath, "configpath", ".", "Temporary path for configuration")
+	flag.StringVar(&binarypath, "envoy", "", "Path to Envoy binary")
+}
+
+func main() {
+	// set global settings
+	flag.Parse()
+	mesh := proxy.DefaultMeshConfig()
+	mesh.MixerAddress = ""
+	mesh.DiscoveryAddress = fmt.Sprintf("%s:%d", localhost, discoveryPort)
 	service = &model.Service{
 		Hostname: host,
 		Address:  localhost,
@@ -55,21 +77,7 @@ var (
 			Protocol: model.ProtocolGRPC,
 		}},
 	}
-)
-
-func init() {
-	flag.IntVar(&baseHTTPPort, http, 9000, "Base HTTP/1.1 port")
-	flag.IntVar(&baseGRPCPort, grpc, 9100, "Base gRPC port")
-	flag.IntVar(&n, "n", 10, "Number of instances")
-	flag.IntVar(&discoveryPort, "xds", 7000, "xDS server port")
-	flag.StringVar(&host, "host", "dev", "Service hostname")
-}
-
-func main() {
-	// set global settings
-	mesh := proxy.DefaultMeshConfig()
-	mesh.MixerAddress = ""
-	mesh.DiscoveryAddress = fmt.Sprintf("%s:%d", localhost, discoveryPort)
+	services := registry{}
 
 	// spawn service instances
 	for i := 0; i < n; i++ {
@@ -77,10 +85,27 @@ func main() {
 		go server.RunGRPC(baseGRPCPort+i, fmt.Sprintf("v%d", i), "", "")
 	}
 
+	// spawn discovery
+	config := memory.Make(model.IstioConfigTypes)
+	environment := proxy.Environment{
+		ServiceDiscovery: services,
+		IstioConfigStore: model.MakeIstioStore(config),
+		Mesh:             &mesh,
+	}
+	discovery, err := envoy.NewDiscoveryService(nil, nil, environment, envoy.DiscoveryServiceOptions{
+		Port:        discoveryPort,
+		EnableLocal: true,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	go discovery.Run()
+
 	// spawn proxy
-	watcher := envoy.NewWatcher(mesh, role, configpath)
-	ctx, cancel := context.WithCancel(context.Background())
-	go watcher.Run(ctx)
+	watcher := envoy.NewWatcher(&mesh, proxy.Sidecar{}, binarypath, configpath)
+	go watcher.Run(context.Background())
+
+	// TODO: spawn mixer
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -133,6 +158,7 @@ func (_ registry) Instances(hostname string, ports []string, tagsList model.Tags
 				Service: service,
 				Tags:    tags,
 			}
+
 			out = append(out, instance)
 		}
 	}
