@@ -250,8 +250,10 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	}
 
 	pod := infra.apps[app][0]
-	request, err := util.Shell(fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
-		pod, kubeconfig, infra.Namespace, url, count, extra))
+	cmd := fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
+		pod, kubeconfig, infra.Namespace, url, count, extra)
+	glog.Infof(cmd)
+	request, err := util.Shell(cmd)
 
 	if err != nil {
 		glog.Errorf("client request error %v for %s in %s", err, url, app)

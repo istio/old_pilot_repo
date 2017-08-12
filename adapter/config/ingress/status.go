@@ -17,6 +17,7 @@ package ingress
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +29,8 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"
+	"github.com/golang/glog"
+	betaext "k8s.io/api/extensions/v1beta1"
 )
 
 const ingressElectionID = "istio-ingress-controller-leader"
@@ -68,7 +71,13 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	if mesh.IngressService != "" {
 		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
 	}
+	glog.Infof("ANDRA STATUS publishService ", publishService)
 	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)
+
+	customIngressStatus := func(*betaext.Ingress) []v1.LoadBalancerIngress {
+		return nil
+	}
+
 	sync := status.NewStatusSyncer(status.Config{
 		Client:              client,
 		IngressLister:       store.IngressLister{Store: informer.GetStore()},
@@ -76,6 +85,7 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 		PublishService:      publishService,
 		DefaultIngressClass: defaultIngressClass,
 		IngressClass:        ingressClass,
+		CustomIngressStatus: customIngressStatus,
 	})
 
 	return &StatusSyncer{
