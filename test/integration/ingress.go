@@ -95,7 +95,7 @@ func (t *ingress) run() error {
 
 	funcs := make(map[string]func() status)
 	funcs["Ingress status IP"] = t.checkIngressStatus
-	funcs["Route rule for /c"] = t.checkRouteRule
+//	funcs["Route rule for /c"] = t.checkRouteRule
 
 	cases := []struct {
 		// empty destination to expect 404
