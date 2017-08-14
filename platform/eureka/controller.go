@@ -67,7 +67,7 @@ func (c *controller) Run(stop <-chan struct{}) {
 			if !reflect.DeepEqual(apps, cachedApps) {
 				cachedApps = apps
 				// TODO: feed with real events.
-				// The handlers are being feed dummy events. This is sufficient with simplistic
+				// The handlers are being fed dummy events. This is sufficient with simplistic
 				// handlers that invalidate the cache on any event but will not work with smarter
 				// handlers.
 				for _, h := range c.serviceHandlers {
