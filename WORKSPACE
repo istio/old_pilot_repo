@@ -183,6 +183,12 @@ go_repository(
 )
 
 go_repository(
+    name = "com_github_mitchellh_go_homedir",
+    commit = "b8bc1bf767474819792c23f32d8286a45736f1c6",
+    importpath = "github.com/mitchellh/go-homedir",
+)
+
+go_repository(
     name = "com_github_pmezard_go_difflib",
     commit = "d8ed2627bdf02c080bf22230dbb337003b7aba2d",
     importpath = "github.com/pmezard/go-difflib",
@@ -414,7 +420,8 @@ go_repository(
 ## Proxy image
 ##
 
-ISTIO_PROXY_BUCKET = "9a1bae7a5d947bb81a4898fbd171d129aeb04c52"
+# Change this and the docker/Dockerfile.proxy* files together
+ISTIO_PROXY_BUCKET = "2a8426631283669ef1a433c5d1bb84642f042e81"
 
 http_file(
     name = "envoy_binary",
