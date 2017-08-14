@@ -1,39 +1,6 @@
 {
   "clusters": [
    {
-    "name": "in.1081",
-    "connect_timeout_ms": 1000,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [
-     {
-      "url": "tcp://127.0.0.1:1081"
-     }
-    ]
-   },
-   {
-    "name": "in.1090",
-    "connect_timeout_ms": 1000,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [
-     {
-      "url": "tcp://127.0.0.1:1090"
-     }
-    ]
-   },
-   {
-    "name": "in.80",
-    "connect_timeout_ms": 1000,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [
-     {
-      "url": "tcp://127.0.0.1:80"
-     }
-    ]
-   },
-   {
     "name": "mixer_server",
     "connect_timeout_ms": 1000,
     "type": "strict_dns",
