@@ -71,17 +71,12 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: "{{.port1}}"
-          tcpSocket:
-            port: tcp-health-port
+            port: {{.port1}}
           initialDelaySeconds: 10
           periodSeconds: 1
         readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 3333
           tcpSocket:
-            port: "{{.port2}}"
+            port: tcp-health-port
           initialDelaySeconds: 10
           periodSeconds: 1
 ---

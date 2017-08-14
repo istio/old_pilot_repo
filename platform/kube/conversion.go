@@ -167,9 +167,8 @@ func convertProbesToPorts(t *v1.PodSpec) (model.PortList, error) {
 						set[p.Name] = p
 					}
 				}
-			}
-
-			if container.LivenessProbe.TCPSocket != nil {
+			} else if container.LivenessProbe.TCPSocket != nil {
+				// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
 				port, err := convertProbePort(container, container.LivenessProbe.TCPSocket.Port)
 				if err != nil {
 					errs = multierror.Append(errs, err)
@@ -203,9 +202,7 @@ func convertProbesToPorts(t *v1.PodSpec) (model.PortList, error) {
 						set[p.Name] = p
 					}
 				}
-			}
-
-			if container.ReadinessProbe.TCPSocket != nil {
+			} else if container.ReadinessProbe.TCPSocket != nil {
 				port, err := convertProbePort(container, container.ReadinessProbe.TCPSocket.Port)
 				if err != nil {
 					errs = multierror.Append(errs, err)

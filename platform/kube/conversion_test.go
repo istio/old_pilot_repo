@@ -207,11 +207,6 @@ func TestProbesToPortsConversion(t *testing.T) {
 
 	expected := model.PortList{
 		{
-			Name:     "mgmt-80",
-			Port:     80,
-			Protocol: model.ProtocolHTTP,
-		},
-		{
 			Name:     "mgmt-3306",
 			Port:     3306,
 			Protocol: model.ProtocolTCP,
@@ -220,6 +215,31 @@ func TestProbesToPortsConversion(t *testing.T) {
 			Name:     "mgmt-9080",
 			Port:     9080,
 			Protocol: model.ProtocolHTTP,
+		},
+	}
+
+	handlers := []v1.Handler{
+		{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.IntOrString{StrVal: "mysql", Type: intstr.String},
+			},
+		},
+		{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.IntOrString{IntVal: 3306, Type: intstr.Int},
+			},
+		},
+		{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/foo",
+				Port: intstr.IntOrString{StrVal: "http-two", Type: intstr.String},
+			},
+		},
+		{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/foo",
+				Port: intstr.IntOrString{IntVal: 9080, Type: intstr.Int},
+			},
 		},
 	}
 
@@ -233,48 +253,46 @@ func TestProbesToPortsConversion(t *testing.T) {
 						ContainerPort: 3306,
 					},
 					{
+						Name:          "http-two",
+						ContainerPort: 9080,
+					},
+					{
 						Name:          "http",
 						ContainerPort: 80,
 					},
 				},
-				LivenessProbe: &v1.Probe{
-					Handler: v1.Handler{
-						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.IntOrString{IntVal: 9080, Type: intstr.Int},
-						},
-						TCPSocket: &v1.TCPSocketAction{
-							Port: intstr.IntOrString{StrVal: "mysql", Type: intstr.String},
-						},
-					},
-				},
-				ReadinessProbe: &v1.Probe{
-					Handler: v1.Handler{
-						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.IntOrString{StrVal: "http", Type: intstr.String},
-						},
-						TCPSocket: &v1.TCPSocketAction{
-							Port: intstr.IntOrString{IntVal: 3306, Type: intstr.Int},
-						},
-					},
-				},
+				LivenessProbe:  &v1.Probe{},
+				ReadinessProbe: &v1.Probe{},
 			},
 		},
 	}
 
-	mgmtPorts, err := convertProbesToPorts(podSpec)
-	if err != nil {
-		t.Errorf("Failed to convert Probes to Ports: %v", err)
-	}
+	for _, handler1 := range handlers {
+		for _, handler2 := range handlers {
+			if (handler1.TCPSocket != nil && handler2.TCPSocket != nil) ||
+				(handler1.HTTPGet != nil && handler2.HTTPGet != nil) {
+				continue
+			}
 
-	if len(mgmtPorts) != len(expected) {
-		t.Errorf("incorrect number of management ports => %v, want %v",
-			len(mgmtPorts), len(expected))
-	}
+			podSpec.Containers[0].LivenessProbe.Handler = handler1
+			podSpec.Containers[0].ReadinessProbe.Handler = handler2
 
-	for i := range expected {
-		if *mgmtPorts[i] != *expected[i] {
-			t.Errorf("Incorrect conversion of probe port => %v, want %v",
-				mgmtPorts[i], expected[i])
+			mgmtPorts, err := convertProbesToPorts(podSpec)
+			if err != nil {
+				t.Errorf("Failed to convert Probes to Ports: %v", err)
+			}
+
+			if len(mgmtPorts) != len(expected) {
+				t.Errorf("incorrect number of management ports => %v, want %v",
+					len(mgmtPorts), len(expected))
+			}
+
+			for i := range expected {
+				if *mgmtPorts[i] != *expected[i] {
+					t.Errorf("Incorrect conversion of probe port => %v, want %v",
+						mgmtPorts[i], expected[i])
+				}
+			}
 		}
 	}
 }
