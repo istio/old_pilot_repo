@@ -20,6 +20,7 @@ import (
 	"istio.io/pilot/model"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var (
@@ -199,5 +200,81 @@ func TestInvalidExternalServiceConversion(t *testing.T) {
 
 	if svc := convertService(extSvc, domainSuffix); svc != nil {
 		t.Errorf("converted a service without an external name")
+	}
+}
+
+func TestProbesToPortsConversion(t *testing.T) {
+
+	expected := model.PortList{
+		{
+			Name:     "mgmt-80",
+			Port:     80,
+			Protocol: model.ProtocolHTTP,
+		},
+		{
+			Name:     "mgmt-3306",
+			Port:     3306,
+			Protocol: model.ProtocolTCP,
+		},
+		{
+			Name:     "mgmt-9080",
+			Port:     9080,
+			Protocol: model.ProtocolHTTP,
+		},
+	}
+
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "scooby",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "mysql",
+						ContainerPort: 3306,
+					},
+					{
+						Name:          "http",
+						ContainerPort: 80,
+					},
+				},
+				LivenessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Port: intstr.IntOrString{IntVal: 9080, Type: intstr.Int},
+						},
+						TCPSocket: &v1.TCPSocketAction{
+							Port: intstr.IntOrString{StrVal: "mysql", Type: intstr.String},
+						},
+					},
+				},
+				ReadinessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Port: intstr.IntOrString{StrVal: "http", Type: intstr.String},
+						},
+						TCPSocket: &v1.TCPSocketAction{
+							Port: intstr.IntOrString{IntVal: 3306, Type: intstr.Int},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mgmtPorts, err := convertProbesToPorts(podSpec)
+	if err != nil {
+		t.Errorf("Failed to convert Probes to Ports: %v", err)
+	}
+
+	if len(mgmtPorts) != len(expected) {
+		t.Errorf("incorrect number of management ports => %v, want %v",
+			len(mgmtPorts), len(expected))
+	}
+
+	for i := range expected {
+		if *mgmtPorts[i] != *expected[i] {
+			t.Errorf("Incorrect conversion of probe port => %v, want %v",
+				mgmtPorts[i], expected[i])
+		}
 	}
 }

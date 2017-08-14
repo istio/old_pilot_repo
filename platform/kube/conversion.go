@@ -18,10 +18,14 @@ import (
 	"fmt"
 	"strings"
 
+	"sort"
+	"strconv"
+
+	multierror "github.com/hashicorp/go-multierror"
+	"istio.io/pilot/model"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"istio.io/pilot/model"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -123,4 +127,108 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 		}
 	}
 	return out
+}
+
+func convertProbePort(c v1.Container, port intstr.IntOrString) (int, error) {
+	switch port.Type {
+	case intstr.Int:
+		return port.IntValue(), nil
+	case intstr.String:
+		for _, named := range c.Ports {
+			if named.Name == port.String() {
+				return int(named.ContainerPort), nil
+			}
+		}
+		return 0, fmt.Errorf("missing named port %q", port)
+	default:
+		return 0, fmt.Errorf("incorrect port type %q", port)
+	}
+}
+
+// convertProbesToPorts returns a PortList consisting of the ports where the
+// pod is configured to do Liveness and Readiness probes
+func convertProbesToPorts(t *v1.PodSpec) (model.PortList, error) {
+	set := make(map[string]*model.Port)
+	var errs error
+	for _, container := range t.Containers {
+		if container.LivenessProbe != nil {
+			if container.LivenessProbe.HTTPGet != nil {
+				port, err := convertProbePort(container, container.LivenessProbe.Handler.HTTPGet.Port)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				} else {
+					p := &model.Port{
+						Name:     "mgmt-" + strconv.Itoa(port),
+						Port:     port,
+						Protocol: model.ProtocolHTTP,
+					}
+					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+					if set[p.Name] == nil {
+						set[p.Name] = p
+					}
+				}
+			}
+
+			if container.LivenessProbe.TCPSocket != nil {
+				port, err := convertProbePort(container, container.LivenessProbe.TCPSocket.Port)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				} else {
+					p := &model.Port{
+						Name:     "mgmt-" + strconv.Itoa(port),
+						Port:     port,
+						Protocol: model.ProtocolTCP,
+					}
+					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+					if set[p.Name] == nil {
+						set[p.Name] = p
+					}
+				}
+			}
+		}
+
+		if container.ReadinessProbe != nil {
+			if container.ReadinessProbe.HTTPGet != nil {
+				port, err := convertProbePort(container, container.ReadinessProbe.HTTPGet.Port)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				} else {
+					p := &model.Port{
+						Name:     "mgmt-" + strconv.Itoa(port),
+						Port:     port,
+						Protocol: model.ProtocolHTTP,
+					}
+					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+					if set[p.Name] == nil {
+						set[p.Name] = p
+					}
+				}
+			}
+
+			if container.ReadinessProbe.TCPSocket != nil {
+				port, err := convertProbePort(container, container.ReadinessProbe.TCPSocket.Port)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				} else {
+					p := &model.Port{
+						Name:     "mgmt-" + strconv.Itoa(port),
+						Port:     port,
+						Protocol: model.ProtocolTCP,
+					}
+					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+					if set[p.Name] == nil {
+						set[p.Name] = p
+					}
+				}
+			}
+		}
+	}
+
+	mgmtPorts := make(model.PortList, 0, len(set))
+	for _, p := range set {
+		mgmtPorts = append(mgmtPorts, p)
+	}
+	sort.Slice(mgmtPorts, func(i, j int) bool { return mgmtPorts[i].Port < mgmtPorts[j].Port })
+
+	return mgmtPorts, errs
 }

@@ -140,12 +140,17 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyco
 func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Clusters) {
 	instances := env.HostInstances(map[string]bool{sidecar.IPAddress: true})
 	services := env.Services()
+	managementPorts := env.ManagementPorts(sidecar.IPAddress)
 
 	inbound, inClusters := buildInboundListeners(instances, env.Mesh)
 	outbound, outClusters := buildOutboundListeners(instances, services, env, env.Mesh)
+	mgmtListeners, mgmtClusters := buildMgmtPortListeners(managementPorts, sidecar.IPAddress, env.Mesh)
 
 	listeners := append(inbound, outbound...)
 	clusters := append(inClusters, outClusters...)
+
+	listeners = append(listeners, mgmtListeners...)
+	clusters = append(clusters, mgmtClusters...)
 
 	// inject static Mixer filter with proxy identities for all HTTP filters
 	if env.Mesh.MixerAddress != "" {
@@ -416,6 +421,54 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	return tcpListeners, tcpClusters
 }
 
+// buildInboundConfig creates clusters and listeners for a given
+// endpoint address, port, and protocol. In addition to creating
+// the inbound cluster, it builds a HTTP/TCP default route.
+func buildInboundConfig(endpointAddress string, endpointPort int, protocol model.Protocol,
+	mesh *proxyconfig.ProxyMeshConfig) (*Listener, *Cluster) {
+
+	cluster := buildInboundCluster(endpointPort, protocol, mesh.ConnectTimeout)
+
+	// Local service instances can be accessed through one of three
+	// addresses: localhost, endpoint IP, and service
+	// VIP. Localhost bypasses the proxy and doesn't need any TCP
+	// route config. Endpoint IP is handled below and Service IP is handled
+	// by outbound routes.
+	// Traffic sent to our service VIP is redirected by remote
+	// services' kubeproxy to our specific endpoint IP.
+	switch protocol {
+	case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+		route := buildDefaultRoute(cluster)
+
+		// set server-side mixer filter config for inbound routes
+		if mesh.MixerAddress != "" {
+			route.OpaqueConfig = map[string]string{
+				"mixer_control": "on",
+				"mixer_forward": "off",
+			}
+		}
+
+		host := &VirtualHost{
+			Name:    fmt.Sprintf("inbound|%d", endpointPort),
+			Domains: []string{"*"},
+			Routes:  []*HTTPRoute{route},
+		}
+
+		config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
+		listener :=
+			buildHTTPListener(mesh, config, endpointAddress, endpointPort, false, false)
+		return listener, cluster
+
+	case model.ProtocolTCP, model.ProtocolHTTPS:
+		listener := buildTCPListener(&TCPRouteConfig{
+			Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpointAddress})},
+		}, endpointAddress, endpointPort)
+		return listener, cluster
+	}
+
+	return nil, nil
+}
+
 // buildInboundListeners creates listeners for the server-side (inbound)
 // configuration for co-located service instances. The function also returns
 // all inbound clusters since they are statically declared in the proxy
@@ -432,51 +485,52 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 	for _, instance := range instances {
 		endpoint := instance.Endpoint
 		servicePort := endpoint.ServicePort
-		protocol := servicePort.Protocol
-		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
-		clusters = append(clusters, cluster)
 
-		// Local service instances can be accessed through one of three
-		// addresses: localhost, endpoint IP, and service
-		// VIP. Localhost bypasses the proxy and doesn't need any TCP
-		// route config. Endpoint IP is handled below and Service IP is handled
-		// by outbound routes.
-		// Traffic sent to our service VIP is redirected by remote
-		// services' kubeproxy to our specific endpoint IP.
-		switch protocol {
-		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-			route := buildDefaultRoute(cluster)
-
-			// set server-side mixer filter config for inbound routes
-			if mesh.MixerAddress != "" {
-				route.OpaqueConfig = map[string]string{
-					"mixer_control": "on",
-					"mixer_forward": "off",
-				}
-			}
-
-			host := &VirtualHost{
-				Name:    fmt.Sprintf("inbound|%d", endpoint.Port),
-				Domains: []string{"*"},
-				Routes:  []*HTTPRoute{route},
-			}
-
-			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
-			listeners = append(listeners,
-				buildHTTPListener(mesh, config, endpoint.Address, endpoint.Port, false, false))
-
-		case model.ProtocolTCP, model.ProtocolHTTPS:
-			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
-			}, endpoint.Address, endpoint.Port))
-
-		default:
-			glog.Warningf("Unsupported inbound protocol %v for port %#v", protocol, servicePort)
+		listener, cluster := buildInboundConfig(endpoint.Address, endpoint.Port, servicePort.Protocol, mesh)
+		if cluster != nil && listener != nil {
+			clusters = append(clusters, cluster)
+			listeners = append(listeners, listener)
+		} else {
+			glog.Warningf("Unsupported inbound protocol %v for service port %#v", servicePort.Protocol, servicePort)
 		}
 	}
 
 	for _, listener := range listeners {
 		applyInboundAuth(listener, mesh)
+	}
+
+	return listeners, clusters
+}
+
+// buildMgmtPortListeners creates inbound listeners for the management ports on
+// server (inbound). The function also returns all inbound clusters since
+// they are statically declared in the proxy configuration and do not
+// utilize CDS.
+// Management port listeners are slightly different from standard Inbound listeners
+// in that, they do not have mixer filters nor do they have inbound auth.
+// N.B. If a given management port is same as the service instance's endpoint port
+// where it listens for normal traffic, then buildInboundListeners would take care of
+// constructing the appropriate HTTP/TCP listeners/routes/clusters for that port
+// along with enabling wildcard routes. Note that if Istio Auth is enabled, then
+// management ports that are same as the service instance's main port would have
+// auth enabled on the listener port. So, if a user wants to use Istio auth and
+// management ports (e.g., kubernetes health checks) where management ports require
+// out of band (non TLS) access, the service instance should be configured with
+// dedicated (management) ports.
+func buildMgmtPortListeners(managementPorts model.PortList,
+	managementIP string, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
+	listeners := make(Listeners, 0, len(managementPorts))
+	clusters := make(Clusters, 0, len(managementPorts))
+
+	// assumes that inbound connections/requests are sent to the endpoint address
+	for _, mPort := range managementPorts {
+		listener, cluster := buildInboundConfig(managementIP, mPort.Port, mPort.Protocol, mesh)
+		if cluster != nil && listener != nil {
+			clusters = append(clusters, cluster)
+			listeners = append(listeners, listener)
+		} else {
+			glog.Warningf("Unsupported inbound protocol %v for management port %#v", mPort.Protocol, mPort)
+		}
 	}
 
 	return listeners, clusters
