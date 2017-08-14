@@ -57,8 +57,8 @@ func NewConfigStoreMonitor(store model.ConfigStore) Monitor {
 	}
 }
 
-func (m *configstoreMonitor) ScheduleProcessEvent(configevent ConfigEvent) {
-	m.processConfigEvent(configevent)
+func (m *configstoreMonitor) ScheduleProcessEvent(configEvent ConfigEvent) {
+	m.eventCh <- configEvent
 }
 
 func (m *configstoreMonitor) Start(stop <-chan struct{}) {
