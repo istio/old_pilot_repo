@@ -16,7 +16,6 @@ package eureka
 
 import (
 	"fmt"
-
 	"strings"
 
 	"github.com/golang/glog"

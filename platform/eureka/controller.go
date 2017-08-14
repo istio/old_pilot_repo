@@ -16,7 +16,6 @@ package eureka
 
 import (
 	"time"
-
 	"reflect"
 
 	"github.com/golang/glog"

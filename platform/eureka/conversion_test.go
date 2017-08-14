@@ -16,10 +16,8 @@ package eureka
 
 import (
 	"testing"
-
 	"fmt"
 	"strings"
-
 	"encoding/json"
 
 	"istio.io/pilot/model"
