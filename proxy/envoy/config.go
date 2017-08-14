@@ -139,8 +139,16 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 
 	// Append management listeners after injecting mixer filter to normal listeners
 	// because management port listeners cannot use mixer or auth (see comment
-	// under buildMgmtPortListeners).
-	listeners = append(listeners, mgmtListeners...)
+	// under buildMgmtPortListeners). If management listener port and service port
+	// are same, bad things happen when running in kubernetes platform, as the
+	// probes stop responding. So, append non overlapping listeners only.
+	for _, l := range mgmtListeners {
+		if listeners.GetByAddress(l.Address) != nil {
+			glog.Warningf("Omitting listener for management address %s due to collision with service listener", l.Address)
+			continue
+		}
+		listeners = append(listeners, l)
+	}
 	clusters = append(clusters, mgmtClusters...)
 
 	// set bind to port values for port redirection
