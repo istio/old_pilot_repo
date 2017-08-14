@@ -118,8 +118,6 @@ func init() {
 
 	cmd.AddFlags(rootCmd)
 
-	rootCmd.Flags().AddGoFlagSet(flag.CommandLine)
-
 	rootCmd.AddCommand(proxyCmd)
 	rootCmd.AddCommand(cmd.VersionCmd)
 }
