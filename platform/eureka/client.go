@@ -53,6 +53,7 @@ type Client interface {
 // Minimal client for Eureka server's REST APIs.
 // TODO: support multiple Eureka servers
 // TODO: caching
+// TODO: Eureka v3 support
 type client struct {
 	client http.Client
 	url    string

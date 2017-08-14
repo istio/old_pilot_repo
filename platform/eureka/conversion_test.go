@@ -235,6 +235,8 @@ func TestConvertTags(t *testing.T) {
 	}
 }
 
+// appName returns a debug app name for testing, given a hostname. There is no requirement that the Eureka app name be
+// based off of a hostname.
 func appName(hostname string) string {
 	return strings.ToUpper(strings.Replace(hostname, ".", "_", -1))
 }
