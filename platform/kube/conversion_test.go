@@ -60,7 +60,8 @@ func TestServiceConversion(t *testing.T) {
 	namespace := "default"
 	saA := "serviceaccountA"
 	saB := "serviceaccountB"
-	annotation := saA + "," + saB
+	saC := "serviceaccountC@cloudservices.gserviceaccount.com"
+	saD := "serviceaccountD@developer.gserviceaccount.com"
 
 	ip := "10.0.0.1"
 
@@ -69,8 +70,9 @@ func TestServiceConversion(t *testing.T) {
 			Name:      serviceName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				ServiceAccountsOnVMAnnotation: annotation,
-				"other/annotation":            "test",
+				KubeServiceAccountsOnVMAnnotation:      saA + "," + saB,
+				CanonicalServiceAccountsOnVMAnnotation: saC + "," + saD,
+				"other/annotation":                     "test",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -114,11 +116,16 @@ func TestServiceConversion(t *testing.T) {
 	}
 
 	sa := service.ServiceAccounts
-	if sa == nil || len(sa) != 2 {
+	if sa == nil || len(sa) != 4 {
 		t.Errorf("number of service accounts is incorrect")
 	}
 	sort.Sort(sort.StringSlice(sa))
-	expected := []string{saA, saB}
+	expected := []string{
+		"spiffe://company.com/ns/default/sa/" + saA,
+		"spiffe://company.com/ns/default/sa/" + saB,
+		"spiffe://" + saC,
+		"spiffe://" + saD,
+	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
 	}

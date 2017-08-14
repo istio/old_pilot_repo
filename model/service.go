@@ -173,6 +173,7 @@ type ServiceInstance struct {
 	Service          *Service        `json:"service,omitempty"`
 	Tags             Tags            `json:"tags,omitempty"`
 	AvailabilityZone string          `json:"az,omitempty"`
+	ServiceAccount   string          `json:"serviceaccount,omitempty"`
 }
 
 // ServiceDiscovery enumerates Istio service instances.
