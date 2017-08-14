@@ -1,3 +1,17 @@
+// Copyright 2017 Istio Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package memory
 
 import (
@@ -12,6 +26,7 @@ type controller struct {
 	configStore model.ConfigStore
 }
 
+// NewController return an implementation of model.ConfigStoreCache
 func NewController(cs model.ConfigStore) model.ConfigStoreCache {
 	out := &controller{
 		configStore: cs,
@@ -41,16 +56,25 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 	return c.configStore.Get(typ, key)
 }
 
-func (c *controller) Post(val proto.Message) (string, error) {
-	return c.configStore.Post(val)
+func (c *controller) Post(val proto.Message) (out string, err error) {
+	if out, err = c.configStore.Post(val); err == nil {
+		c.monitor.UpdateConfigRecord()
+	}
+	return
 }
 
-func (c *controller) Put(val proto.Message, revision string) (string, error) {
-	return c.configStore.Put(val, revision)
+func (c *controller) Put(val proto.Message, revision string) (out string, err error) {
+	if out, err = c.configStore.Put(val, revision); err == nil {
+		c.monitor.UpdateConfigRecord()
+	}
+	return
 }
 
-func (c *controller) Delete(typ, key string) error {
-	return c.configStore.Delete(typ, key)
+func (c *controller) Delete(typ, key string) (err error) {
+	if err = c.configStore.Delete(typ, key); err == nil {
+		c.monitor.UpdateConfigRecord()
+	}
+	return
 }
 
 func (c *controller) List(typ string) ([]model.Config, error) {

@@ -18,7 +18,10 @@ go_library(
 go_test(
     name = "go_default_xtest",
     size = "small",
-    srcs = ["config_test.go"],
+    srcs = [
+        "config_test.go",
+        "monitor_test.go",
+    ],
     deps = [
         ":go_default_library",
         "//model:go_default_library",
