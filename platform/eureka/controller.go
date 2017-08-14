@@ -15,8 +15,8 @@
 package eureka
 
 import (
-	"time"
 	"reflect"
+	"time"
 
 	"github.com/golang/glog"
 	"istio.io/pilot/model"

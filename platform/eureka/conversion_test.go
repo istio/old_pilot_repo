@@ -15,10 +15,10 @@
 package eureka
 
 import (
-	"testing"
+	"encoding/json"
 	"fmt"
 	"strings"
-	"encoding/json"
+	"testing"
 
 	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"

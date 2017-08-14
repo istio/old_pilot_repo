@@ -15,9 +15,9 @@
 package eureka
 
 import (
+	"sync"
 	"testing"
 	"time"
-	"sync"
 
 	"istio.io/pilot/model"
 )
