@@ -15,8 +15,6 @@
 package memory
 
 import (
-	"time"
-
 	"github.com/golang/protobuf/proto"
 	"istio.io/pilot/model"
 )
@@ -30,7 +28,7 @@ type controller struct {
 func NewController(cs model.ConfigStore) model.ConfigStoreCache {
 	out := &controller{
 		configStore: cs,
-		monitor:     NewConfigsMonitor(cs, time.Second*1),
+		monitor:     NewConfigStoreMonitor(cs),
 	}
 	return out
 }
@@ -56,27 +54,52 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 	return c.configStore.Get(typ, key)
 }
 
-func (c *controller) Post(val proto.Message) (out string, err error) {
-	if out, err = c.configStore.Post(val); err == nil {
-		c.monitor.UpdateConfigRecord()
+func (c *controller) Post(val proto.Message) (revision string, err error) {
+	if revision, err = c.configStore.Post(val); err == nil {
+		c.monitor.ScheduleProcessEvent(ConfigEvent{
+			config: c.convertToConfig(val, revision),
+			event:  model.EventAdd,
+		})
 	}
 	return
 }
 
-func (c *controller) Put(val proto.Message, revision string) (out string, err error) {
-	if out, err = c.configStore.Put(val, revision); err == nil {
-		c.monitor.UpdateConfigRecord()
+func (c *controller) Put(val proto.Message, oldRevision string) (newRevision string, err error) {
+	if newRevision, err = c.configStore.Put(val, oldRevision); err == nil {
+		c.monitor.ScheduleProcessEvent(ConfigEvent{
+			config: c.convertToConfig(val, newRevision),
+			event:  model.EventUpdate,
+		})
 	}
 	return
 }
 
 func (c *controller) Delete(typ, key string) (err error) {
 	if err = c.configStore.Delete(typ, key); err == nil {
-		c.monitor.UpdateConfigRecord()
+		c.monitor.ScheduleProcessEvent(ConfigEvent{
+			config: model.Config{
+				Type: typ,
+				Key:  key,
+			},
+			event: model.EventDelete,
+		})
 	}
 	return
 }
 
 func (c *controller) List(typ string) ([]model.Config, error) {
 	return c.configStore.List(typ)
+}
+
+func (c *controller) convertToConfig(val proto.Message, rev string) model.Config {
+	schema, _ := c.configStore.ConfigDescriptor().GetByMessageName(proto.MessageName(val))
+	typ := schema.Type
+	key := schema.Key(val)
+
+	return model.Config{
+		Type:     typ,
+		Key:      key,
+		Revision: rev,
+		Content:  val,
+	}
 }

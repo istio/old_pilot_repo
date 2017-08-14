@@ -15,9 +15,6 @@
 package memory_test
 
 import (
-	"bufio"
-	"fmt"
-	"os"
 	"testing"
 
 	"istio.io/pilot/adapter/config/memory"
@@ -32,57 +29,41 @@ func TestEventConsistency(t *testing.T) {
 	// Create a controller
 	controller := memory.NewController(store)
 
-	recFile := "/tmp/events.log"
-	f, err := os.Create(recFile)
-	if err != nil {
-		t.Errorf("Fail to open file %s", recFile)
-	}
-	w := bufio.NewWriter(f)
+	testConfig := mock.Make(0)
+	testEvent := model.EventAdd
 
 	// Append notify handlers to the controller
 	controller.RegisterEventHandler(mock.Type, func(config model.Config, event model.Event) {
-		switch event {
-		case model.EventAdd:
-			fmt.Fprintf(w, "Added\n")
-		case model.EventUpdate:
-			fmt.Fprintf(w, "Updated\n")
-		case model.EventDelete:
-			fmt.Fprintf(w, "Deleted\n")
+		if event != testEvent {
+			t.Errorf("desired %v, but %v", testEvent, event)
+		}
+		if config.Key != testConfig.Key {
+			t.Errorf("desired %v, but %v", testConfig.Key, config.Key)
 		}
 	})
 
 	stop := make(<-chan struct{})
 	go controller.Run(stop)
-	mock.CheckMapInvariant(controller, t, 10)
-	if err = w.Flush(); err != nil {
+
+	var revision string
+	// Test Add Event
+	if rev, err := controller.Post(testConfig); err != nil {
 		t.Error(err)
+	} else {
+		revision = rev
 	}
-	if err = f.Close(); err != nil {
+
+	testEvent = model.EventUpdate
+
+	// Test Update Event
+	if _, err := controller.Put(testConfig, revision); err != nil {
 		t.Error(err)
 	}
 
-	added, updated, deleted := 0, 0, 0
-	f, err = os.Open(recFile)
-	if err != nil {
-		t.Errorf("Fail to open file %s", recFile)
-	}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		event := scanner.Text()
-		switch event {
-		case "Added":
-			added++
-		case "Updated":
-			updated++
-		case "Deleted":
-			deleted++
-		}
-	}
+	testEvent = model.EventDelete
 
-	if added != 10 || updated != 10 || deleted != 10 {
-		t.Errorf("Event record check fails, %d %d %d", added, updated, deleted)
-	}
-	if err = f.Close(); err != nil {
+	// Test Delete Event
+	if err := controller.Delete(mock.Type, testConfig.Key); err != nil {
 		t.Error(err)
 	}
 }
