@@ -68,33 +68,6 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-/* TODO: passthrough listeners are disabled since they must be provided through LDS/
-// PassthroughPorts is a list of ports on the proxy IP address that must be
-// open and allowed through the proxy to the co-located service instances.
-// These ports are utilized by the underlying cluster platform for health
-// checking, for example.
-//
-// The passthrough ports should be exposed irrespective of the services
-// model. In case there is an overlap, that is the port is utilized by a
-// service for a service instance and is also present in this list, the
-// service model declaration takes precedence. That means any protocol
-// upgrade (such as utilizng TLS for proxy-to-proxy traffic) will be applied
-// to the passthrough port.
-PassthroughPorts []int
-// create passthrough listeners if they are missing
-for _, port := range context.PassthroughPorts {
-	cluster := buildInboundCluster(port, model.ProtocolTCP, mesh.ConnectTimeout)
-	cluster.Name = fmt.Sprintf("passthrough_%d", port)
-	// skip naming the listener to preserve it across updates
-	listener := buildTCPListener(&TCPRouteConfig{
-		Routes: []*TCPRoute{buildTCPRoute(cluster, []string{context.IPAddress})},
-	}, "", context.IPAddress, port)
-	listener.BindToPort = false
-	listeners = append(listeners, listener)
-	clusters = append(clusters, cluster)
-}
-*/
-
 // buildConfig creates a proxy config with discovery services and admin port
 func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyconfig.ProxyMeshConfig) *Config {
 	out := &Config{
@@ -166,7 +139,7 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 
 	// Append management listeners after injecting mixer filter to normal listeners
 	// because management port listeners cannot use mixer or auth (see comment
-	// under buildMgmtPortListeners)
+	// under buildMgmtPortListeners).
 	listeners = append(listeners, mgmtListeners...)
 	clusters = append(clusters, mgmtClusters...)
 
@@ -428,7 +401,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 // endpoint address, port, and protocol. In addition to creating
 // the inbound cluster, it builds a HTTP/TCP default route.
 func buildInboundConfig(endpointAddress string, endpointPort int, protocol model.Protocol,
-	mesh *proxyconfig.ProxyMeshConfig) (*Listener, *Cluster) {
+	mesh *proxyconfig.ProxyMeshConfig) (*Listener, *Cluster, error) {
 
 	cluster := buildInboundCluster(endpointPort, protocol, mesh.ConnectTimeout)
 
@@ -460,16 +433,16 @@ func buildInboundConfig(endpointAddress string, endpointPort int, protocol model
 		config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 		listener :=
 			buildHTTPListener(mesh, config, endpointAddress, endpointPort, false, false)
-		return listener, cluster
+		return listener, cluster, nil
 
 	case model.ProtocolTCP, model.ProtocolHTTPS:
 		listener := buildTCPListener(&TCPRouteConfig{
 			Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpointAddress})},
 		}, endpointAddress, endpointPort)
-		return listener, cluster
+		return listener, cluster, nil
 	}
 
-	return nil, nil
+	return nil, nil, fmt.Errorf("Unknown protocol for endpoint %s:%d - %v", endpointAddress, endpointPort, protocol)
 }
 
 // buildInboundListeners creates listeners for the server-side (inbound)
@@ -489,8 +462,8 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 		endpoint := instance.Endpoint
 		servicePort := endpoint.ServicePort
 
-		listener, cluster := buildInboundConfig(endpoint.Address, endpoint.Port, servicePort.Protocol, mesh)
-		if cluster != nil && listener != nil {
+		listener, cluster, err := buildInboundConfig(endpoint.Address, endpoint.Port, servicePort.Protocol, mesh)
+		if err != nil {
 			clusters = append(clusters, cluster)
 			listeners = append(listeners, listener)
 		} else {
@@ -528,8 +501,8 @@ func buildMgmtPortListeners(managementPorts model.PortList,
 
 	// assumes that inbound connections/requests are sent to the endpoint address
 	for _, mPort := range managementPorts {
-		listener, cluster := buildInboundConfig(managementIP, mPort.Port, mPort.Protocol, mesh)
-		if cluster != nil && listener != nil {
+		listener, cluster, err := buildInboundConfig(managementIP, mPort.Port, mPort.Protocol, mesh)
+		if err != nil {
 			clusters = append(clusters, cluster)
 			listeners = append(listeners, listener)
 		} else {

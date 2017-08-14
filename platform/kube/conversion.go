@@ -16,10 +16,9 @@ package kube
 
 import (
 	"fmt"
-	"strings"
-
 	"sort"
 	"strconv"
+	"strings"
 
 	multierror "github.com/hashicorp/go-multierror"
 	"istio.io/pilot/model"
@@ -129,19 +128,48 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 	return out
 }
 
-func convertProbePort(c v1.Container, port intstr.IntOrString) (int, error) {
-	switch port.Type {
+func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) {
+	if handler == nil {
+		return nil, nil
+	}
+
+	var protocol model.Protocol
+	var portVal intstr.IntOrString
+	port := 0
+
+	// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
+	if handler.HTTPGet != nil {
+		portVal = handler.HTTPGet.Port
+		protocol = model.ProtocolHTTP
+	} else if handler.TCPSocket != nil {
+		portVal = handler.TCPSocket.Port
+		protocol = model.ProtocolTCP
+	} else {
+		return nil, nil
+	}
+
+	switch portVal.Type {
 	case intstr.Int:
-		return port.IntValue(), nil
+		port = portVal.IntValue()
+		return &model.Port{
+			Name:     "mgmt-" + strconv.Itoa(port),
+			Port:     port,
+			Protocol: protocol,
+		}, nil
 	case intstr.String:
 		for _, named := range c.Ports {
-			if named.Name == port.String() {
-				return int(named.ContainerPort), nil
+			if named.Name == portVal.String() {
+				port = int(named.ContainerPort)
+				return &model.Port{
+					Name:     "mgmt-" + strconv.Itoa(port),
+					Port:     port,
+					Protocol: protocol,
+				}, nil
 			}
 		}
-		return 0, fmt.Errorf("missing named port %q", port)
+		return nil, fmt.Errorf("missing named port %q", portVal)
 	default:
-		return 0, fmt.Errorf("incorrect port type %q", port)
+		return nil, fmt.Errorf("incorrect port type %q", portVal)
 	}
 }
 
@@ -151,72 +179,17 @@ func convertProbesToPorts(t *v1.PodSpec) (model.PortList, error) {
 	set := make(map[string]*model.Port)
 	var errs error
 	for _, container := range t.Containers {
-		if container.LivenessProbe != nil {
-			if container.LivenessProbe.HTTPGet != nil {
-				port, err := convertProbePort(container, container.LivenessProbe.Handler.HTTPGet.Port)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					p := &model.Port{
-						Name:     "mgmt-" + strconv.Itoa(port),
-						Port:     port,
-						Protocol: model.ProtocolHTTP,
-					}
-					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
-					if set[p.Name] == nil {
-						set[p.Name] = p
-					}
-				}
-			} else if container.LivenessProbe.TCPSocket != nil {
-				// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
-				port, err := convertProbePort(container, container.LivenessProbe.TCPSocket.Port)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					p := &model.Port{
-						Name:     "mgmt-" + strconv.Itoa(port),
-						Port:     port,
-						Protocol: model.ProtocolTCP,
-					}
-					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
-					if set[p.Name] == nil {
-						set[p.Name] = p
-					}
-				}
+		for _, probe := range []*v1.Probe{container.LivenessProbe, container.ReadinessProbe} {
+			if probe == nil {
+				continue
 			}
-		}
 
-		if container.ReadinessProbe != nil {
-			if container.ReadinessProbe.HTTPGet != nil {
-				port, err := convertProbePort(container, container.ReadinessProbe.HTTPGet.Port)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					p := &model.Port{
-						Name:     "mgmt-" + strconv.Itoa(port),
-						Port:     port,
-						Protocol: model.ProtocolHTTP,
-					}
-					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
-					if set[p.Name] == nil {
-						set[p.Name] = p
-					}
-				}
-			} else if container.ReadinessProbe.TCPSocket != nil {
-				port, err := convertProbePort(container, container.ReadinessProbe.TCPSocket.Port)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				} else {
-					p := &model.Port{
-						Name:     "mgmt-" + strconv.Itoa(port),
-						Port:     port,
-						Protocol: model.ProtocolTCP,
-					}
-					// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
-					if set[p.Name] == nil {
-						set[p.Name] = p
-					}
-				}
+			p, err := convertProbePort(container, &probe.Handler)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			} else if p != nil && set[p.Name] == nil {
+				// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+				set[p.Name] = p
 			}
 		}
 	}

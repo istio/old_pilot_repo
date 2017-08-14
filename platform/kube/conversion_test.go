@@ -15,6 +15,7 @@
 package kube
 
 import (
+	"reflect"
 	"testing"
 
 	"istio.io/pilot/model"
@@ -282,16 +283,9 @@ func TestProbesToPortsConversion(t *testing.T) {
 				t.Errorf("Failed to convert Probes to Ports: %v", err)
 			}
 
-			if len(mgmtPorts) != len(expected) {
+			if !reflect.DeepEqual(mgmtPorts, expected) {
 				t.Errorf("incorrect number of management ports => %v, want %v",
 					len(mgmtPorts), len(expected))
-			}
-
-			for i := range expected {
-				if *mgmtPorts[i] != *expected[i] {
-					t.Errorf("Incorrect conversion of probe port => %v, want %v",
-						mgmtPorts[i], expected[i])
-				}
 			}
 		}
 	}
