@@ -149,9 +149,6 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 	listeners := append(inbound, outbound...)
 	clusters := append(inClusters, outClusters...)
 
-	listeners = append(listeners, mgmtListeners...)
-	clusters = append(clusters, mgmtClusters...)
-
 	// inject static Mixer filter with proxy identities for all HTTP filters
 	if env.Mesh.MixerAddress != "" {
 		mixerCluster := buildCluster(env.Mesh.MixerAddress, MixerCluster, env.Mesh.ConnectTimeout)
@@ -166,6 +163,12 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 		clusters = append(clusters, mixerCluster)
 		insertMixerFilter(listeners, instances, sidecar)
 	}
+
+	// Append management listeners after injecting mixer filter to normal listeners
+	// because management port listeners cannot use mixer or auth (see comment
+	// under buildMgmtPortListeners)
+	listeners = append(listeners, mgmtListeners...)
+	clusters = append(clusters, mgmtClusters...)
 
 	// set bind to port values for port redirection
 	for _, listener := range listeners {
@@ -509,14 +512,15 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 // Management port listeners are slightly different from standard Inbound listeners
 // in that, they do not have mixer filters nor do they have inbound auth.
 // N.B. If a given management port is same as the service instance's endpoint port
-// where it listens for normal traffic, then buildInboundListeners would take care of
-// constructing the appropriate HTTP/TCP listeners/routes/clusters for that port
-// along with enabling wildcard routes. Note that if Istio Auth is enabled, then
-// management ports that are same as the service instance's main port would have
-// auth enabled on the listener port. So, if a user wants to use Istio auth and
-// management ports (e.g., kubernetes health checks) where management ports require
-// out of band (non TLS) access, the service instance should be configured with
-// dedicated (management) ports.
+// the pod will fail to start in Kubernetes, because the mixer service tries to
+// lookup the service associated with the Pod. Since the pod is yet to be started
+// and hence not bound to the service), the service lookup fails causing the mixer
+// to fail the health check call. This results in a vicious cycle, where kubernetes
+// restarts the unhealthy pod after successive failed health checks, and the mixer
+// continues to reject the health checks as there is no service associated with
+// the pod.
+// So, if a user wants to use kubernetes probes with Istio, she should ensure
+// that the health check ports are distinct from the service ports.
 func buildMgmtPortListeners(managementPorts model.PortList,
 	managementIP string, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
 	listeners := make(Listeners, 0, len(managementPorts))
