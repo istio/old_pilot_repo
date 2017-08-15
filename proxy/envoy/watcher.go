@@ -50,7 +50,7 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath string) Watcher {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, binarypath, configpath string) Watcher {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
@@ -62,7 +62,7 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Role, configpath s
 		}
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), binarypath, configpath), proxy.DefaultRetry)
 	out := &watcher{
 		agent: agent,
 		role:  role,
@@ -175,9 +175,6 @@ func (w *watcher) UpdateIngressSecret(ctx context.Context) error {
 const (
 	// EpochFileTemplate is a template for the root config JSON
 	EpochFileTemplate = "envoy-rev%d.json"
-
-	// BinaryPath is the path to envoy binary
-	BinaryPath = "/usr/local/bin/envoy"
 )
 
 func configFile(config string, epoch int) string {
@@ -194,7 +191,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, binarypath, configpath string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -221,7 +218,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 			glog.V(2).Infof("Envoy command: %v", args)
 
 			/* #nosec */
-			cmd := exec.Command(BinaryPath, args...)
+			cmd := exec.Command(binarypath, args...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Start(); err != nil {

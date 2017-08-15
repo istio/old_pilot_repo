@@ -36,7 +36,8 @@ import (
 // DiscoveryService publishes services, clusters, and routes for all proxies
 type DiscoveryService struct {
 	proxy.Environment
-	server *http.Server
+	server     *http.Server
+	useVirtual bool
 
 	// TODO Profile and optimize cache eviction policy to avoid
 	// flushing the entire cache when any route, service, or endpoint
@@ -194,6 +195,7 @@ type DiscoveryServiceOptions struct {
 	Port            int
 	EnableProfiling bool
 	EnableCaching   bool
+	EnableLocal     bool
 }
 
 // NewDiscoveryService creates an Envoy discovery service on a given port
@@ -201,6 +203,7 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 	environment proxy.Environment, o DiscoveryServiceOptions) (*DiscoveryService, error) {
 	out := &DiscoveryService{
 		Environment: environment,
+		useVirtual:  !o.EnableLocal,
 		sdsCache:    newDiscoveryCache(o.EnableCaching),
 		cdsCache:    newDiscoveryCache(o.EnableCaching),
 		rdsCache:    newDiscoveryCache(o.EnableCaching),
@@ -219,13 +222,16 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 
 	// Flush cached discovery responses whenever services, service
 	// instances, or routing configuration changes.
-	serviceHandler := func(s *model.Service, e model.Event) { out.clearCache() }
-	if err := ctl.AppendServiceHandler(serviceHandler); err != nil {
-		return nil, err
-	}
-	instanceHandler := func(s *model.ServiceInstance, e model.Event) { out.clearCache() }
-	if err := ctl.AppendInstanceHandler(instanceHandler); err != nil {
-		return nil, err
+
+	if ctl != nil {
+		serviceHandler := func(s *model.Service, e model.Event) { out.clearCache() }
+		if err := ctl.AppendServiceHandler(serviceHandler); err != nil {
+			return nil, err
+		}
+		instanceHandler := func(s *model.ServiceInstance, e model.Event) { out.clearCache() }
+		if err := ctl.AppendInstanceHandler(instanceHandler); err != nil {
+			return nil, err
+		}
 	}
 
 	if configCache != nil {
@@ -668,7 +674,7 @@ func (ds *DiscoveryService) getListeners(node string) (listeners Listeners, clus
 		if err != nil {
 			return Listeners{}, Clusters{}
 		}
-		listeners, clusters = buildListeners(ds.Environment, sidecar)
+		listeners, clusters = buildListeners(ds.Environment, sidecar, ds.useVirtual)
 	}
 
 	// set connect timeout

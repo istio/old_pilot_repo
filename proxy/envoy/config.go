@@ -137,7 +137,8 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyco
 }
 
 // buildListeners produces a list of listeners and referenced clusters.
-func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Clusters) {
+// Set "virtual" to true to use the virtual listeners and iptables redirection
+func buildListeners(env proxy.Environment, sidecar proxy.Sidecar, virtual bool) (Listeners, Clusters) {
 	instances := env.HostInstances(map[string]bool{sidecar.IPAddress: true})
 	services := env.Services()
 
@@ -162,19 +163,21 @@ func buildListeners(env proxy.Environment, sidecar proxy.Sidecar) (Listeners, Cl
 		insertMixerFilter(listeners, instances, sidecar)
 	}
 
-	// set bind to port values for port redirection
-	for _, listener := range listeners {
-		listener.BindToPort = false
-	}
+	if virtual {
+		// set bind to port values for port redirection
+		for _, listener := range listeners {
+			listener.BindToPort = false
+		}
 
-	// add an extra listener that binds to the port that is the recipient of the iptables redirect
-	listeners = append(listeners, &Listener{
-		Name:           VirtualListenerName,
-		Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, env.Mesh.ProxyListenPort),
-		BindToPort:     true,
-		UseOriginalDst: true,
-		Filters:        make([]*NetworkFilter, 0),
-	})
+		// add an extra listener that binds to the port that is the recipient of the iptables redirect
+		listeners = append(listeners, &Listener{
+			Name:           VirtualListenerName,
+			Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, env.Mesh.ProxyListenPort),
+			BindToPort:     true,
+			UseOriginalDst: true,
+			Filters:        make([]*NetworkFilter, 0),
+		})
+	}
 
 	return listeners.normalize(), clusters.normalize()
 }
