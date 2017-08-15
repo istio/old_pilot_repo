@@ -160,7 +160,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 
 	inbound, inClusters := buildInboundListeners(env.Mesh, sidecar, instances)
 	outbound, outClusters := buildOutboundListeners(env.Mesh, sidecar, instances, services, env)
-	mgmtListeners, mgmtClusters := buildMgmtPortListeners(env.Mesh, sidecar, managementPorts, sidecar.IPAddress)
+	mgmtListeners, mgmtClusters := buildMgmtPortListeners(env.Mesh, managementPorts, sidecar.IPAddress)
 
 	listeners := append(inbound, outbound...)
 	clusters := append(inClusters, outClusters...)
