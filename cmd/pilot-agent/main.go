@@ -32,7 +32,7 @@ var (
 	configpath string
 	meshconfig string
 	role       proxy.Node
-  customConfig string
+	customConfig string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
