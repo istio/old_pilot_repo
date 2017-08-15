@@ -28,7 +28,7 @@ type application struct {
 	Instances []*instance `json:"instance"`
 }
 
-type instance struct {
+type instance struct { // nolint: aligncheck
 	Hostname   string `json:"hostName"`
 	IPAddress  string `json:"ipAddr"`
 	Status     string `json:"status"`
