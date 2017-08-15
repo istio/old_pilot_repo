@@ -168,7 +168,9 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 	// If management listener port and service port are same, bad things happen
 	// when running in kubernetes, as the probes stop responding. So, append
 	// non overlapping listeners only.
-	for _, m := range mgmtListeners {
+	for i := range mgmtListeners {
+		m := mgmtListeners[i]
+		c := mgmtClusters[i]
 		l := listeners.GetByAddress(m.Address)
 		if l != nil {
 			glog.Warningf("Omitting listener for management address %s (%s) due to collision with service listener %s (%s)",
@@ -176,8 +178,9 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 			continue
 		}
 		listeners = append(listeners, m)
+		clusters = append(clusters, c)
 	}
-	clusters = append(clusters, mgmtClusters...)
+
 
 	// set bind to port values for port redirection
 	for _, listener := range listeners {
