@@ -110,6 +110,5 @@ func mixerTCPConfig(role proxy.Node) *FilterMixerConfig {
 			AttrTargetIP:  role.IPAddress,
 			AttrTargetUID: "kubernetes://" + role.ID,
 		},
-		QuotaName: MixerRequestCount,
 	}
 }

@@ -325,8 +325,7 @@
        "mixer_attributes": {
         "target.ip": "10.1.1.0",
         "target.uid": "kubernetes://v0.default"
-       },
-       "quota_name": "RequestCount"
+       }
       }
      },
      {
