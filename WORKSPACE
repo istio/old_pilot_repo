@@ -312,7 +312,7 @@ go_repository(
 
 go_repository(
     name = "io_k8s_ingress",
-    commit = "3495bfb4aca9d34c97ad0cd3915965a79831fc9c",
+    commit = "cafc5bab1ef5f3289f777d864721bea988129be1",
     importpath = "k8s.io/ingress",
 )
 
