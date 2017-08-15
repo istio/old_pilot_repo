@@ -65,7 +65,7 @@ type FilterMixerConfig struct {
 	QuotaName string `json:"quota_name,omitempty"`
 }
 
-func (_ *FilterMixerConfig) isNetworkFilterConfig() {}
+func (*FilterMixerConfig) isNetworkFilterConfig() {}
 
 func buildMixerCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
 	mixerCluster := buildCluster(mesh.MixerAddress, MixerCluster, mesh.ConnectTimeout)
