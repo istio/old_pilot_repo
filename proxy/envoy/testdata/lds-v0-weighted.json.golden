@@ -185,6 +185,162 @@
     "bind_to_port": false
    },
    {
+    "address": "tcp://10.1.1.0:1081",
+    "name": "http_10.1.1.0_1081",
+    "filters": [
+     {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+       "codec_type": "auto",
+       "stat_prefix": "http",
+       "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
+       "route_config": {
+        "virtual_hosts": [
+         {
+          "name": "inbound|1081",
+          "domains": [
+           "*"
+          ],
+          "routes": [
+           {
+            "prefix": "/",
+            "cluster": "in.1081",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.0",
+           "target.uid": "kubernetes://v0.default"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
+        {
+         "type": "decoder",
+         "name": "router",
+         "config": {}
+        }
+       ],
+       "access_log": [
+        {
+         "path": "/dev/stdout"
+        }
+       ]
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.0:1090",
+    "name": "tcp_10.1.1.0_1090",
+    "filters": [
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.1090",
+          "destination_ip_list": [
+           "10.1.1.0/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.0:80",
+    "name": "http_10.1.1.0_80",
+    "filters": [
+     {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+       "codec_type": "auto",
+       "stat_prefix": "http",
+       "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
+       "route_config": {
+        "virtual_hosts": [
+         {
+          "name": "inbound|80",
+          "domains": [
+           "*"
+          ],
+          "routes": [
+           {
+            "prefix": "/",
+            "cluster": "in.80",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
+         "config": {
+          "mixer_attributes": {
+           "target.ip": "10.1.1.0",
+           "target.uid": "kubernetes://v0.default"
+          },
+          "forward_attributes": {
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
+          },
+          "quota_name": "RequestCount"
+         }
+        },
+        {
+         "type": "decoder",
+         "name": "router",
+         "config": {}
+        }
+       ],
+       "access_log": [
+        {
+         "path": "/dev/stdout"
+        }
+       ]
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
     "address": "tcp://10.2.0.0:90",
     "name": "tcp_10.2.0.0_90",
     "filters": [
