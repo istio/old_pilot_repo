@@ -171,7 +171,8 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 	for _, m := range mgmtListeners {
 		l := listeners.GetByAddress(m.Address)
 		if l != nil {
-			glog.Warningf("Omitting listener for management address %s (%s) due to collision with service listener %s (%s)", m.Name, m.Address, l.Name, l.Address)
+			glog.Warningf("Omitting listener for management address %s (%s) due to collision with service listener %s (%s)",
+				m.Name, m.Address, l.Name, l.Address)
 			continue
 		}
 		listeners = append(listeners, m)
