@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	pb "istio.io/pilot/test/grpcecho"
 )
 
@@ -40,14 +41,21 @@ var (
 	url       string
 	headerKey string
 	headerVal string
+
+	caFile string
+)
+
+const (
+	hostKey = "Host"
 )
 
 func init() {
 	flag.IntVar(&count, "count", 1, "Number of times to make the request")
 	flag.DurationVar(&timeout, "timeout", 15*time.Second, "Request timeout")
 	flag.StringVar(&url, "url", "", "Specify URL")
-	flag.StringVar(&headerKey, "key", "", "Header key")
+	flag.StringVar(&headerKey, "key", "", "Header key (use Host for authority)")
 	flag.StringVar(&headerVal, "val", "", "Header value")
+	flag.StringVar(&caFile, "ca", "/cert.crt", "CA root cert file")
 }
 
 func makeHTTPRequest(client *http.Client) func(int) func() error {
@@ -59,7 +67,7 @@ func makeHTTPRequest(client *http.Client) func(int) func() error {
 			}
 
 			log.Printf("[%d] Url=%s\n", i, url)
-			if headerKey == "Host" {
+			if headerKey == hostKey {
 				req.Host = headerVal
 				log.Printf("[%d] Host=%s\n", i, headerVal)
 			} else if headerKey != "" {
@@ -133,12 +141,34 @@ func main() {
 			Timeout: timeout,
 		}
 		f = makeHTTPRequest(client)
-	} else if strings.HasPrefix(url, "grpc://") {
-		address := url[len("grpc://"):]
+	} else if strings.HasPrefix(url, "grpc://") || strings.HasPrefix(url, "grpcs://") {
+		secure := strings.HasPrefix(url, "grpcs://")
+		var address string
+		if secure {
+			address = url[len("grpcs://"):]
+		} else {
+			address = url[len("grpc://"):]
+		}
+
+		// grpc-go sets incorrect authority header
+		authority := address
+		if headerKey == hostKey {
+			authority = headerVal
+		}
+
+		// transport security
+		security := grpc.WithInsecure()
+		if secure {
+			creds, err := credentials.NewClientTLSFromFile(caFile, authority)
+			if err != nil {
+				log.Fatalf("failed to load client certs %s %v", caFile, err)
+			}
+			security = grpc.WithTransportCredentials(creds)
+		}
+
 		conn, err := grpc.Dial(address,
-			grpc.WithInsecure(),
-			// grpc-go sets incorrect authority header
-			grpc.WithAuthority(address),
+			security,
+			grpc.WithAuthority(authority),
 			grpc.WithBlock(),
 			grpc.WithTimeout(timeout))
 		if err != nil {

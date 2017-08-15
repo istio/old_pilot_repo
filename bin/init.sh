@@ -1,6 +1,13 @@
 #!/bin/bash
 set -ex
 
+# Ensure expected GOPATH setup
+PDIR=`pwd`
+if [ $PDIR != "$GOPATH/src/istio.io/pilot" ]; then
+       echo "Pilot not found in GOPATH/src/istio.io/"
+       exit 1
+fi
+
 # Building and testing with Bazel
 bazel build //...
 
@@ -11,9 +18,7 @@ rm -rf $(pwd)/vendor
 bin/bazel_to_go.py
 
 # Remove doubly-vendorized k8s dependencies
-rm -rf vendor/k8s.io/client-go/vendor
-rm -rf vendor/k8s.io/apimachinery/vendor
-rm -rf vendor/k8s.io/ingress/vendor
+rm -rf vendor/k8s.io/*/vendor
 
 # Link proto gen files
 mkdir -p vendor/istio.io/api/proxy/v1/config

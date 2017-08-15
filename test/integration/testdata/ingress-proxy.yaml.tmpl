@@ -34,11 +34,16 @@ spec:
       - name: istio-proxy
         image: {{.Hub}}/proxy_debug:{{.Tag}}
         args: ["proxy", "ingress", "-v", "{{.Verbosity}}"]
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 443
         - containerPort: 80
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
