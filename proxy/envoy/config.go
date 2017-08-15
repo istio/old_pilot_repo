@@ -459,51 +459,6 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	return tcpListeners, tcpClusters
 }
 
-// buildInboundConfig creates clusters and listeners for a given
-// endpoint address, port, and protocol. In addition to creating
-// the inbound cluster, it builds a HTTP/TCP default route.
-func buildInboundConfig(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node,
-	endpointAddress string, endpointPort int, protocol model.Protocol) (*Listener, *Cluster, error) {
-	cluster := buildInboundCluster(endpointPort, protocol, mesh.ConnectTimeout)
-
-	// Local service instances can be accessed through one of three
-	// addresses: localhost, endpoint IP, and service
-	// VIP. Localhost bypasses the proxy and doesn't need any TCP
-	// route config. Endpoint IP is handled below and Service IP is handled
-	// by outbound routes.
-	// Traffic sent to our service VIP is redirected by remote
-	// services' kubeproxy to our specific endpoint IP.
-	switch protocol {
-	case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-		route := buildDefaultRoute(cluster)
-
-		// set server-side mixer filter config for inbound routes
-		if mesh.MixerAddress != "" {
-			route.OpaqueConfig = buildMixerInboundOpaqueConfig()
-		}
-
-		host := &VirtualHost{
-			Name:    fmt.Sprintf("inbound|%d", endpointPort),
-			Domains: []string{"*"},
-			Routes:  []*HTTPRoute{route},
-		}
-
-		config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
-		listener := buildHTTPListener(mesh, sidecar, config, endpointAddress,
-			endpointPort, false, false)
-		return listener, cluster, nil
-
-	case model.ProtocolTCP, model.ProtocolHTTPS:
-		listener := buildTCPListener(&TCPRouteConfig{
-			Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpointAddress})},
-		}, endpointAddress, endpointPort)
-		return listener, cluster, nil
-	}
-
-	return nil, nil, fmt.Errorf("Unknown protocol for endpoint %s:%d - %v",
-		endpointAddress, endpointPort, protocol)
-}
-
 // buildInboundListeners creates listeners for the server-side (inbound)
 // configuration for co-located service instances. The function also returns
 // all inbound clusters since they are statically declared in the proxy
@@ -520,15 +475,43 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 	for _, instance := range instances {
 		endpoint := instance.Endpoint
 		servicePort := endpoint.ServicePort
+		protocol := servicePort.Protocol
+		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
+		clusters = append(clusters, cluster)
 
-		listener, cluster, err := buildInboundConfig(mesh, sidecar,
-			endpoint.Address, endpoint.Port, servicePort.Protocol)
-		if err != nil {
-			clusters = append(clusters, cluster)
-			listeners = append(listeners, listener)
-		} else {
-			glog.Warningf("Unsupported inbound protocol %v for service port %#v",
-				servicePort.Protocol, servicePort)
+		// Local service instances can be accessed through one of three
+		// addresses: localhost, endpoint IP, and service
+		// VIP. Localhost bypasses the proxy and doesn't need any TCP
+		// route config. Endpoint IP is handled below and Service IP is handled
+		// by outbound routes.
+		// Traffic sent to our service VIP is redirected by remote
+		// services' kubeproxy to our specific endpoint IP.
+		switch protocol {
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+			route := buildDefaultRoute(cluster)
+
+			// set server-side mixer filter config for inbound routes
+			if mesh.MixerAddress != "" {
+				route.OpaqueConfig = buildMixerInboundOpaqueConfig()
+			}
+
+			host := &VirtualHost{
+				Name:    fmt.Sprintf("inbound|%d", endpoint.Port),
+				Domains: []string{"*"},
+				Routes:  []*HTTPRoute{route},
+			}
+
+			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
+			listeners = append(listeners,
+				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, false, false))
+
+		case model.ProtocolTCP, model.ProtocolHTTPS:
+			listeners = append(listeners, buildTCPListener(&TCPRouteConfig{
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
+			}, endpoint.Address, endpoint.Port))
+
+		default:
+			glog.Warningf("Unsupported inbound protocol %v for port %#v", protocol, servicePort)
 		}
 	}
 
@@ -539,7 +522,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 	return listeners, clusters
 }
 
-// buildMgmtPortListeners creates inbound listeners for the management ports on
+// buildMgmtPortListeners creates inbound TCP only listeners for the management ports on
 // server (inbound). The function also returns all inbound clusters since
 // they are statically declared in the proxy configuration and do not
 // utilize CDS.
@@ -555,19 +538,24 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 // the pod.
 // So, if a user wants to use kubernetes probes with Istio, she should ensure
 // that the health check ports are distinct from the service ports.
-func buildMgmtPortListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node,
-	managementPorts model.PortList, managementIP string) (Listeners, Clusters) {
+func buildMgmtPortListeners(mesh *proxyconfig.ProxyMeshConfig, managementPorts model.PortList,
+	managementIP string) (Listeners, Clusters) {
 	listeners := make(Listeners, 0, len(managementPorts))
 	clusters := make(Clusters, 0, len(managementPorts))
 
 	// assumes that inbound connections/requests are sent to the endpoint address
 	for _, mPort := range managementPorts {
-		listener, cluster, err := buildInboundConfig(mesh, sidecar, managementIP,
-			mPort.Port, mPort.Protocol)
-		if err != nil {
+		switch mPort.Protocol {
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
+		case model.ProtocolTCP, model.ProtocolHTTPS:
+			cluster := buildInboundCluster(mPort.Port, model.ProtocolTCP, mesh.ConnectTimeout)
+			listener := buildTCPListener(&TCPRouteConfig{
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP})},
+			}, managementIP, mPort.Port)
+
 			clusters = append(clusters, cluster)
 			listeners = append(listeners, listener)
-		} else {
+		default:
 			glog.Warningf("Unsupported inbound protocol %v for management port %#v",
 				mPort.Protocol, mPort)
 		}
