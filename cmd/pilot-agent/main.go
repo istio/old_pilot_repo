@@ -16,17 +16,12 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
-	"flag"
-
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
@@ -34,10 +29,10 @@ import (
 )
 
 var (
-	configpath   string
-	meshconfig   string
-	sidecar      proxy.Sidecar
-	customConfig string
+	configpath string
+	meshconfig string
+	role       proxy.Node
+  customConfig string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -50,12 +45,21 @@ var (
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
 			// set values from environment variables
-			if sidecar.IPAddress == "" {
-				sidecar.IPAddress = os.Getenv("INSTANCE_IP")
+			if role.IPAddress == "" {
+				role.IPAddress = os.Getenv("INSTANCE_IP")
 			}
-			if sidecar.ID == "" {
-				sidecar.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
+			if role.ID == "" {
+				role.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
 			}
+			if role.Domain == "" {
+				role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
+			}
+
+			role.Type = proxy.Sidecar
+			if len(args) > 0 {
+				role.Type = proxy.NodeType(args[0])
+			}
+
 			// receive mesh configuration
 			mesh, err := cmd.ReadMeshConfig(meshconfig)
 			if err != nil {
@@ -63,34 +67,13 @@ var (
 			}
 
 			glog.V(2).Infof("version %s", version.Line())
-			glog.V(2).Infof("sidecar %#v", sidecar)
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
-			if err = os.MkdirAll(configpath, 0700); err != nil {
-				return multierror.Prefix(err, "failed to create directory for proxy configuration")
+			watcher, err := envoy.NewWatcher(mesh, role, configpath, customConfig)
+			if err != nil {
+				return err
 			}
 
-			var role proxy.Role = sidecar
-			if len(args) > 0 {
-				switch args[0] {
-				case proxy.EgressNode:
-					if mesh.EgressProxyAddress == "" {
-						return errors.New("egress proxy requires address configuration")
-					}
-					role = proxy.EgressRole{}
-
-				case proxy.IngressNode:
-					if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-						return errors.New("ingress proxy is disabled")
-					}
-					role = proxy.IngressRole{}
-
-				default:
-					return fmt.Errorf("failed to recognize proxy role %s", args[0])
-				}
-			}
-
-			watcher := envoy.NewWatcher(mesh, role, configpath, customConfig)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
 			stop := make(chan struct{})
@@ -107,18 +90,16 @@ func init() {
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
 		"Path to generated proxy configuration directory")
-	proxyCmd.PersistentFlags().StringVar(&sidecar.IPAddress, "ip", "",
-		"Sidecar proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
-	proxyCmd.PersistentFlags().StringVar(&sidecar.ID, "id", "",
-		"Sidecar proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} environment variables")
-	proxyCmd.PersistentFlags().StringVar(&sidecar.Domain, "domain", "cluster.local",
-		"DNS domain suffix")
+	proxyCmd.PersistentFlags().StringVar(&role.IPAddress, "ip", "",
+		"Proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
+	proxyCmd.PersistentFlags().StringVar(&role.ID, "id", "",
+		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
+	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
+		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
 	proxyCmd.PersistentFlags().StringVar(&customConfig, "envoyconfig", "",
 		"Custom envoy config. The meshconfig options and auto-generated envoy configs will not be used.")
 
 	cmd.AddFlags(rootCmd)
-
-	rootCmd.Flags().AddGoFlagSet(flag.CommandLine)
 
 	rootCmd.AddCommand(proxyCmd)
 	rootCmd.AddCommand(cmd.VersionCmd)
