@@ -50,7 +50,7 @@ pkg_deb(
     description_file = "description-agent",
     homepage = "http://istio.io",
     maintainer = "The Istio Authors <istio-dev@googlegroups.com>",
-    package = "istio-proxy",
+    package = "istio-agent",
     version = "0.2.1",
 )
 
@@ -62,6 +62,6 @@ pkg_deb(
     description_file = "description-discovery",
     homepage = "http://istio.io",
     maintainer = "The Istio Authors <istio-dev@googlegroups.com>",
-    package = "istio-proxy",
+    package = "istio-discovery",
     version = "0.2.1",
 )
