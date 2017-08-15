@@ -48,6 +48,10 @@ const (
 
 	// MixerForward switches attribute forwarding on and off
 	MixerForward = "mixer_forward"
+
+	on = "on"
+
+	off = "off"
 )
 
 // FilterMixerConfig definition
@@ -93,8 +97,8 @@ func mixerHTTPRouteConfig(role proxy.Node) *FilterMixerConfig {
 			AttrTargetUID: "kubernetes://" + role.ID,
 		},
 		ForwardAttributes: map[string]string{
-			AttrTargetIP:  role.IPAddress,
-			AttrTargetUID: "kubernetes://" + role.ID,
+			AttrSourceIP:  role.IPAddress,
+			AttrSourceUID: "kubernetes://" + role.ID,
 		},
 		QuotaName: MixerRequestCount,
 	}

@@ -30,8 +30,8 @@
            "target.uid": "kubernetes://ingress.default"
           },
           "forward_attributes": {
-           "target.ip": "10.3.3.3",
-           "target.uid": "kubernetes://ingress.default"
+           "source.ip": "10.3.3.3",
+           "source.uid": "kubernetes://ingress.default"
           },
           "quota_name": "RequestCount"
          }
@@ -82,8 +82,8 @@
            "target.uid": "kubernetes://ingress.default"
           },
           "forward_attributes": {
-           "target.ip": "10.3.3.3",
-           "target.uid": "kubernetes://ingress.default"
+           "source.ip": "10.3.3.3",
+           "source.uid": "kubernetes://ingress.default"
           },
           "quota_name": "RequestCount"
          }

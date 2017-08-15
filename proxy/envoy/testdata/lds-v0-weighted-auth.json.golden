@@ -36,8 +36,8 @@
            "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
-           "target.ip": "10.1.1.0",
-           "target.uid": "kubernetes://v0.default"
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -87,8 +87,8 @@
            "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
-           "target.ip": "10.1.1.0",
-           "target.uid": "kubernetes://v0.default"
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -138,8 +138,8 @@
            "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
-           "target.ip": "10.1.1.0",
-           "target.uid": "kubernetes://v0.default"
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -228,8 +228,8 @@
            "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
-           "target.ip": "10.1.1.0",
-           "target.uid": "kubernetes://v0.default"
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -330,8 +330,8 @@
            "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
-           "target.ip": "10.1.1.0",
-           "target.uid": "kubernetes://v0.default"
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }

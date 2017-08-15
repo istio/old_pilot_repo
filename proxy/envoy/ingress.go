@@ -146,13 +146,9 @@ func buildIngressRoute(mesh *proxyconfig.ProxyMeshConfig, ingress *proxyconfig.I
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
 		// enable mixer check on the route
-		// Ingress mixer filter should perform two operations:
-		// - check against mixer on the inbound request
-		// - forward attributes to backend
-		// TODO: disabling mixer on ingress due to issues with mixer configuration
-		// if mesh.MixerAddress != "" {
-		// 	route.OpaqueConfig = buildMixerInboundOpaqueConfig()
-		// }
+		if mesh.MixerAddress != "" {
+			route.OpaqueConfig = buildMixerInboundOpaqueConfig()
+		}
 
 		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {
 			out = append(out, applied)
