@@ -181,7 +181,6 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 		clusters = append(clusters, c)
 	}
 
-
 	// set bind to port values for port redirection
 	for _, listener := range listeners {
 		listener.BindToPort = false
