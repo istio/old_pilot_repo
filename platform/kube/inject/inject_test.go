@@ -19,6 +19,8 @@ import (
 	"os"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/util"
@@ -166,4 +168,55 @@ func TestIntoResourceFile(t *testing.T) {
 	// file with mixture of deployment, service, etc.
 	// file with existing annotation
 	// file with another init-container
+}
+
+func TestInjectRequired(t *testing.T) {
+	cases := []struct {
+		policy InjectionPolicy
+		meta   *metav1.ObjectMeta
+		want   bool
+	}{
+		{
+			policy: InjectionPolicyOptOut,
+			meta: &metav1.ObjectMeta{
+				Name:        "no-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyOptOut,
+			meta: &metav1.ObjectMeta{
+				Name:        "default-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueDefault},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyOptOut,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-on-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOn},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyOptOut,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-off-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOff},
+			},
+			want: false,
+		},
+	}
+
+	for _, c := range cases {
+		if got := injectRequired(c.policy, c.meta); got != c.want {
+			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
+		}
+	}
 }
