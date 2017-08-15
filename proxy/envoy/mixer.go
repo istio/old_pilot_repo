@@ -83,8 +83,8 @@ func buildMixerCluster(mesh *proxyconfig.ProxyMeshConfig) *Cluster {
 
 func buildMixerInboundOpaqueConfig() map[string]string {
 	return map[string]string{
-		MixerControl: "on",
-		MixerForward: "off",
+		MixerControl: on,
+		MixerForward: off,
 	}
 }
 
