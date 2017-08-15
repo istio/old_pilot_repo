@@ -19,10 +19,6 @@
          "weight": 25
         }
        ]
-      },
-      "opaque_config": {
-       "mixer_control": "on",
-       "mixer_forward": "off"
       }
      }
     ]
