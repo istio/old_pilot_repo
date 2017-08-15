@@ -243,15 +243,14 @@ func appName(hostname string) string {
 
 func makeInstance(hostname, ip string, portNum, securePort int, md metadata) *instance {
 	inst := &instance{
-		App:       appName(hostname),
 		Hostname:  hostname,
 		IPAddress: ip,
 		Status:    statusUp,
-		Port: &port{
+		Port: port{
 			Port:    7002,
 			Enabled: false,
 		},
-		SecurePort: &port{
+		SecurePort: port{
 			Port:    7002,
 			Enabled: false,
 		},

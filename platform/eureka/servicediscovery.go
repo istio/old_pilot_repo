@@ -39,7 +39,6 @@ func (sd *serviceDiscovery) Services() []*model.Service {
 	}
 	services := convertServices(apps, nil)
 
-	// TODO: canonical ordering?
 	out := make([]*model.Service, 0, len(services))
 	for _, service := range services {
 		out = append(out, service)

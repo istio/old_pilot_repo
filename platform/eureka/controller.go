@@ -63,6 +63,7 @@ func (c *controller) Run(stop <-chan struct{}) {
 				glog.Warningf("periodic Eureka poll failed: %v", err)
 				continue
 			}
+			sortApplications(apps)
 
 			if !reflect.DeepEqual(apps, cachedApps) {
 				cachedApps = apps

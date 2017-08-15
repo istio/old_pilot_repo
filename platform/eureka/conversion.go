@@ -36,6 +36,11 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 				continue
 			}
 
+			ports := convertPorts(instance)
+			if len(ports) == 0 {
+				continue
+			}
+
 			service := services[instance.Hostname]
 			if service == nil {
 				service = &model.Service{
@@ -48,7 +53,7 @@ func convertServices(apps []*application, hostnames map[string]bool) map[string]
 			}
 
 			protocol := convertProtocol(instance.Metadata)
-			for _, port := range convertPorts(instance) {
+			for _, port := range ports {
 				if servicePort, exists := service.Ports.GetByPort(port.Port); exists {
 					if servicePort.Protocol != protocol {
 						glog.Warningf(
@@ -98,10 +103,10 @@ func convertServiceInstances(services map[string]*model.Service, apps []*applica
 }
 
 func convertPorts(instance *instance) model.PortList {
-	out := make(model.PortList, 0, 2)
+	out := make(model.PortList, 0, 2) // Eureka instances have 0..2 enabled ports
 	protocol := convertProtocol(instance.Metadata)
-	for _, port := range []*port{instance.Port, instance.SecurePort} {
-		if port == nil || !port.Enabled {
+	for _, port := range []port{instance.Port, instance.SecurePort} {
+		if !port.Enabled {
 			continue
 		}
 
