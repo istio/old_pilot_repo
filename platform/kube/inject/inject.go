@@ -27,10 +27,11 @@ import (
 	"strconv"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -42,6 +43,36 @@ import (
 	"istio.io/pilot/proxy"
 )
 
+// TODO - Temporally retain the deprecated alpha annotations to ease
+// migration to k8s sidecar initializer.
+var (
+	insertDeprecatedAlphaAnnotation = true
+	checkDeprecatedAlphaAnnotation  = true
+)
+
+const istioSidecarAnnotationStatusKey = "status.sidecar.istio.io"
+
+// per-sidecar policy (deployment, job, statefulset, pod, etc)
+const (
+	istioSidecarAnnotationPolicyKey           = "policy.sidecar.istio.io"
+	istioSidecarAnnotationPolicyValueDefault  = "policy.sidecar.istio.io/default"
+	istioSidecarAnnotationPolicyValueForceOn  = "policy.sidecar.istio.io/force-on"
+	istioSidecarAnnotationPolicyValueForceOff = "policy.sidecar.istio.io/force-off"
+)
+
+type InjectionPolicy string
+
+const (
+	InjectionPolicyOff    InjectionPolicy = "off"
+	InjectionPolicyOptIn  InjectionPolicy = "opt-in"
+	InjectionPolicyOptOut InjectionPolicy = "opt-out"
+)
+
+var defaultNamespacePolicy = map[string]InjectionPolicy{
+	"":            InjectionPolicyOptOut,
+	"kube-system": InjectionPolicyOff,
+}
+
 // Defaults values for injecting istio proxy into kubernetes
 // resources.
 const (
@@ -50,9 +81,9 @@ const (
 )
 
 const (
-	istioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
-	istioSidecarAnnotationSidecarValue = "injected"
-	istioSidecarAnnotationVersionKey   = "alpha.istio.io/version"
+	// deprecated - remove after istio/istio is updated to use new templates
+	deprecatedIstioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
+	deprecatedIstioSidecarAnnotationSidecarValue = "injected(deprecated)"
 
 	// InitContainerName is the name for init container
 	InitContainerName = "istio-init"
@@ -125,15 +156,78 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 	return &mesh, nil
 }
 
-func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
-	if t.Annotations == nil {
-		t.Annotations = make(map[string]string)
-	} else if _, ok := t.Annotations[istioSidecarAnnotationSidecarKey]; ok {
-		// Return unmodified resource if sidecar is already present or ignored.
+func injectRequired(injectionPolicy map[string]InjectionPolicy, objectMeta *metav1.ObjectMeta) bool {
+	namespacePolicy, ok := injectionPolicy[objectMeta.Namespace]
+	if !ok {
+		glog.V(2).Infof("No namespace policy for %v/%v: trying global policy",
+			objectMeta.Namespace, objectMeta.Name)
+		// inherit from global policy
+		namespacePolicy, ok = injectionPolicy[v1.NamespaceAll]
+		if !ok {
+			return false
+		}
+	}
+
+	var resourcePolicy string
+	if objectMeta.Annotations == nil {
+		resourcePolicy = istioSidecarAnnotationPolicyValueDefault
+	} else {
+		if resourcePolicy, ok = objectMeta.Annotations[istioSidecarAnnotationPolicyKey]; !ok {
+			resourcePolicy = istioSidecarAnnotationPolicyValueDefault
+			glog.V(2).Infof("No policy for %v/%v: defaulting to %v",
+				objectMeta.Namespace, objectMeta.Name, resourcePolicy)
+		}
+	}
+
+	var required bool
+	switch namespacePolicy {
+	case InjectionPolicyOptIn:
+		if resourcePolicy == istioSidecarAnnotationPolicyValueForceOn {
+			required = true
+		}
+	case InjectionPolicyOptOut:
+		if resourcePolicy != istioSidecarAnnotationPolicyValueForceOff {
+			required = true
+		}
+	}
+
+	status, ok := objectMeta.Annotations[istioSidecarAnnotationStatusKey]
+
+	glog.V(2).Info("Sidecar injection policy for %v/%v: namespacePolicy:%v resourcePolicy:%v inject?:%v status:%v",
+		objectMeta.Namespace, objectMeta.Name, namespacePolicy, resourcePolicy, required, status)
+
+	if checkDeprecatedAlphaAnnotation {
+		if _, ok := objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey]; ok {
+			return false
+		}
+	}
+
+	if !required {
+		return false
+	}
+
+	// TODO - add version check for sidecar upgrade
+
+	return !ok
+}
+
+func addAnnotation(objectMeta *metav1.ObjectMeta, version string) {
+	if objectMeta.Annotations == nil {
+		objectMeta.Annotations = make(map[string]string)
+	}
+	objectMeta.Annotations[istioSidecarAnnotationStatusKey] = "injected-version-" + version
+
+	if insertDeprecatedAlphaAnnotation {
+		objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey] =
+			deprecatedIstioSidecarAnnotationSidecarValue
+	}
+}
+
+func injectIntoPodTemplateSpec(policy map[string]InjectionPolicy, p *Params, objectMeta *metav1.ObjectMeta, spec *v1.PodSpec) error {
+	if !injectRequired(policy, objectMeta) {
 		return nil
 	}
-	t.Annotations[istioSidecarAnnotationSidecarKey] = istioSidecarAnnotationSidecarValue
-	t.Annotations[istioSidecarAnnotationVersionKey] = p.Version
+	addAnnotation(objectMeta, p.Version)
 
 	// proxy initContainer 1.6 spec
 	initArgs := []string{
@@ -187,10 +281,10 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		},
 	}
 
-	t.Spec.InitContainers = append(t.Spec.InitContainers, initContainer)
+	spec.InitContainers = append(spec.InitContainers, initContainer)
 
 	if p.EnableCoreDump {
-		t.Spec.InitContainers = append(t.Spec.InitContainers, enableCoreDumpContainer)
+		spec.InitContainers = append(spec.InitContainers, enableCoreDumpContainer)
 	}
 
 	// sidecar proxy container
@@ -200,7 +294,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
 
-	_, _ = healthPorts(t)
+	_, _ = healthPorts(spec)
 	/* See issue https://github.com/istio/pilot/issues/953
 	if err != nil {
 		return err
@@ -222,7 +316,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		},
 	}
 
-	t.Spec.Volumes = append(t.Spec.Volumes,
+	spec.Volumes = append(spec.Volumes,
 		v1.Volume{
 			Name: istioConfigVolumeName,
 			VolumeSource: v1.VolumeSource{
@@ -249,11 +343,11 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			MountPath: p.Mesh.AuthCertsPath,
 		})
 
-		sa := t.Spec.ServiceAccountName
+		sa := spec.ServiceAccountName
 		if sa == "" {
 			sa = "default"
 		}
-		t.Spec.Volumes = append(t.Spec.Volumes, v1.Volume{
+		spec.Volumes = append(spec.Volumes, v1.Volume{
 			Name: istioCertVolumeName,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
@@ -298,7 +392,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		VolumeMounts: volumeMounts,
 	}
 
-	t.Spec.Containers = append(t.Spec.Containers, sidecar)
+	spec.Containers = append(spec.Containers, sidecar)
 
 	return nil
 }
@@ -319,10 +413,10 @@ func resolvePort(c v1.Container, port intstr.IntOrString) (int, error) {
 	}
 }
 
-func healthPorts(t *v1.PodTemplateSpec) ([]int, error) {
+func healthPorts(spec *v1.PodSpec) ([]int, error) {
 	set := make(map[int]bool)
 	var errs error
-	for _, container := range t.Spec.Containers {
+	for _, container := range spec.Containers {
 		if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
 			port, err := resolvePort(container, container.LivenessProbe.HTTPGet.Port)
 			if err != nil {
@@ -367,44 +461,74 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 			inject func(typ interface{}) error
 		}{
 			"Job": {
-				typ: &batch.Job{},
+				typ: &batchv1.Job{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, &((typ.(*batch.Job)).Spec.Template))
+					o := typ.(*batchv1.Job)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 			"DaemonSet": {
 				typ: &v1beta1.DaemonSet{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.DaemonSet)).Spec.Template))
+					o := typ.(*v1beta1.DaemonSet)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 			"ReplicaSet": {
 				typ: &v1beta1.ReplicaSet{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.ReplicaSet)).Spec.Template))
+					o := typ.(*v1beta1.ReplicaSet)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 			"Deployment": {
 				typ: &v1beta1.Deployment{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, &((typ.(*v1beta1.Deployment)).Spec.Template))
+					o := typ.(*v1beta1.Deployment)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 			"ReplicationController": {
 				typ: &v1.ReplicationController{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, ((typ.(*v1.ReplicationController)).Spec.Template))
+					o := typ.(*v1.ReplicationController)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 			"StatefulSet": {
 				typ: &appsv1beta1.StatefulSet{},
 				inject: func(typ interface{}) error {
-					return injectIntoPodTemplateSpec(p, &((typ.(*appsv1beta1.StatefulSet)).Spec.Template))
+					o := typ.(*appsv1beta1.StatefulSet)
+					meta := &o.ObjectMeta
+					if insertDeprecatedAlphaAnnotation {
+						meta = &o.Spec.Template.ObjectMeta
+					}
+					return injectIntoPodTemplateSpec(defaultNamespacePolicy, p, meta, &o.Spec.Template.Spec)
 				},
 			},
 		}
-		var updated []byte
 		var meta metav1.TypeMeta
+		var updated []byte
 		if err = yaml.Unmarshal(raw, &meta); err != nil {
 			return err
 		}
