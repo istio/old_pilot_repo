@@ -1,0 +1,12 @@
+[Unit]
+Description=Istio discovery service
+Documentation=http://istio.io/
+
+[Service]
+ExecStart=/usr/local/bin/pilot-discovery
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
