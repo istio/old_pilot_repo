@@ -138,7 +138,7 @@ func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model
 		return
 	}
 	c.kinds[typ].handler.Append(func(obj interface{}, ev model.Event) error {
-		item, ok := obj.(istioObject)
+		item, ok := obj.(IstioObject)
 		if ok {
 			data, err := schema.FromJSONMap(item.GetSpec())
 			if err != nil {
@@ -197,7 +197,7 @@ func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	config, ok := data.(istioObject)
+	config, ok := data.(IstioObject)
 	if !ok {
 		glog.Warning("Cannot convert to config from store")
 		return nil, false, ""
@@ -232,7 +232,7 @@ func (c *controller) List(typ string) ([]model.Config, error) {
 	var errs error
 	out := make([]model.Config, 0)
 	for _, data := range c.kinds[typ].informer.GetStore().List() {
-		item, ok := data.(istioObject)
+		item, ok := data.(IstioObject)
 		if ok {
 			data, err := schema.FromJSONMap(item.GetSpec())
 			if err != nil {

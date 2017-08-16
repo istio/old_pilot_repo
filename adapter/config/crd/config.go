@@ -26,18 +26,22 @@ type IstioKind struct {
 	Spec               map[string]interface{} `json:"spec"`
 }
 
+// GetSpec from a wrapper
 func (in *IstioKind) GetSpec() map[string]interface{} {
 	return in.Spec
 }
 
+// SetSpec for a wrapper
 func (in *IstioKind) SetSpec(spec map[string]interface{}) {
 	in.Spec = spec
 }
 
+// GetObjectMeta from a wrapper
 func (in *IstioKind) GetObjectMeta() meta_v1.ObjectMeta {
 	return in.ObjectMeta
 }
 
+// SetObjectMeta for a wrapper
 func (in *IstioKind) SetObjectMeta(metadata meta_v1.ObjectMeta) {
 	in.ObjectMeta = metadata
 }
@@ -49,8 +53,9 @@ type IstioKindList struct {
 	Items            []*IstioKind `json:"items"`
 }
 
-func (in *IstioKindList) GetItems() []istioObject {
-	out := make([]istioObject, len(in.Items))
+// GetItems from a wrapper
+func (in *IstioKindList) GetItems() []IstioObject {
+	out := make([]IstioObject, len(in.Items))
 	for i, v := range in.Items {
 		out[i] = v
 	}

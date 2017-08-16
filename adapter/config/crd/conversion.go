@@ -40,12 +40,12 @@ func configKey(typ, key string) string {
 }
 
 // modelToKube translates Istio config to k8s config JSON
-func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message, revision string) (istioObject, error) {
+func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message, revision string) (IstioObject, error) {
 	spec, err := schema.ToJSONMap(config)
 	if err != nil {
 		return nil, err
 	}
-	out := knownTypes[schema.Type].obj.DeepCopyObject().(istioObject)
+	out := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
 	out.SetObjectMeta(meta_v1.ObjectMeta{
 		Name:            configKey(schema.Type, schema.Key(config)),
 		Namespace:       namespace,

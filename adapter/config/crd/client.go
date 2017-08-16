@@ -43,7 +43,8 @@ import (
 	"istio.io/pilot/platform/kube"
 )
 
-type istioObject interface {
+// IstioObject is a k8s wrapper interface for config objects
+type IstioObject interface {
 	runtime.Object
 	GetSpec() map[string]interface{}
 	SetSpec(map[string]interface{})
@@ -51,9 +52,10 @@ type istioObject interface {
 	SetObjectMeta(meta_v1.ObjectMeta)
 }
 
-type istioObjectList interface {
+// IstioObjectList is a k8s wrapper interface for config lists
+type IstioObjectList interface {
 	runtime.Object
-	GetItems() []istioObject
+	GetItems() []IstioObject
 }
 
 // Client is a basic REST client for CRDs implementing config store
@@ -235,7 +237,7 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	config := knownTypes[typ].obj.DeepCopyObject().(istioObject)
+	config := knownTypes[typ].obj.DeepCopyObject().(IstioObject)
 	err := cl.dynamic.Get().
 		Namespace(cl.namespace).
 		Resource(schema.Plural).
@@ -272,7 +274,7 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 		return "", err
 	}
 
-	config := knownTypes[schema.Type].obj.DeepCopyObject().(istioObject)
+	config := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Post().
 		Namespace(out.GetObjectMeta().Namespace).
 		Resource(schema.Plural).
@@ -306,7 +308,7 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 		return "", err
 	}
 
-	config := knownTypes[schema.Type].obj.DeepCopyObject().(istioObject)
+	config := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Put().
 		Namespace(out.GetObjectMeta().Namespace).
 		Resource(schema.Plural).
@@ -341,7 +343,7 @@ func (cl *Client) List(typ string) ([]model.Config, error) {
 		return nil, fmt.Errorf("missing type %q", typ)
 	}
 
-	list := knownTypes[schema.Type].collection.DeepCopyObject().(istioObjectList)
+	list := knownTypes[schema.Type].collection.DeepCopyObject().(IstioObjectList)
 	errs := cl.dynamic.Get().
 		Namespace(cl.namespace).
 		Resource(schema.Plural).
