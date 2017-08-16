@@ -120,7 +120,7 @@ func main() {
 
 	if len(params.Namespace) != 0 && authmode == "both" {
 		glog.Infof("When namespace(=%s) is specified, auth mode(=%s) must be one of enable or disable.",
-			 params.Namespace, authmode)
+			params.Namespace, authmode)
 		return
 	}
 	switch authmode {
