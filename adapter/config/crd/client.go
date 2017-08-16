@@ -113,7 +113,12 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
 func NewClient(config string, descriptor model.ConfigDescriptor, namespace string) (*Client, error) {
-	// TODO: filter kinds by known
+	for _, typ := range descriptor {
+		if _, exists := knownTypes[typ.Type]; !exists {
+			return nil, fmt.Errorf("missing known type for %q", typ.Type)
+		}
+	}
+
 	kubeconfig, err := kube.ResolveConfig(config)
 	if err != nil {
 		return nil, err
@@ -162,7 +167,7 @@ func (cl *Client) RegisterResources() error {
 				},
 			},
 		}
-		glog.V(2).Infof("registering CRD %v", name)
+		glog.V(2).Infof("registering CRD %q", name)
 		_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
@@ -182,7 +187,7 @@ func (cl *Client) RegisterResources() error {
 				switch cond.Type {
 				case apiextensionsv1beta1.Established:
 					if cond.Status == apiextensionsv1beta1.ConditionTrue {
-						glog.V(2).Infof("established CRD %v", name)
+						glog.V(2).Infof("established CRD %q", name)
 						continue descriptor
 					}
 				case apiextensionsv1beta1.NamesAccepted:
@@ -191,6 +196,7 @@ func (cl *Client) RegisterResources() error {
 					}
 				}
 			}
+			glog.V(2).Infof("missing status condition for %q", name)
 			return false, err
 		}
 		return true, nil
@@ -206,7 +212,7 @@ func (cl *Client) RegisterResources() error {
 		}
 	*/
 
-	return nil
+	return err
 }
 
 // DeregisterResources removes third party resources

@@ -37,8 +37,8 @@ genrule(
     name = "crd",
     srcs = ["config.go"],
     outs = ["types.go"],
-    tools = ["generate.sh"],
     cmd = "adapter/config/crd/generate.sh > $@",
+    tools = ["generate.sh"],
 )
 
 go_test(

@@ -29,18 +29,19 @@ import (
 func configKey(typ, key string) string {
 	switch typ {
 	case model.RouteRule.Type, model.IngressRule.Type:
-		return typ + "-" + key
+		return key
 	case model.DestinationPolicy.Type:
 		// TODO: special key encoding for long hostnames-based keys
 		parts := strings.Split(key, ".")
-		return typ + "-" + strings.Replace(parts[0], "-", "--", -1) +
+		return strings.Replace(parts[0], "-", "--", -1) +
 			"-" + strings.Replace(parts[1], "-", "--", -1)
 	}
 	return key
 }
 
 // modelToKube translates Istio config to k8s config JSON
-func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message, revision string) (IstioObject, error) {
+func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message,
+	revision string) (IstioObject, error) {
 	spec, err := schema.ToJSONMap(config)
 	if err != nil {
 		return nil, err

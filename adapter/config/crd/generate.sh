@@ -56,9 +56,9 @@ CRDS="MockConfig RouteRule IngressRule DestinationPolicy"
 for crd in $CRDS; do
 cat << EOF
 	model.$crd.Type: {
-		obj:        &${crd}{
+		obj: &${crd}{
 			TypeMeta: meta_v1.TypeMeta{
-				Kind: "${crd}",
+				Kind:       "${crd}",
 				APIVersion: model.IstioAPIVersion,
 			},
 		},
@@ -70,7 +70,6 @@ done
 
 cat <<EOF
 }
-
 EOF
 
 for crd in $CRDS; do
