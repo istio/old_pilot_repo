@@ -97,7 +97,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
 			for _, kind := range knownTypes {
-				scheme.AddKnownTypes(version, kind.obj, kind.collection)
+				scheme.AddKnownTypes(version, kind.object, kind.collection)
 			}
 			meta_v1.AddToGroupVersion(scheme, version)
 			return nil
@@ -163,7 +163,7 @@ func (cl *Client) RegisterResources() error {
 				Scope:   apiextensionsv1beta1.NamespaceScoped,
 				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 					Plural: schema.Plural,
-					Kind:   kabobToCamel(schema.Type),
+					Kind:   kabobCaseToCamelCase(schema.Type),
 				},
 			},
 		}
@@ -243,7 +243,7 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	config := knownTypes[typ].obj.DeepCopyObject().(IstioObject)
+	config := knownTypes[typ].object.DeepCopyObject().(IstioObject)
 	err := cl.dynamic.Get().
 		Namespace(cl.namespace).
 		Resource(schema.Plural).
@@ -280,7 +280,7 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 		return "", err
 	}
 
-	config := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
+	config := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Post().
 		Namespace(out.GetObjectMeta().Namespace).
 		Resource(schema.Plural).
@@ -314,7 +314,7 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 		return "", err
 	}
 
-	config := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
+	config := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Put().
 		Namespace(out.GetObjectMeta().Namespace).
 		Resource(schema.Plural).

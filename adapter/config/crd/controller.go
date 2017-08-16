@@ -64,7 +64,7 @@ func NewController(client *Client, resyncPeriod time.Duration) model.ConfigStore
 }
 
 func (c *controller) addInformer(schema model.ProtoSchema, resyncPeriod time.Duration) {
-	c.kinds[schema.Type] = c.createInformer(knownTypes[schema.Type].obj.DeepCopyObject(), resyncPeriod,
+	c.kinds[schema.Type] = c.createInformer(knownTypes[schema.Type].object.DeepCopyObject(), resyncPeriod,
 		func(opts meta_v1.ListOptions) (result runtime.Object, err error) {
 			result = knownTypes[schema.Type].collection.DeepCopyObject()
 			err = c.client.dynamic.Get().
@@ -137,12 +137,12 @@ func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model
 	if !exists {
 		return
 	}
-	c.kinds[typ].handler.Append(func(obj interface{}, ev model.Event) error {
-		item, ok := obj.(IstioObject)
+	c.kinds[typ].handler.Append(func(object interface{}, ev model.Event) error {
+		item, ok := object.(IstioObject)
 		if ok {
 			data, err := schema.FromJSONMap(item.GetSpec())
 			if err != nil {
-				glog.Warningf("error translating object %#v", obj)
+				glog.Warningf("error translating object %#v", object)
 			} else {
 				f(model.Config{
 					Type:     schema.Type,

@@ -30,7 +30,7 @@ func TestCamelKabob(t *testing.T) {
 		if s != tt.out {
 			t.Errorf("camelCaseToKabobCase(%q) => %q, want %q", tt.in, s, tt.out)
 		}
-		u := kabobToCamel(tt.out)
+		u := kabobCaseToCamelCase(tt.out)
 		if u != tt.in {
 			t.Errorf("kabobToCamel(%q) => %q, want %q", tt.out, u, tt.in)
 		}

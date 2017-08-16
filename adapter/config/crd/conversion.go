@@ -46,7 +46,7 @@ func modelToKube(schema model.ProtoSchema, namespace string, config proto.Messag
 	if err != nil {
 		return nil, err
 	}
-	out := knownTypes[schema.Type].obj.DeepCopyObject().(IstioObject)
+	out := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	out.SetObjectMeta(meta_v1.ObjectMeta{
 		Name:            configKey(schema.Type, schema.Key(config)),
 		Namespace:       namespace,
@@ -58,7 +58,7 @@ func modelToKube(schema model.ProtoSchema, namespace string, config proto.Messag
 }
 
 // camelCaseToKabobCase converts "my-name" to "MyName"
-func kabobToCamel(s string) string {
+func kabobCaseToCamelCase(s string) string {
 	words := strings.Split(s, "-")
 	out := ""
 	for _, word := range words {
