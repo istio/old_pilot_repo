@@ -212,6 +212,42 @@ func TestInjectRequired(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			policy: InjectionPolicyOptIn,
+			meta: &metav1.ObjectMeta{
+				Name:        "no-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{},
+			},
+			want: false,
+		},
+		{
+			policy: InjectionPolicyOptIn,
+			meta: &metav1.ObjectMeta{
+				Name:        "default-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueDefault},
+			},
+			want: false,
+		},
+		{
+			policy: InjectionPolicyOptIn,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-on-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOn},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyOptIn,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-off-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOff},
+			},
+			want: false,
+		},
 	}
 
 	for _, c := range cases {
