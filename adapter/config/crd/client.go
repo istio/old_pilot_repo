@@ -43,12 +43,6 @@ import (
 	"istio.io/pilot/platform/kube"
 )
 
-const (
-	// IstioKindName defines the shared CRD kind to avoid boilerplate
-	// code for each custom kind
-	IstioKindName = "IstioKind"
-)
-
 type istioObject interface {
 	runtime.Object
 	GetSpec() map[string]interface{}

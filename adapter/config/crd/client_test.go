@@ -74,7 +74,7 @@ func makeTempClient(t *testing.T) (*Client, func()) {
 	cl := makeClient(ns, t)
 
 	// the rest of the test can run in parallel
-	//t.Parallel()
+	t.Parallel()
 	return cl, func() { util.DeleteNamespace(client, ns) }
 }
 

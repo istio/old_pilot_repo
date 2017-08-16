@@ -14,7 +14,13 @@
 
 package crd
 
-/*
+import (
+	"testing"
+	"time"
+
+	"istio.io/pilot/test/mock"
+)
+
 const (
 	resync = 1 * time.Second
 )
@@ -39,4 +45,3 @@ func TestControllerClientSync(t *testing.T) {
 	ctl := NewController(cl, resync)
 	mock.CheckCacheSync(cl, ctl, 5, t)
 }
-*/
