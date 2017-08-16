@@ -86,17 +86,17 @@ func getRootCmd() *cobra.Command {
 	}
 
 	root.PersistentFlags().StringVar(&flags.hub, "hub", "docker.io/istio", "Docker hub")
-	root.PersistentFlags().StringVar(&flags.tag, "tag", "0.1", "Docker tag")
+	root.PersistentFlags().StringVar(&flags.tag, "tag", "0.2", "Docker tag")
 	root.PersistentFlags().StringVar(&flags.namespace, "namespace",
-		v1.NamespaceDefault, "Namespace managed by initializer")
+		v1.NamespaceAll, "Namespace managed by initializer")
 	root.PersistentFlags().StringVar(&flags.policy, "policy",
 		string(inject.InjectionPolicyOff), "default injection policy")
 
 	root.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	root.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
+	root.PersistentFlags().StringVar(&flags.meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		fmt.Sprintf("File name for Istio mesh configuration"))
-	root.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", time.Duration(0),
+	root.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 6*time.Minute,
 		"Initializers resync interval")
 
 	cmd.AddFlags(root)

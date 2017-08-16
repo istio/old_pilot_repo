@@ -195,14 +195,15 @@ func injectRequired(namespacePolicy InjectionPolicy, objectMeta *metav1.ObjectMe
 
 	status, ok := objectMeta.Annotations[istioSidecarAnnotationStatusKey]
 
-	glog.V(2).Infof("Sidecar injection policy for %v/%v: namespace:%v resource:%v status:%q required:%v",
-		objectMeta.Namespace, objectMeta.Name, namespacePolicy, resourcePolicy, status, required)
-
+	// avoid injecting sidecar to resources previously modified with kube-inject
 	if checkDeprecatedAlphaAnnotation {
 		if _, ok = objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey]; ok {
-			return false
+			required = false
 		}
 	}
+
+	glog.V(2).Infof("Sidecar injection policy for %v/%v: namespace:%v resource:%v status:%q required:%v",
+		objectMeta.Namespace, objectMeta.Name, namespacePolicy, resourcePolicy, status, required)
 
 	if !required {
 		return false

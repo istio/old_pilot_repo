@@ -78,7 +78,7 @@ func TestInitializerRun(t *testing.T) {
 	close(stop)
 }
 
-func TestInitializerPresent(t *testing.T) {
+func TestHasIstioInitializerNext(t *testing.T) {
 	cl := makeClient(t)
 	t.Parallel()
 	ns, err := util.CreateNamespace(cl)
@@ -149,8 +149,8 @@ func TestInitializerPresent(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if got := i.initializerPresent(c.meta); got != c.want {
-			t.Errorf("initializerPresent(%v): got %v want %v", c.meta.Name, got, c.want)
+		if got := i.hasIstioInitializerNext(c.meta); got != c.want {
+			t.Errorf("hasIstioInitializerNext(%v): got %v want %v", c.meta.Name, got, c.want)
 		}
 	}
 }

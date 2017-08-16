@@ -44,6 +44,11 @@ import (
 
 const initializerName = "sidecar.initializer.istio.io"
 
+var ignoredNamespaces = []string{
+	"kube-system",
+	"kube-public",
+}
+
 // InitializerOptions stores the configurable options for an initializer
 type InitializerOptions struct {
 	// TODO - pull from ConfigMap?
@@ -186,7 +191,7 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 	return i
 }
 
-func (i *Initializer) initializerPresent(objectMeta *metav1.ObjectMeta) bool {
+func (i *Initializer) hasIstioInitializerNext(objectMeta *metav1.ObjectMeta) bool {
 	glog.V(2).Infof("ObjectMeta initializer info %v/%v policy:%q status:%q %v",
 		objectMeta.Namespace, objectMeta.Name,
 		objectMeta.Annotations[istioSidecarAnnotationPolicyKey],
@@ -210,11 +215,14 @@ func (i *Initializer) initializerPresent(objectMeta *metav1.ObjectMeta) bool {
 func (i *Initializer) modifyResource(objectMeta *metav1.ObjectMeta, templateObjectMeta *metav1.ObjectMeta, spec *v1.PodSpec) error { // nolint: lll
 	switch i.options.Namespace {
 	case v1.NamespaceAll:
-		// skip kubernetes system namespace
-		if objectMeta.Namespace == "kube-system" {
-			return nil
+		// skip special kubernetes system namespaces
+		for _, namespace := range ignoredNamespaces {
+			if objectMeta.Namespace == namespace {
+				return nil
+			}
 		}
 	case objectMeta.Namespace:
+		// Don't skip. The initializer should initialize this resource.
 	default:
 		// Skip namespace(s) that we're not responsible for
 		// initializing.
@@ -264,7 +272,7 @@ func (i *Initializer) createTwoWayMergePatch(prev, curr interface{}, dataStruct 
 
 func (i *Initializer) initializeDeployment(obj interface{}) error {
 	in := obj.(*appsv1beta1.Deployment)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -290,7 +298,7 @@ func (i *Initializer) initializeDeployment(obj interface{}) error {
 
 func (i *Initializer) initializeStatefulSet(obj interface{}) error {
 	in := obj.(*appsv1beta1.StatefulSet)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -316,7 +324,7 @@ func (i *Initializer) initializeStatefulSet(obj interface{}) error {
 
 func (i *Initializer) initializeJob(obj interface{}) error {
 	in := obj.(*batchv1.Job)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -342,7 +350,7 @@ func (i *Initializer) initializeJob(obj interface{}) error {
 
 func (i *Initializer) initializeDaemonSet(obj interface{}) error {
 	in := obj.(*v1beta1.DaemonSet)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -368,7 +376,7 @@ func (i *Initializer) initializeDaemonSet(obj interface{}) error {
 
 func (i *Initializer) initializeReplicaSet(obj interface{}) error {
 	in := obj.(*v1beta1.ReplicaSet)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -394,7 +402,7 @@ func (i *Initializer) initializeReplicaSet(obj interface{}) error {
 
 func (i *Initializer) initializeReplicationController(obj interface{}) error {
 	in := obj.(*v1.ReplicationController)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
@@ -420,7 +428,7 @@ func (i *Initializer) initializeReplicationController(obj interface{}) error {
 
 func (i *Initializer) initializePod(obj interface{}) error {
 	in := obj.(*v1.Pod)
-	if !i.initializerPresent(&in.ObjectMeta) {
+	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
 		return nil
 	}
 
