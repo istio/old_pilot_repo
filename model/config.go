@@ -210,6 +210,12 @@ type IstioConfigStore interface {
 }
 
 const (
+	// IstioAPIGroup defines API group name for Istio configuration resources
+	IstioAPIGroup = "config.istio.io"
+
+	// IstioResourceVersion defines API group version
+	IstioResourceVersion = "v1alpha1"
+
 	// RouteRule defines the type for the route rule configuration
 	RouteRule = "route-rule"
 	// RouteRuleProto message name

@@ -45,12 +45,6 @@ import (
 )
 
 const (
-	// IstioAPIGroup defines Kubernetes API group for CRD
-	IstioAPIGroup = "config.istio.io"
-
-	// IstioResourceVersion defines Kubernetes API group version
-	IstioResourceVersion = "v1alpha1"
-
 	// IstioKindName defines the shared CRD kind to avoid boilerplate
 	// code for each custom kind
 	IstioKindName = "IstioKind"
@@ -83,8 +77,8 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	}
 
 	version := schema.GroupVersion{
-		Group:   IstioAPIGroup,
-		Version: IstioResourceVersion,
+		Group:   model.IstioAPIGroup,
+		Version: model.IstioResourceVersion,
 	}
 
 	config.GroupVersion = &version
@@ -143,15 +137,15 @@ func (cl *Client) RegisterResources() error {
 		return err
 	}
 
-	name := strings.ToLower(IstioKindName) + "s." + IstioAPIGroup
+	name := strings.ToLower(IstioKindName) + "s." + model.IstioAPIGroup
 
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: name,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   IstioAPIGroup,
-			Version: IstioResourceVersion,
+			Group:   model.IstioAPIGroup,
+			Version: model.IstioResourceVersion,
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural: strings.ToLower(IstioKindName) + "s",
@@ -203,7 +197,7 @@ func (cl *Client) DeregisterResources() error {
 		return err
 	}
 
-	name := strings.ToLower(IstioKindName) + "s." + IstioAPIGroup
+	name := strings.ToLower(IstioKindName) + "s." + model.IstioAPIGroup
 	return clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
 }
 
