@@ -28,9 +28,9 @@ import (
 // configKey assigns k8s CRD name to Istio config
 func configKey(typ, key string) string {
 	switch typ {
-	case model.RouteRule, model.IngressRule:
+	case model.RouteRule.Type, model.IngressRule.Type:
 		return typ + "-" + key
-	case model.DestinationPolicy:
+	case model.DestinationPolicy.Type:
 		// TODO: special key encoding for long hostnames-based keys
 		parts := strings.Split(key, ".")
 		return typ + "-" + strings.Replace(parts[0], "-", "--", -1) +

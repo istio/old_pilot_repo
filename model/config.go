@@ -216,21 +216,6 @@ const (
 	// IstioResourceVersion defines API group version
 	IstioResourceVersion = "v1alpha1"
 
-	// RouteRule defines the type for the route rule configuration
-	RouteRule = "route-rule"
-	// RouteRuleProto message name
-	RouteRuleProto = "istio.proxy.v1.config.RouteRule"
-
-	// IngressRule type
-	IngressRule = "ingress-rule"
-	// IngressRuleProto message name
-	IngressRuleProto = "istio.proxy.v1.config.IngressRule"
-
-	// DestinationPolicy defines the type for the destination policy configuration
-	DestinationPolicy = "destination-policy"
-	// DestinationPolicyProto message name
-	DestinationPolicyProto = "istio.proxy.v1.config.DestinationPolicy"
-
 	// HeaderURI is URI HTTP header
 	HeaderURI = "uri"
 
@@ -239,10 +224,10 @@ const (
 )
 
 var (
-	// RouteRuleDescriptor describes route rules
-	RouteRuleDescriptor = ProtoSchema{
-		Type:        RouteRule,
-		MessageName: RouteRuleProto,
+	// RouteRule describes route rules
+	RouteRule = ProtoSchema{
+		Type:        "route-rule",
+		MessageName: "istio.proxy.v1.config.RouteRule",
 		Validate:    ValidateRouteRule,
 		Key: func(config proto.Message) string {
 			rule := config.(*proxyconfig.RouteRule)
@@ -250,10 +235,10 @@ var (
 		},
 	}
 
-	// IngressRuleDescriptor describes ingress rules
-	IngressRuleDescriptor = ProtoSchema{
-		Type:        IngressRule,
-		MessageName: IngressRuleProto,
+	// IngressRule describes ingress rules
+	IngressRule = ProtoSchema{
+		Type:        "ingress-rule",
+		MessageName: "istio.proxy.v1.config.IngressRule",
 		Validate:    ValidateIngressRule,
 		Key: func(config proto.Message) string {
 			rule := config.(*proxyconfig.IngressRule)
@@ -261,10 +246,10 @@ var (
 		},
 	}
 
-	// DestinationPolicyDescriptor describes destination rules
-	DestinationPolicyDescriptor = ProtoSchema{
-		Type:        DestinationPolicy,
-		MessageName: DestinationPolicyProto,
+	// DestinationPolicy describes destination rules
+	DestinationPolicy = ProtoSchema{
+		Type:        "destination-policy",
+		MessageName: "istio.proxy.v1.config.DestinationPolicy",
 		Validate:    ValidateDestinationPolicy,
 		Key: func(config proto.Message) string {
 			return config.(*proxyconfig.DestinationPolicy).Destination
@@ -273,9 +258,9 @@ var (
 
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
-		RouteRuleDescriptor,
-		IngressRuleDescriptor,
-		DestinationPolicyDescriptor,
+		RouteRule,
+		IngressRule,
+		DestinationPolicy,
 	}
 )
 
@@ -292,7 +277,7 @@ func MakeIstioStore(store ConfigStore) IstioConfigStore {
 
 func (i istioConfigStore) RouteRules() map[string]*proxyconfig.RouteRule {
 	out := make(map[string]*proxyconfig.RouteRule)
-	rs, err := i.List(RouteRule)
+	rs, err := i.List(RouteRule.Type)
 	if err != nil {
 		glog.V(2).Infof("RouteRules => %v", err)
 	}
@@ -345,7 +330,7 @@ func (i *istioConfigStore) RouteRulesBySource(instances []*ServiceInstance) []*p
 
 func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.IngressRule {
 	out := make(map[string]*proxyconfig.IngressRule)
-	rs, err := i.List(IngressRule)
+	rs, err := i.List(IngressRule.Type)
 	if err != nil {
 		glog.V(2).Infof("IngressRules => %v", err)
 	}
@@ -359,7 +344,7 @@ func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.IngressRule {
 
 func (i *istioConfigStore) DestinationPolicies() []*proxyconfig.DestinationPolicy {
 	out := make([]*proxyconfig.DestinationPolicy, 0)
-	rs, err := i.List(DestinationPolicy)
+	rs, err := i.List(DestinationPolicy.Type)
 	if err != nil {
 		glog.V(2).Infof("DestinationPolicies => %v", err)
 	}
@@ -372,7 +357,7 @@ func (i *istioConfigStore) DestinationPolicies() []*proxyconfig.DestinationPolic
 }
 
 func (i *istioConfigStore) DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy {
-	value, exists, _ := i.Get(DestinationPolicy, destination)
+	value, exists, _ := i.Get(DestinationPolicy.Type, destination)
 	if exists {
 		for _, policy := range value.(*proxyconfig.DestinationPolicy).Policy {
 			if tags.Equals(policy.Tags) {
