@@ -106,8 +106,3 @@ func (sd *serviceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 	}
 	return out
 }
-
-// ManagementPorts implements a service catalog operation.
-func (sd *serviceDiscovery) ManagementPorts(addr string) model.PortList {
-	return nil
-}
