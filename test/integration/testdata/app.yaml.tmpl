@@ -72,13 +72,13 @@ spec:
           httpGet:
             path: /healthz
             port: 3333
-          initialDelaySeconds: 30
+          initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 10
         readinessProbe:
           tcpSocket:
             port: tcp-health-port
-          initialDelaySeconds: 30
+          initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 10
 ---
