@@ -23,7 +23,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"sort"
 	"strconv"
 
 	"github.com/ghodss/yaml"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 
@@ -92,6 +90,7 @@ type Params struct {
 	EnableCoreDump    bool
 	Mesh              *proxyconfig.ProxyMeshConfig
 	MeshConfigMapName string
+	ImagePullPolicy   string
 	// Comma separated list of IP ranges in CIDR form. If set, only
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
@@ -143,13 +142,25 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 		initArgs = append(initArgs, "-i", p.IncludeIPRanges)
 	}
 
+	var pullPolicy v1.PullPolicy
+	switch p.ImagePullPolicy {
+	case "Always":
+		pullPolicy = v1.PullAlways
+	case "IfNotPresent":
+		pullPolicy = v1.PullIfNotPresent
+	case "Never":
+		pullPolicy = v1.PullNever
+	default:
+		pullPolicy = v1.PullIfNotPresent
+	}
+
 	privTrue := true
 
 	initContainer := v1.Container{
 		Name:            InitContainerName,
 		Image:           p.InitImage,
 		Args:            initArgs,
-		ImagePullPolicy: "Always",
+		ImagePullPolicy: pullPolicy,
 		SecurityContext: &v1.SecurityContext{
 			Capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"CAP_NET_ADMIN"},
@@ -167,7 +178,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 			"-c",
 			"sysctl -w kernel.core_pattern=/tmp/core.%e.%p.%t && ulimit -c unlimited",
 		},
-		ImagePullPolicy: "Always",
+		ImagePullPolicy: pullPolicy,
 		SecurityContext: &v1.SecurityContext{
 			// TODO: Determine SELINUX options needed to remove privileged
 			Privileged: &privTrue,
@@ -186,16 +197,6 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	if p.Verbosity > 0 {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
-
-	_, _ = healthPorts(t)
-	/* See issue https://github.com/istio/pilot/issues/953
-	if err != nil {
-		return err
-	}
-		for _, port := range ports {
-			args = append(args, "--passthrough", strconv.Itoa(port))
-		}
-	*/
 
 	volumeMounts := []v1.VolumeMount{
 		{
@@ -277,7 +278,7 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 				},
 			},
 		}},
-		ImagePullPolicy: v1.PullIfNotPresent,
+		ImagePullPolicy: pullPolicy,
 		SecurityContext: &v1.SecurityContext{
 			RunAsUser:              &p.SidecarProxyUID,
 			ReadOnlyRootFilesystem: &readOnly,
@@ -288,53 +289,6 @@ func injectIntoPodTemplateSpec(p *Params, t *v1.PodTemplateSpec) error {
 	t.Spec.Containers = append(t.Spec.Containers, sidecar)
 
 	return nil
-}
-
-func resolvePort(c v1.Container, port intstr.IntOrString) (int, error) {
-	switch port.Type {
-	case intstr.Int:
-		return port.IntValue(), nil
-	case intstr.String:
-		for _, named := range c.Ports {
-			if named.Name == port.String() {
-				return int(named.ContainerPort), nil
-			}
-		}
-		return 0, fmt.Errorf("missing named port %q", port)
-	default:
-		return 0, fmt.Errorf("incorrect port type %q", port)
-	}
-}
-
-func healthPorts(t *v1.PodTemplateSpec) ([]int, error) {
-	set := make(map[int]bool)
-	var errs error
-	for _, container := range t.Spec.Containers {
-		if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
-			port, err := resolvePort(container, container.LivenessProbe.HTTPGet.Port)
-			if err != nil {
-				errs = multierror.Append(errs, err)
-			} else {
-				set[port] = true
-			}
-		}
-		if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
-			port, err := resolvePort(container, container.ReadinessProbe.HTTPGet.Port)
-			if err != nil {
-				errs = multierror.Append(errs, err)
-			} else {
-				set[port] = true
-			}
-		}
-	}
-
-	out := make([]int, 0, len(set))
-	for port := range set {
-		out = append(out, port)
-	}
-	sort.Ints(out)
-	return out, errs
-
 }
 
 // IntoResourceFile injects the istio proxy into the specified

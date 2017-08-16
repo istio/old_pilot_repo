@@ -54,6 +54,9 @@ type Service struct {
 	// service DNS name.  External services are name-based solution to represent
 	// external service instances as a service inside the cluster.
 	ExternalName string `json:"external"`
+
+	// ServiceAccounts specifies the service accounts that run the service.
+	ServiceAccounts []string `json:"serviceaccounts,omitempty"`
 }
 
 // Port represents a network port where a service is listening for
@@ -170,6 +173,7 @@ type ServiceInstance struct {
 	Service          *Service        `json:"service,omitempty"`
 	Tags             Tags            `json:"tags,omitempty"`
 	AvailabilityZone string          `json:"az,omitempty"`
+	ServiceAccount   string          `json:"serviceaccount,omitempty"`
 }
 
 // ServiceDiscovery enumerates Istio service instances.
@@ -201,6 +205,14 @@ type ServiceDiscovery interface {
 
 	// HostInstances lists service instances for a given set of IPv4 addresses.
 	HostInstances(addrs map[string]bool) []*ServiceInstance
+
+	// ManagementPorts lists set of management ports associated with an IPv4 address.
+	// These management ports are typically used by the platform for out of band management
+	// tasks such as health checks, etc. In a scenario where the proxy functions in the
+	// transparent mode (traps all traffic to and from the service instance IP address),
+	// the configuration generated for the proxy will not manipulate traffic destined for
+	// the management ports
+	ManagementPorts(addr string) PortList
 }
 
 // ServiceAccounts exposes Istio service accounts

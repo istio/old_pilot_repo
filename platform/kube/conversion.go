@@ -16,18 +16,32 @@ package kube
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
+	multierror "github.com/hashicorp/go-multierror"
+	"istio.io/pilot/model"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"istio.io/pilot/model"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
 	// IngressClassAnnotation is the annotation on ingress resources for the class of controllers
 	// responsible for it
 	IngressClassAnnotation = "kubernetes.io/ingress.class"
+
+	// KubeServiceAccountsOnVMAnnotation is to specify the K8s service accounts that are allowed to run
+	// this service on the VMs
+	KubeServiceAccountsOnVMAnnotation = "alpha.istio.io/serviceaccounts/kubernetes"
+
+	// CanonicalServiceAccountsOnVMAnnotation is to specify the non-Kubernetes service accounts that
+	// are allowed to run this service on the VMs
+	CanonicalServiceAccountsOnVMAnnotation = "alpha.istio.io/serviceaccounts/canonical"
+
+	// IstioURIPrefix is the URI prefix in the Istio service account scheme
+	IstioURIPrefix = "spiffe"
 )
 
 func convertTags(obj meta_v1.ObjectMeta) model.Tags {
@@ -69,17 +83,39 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		ports = append(ports, convertPort(port))
 	}
 
+	serviceaccounts := make([]string, 0)
+	if svc.Annotations != nil {
+		for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
+			serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+		}
+		for _, ksa := range strings.Split(svc.Annotations[KubeServiceAccountsOnVMAnnotation], ",") {
+			serviceaccounts = append(serviceaccounts, kubeToIstioServiceAccount(ksa, svc.Namespace, domainSuffix))
+		}
+	}
+	sort.Sort(sort.StringSlice(serviceaccounts))
+
 	return &model.Service{
-		Hostname:     serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:        ports,
-		Address:      addr,
-		ExternalName: external,
+		Hostname:        serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:           ports,
+		Address:         addr,
+		ExternalName:    external,
+		ServiceAccounts: serviceaccounts,
 	}
 }
 
 // serviceHostname produces FQDN for a k8s service
 func serviceHostname(name, namespace, domainSuffix string) string {
 	return fmt.Sprintf("%s.%s.svc.%s", name, namespace, domainSuffix)
+}
+
+// canonicalToIstioServiceAccount converts a Canonical service account to an Istio service account
+func canonicalToIstioServiceAccount(saname string) string {
+	return fmt.Sprintf("%v://%v", IstioURIPrefix, saname)
+}
+
+// kubeToIstioServiceAccount converts a K8s service account to an Istio service account
+func kubeToIstioServiceAccount(saname string, ns string, domain string) string {
+	return fmt.Sprintf("%v://%v/ns/%v/sa/%v", IstioURIPrefix, domain, ns, saname)
 }
 
 // KeyFunc is the internal API key function that returns "namespace"/"name" or
@@ -126,4 +162,79 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 		}
 	}
 	return out
+}
+
+func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) {
+	if handler == nil {
+		return nil, nil
+	}
+
+	var protocol model.Protocol
+	var portVal intstr.IntOrString
+	port := 0
+
+	// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
+	if handler.HTTPGet != nil {
+		portVal = handler.HTTPGet.Port
+		protocol = model.ProtocolHTTP
+	} else if handler.TCPSocket != nil {
+		portVal = handler.TCPSocket.Port
+		protocol = model.ProtocolTCP
+	} else {
+		return nil, nil
+	}
+
+	switch portVal.Type {
+	case intstr.Int:
+		port = portVal.IntValue()
+		return &model.Port{
+			Name:     "mgmt-" + strconv.Itoa(port),
+			Port:     port,
+			Protocol: protocol,
+		}, nil
+	case intstr.String:
+		for _, named := range c.Ports {
+			if named.Name == portVal.String() {
+				port = int(named.ContainerPort)
+				return &model.Port{
+					Name:     "mgmt-" + strconv.Itoa(port),
+					Port:     port,
+					Protocol: protocol,
+				}, nil
+			}
+		}
+		return nil, fmt.Errorf("missing named port %q", portVal)
+	default:
+		return nil, fmt.Errorf("incorrect port type %q", portVal)
+	}
+}
+
+// convertProbesToPorts returns a PortList consisting of the ports where the
+// pod is configured to do Liveness and Readiness probes
+func convertProbesToPorts(t *v1.PodSpec) (model.PortList, error) {
+	set := make(map[string]*model.Port)
+	var errs error
+	for _, container := range t.Containers {
+		for _, probe := range []*v1.Probe{container.LivenessProbe, container.ReadinessProbe} {
+			if probe == nil {
+				continue
+			}
+
+			p, err := convertProbePort(container, &probe.Handler)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			} else if p != nil && set[p.Name] == nil {
+				// Deduplicate along the way. We don't differentiate between HTTP vs TCP mgmt ports
+				set[p.Name] = p
+			}
+		}
+	}
+
+	mgmtPorts := make(model.PortList, 0, len(set))
+	for _, p := range set {
+		mgmtPorts = append(mgmtPorts, p)
+	}
+	sort.Slice(mgmtPorts, func(i, j int) bool { return mgmtPorts[i].Port < mgmtPorts[j].Port })
+
+	return mgmtPorts, errs
 }

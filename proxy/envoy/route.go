@@ -40,9 +40,10 @@ const (
 // buildListenerSSLContext returns an SSLContext struct.
 func buildListenerSSLContext(certsDir string) *SSLContext {
 	return &SSLContext{
-		CertChainFile:  certsDir + "/" + certChainFilename,
-		PrivateKeyFile: certsDir + "/" + keyFilename,
-		CaCertFile:     certsDir + "/" + rootCertFilename,
+		CertChainFile:            certsDir + "/" + certChainFilename,
+		PrivateKeyFile:           certsDir + "/" + keyFilename,
+		CaCertFile:               certsDir + "/" + rootCertFilename,
+		RequireClientCertificate: true,
 	}
 }
 
@@ -89,6 +90,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		ServiceName: key,
 		Type:        SDSName,
 		LbType:      DefaultLbType,
+		outbound:    true,
 		hostname:    hostname,
 		port:        port,
 		tags:        tags,
@@ -255,15 +257,6 @@ func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string, rou
 		Domains: domains,
 		Routes:  routes,
 	}
-}
-
-// sharedInstanceHost computes the shared subdomain suffix for co-located instances
-func sharedInstanceHost(instances []*model.ServiceInstance) []string {
-	hostnames := make([][]string, 0)
-	for _, instance := range instances {
-		hostnames = append(hostnames, strings.Split(instance.Service.Hostname, "."))
-	}
-	return sharedHost(hostnames...)
 }
 
 // sharedHost computes the shared host name suffix for instances.
