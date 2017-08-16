@@ -3,15 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "DestinationPolicy.go",
-        "IngressRule.go",
-        "MockConfig.go",
-        "RouteRule.go",
         "client.go",
         "config.go",
         "controller.go",
         "conversion.go",
-        "registry.go",
+        "types.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -35,6 +31,14 @@ go_library(
         "@io_k8s_client_go//tools/cache:go_default_library",
         "@io_k8s_client_go//tools/clientcmd:go_default_library",
     ],
+)
+
+genrule(
+    name = "crd",
+    srcs = ["config.go"],
+    outs = ["types.go"],
+    tools = ["generate.sh"],
+    cmd = "adapter/config/crd/generate.sh > $@",
 )
 
 go_test(
