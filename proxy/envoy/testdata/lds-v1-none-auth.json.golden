@@ -261,6 +261,16 @@
     "name": "tcp_10.1.1.1_1090",
     "filters": [
      {
+      "type": "both",
+      "name": "mixer",
+      "config": {
+       "mixer_attributes": {
+        "target.ip": "10.1.1.1",
+        "target.uid": "kubernetes://v1.default"
+       }
+      }
+     },
+     {
       "type": "read",
       "name": "tcp_proxy",
       "config": {
@@ -284,6 +294,30 @@
      "ca_cert_file": "/etc/certs/root-cert.pem",
      "require_client_certificate": true
     },
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.1:3333",
+    "name": "tcp_10.1.1.1_3333",
+    "filters": [
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.3333",
+          "destination_ip_list": [
+           "10.1.1.1/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
     "bind_to_port": false
    },
    {
@@ -356,6 +390,30 @@
      "ca_cert_file": "/etc/certs/root-cert.pem",
      "require_client_certificate": true
     },
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.1:9999",
+    "name": "tcp_10.1.1.1_9999",
+    "filters": [
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.9999",
+          "destination_ip_list": [
+           "10.1.1.1/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
     "bind_to_port": false
    },
    {
