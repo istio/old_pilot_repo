@@ -20,6 +20,10 @@ import (
 	"istio.io/pilot/model"
 )
 
+const (
+	BufferSize = 10
+)
+
 // Handler specifies a function to apply on a Config for a given event type
 type Handler func(model.Config, model.Event)
 
@@ -53,7 +57,7 @@ func NewConfigStoreMonitor(store model.ConfigStore) Monitor {
 	return &configstoreMonitor{
 		store:    store,
 		handlers: handlers,
-		eventCh:  make(chan ConfigEvent),
+		eventCh:  make(chan ConfigEvent, BufferSize),
 	}
 }
 
@@ -69,9 +73,13 @@ func (m *configstoreMonitor) run(stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
-			close(m.eventCh)
-		case ce := <-m.eventCh:
-			m.processConfigEvent(ce)
+			if _, ok := <-m.eventCh; ok {
+				close(m.eventCh)
+			}
+		case ce, ok := <-m.eventCh:
+			if ok {
+				m.processConfigEvent(ce)
+			}
 		}
 	}
 }
