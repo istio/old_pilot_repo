@@ -175,13 +175,13 @@ func (cl *Client) RegisterResources() error {
 	}
 
 	// wait for CRD being established
-	err = wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
+	errPoll := wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
 	descriptor:
 		for _, schema := range cl.descriptor {
 			name := schema.Plural + "." + model.IstioAPIGroup
-			crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
-			if err != nil {
-				return false, err
+			crd, errGet := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
+			if errGet != nil {
+				return false, errGet
 			}
 			for _, cond := range crd.Status.Conditions {
 				switch cond.Type {
@@ -202,17 +202,15 @@ func (cl *Client) RegisterResources() error {
 		return true, nil
 	})
 
-	/*
-		if err != nil {
-			deleteErr := cl.DeregisterResources()
-			if deleteErr != nil {
-				return multierror.Append(err, deleteErr)
-			}
-			return err
+	if errPoll != nil {
+		deleteErr := cl.DeregisterResources()
+		if deleteErr != nil {
+			return multierror.Append(err, deleteErr)
 		}
-	*/
+		return err
+	}
 
-	return err
+	return nil
 }
 
 // DeregisterResources removes third party resources
