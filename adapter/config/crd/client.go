@@ -18,7 +18,6 @@ package crd
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -49,6 +48,19 @@ const (
 	// code for each custom kind
 	IstioKindName = "IstioKind"
 )
+
+type istioObject interface {
+	runtime.Object
+	GetSpec() map[string]interface{}
+	SetSpec(map[string]interface{})
+	GetObjectMeta() meta_v1.ObjectMeta
+	SetObjectMeta(meta_v1.ObjectMeta)
+}
+
+type istioObjectList interface {
+	runtime.Object
+	GetItems() []istioObject
+}
 
 // Client is a basic REST client for CRDs implementing config store
 type Client struct {
@@ -88,9 +100,9 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 	types := runtime.NewScheme()
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
-			scheme.AddKnownTypes(
-				version, &IstioKind{}, &IstioKindList{},
-			)
+			for _, kind := range knownTypes {
+				scheme.AddKnownTypes(version, kind.obj, kind.collection)
+			}
 			meta_v1.AddToGroupVersion(scheme, version)
 			return nil
 		})
@@ -105,6 +117,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
 func NewClient(config string, descriptor model.ConfigDescriptor, namespace string) (*Client, error) {
+	// TODO: filter kinds by known
 	kubeconfig, err := kube.ResolveConfig(config)
 	if err != nil {
 		return nil, err
@@ -137,55 +150,65 @@ func (cl *Client) RegisterResources() error {
 		return err
 	}
 
-	name := strings.ToLower(IstioKindName) + "s." + model.IstioAPIGroup
-
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: name,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   model.IstioAPIGroup,
-			Version: model.IstioAPIVersion,
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: strings.ToLower(IstioKindName) + "s",
-				Kind:   IstioKindName,
+	for _, schema := range cl.descriptor {
+		name := schema.Plural + "." + model.IstioAPIGroup
+		crd := &apiextensionsv1beta1.CustomResourceDefinition{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name: name,
 			},
-		},
-	}
-	_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+				Group:   model.IstioAPIGroup,
+				Version: model.IstioAPIVersion,
+				Scope:   apiextensionsv1beta1.NamespaceScoped,
+				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+					Plural: schema.Plural,
+					Kind:   kabobToCamel(schema.Type),
+				},
+			},
+		}
+		glog.V(2).Infof("registering CRD %v", name)
+		_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
 	}
 
 	// wait for CRD being established
 	err = wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
-		crd, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, cond := range crd.Status.Conditions {
-			switch cond.Type {
-			case apiextensionsv1beta1.Established:
-				if cond.Status == apiextensionsv1beta1.ConditionTrue {
-					return true, err
-				}
-			case apiextensionsv1beta1.NamesAccepted:
-				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					glog.Warningf("name conflict: %v", cond.Reason)
+	descriptor:
+		for _, schema := range cl.descriptor {
+			name := schema.Plural + "." + model.IstioAPIGroup
+			crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			for _, cond := range crd.Status.Conditions {
+				switch cond.Type {
+				case apiextensionsv1beta1.Established:
+					if cond.Status == apiextensionsv1beta1.ConditionTrue {
+						glog.V(2).Infof("established CRD %v", name)
+						continue descriptor
+					}
+				case apiextensionsv1beta1.NamesAccepted:
+					if cond.Status == apiextensionsv1beta1.ConditionFalse {
+						glog.Warningf("name conflict: %v", cond.Reason)
+					}
 				}
 			}
+			return false, err
 		}
-		return false, err
+		return true, nil
 	})
 
-	if err != nil {
-		deleteErr := cl.DeregisterResources()
-		if deleteErr != nil {
-			return multierror.Append(err, deleteErr)
+	/*
+		if err != nil {
+			deleteErr := cl.DeregisterResources()
+			if deleteErr != nil {
+				return multierror.Append(err, deleteErr)
+			}
+			return err
 		}
-		return err
-	}
+	*/
 
 	return nil
 }
@@ -197,8 +220,13 @@ func (cl *Client) DeregisterResources() error {
 		return err
 	}
 
-	name := strings.ToLower(IstioKindName) + "s." + model.IstioAPIGroup
-	return clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
+	var errs error
+	for _, schema := range cl.descriptor {
+		name := schema.Plural + "." + model.IstioAPIGroup
+		err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
+		errs = multierror.Append(errs, err)
+	}
+	return errs
 }
 
 // ConfigDescriptor for the store
@@ -213,10 +241,10 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	config := &IstioKind{}
+	config := knownTypes[typ].obj.DeepCopyObject().(istioObject)
 	err := cl.dynamic.Get().
 		Namespace(cl.namespace).
-		Resource(IstioKindName + "s").
+		Resource(schema.Plural).
 		Name(configKey(typ, key)).
 		Do().Into(config)
 
@@ -225,12 +253,12 @@ func (cl *Client) Get(typ, key string) (proto.Message, bool, string) {
 		return nil, false, ""
 	}
 
-	out, err := schema.FromJSONMap(config.Spec)
+	out, err := schema.FromJSONMap(config.GetSpec())
 	if err != nil {
-		glog.Warningf("%v for %#v", err, config.Spec)
+		glog.Warningf("%v for %#v", err, config.GetObjectMeta())
 		return nil, false, ""
 	}
-	return out, true, config.ObjectMeta.ResourceVersion
+	return out, true, config.GetObjectMeta().ResourceVersion
 }
 
 // Post implements store interface
@@ -245,22 +273,22 @@ func (cl *Client) Post(v proto.Message) (string, error) {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 
-	out, err := modelToKube(schema, cl.namespace, v)
+	out, err := modelToKube(schema, cl.namespace, v, "")
 	if err != nil {
 		return "", err
 	}
 
-	config := &IstioKind{}
+	config := knownTypes[schema.Type].obj.DeepCopyObject().(istioObject)
 	err = cl.dynamic.Post().
-		Namespace(out.ObjectMeta.Namespace).
-		Resource(IstioKindName + "s").
+		Namespace(out.GetObjectMeta().Namespace).
+		Resource(schema.Plural).
 		Body(out).
 		Do().Into(config)
 	if err != nil {
 		return "", err
 	}
 
-	return config.ObjectMeta.ResourceVersion, nil
+	return config.GetObjectMeta().ResourceVersion, nil
 }
 
 // Put implements store interface
@@ -279,63 +307,64 @@ func (cl *Client) Put(v proto.Message, revision string) (string, error) {
 		return "", fmt.Errorf("revision is required")
 	}
 
-	out, err := modelToKube(schema, cl.namespace, v)
+	out, err := modelToKube(schema, cl.namespace, v, revision)
 	if err != nil {
 		return "", err
 	}
 
-	out.ObjectMeta.ResourceVersion = revision
-
-	config := &IstioKind{}
+	config := knownTypes[schema.Type].obj.DeepCopyObject().(istioObject)
 	err = cl.dynamic.Put().
-		Namespace(out.ObjectMeta.Namespace).
-		Resource(IstioKindName + "s").
-		Name(out.ObjectMeta.Name).
+		Namespace(out.GetObjectMeta().Namespace).
+		Resource(schema.Plural).
+		Name(out.GetObjectMeta().Name).
 		Body(out).
 		Do().Into(config)
 	if err != nil {
 		return "", err
 	}
 
-	return config.ObjectMeta.ResourceVersion, nil
+	return config.GetObjectMeta().ResourceVersion, nil
 }
 
 // Delete implements store interface
 func (cl *Client) Delete(typ, key string) error {
-	_, exists := cl.descriptor.GetByType(typ)
+	schema, exists := cl.descriptor.GetByType(typ)
 	if !exists {
 		return fmt.Errorf("missing type %q", typ)
 	}
 
 	return cl.dynamic.Delete().
 		Namespace(cl.namespace).
-		Resource(IstioKindName + "s").
+		Resource(schema.Plural).
 		Name(configKey(typ, key)).
 		Do().Error()
 }
 
 // List implements store interface
 func (cl *Client) List(typ string) ([]model.Config, error) {
-	_, exists := cl.descriptor.GetByType(typ)
+	schema, exists := cl.descriptor.GetByType(typ)
 	if !exists {
 		return nil, fmt.Errorf("missing type %q", typ)
 	}
 
-	list := &IstioKindList{}
+	list := knownTypes[schema.Type].collection.DeepCopyObject().(istioObjectList)
 	errs := cl.dynamic.Get().
 		Namespace(cl.namespace).
-		Resource(IstioKindName + "s").
+		Resource(schema.Plural).
 		Do().Into(list)
 
 	out := make([]model.Config, 0)
-	for _, item := range list.Items {
-		config, err := cl.convertConfig(&item)
-		if typ == config.Type {
-			if err != nil {
-				errs = multierror.Append(errs, err)
-			} else {
-				out = append(out, config)
-			}
+	for _, item := range list.GetItems() {
+		data, err := schema.FromJSONMap(item.GetSpec())
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		} else {
+			out = append(out, model.Config{
+				Type:     schema.Type,
+				Key:      schema.Key(data),
+				Revision: item.GetObjectMeta().ResourceVersion,
+				Content:  data,
+			})
 		}
 	}
 	return out, errs

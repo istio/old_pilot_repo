@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "DestinationPolicy.go",
         "IngressRule.go",
-        "Mock.go",
+        "MockConfig.go",
         "RouteRule.go",
         "client.go",
         "config.go",

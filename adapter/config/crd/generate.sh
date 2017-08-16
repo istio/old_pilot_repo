@@ -41,21 +41,22 @@ cat > adapter/config/crd/registry.go << EOF
 package crd
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"istio.io/pilot/model"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var knownTypes = map[string]struct {
-	obj        runtime.Object
-	collection runtime.Object
+	obj        istioObject
+	collection istioObjectList
 }{
 EOF
 
-for crd in Mock RouteRule IngressRule DestinationPolicy; do
+for crd in MockConfig RouteRule IngressRule DestinationPolicy; do
   sed -e s/IstioKind/$crd/g adapter/config/crd/config.go > adapter/config/crd/$crd.go
 cat >> adapter/config/crd/registry.go << EOF
 	model.$crd.Type: {
-		obj:        &${crd}{},
+		obj:        &${crd}{TypeMeta: meta_v1.TypeMeta{Kind: "${crd}", APIVersion: model.IstioAPIVersion}},
 		collection: &${crd}List{},
 	},
 EOF

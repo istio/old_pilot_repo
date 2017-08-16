@@ -229,8 +229,8 @@ const (
 )
 
 var (
-	// Mock config is used purely for testing
-	Mock = ProtoSchema{
+	// MockConfig is used purely for testing
+	MockConfig = ProtoSchema{
 		Type:        "mock-config",
 		Plural:      "mock-configs",
 		MessageName: "test.MockConfig",

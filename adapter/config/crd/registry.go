@@ -15,28 +15,29 @@
 package crd
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"istio.io/pilot/model"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var knownTypes = map[string]struct {
-	obj        runtime.Object
-	collection runtime.Object
+	obj        istioObject
+	collection istioObjectList
 }{
-	model.Mock.Type: {
-		obj:        &Mock{},
-		collection: &MockList{},
+	model.MockConfig.Type: {
+		obj:        &MockConfig{TypeMeta: meta_v1.TypeMeta{Kind: "MockConfig", APIVersion: model.IstioAPIVersion}},
+		collection: &MockConfigList{},
 	},
 	model.RouteRule.Type: {
-		obj:        &RouteRule{},
+		obj:        &RouteRule{TypeMeta: meta_v1.TypeMeta{Kind: "RouteRule", APIVersion: model.IstioAPIVersion}},
 		collection: &RouteRuleList{},
 	},
 	model.IngressRule.Type: {
-		obj:        &IngressRule{},
+		obj:        &IngressRule{TypeMeta: meta_v1.TypeMeta{Kind: "IngressRule", APIVersion: model.IstioAPIVersion}},
 		collection: &IngressRuleList{},
 	},
 	model.DestinationPolicy.Type: {
-		obj:        &DestinationPolicy{},
+		obj:        &DestinationPolicy{TypeMeta: meta_v1.TypeMeta{Kind: "DestinationPolicy", APIVersion: model.IstioAPIVersion}},
 		collection: &DestinationPolicyList{},
 	},
 }
