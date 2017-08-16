@@ -199,7 +199,7 @@ func injectRequired(namespacePolicy InjectionPolicy, objectMeta *metav1.ObjectMe
 		objectMeta.Namespace, objectMeta.Name, namespacePolicy, resourcePolicy, status, required)
 
 	if checkDeprecatedAlphaAnnotation {
-		if _, ok := objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey]; ok {
+		if _, ok = objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey]; ok {
 			return false
 		}
 	}
@@ -223,18 +223,6 @@ func addAnnotation(objectMeta *metav1.ObjectMeta, version string) {
 		objectMeta.Annotations[deprecatedIstioSidecarAnnotationSidecarKey] =
 			deprecatedIstioSidecarAnnotationSidecarValue
 	}
-}
-
-func injectWithPolicyCheck(policy InjectionPolicy, p *Params, objectMeta, templateObjectMeta *metav1.ObjectMeta, spec *v1.PodSpec) error {
-	if !injectRequired(policy, objectMeta) {
-		return nil
-	}
-	if err := injectIntoSpec(p, spec); err != nil {
-		return err
-	}
-	addAnnotation(objectMeta, p.Version)
-	addAnnotation(templateObjectMeta, p.Version)
-	return nil
 }
 
 func injectIntoSpec(p *Params, spec *v1.PodSpec) error {
@@ -399,6 +387,18 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) error {
 // IntoResourceFile injects the istio proxy into the specified
 // kubernetes YAML file.
 func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
+	injectWithPolicyCheck := func(objectMeta, templateObjectMeta *metav1.ObjectMeta, spec *v1.PodSpec) error {
+		if !injectRequired(DefaultInjectionPolicy, objectMeta) {
+			return nil
+		}
+		if err := injectIntoSpec(p, spec); err != nil {
+			return err
+		}
+		addAnnotation(objectMeta, p.Version)
+		addAnnotation(templateObjectMeta, p.Version)
+		return nil
+	}
+
 	reader := yamlDecoder.NewYAMLReader(bufio.NewReaderSize(in, 4096))
 	for {
 		raw, err := reader.Read()
@@ -416,48 +416,42 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 				typ: &batchv1.Job{},
 				inject: func(typ interface{}) error {
 					o := typ.(*batchv1.Job)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 			"DaemonSet": {
 				typ: &v1beta1.DaemonSet{},
 				inject: func(typ interface{}) error {
 					o := typ.(*v1beta1.DaemonSet)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 			"ReplicaSet": {
 				typ: &v1beta1.ReplicaSet{},
 				inject: func(typ interface{}) error {
 					o := typ.(*v1beta1.ReplicaSet)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 			"Deployment": {
 				typ: &v1beta1.Deployment{},
 				inject: func(typ interface{}) error {
 					o := typ.(*v1beta1.Deployment)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 			"ReplicationController": {
 				typ: &v1.ReplicationController{},
 				inject: func(typ interface{}) error {
 					o := typ.(*v1.ReplicationController)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 			"StatefulSet": {
 				typ: &appsv1beta1.StatefulSet{},
 				inject: func(typ interface{}) error {
 					o := typ.(*appsv1beta1.StatefulSet)
-					return injectWithPolicyCheck(DefaultInjectionPolicy, p,
-						&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
+					return injectWithPolicyCheck(&o.ObjectMeta, &o.Spec.Template.ObjectMeta, &o.Spec.Template.Spec)
 				},
 			},
 		}

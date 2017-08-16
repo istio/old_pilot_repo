@@ -127,7 +127,7 @@ func TestInitializerPresent(t *testing.T) {
 				Annotations: map[string]string{},
 				Initializers: &metav1.Initializers{
 					Pending: []metav1.Initializer{
-						{"unknown-initializer"},
+						{Name: "unknown-initializer"},
 					},
 				},
 			},
@@ -140,7 +140,7 @@ func TestInitializerPresent(t *testing.T) {
 				Annotations: map[string]string{},
 				Initializers: &metav1.Initializers{
 					Pending: []metav1.Initializer{
-						{initializerName},
+						{Name: initializerName},
 					},
 				},
 			},

@@ -276,7 +276,7 @@ func (i *Initializer) initializeDeployment(obj interface{}) error {
 	}
 	out := o.(*appsv1beta1.Deployment)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, appsv1beta1.Deployment{})
@@ -285,10 +285,7 @@ func (i *Initializer) initializeDeployment(obj interface{}) error {
 	}
 	_, err = i.clientset.AppsV1beta1().Deployments(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializeStatefulSet(obj interface{}) error {
@@ -305,7 +302,7 @@ func (i *Initializer) initializeStatefulSet(obj interface{}) error {
 	}
 	out := o.(*appsv1beta1.StatefulSet)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, appsv1beta1.StatefulSet{})
@@ -314,10 +311,7 @@ func (i *Initializer) initializeStatefulSet(obj interface{}) error {
 	}
 	_, err = i.clientset.AppsV1beta1().StatefulSets(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializeJob(obj interface{}) error {
@@ -334,7 +328,7 @@ func (i *Initializer) initializeJob(obj interface{}) error {
 	}
 	out := o.(*batchv1.Job)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, batchv1.Job{})
@@ -343,10 +337,7 @@ func (i *Initializer) initializeJob(obj interface{}) error {
 	}
 	_, err = i.clientset.BatchV1().Jobs(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializeDaemonSet(obj interface{}) error {
@@ -363,7 +354,7 @@ func (i *Initializer) initializeDaemonSet(obj interface{}) error {
 	}
 	out := o.(*v1beta1.DaemonSet)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, v1beta1.DaemonSet{})
@@ -372,10 +363,7 @@ func (i *Initializer) initializeDaemonSet(obj interface{}) error {
 	}
 	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializeReplicaSet(obj interface{}) error {
@@ -392,7 +380,7 @@ func (i *Initializer) initializeReplicaSet(obj interface{}) error {
 	}
 	out := o.(*v1beta1.ReplicaSet)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, v1beta1.ReplicaSet{})
@@ -401,10 +389,7 @@ func (i *Initializer) initializeReplicaSet(obj interface{}) error {
 	}
 	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializeReplicationController(obj interface{}) error {
@@ -421,7 +406,7 @@ func (i *Initializer) initializeReplicationController(obj interface{}) error {
 	}
 	out := o.(*v1.ReplicationController)
 
-	if err := i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, v1.ReplicationController{})
@@ -430,10 +415,7 @@ func (i *Initializer) initializeReplicationController(obj interface{}) error {
 	}
 	_, err = i.clientset.CoreV1().ReplicationControllers(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (i *Initializer) initializePod(obj interface{}) error {
@@ -450,7 +432,7 @@ func (i *Initializer) initializePod(obj interface{}) error {
 	}
 	out := o.(*v1.Pod)
 
-	if err := i.modifyResource(&out.ObjectMeta, nil, &out.Spec); err != nil {
+	if err = i.modifyResource(&out.ObjectMeta, nil, &out.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, v1.Pod{})
@@ -459,10 +441,7 @@ func (i *Initializer) initializePod(obj interface{}) error {
 	}
 	_, err = i.clientset.CoreV1().Pods(in.Namespace).
 		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Run runs the Initializer controller.

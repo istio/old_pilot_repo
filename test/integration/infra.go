@@ -38,10 +38,9 @@ type infra struct {
 	Name string
 
 	// docker tags
-	Hub, Tag    string
-	MixerImage  string
-	CaImage     string
-	injectProxy bool // included so non-app images don't
+	Hub, Tag   string
+	MixerImage string
+	CaImage    string
 
 	Namespace string
 	Verbosity int
