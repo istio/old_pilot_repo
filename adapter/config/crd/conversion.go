@@ -47,7 +47,8 @@ func modelToKube(schema model.ProtoSchema, namespace string, config proto.Messag
 	}
 	out := &IstioKind{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind: IstioKindName,
+			Kind:       IstioKindName,
+			APIVersion: model.IstioAPIVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      configKey(schema.Type, schema.Key(config)),

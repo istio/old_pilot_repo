@@ -15,12 +15,14 @@
 package model
 
 import (
+	"errors"
 	"sort"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model/test"
 )
 
 // Config is a configuration unit consisting of the type of configuration, the
@@ -143,6 +145,9 @@ type ProtoSchema struct {
 	// Type refers to the short configuration type name
 	Type string
 
+	// Plural refers to the short plural configuration name
+	Plural string
+
 	// MessageName refers to the protobuf message type name corresponding to the type
 	MessageName string
 
@@ -213,8 +218,8 @@ const (
 	// IstioAPIGroup defines API group name for Istio configuration resources
 	IstioAPIGroup = "config.istio.io"
 
-	// IstioResourceVersion defines API group version
-	IstioResourceVersion = "v1alpha1"
+	// IstioAPIVersion defines API group version
+	IstioAPIVersion = "v1alpha1"
 
 	// HeaderURI is URI HTTP header
 	HeaderURI = "uri"
@@ -224,9 +229,26 @@ const (
 )
 
 var (
+	// Mock config is used purely for testing
+	Mock = ProtoSchema{
+		Type:        "mock-config",
+		Plural:      "mock-configs",
+		MessageName: "test.MockConfig",
+		Validate: func(config proto.Message) error {
+			if config.(*test.MockConfig).Key == "" {
+				return errors.New("empty key")
+			}
+			return nil
+		},
+		Key: func(config proto.Message) string {
+			return config.(*test.MockConfig).Key
+		},
+	}
+
 	// RouteRule describes route rules
 	RouteRule = ProtoSchema{
 		Type:        "route-rule",
+		Plural:      "route-rules",
 		MessageName: "istio.proxy.v1.config.RouteRule",
 		Validate:    ValidateRouteRule,
 		Key: func(config proto.Message) string {
@@ -238,6 +260,7 @@ var (
 	// IngressRule describes ingress rules
 	IngressRule = ProtoSchema{
 		Type:        "ingress-rule",
+		Plural:      "ingress-rules",
 		MessageName: "istio.proxy.v1.config.IngressRule",
 		Validate:    ValidateIngressRule,
 		Key: func(config proto.Message) string {
@@ -249,6 +272,7 @@ var (
 	// DestinationPolicy describes destination rules
 	DestinationPolicy = ProtoSchema{
 		Type:        "destination-policy",
+		Plural:      "destination-policies",
 		MessageName: "istio.proxy.v1.config.DestinationPolicy",
 		Validate:    ValidateDestinationPolicy,
 		Key: func(config proto.Message) string {

@@ -12,19 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+package crd
 
-// Basic config resource consisting
-// of a set of key-value pairs
+import (
+	"istio.io/pilot/model"
+	"k8s.io/apimachinery/pkg/runtime"
+)
 
-package mock;
-
-message MockConfig {
-  string key = 1;
-  repeated ConfigPair pairs = 2;
-}
-
-message ConfigPair {
-  string key = 1;
-  string value = 2;
+var knownTypes = map[string]struct {
+	obj        runtime.Object
+	collection runtime.Object
+}{
+	model.Mock.Type: {
+		obj:        &Mock{},
+		collection: &MockList{},
+	},
+	model.RouteRule.Type: {
+		obj:        &RouteRule{},
+		collection: &RouteRuleList{},
+	},
+	model.IngressRule.Type: {
+		obj:        &IngressRule{},
+		collection: &IngressRuleList{},
+	},
+	model.DestinationPolicy.Type: {
+		obj:        &DestinationPolicy{},
+		collection: &DestinationPolicyList{},
+	},
 }

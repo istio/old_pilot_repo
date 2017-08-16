@@ -12,31 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package crd
+syntax = "proto3";
 
-/*
-const (
-	resync = 1 * time.Second
-)
+// Basic config resource consisting
+// of a set of key-value pairs
 
-func TestControllerEvents(t *testing.T) {
-	cl, cleanup := makeTempClient(t)
-	defer cleanup()
-	ctl := NewController(cl, resync)
-	mock.CheckCacheEvents(cl, ctl, 5, t)
+package test;
+
+message MockConfig {
+  string key = 1;
+  repeated ConfigPair pairs = 2;
 }
 
-func TestControllerCacheFreshness(t *testing.T) {
-	cl, cleanup := makeTempClient(t)
-	defer cleanup()
-	ctl := NewController(cl, resync)
-	mock.CheckCacheFreshness(ctl, t)
+message ConfigPair {
+  string key = 1;
+  string value = 2;
 }
-
-func TestControllerClientSync(t *testing.T) {
-	cl, cleanup := makeTempClient(t)
-	defer cleanup()
-	ctl := NewController(cl, resync)
-	mock.CheckCacheSync(cl, ctl, 5, t)
-}
-*/

@@ -3,10 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "DestinationPolicy.go",
+        "IngressRule.go",
+        "Mock.go",
+        "RouteRule.go",
         "client.go",
         "config.go",
         "controller.go",
         "conversion.go",
+        "registry.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

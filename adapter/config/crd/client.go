@@ -78,7 +78,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 
 	version := schema.GroupVersion{
 		Group:   model.IstioAPIGroup,
-		Version: model.IstioResourceVersion,
+		Version: model.IstioAPIVersion,
 	}
 
 	config.GroupVersion = &version
@@ -145,7 +145,7 @@ func (cl *Client) RegisterResources() error {
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   model.IstioAPIGroup,
-			Version: model.IstioResourceVersion,
+			Version: model.IstioAPIVersion,
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural: strings.ToLower(IstioKindName) + "s",
