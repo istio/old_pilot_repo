@@ -43,7 +43,10 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
-const initializerName = "sidecar.initializer.istio.io"
+const (
+	initializerName = "sidecar.initializer.istio.io"
+	patchType       = types.StrategicMergePatchType
+)
 
 var ignoredNamespaces = []string{
 	"kube-system",
@@ -222,7 +225,6 @@ func (i *Initializer) hasIstioInitializerNext(object metav1.Object) bool {
 	if initializerName != pendingInitializers[0].Name {
 		return false
 	}
-
 	return true
 }
 
@@ -263,7 +265,6 @@ func (i *Initializer) modifyResource(objectMeta *metav1.ObjectMeta, templateObje
 	}
 
 	addAnnotation(objectMeta, i.params.Version)
-
 	// templated annotation to avoid double-injection
 	if templateObjectMeta != nil {
 		addAnnotation(templateObjectMeta, i.params.Version)
@@ -294,7 +295,7 @@ func (i *Initializer) initializeDeployment(in, out interface{}) error {
 		return err
 	}
 	_, err = i.clientset.AppsV1beta1().Deployments(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+		Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -307,8 +308,7 @@ func (i *Initializer) initializeStatefulSet(in, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.AppsV1beta1().StatefulSets(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.AppsV1beta1().StatefulSets(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -321,8 +321,7 @@ func (i *Initializer) initializeJob(in, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.BatchV1().Jobs(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.BatchV1().Jobs(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -335,8 +334,7 @@ func (i *Initializer) initializeDaemonSet(in, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -349,8 +347,7 @@ func (i *Initializer) initializeReplicaSet(in, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -363,8 +360,7 @@ func (i *Initializer) initializeReplicationController(in, out interface{}) error
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.CoreV1().ReplicationControllers(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.CoreV1().ReplicationControllers(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
@@ -377,8 +373,7 @@ func (i *Initializer) initializePod(in, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.CoreV1().Pods(obj.Namespace).
-		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.CoreV1().Pods(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 

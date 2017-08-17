@@ -17,8 +17,10 @@ package inject
 import (
 	"bytes"
 	"os"
+	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -123,6 +125,22 @@ func TestIntoResourceFile(t *testing.T) {
 			authConfigPath: "/etc/non-default-dir/",
 			in:             "testdata/auth.yaml",
 			want:           "testdata/auth.cert-dir.yaml.injected",
+		},
+		{
+			in:   "testdata/daemonset.yaml",
+			want: "testdata/daemonset.yaml.injected",
+		},
+		{
+			in:   "testdata/job.yaml",
+			want: "testdata/job.yaml.injected",
+		},
+		{
+			in:   "testdata/replicaset.yaml",
+			want: "testdata/replicaset.yaml.injected",
+		},
+		{
+			in:   "testdata/replicationcontroller.yaml",
+			want: "testdata/replicationcontroller.yaml.injected",
 		},
 	}
 
@@ -254,5 +272,43 @@ func TestInjectRequired(t *testing.T) {
 		if got := injectRequired(c.policy, c.meta); got != c.want {
 			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
 		}
+	}
+}
+
+func TestGetMeshConfig(t *testing.T) {
+	cl := makeClient(t)
+	t.Parallel()
+	ns, err := util.CreateNamespace(cl)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	defer util.DeleteNamespace(cl, ns)
+	name := "istio-config"
+
+	configMap := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string]string{
+			ConfigMapKey: "", // empty config
+		},
+	}
+
+	_, err = cl.CoreV1().ConfigMaps(ns).Create(configMap)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	want := proxy.DefaultMeshConfig()
+	got, err := GetMeshConfig(cl, ns, name)
+	if err != nil {
+		t.Fatalf("GetMeshConfig returned an error: %v", err)
+	}
+	if !reflect.DeepEqual(got, &want) {
+		t.Fatalf("GetMeshConfig returned the wrong result: \ngot  %v \nwant %v", got, &want)
 	}
 }
