@@ -29,6 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +113,7 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 		resource   string
 		getter     cache.Getter
 		objType    runtime.Object
-		initialize func(in interface{}) error
+		initialize func(in, out interface{}) error
 	}{
 		{
 			"deployments",
@@ -179,8 +180,21 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 
 		_, controller := cache.NewInformer(includeUninitializedWatchList, kind.objType, i.options.ResyncPeriod,
 			cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					if err := kind.initialize(obj); err != nil {
+				AddFunc: func(in interface{}) {
+					obj, err := meta.Accessor(in)
+					if err != nil {
+						return
+					}
+					if !i.hasIstioInitializerNext(obj) {
+						return
+					}
+					out, err := runtime.NewScheme().DeepCopy(in)
+					if err != nil {
+						return
+					}
+					glog.Infof("Initializing %v: %v", meta.AsPartialObjectMetadata(obj).Kind, obj.GetName())
+
+					if err := kind.initialize(in, out); err != nil {
 						glog.Errorf("Could not initialize %s: %v", kind.resource, err)
 					}
 				},
@@ -191,17 +205,17 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 	return i
 }
 
-func (i *Initializer) hasIstioInitializerNext(objectMeta *metav1.ObjectMeta) bool {
+func (i *Initializer) hasIstioInitializerNext(object metav1.Object) bool {
 	glog.V(2).Infof("ObjectMeta initializer info %v/%v policy:%q status:%q %v",
-		objectMeta.Namespace, objectMeta.Name,
-		objectMeta.Annotations[istioSidecarAnnotationPolicyKey],
-		objectMeta.Annotations[istioSidecarAnnotationStatusKey],
-		objectMeta.Initializers)
+		object.GetNamespace(), object.GetName(),
+		object.GetAnnotations()[istioSidecarAnnotationPolicyKey],
+		object.GetAnnotations()[istioSidecarAnnotationStatusKey],
+		object.GetInitializers())
 
-	if objectMeta.GetInitializers() == nil {
+	if object.GetInitializers() == nil {
 		return false
 	}
-	pendingInitializers := objectMeta.GetInitializers().Pending
+	pendingInitializers := object.GetInitializers().Pending
 	if len(pendingInitializers) == 0 {
 		return false
 	}
@@ -270,185 +284,101 @@ func (i *Initializer) createTwoWayMergePatch(prev, curr interface{}, dataStruct 
 	return strategicpatch.CreateTwoWayMergePatch(prevData, currData, dataStruct)
 }
 
-func (i *Initializer) initializeDeployment(obj interface{}) error {
-	in := obj.(*appsv1beta1.Deployment)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
+func (i *Initializer) initializeDeployment(in, out interface{}) error {
+	obj := out.(*appsv1beta1.Deployment)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
+		return err
 	}
-
-	glog.Infof("Initializing deployment: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
+	patchBytes, err := i.createTwoWayMergePatch(in, obj, appsv1beta1.Deployment{})
 	if err != nil {
 		return err
 	}
-	out := o.(*appsv1beta1.Deployment)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, appsv1beta1.Deployment{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.AppsV1beta1().Deployments(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.AppsV1beta1().Deployments(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializeStatefulSet(obj interface{}) error {
-	in := obj.(*appsv1beta1.StatefulSet)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
-	}
-
-	glog.Infof("Initializing statefulset: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
-	if err != nil {
-		return err
-	}
-	out := o.(*appsv1beta1.StatefulSet)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+func (i *Initializer) initializeStatefulSet(in, out interface{}) error {
+	obj := in.(*appsv1beta1.StatefulSet)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, appsv1beta1.StatefulSet{})
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.AppsV1beta1().StatefulSets(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.AppsV1beta1().StatefulSets(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializeJob(obj interface{}) error {
-	in := obj.(*batchv1.Job)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
+func (i *Initializer) initializeJob(in, out interface{}) error {
+	obj := in.(*batchv1.Job)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
+		return err
 	}
-
-	glog.Infof("Initializing job: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
+	patchBytes, err := i.createTwoWayMergePatch(in, obj, batchv1.Job{})
 	if err != nil {
 		return err
 	}
-	out := o.(*batchv1.Job)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, batchv1.Job{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.BatchV1().Jobs(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.BatchV1().Jobs(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializeDaemonSet(obj interface{}) error {
-	in := obj.(*v1beta1.DaemonSet)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
+func (i *Initializer) initializeDaemonSet(in, out interface{}) error {
+	obj := in.(*v1beta1.DaemonSet)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
+		return err
 	}
-
-	glog.Infof("Initializing daemonset: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
+	patchBytes, err := i.createTwoWayMergePatch(in, obj, v1beta1.DaemonSet{})
 	if err != nil {
 		return err
 	}
-	out := o.(*v1beta1.DaemonSet)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, v1beta1.DaemonSet{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializeReplicaSet(obj interface{}) error {
-	in := obj.(*v1beta1.ReplicaSet)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
+func (i *Initializer) initializeReplicaSet(in, out interface{}) error {
+	obj := in.(*v1beta1.ReplicaSet)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
+		return err
 	}
-
-	glog.Infof("Initializing replicaset: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
+	patchBytes, err := i.createTwoWayMergePatch(in, obj, v1beta1.ReplicaSet{})
 	if err != nil {
 		return err
 	}
-	out := o.(*v1beta1.ReplicaSet)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, v1beta1.ReplicaSet{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializeReplicationController(obj interface{}) error {
-	in := obj.(*v1.ReplicationController)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
-	}
-
-	glog.Infof("Initializing replicationcontroller: %s", in.Name)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
-	if err != nil {
-		return err
-	}
-	out := o.(*v1.ReplicationController)
-
-	if err = i.modifyResource(&out.ObjectMeta, &out.Spec.Template.ObjectMeta, &out.Spec.Template.Spec); err != nil {
+func (i *Initializer) initializeReplicationController(in, out interface{}) error {
+	obj := in.(*v1.ReplicationController)
+	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
 	patchBytes, err := i.createTwoWayMergePatch(in, out, v1.ReplicationController{})
 	if err != nil {
 		return err
 	}
-	_, err = i.clientset.CoreV1().ReplicationControllers(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.CoreV1().ReplicationControllers(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
-func (i *Initializer) initializePod(obj interface{}) error {
-	in := obj.(*v1.Pod)
-	if !i.hasIstioInitializerNext(&in.ObjectMeta) {
-		return nil
+func (i *Initializer) initializePod(in, out interface{}) error {
+	obj := in.(*v1.Pod)
+	if err := i.modifyResource(&obj.ObjectMeta, nil, &obj.Spec); err != nil {
+		return err
 	}
-
-	glog.Infof("Initializing pod: %v", in)
-
-	o, err := runtime.NewScheme().DeepCopy(in)
+	patchBytes, err := i.createTwoWayMergePatch(in, obj, v1.Pod{})
 	if err != nil {
 		return err
 	}
-	out := o.(*v1.Pod)
-
-	if err = i.modifyResource(&out.ObjectMeta, nil, &out.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, v1.Pod{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.CoreV1().Pods(in.Namespace).
-		Patch(in.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = i.clientset.CoreV1().Pods(obj.Namespace).
+		Patch(obj.Name, types.StrategicMergePatchType, patchBytes)
 	return err
 }
 
