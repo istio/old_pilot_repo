@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -377,6 +378,8 @@ func buildOutboundHTTPRoutes(
 		}
 	}
 
+	addExternalTrafficVirtualHosts(&httpConfigs, config.EgressRules(), mesh.EgressProxyAddress)
+
 	httpConfigs.normalize()
 	return httpConfigs
 }
@@ -480,4 +483,46 @@ func buildInboundListeners(instances []*model.ServiceInstance,
 	}
 
 	return listeners, clusters
+}
+
+func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, egressProxyAddress string, port *model.Port) *VirtualHost {
+
+	egressCluster := buildOutboundCluster("istio-egress.default", port, nil)
+	egressCluster.ServiceName = ""
+	egressCluster.Type = ClusterTypeStrictDNS
+	egressCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", egressProxyAddress)}}
+
+	egressRoute := buildDefaultRoute(egressCluster)
+
+	return &VirtualHost{
+		Name:    rule.Name,
+		Domains: rule.Domains,
+		Routes:  []*HTTPRoute{egressRoute},
+	}
+}
+
+// buildExternalTrafficVirtualHosts builds virtual hosts from egress rule
+func buildExternalTrafficVirtualHostsOnPort(rule *proxyconfig.EgressRule, egressProxyAddress string, port *model.Port) []*VirtualHost {
+	hosts := make([]*VirtualHost, 0)
+
+	host := buildExternalTrafficVirtualHostOnPort(rule, egressProxyAddress, port)
+	hosts = append(hosts, host)
+
+	return hosts
+}
+
+func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules map[string]*proxyconfig.EgressRule, egressProxyAddress string) {
+	for _, rule := range egressRules {
+		for _, port := range rule.Ports {
+			protocol := model.Protocol(strings.ToUpper(port.Protocol))
+			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS {
+				continue
+			}
+			intPort := int(port.Port)
+			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
+			httpConfig := httpConfigs.EnsurePort(intPort)
+			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
+				buildExternalTrafficVirtualHostsOnPort(rule, egressProxyAddress, modelPort)...)
+		}
+	}
 }
