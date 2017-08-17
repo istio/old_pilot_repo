@@ -51,7 +51,7 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath, customConfig string) (Watcher,error) {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath, customConfig string) (Watcher, error) {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {

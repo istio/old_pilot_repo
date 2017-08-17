@@ -29,9 +29,9 @@ import (
 )
 
 var (
-	configpath string
-	meshconfig string
-	role       proxy.Node
+	configpath   string
+	meshconfig   string
+	role         proxy.Node
 	customConfig string
 
 	rootCmd = &cobra.Command{
