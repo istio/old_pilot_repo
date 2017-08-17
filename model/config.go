@@ -32,24 +32,25 @@ import (
 // last update operation on the object.
 type ConfigMeta struct {
 	// Type is a short configuration name that matches the content message type
-	Type string
+	// (e.g. "route-rule")
+	Type string `json:"type,omitempty"`
 
 	// Name is a unique immutable identifier in a namespace
-	Name string
+	Name string `json:"name,omitempty"`
 
 	// Namespace defines the space for names (optional for some types),
 	// applications may choose to use namespaces for a variety of purposes
 	// (security domains, fault domains, organizational domains)
-	Namespace string
+	Namespace string `json:"namespace,omitempty"`
 
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects.
-	Labels map[string]string
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
-	Annotations map[string]string
+	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// ResourceVersion is an opaque identifier for tracking updates to the config registry.
 	// The implementation may use a change index or a commit log for the revision.
@@ -61,7 +62,7 @@ type ConfigMeta struct {
 	//
 	// An empty revision carries a special meaning that the associated object has
 	// not been stored and assigned a revision.
-	ResourceVersion string
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
 // Config is a configuration unit consisting of the type of configuration, the
