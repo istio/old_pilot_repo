@@ -107,12 +107,15 @@ func createIngressRule(name, host, path, domainSuffix string,
 	}
 
 	return model.Config{
-		Name:            name,
-		Namespace:       ingress.Namespace,
-		Labels:          ingress.Labels,
-		Annotations:     ingress.Annotations,
-		ResourceVersion: ingress.ResourceVersion,
-		Spec:            rule,
+		ConfigMeta: model.ConfigMeta{
+			Type:            model.IngressRule.Type,
+			Name:            name,
+			Namespace:       ingress.Namespace,
+			Labels:          ingress.Labels,
+			Annotations:     ingress.Annotations,
+			ResourceVersion: ingress.ResourceVersion,
+		},
+		Spec: rule,
 	}
 }
 

@@ -203,7 +203,7 @@ func TestIstioRegistryRouteRules(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		r.mock.EXPECT().List(RouteRule.Type).Return(c.mockObjs, c.mockError)
+		r.mock.EXPECT().List(RouteRule.Type, "").Return(c.mockObjs, c.mockError)
 		if got := r.registry.RouteRules(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%v with RouteRule failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}
@@ -219,7 +219,7 @@ func TestIstioRegistryIngressRules(t *testing.T) {
 		Destination: "a.svc",
 	}
 
-	r.mock.EXPECT().List(IngressRule.Type).Return([]Config{{
+	r.mock.EXPECT().List(IngressRule.Type, "").Return([]Config{{
 		Name: rule.Name,
 		Spec: rule,
 	}}, nil)
@@ -230,7 +230,7 @@ func TestIstioRegistryIngressRules(t *testing.T) {
 		t.Errorf("IngressRules failed: \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(rule))
 	}
 
-	r.mock.EXPECT().List(IngressRule.Type).Return(nil, errors.New("cannot list"))
+	r.mock.EXPECT().List(IngressRule.Type, "").Return(nil, errors.New("cannot list"))
 	if got := r.registry.IngressRules(); len(got) > 0 {
 		t.Errorf("IngressRules failed: \ngot %+vwant empty", spew.Sdump(got))
 	}
@@ -258,7 +258,7 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 		routeRule2SourceEmpty,
 	}
 
-	r.mock.EXPECT().List(RouteRule.Type).Return(mockObjs, nil)
+	r.mock.EXPECT().List(RouteRule.Type, "").Return(mockObjs, nil)
 	got := r.registry.RouteRulesBySource(instances)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Failed \ngot %+vwant %+v", spew.Sdump(got), spew.Sdump(want))
@@ -302,7 +302,7 @@ func TestIstioRegistryPolicies(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r.mock.EXPECT().List(DestinationPolicy.Type).Return(c.mockObjs, c.mockError)
+		r.mock.EXPECT().List(DestinationPolicy.Type, "").Return(c.mockObjs, c.mockError)
 		if got := r.registry.DestinationPolicies(); !reflect.DeepEqual(makeSet(got), makeSet(c.want)) {
 			t.Errorf("%v failed: \ngot %+vwant %+v", c.name, spew.Sdump(got), spew.Sdump(c.want))
 		}

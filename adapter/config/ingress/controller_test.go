@@ -87,10 +87,12 @@ func TestIngressController(t *testing.T) {
 	}
 
 	rule := model.Config{
-		Type:      model.IngressRule.Type,
-		Name:      "test",
-		Namespace: ns,
-		Spec:      mock.ExampleIngressRule,
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.IngressRule.Type,
+			Name:      "test",
+			Namespace: ns,
+		},
+		Spec: mock.ExampleIngressRule,
 	}
 
 	// make sure all operations error out

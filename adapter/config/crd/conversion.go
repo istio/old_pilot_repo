@@ -44,13 +44,15 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 	}
 	meta := object.GetObjectMeta()
 	return &model.Config{
-		Type:            schema.Type,
-		Name:            meta.Name,
-		Namespace:       meta.Namespace,
-		Labels:          meta.Labels,
-		Annotations:     meta.Annotations,
-		ResourceVersion: meta.ResourceVersion,
-		Spec:            data,
+		ConfigMeta: model.ConfigMeta{
+			Type:            schema.Type,
+			Name:            meta.Name,
+			Namespace:       meta.Namespace,
+			Labels:          meta.Labels,
+			Annotations:     meta.Annotations,
+			ResourceVersion: meta.ResourceVersion,
+		},
+		Spec: data,
 	}, nil
 }
 

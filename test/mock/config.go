@@ -66,14 +66,16 @@ var (
 func Make(namespace string, i int) model.Config {
 	name := fmt.Sprintf("%s%d", "mock-config", i)
 	return model.Config{
-		Type:      model.MockConfig.Type,
-		Name:      name,
-		Namespace: namespace,
-		Labels: map[string]string{
-			"key": name,
-		},
-		Annotations: map[string]string{
-			"annotationkey": name,
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.MockConfig.Type,
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"key": name,
+			},
+			Annotations: map[string]string{
+				"annotationkey": name,
+			},
 		},
 		Spec: &test.MockConfig{
 			Key: name,
@@ -129,17 +131,21 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, namespace string, n in
 	}
 
 	invalid := model.Config{
-		Type:            model.MockConfig.Type,
-		Name:            "invalid",
-		ResourceVersion: revs[0],
-		Spec:            &test.MockConfig{},
+		ConfigMeta: model.ConfigMeta{
+			Type:            model.MockConfig.Type,
+			Name:            "invalid",
+			ResourceVersion: revs[0],
+		},
+		Spec: &test.MockConfig{},
 	}
 
 	missing := model.Config{
-		Type:            model.MockConfig.Type,
-		Name:            "missing",
-		ResourceVersion: revs[0],
-		Spec:            &test.MockConfig{Key: "missing"},
+		ConfigMeta: model.ConfigMeta{
+			Type:            model.MockConfig.Type,
+			Name:            "missing",
+			ResourceVersion: revs[0],
+		},
+		Spec: &test.MockConfig{Key: "missing"},
 	}
 
 	if _, err := r.Create(invalid); err == nil {
@@ -238,26 +244,32 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, namespace string, n in
 func CheckIstioConfigTypes(store model.ConfigStore, namespace string, t *testing.T) {
 	name := "example"
 	if _, err := store.Create(model.Config{
-		Type:      model.RouteRule.Type,
-		Name:      name,
-		Namespace: namespace,
-		Spec:      ExampleRouteRule,
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.RouteRule.Type,
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: ExampleRouteRule,
 	}); err != nil {
 		t.Errorf("Post(RouteRule) => got %v", err)
 	}
 	if _, err := store.Create(model.Config{
-		Type:      model.IngressRule.Type,
-		Name:      name,
-		Namespace: namespace,
-		Spec:      ExampleIngressRule,
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.IngressRule.Type,
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: ExampleIngressRule,
 	}); err != nil {
 		t.Errorf("Post(IngressRule) => got %v", err)
 	}
 	if _, err := store.Create(model.Config{
-		Type:      model.DestinationPolicy.Type,
-		Name:      name,
-		Namespace: namespace,
-		Spec:      ExampleDestinationPolicy,
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.DestinationPolicy.Type,
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: ExampleDestinationPolicy,
 	}); err != nil {
 		t.Errorf("Post(DestinationPolicy) => got %v", err)
 	}

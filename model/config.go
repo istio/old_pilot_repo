@@ -27,11 +27,10 @@ import (
 	"istio.io/pilot/model/test"
 )
 
-// Config is a configuration unit consisting of the type of configuration, the
-// key identifier that is unique per type, and the content represented as a
-// protobuf message.  The revision is optional, and if provided, identifies the
+// ConfigMeta is metadata attached to each configuration unit.
+// The revision is optional, and if provided, identifies the
 // last update operation on the object.
-type Config struct {
+type ConfigMeta struct {
 	// Type is a short configuration name that matches the content message type
 	Type string
 
@@ -63,6 +62,13 @@ type Config struct {
 	// An empty revision carries a special meaning that the associated object has
 	// not been stored and assigned a revision.
 	ResourceVersion string
+}
+
+// Config is a configuration unit consisting of the type of configuration, the
+// key identifier that is unique per type, and the content represented as a
+// protobuf message.
+type Config struct {
+	ConfigMeta
 
 	// Spec holds the configuration object as a protobuf message
 	Spec proto.Message
