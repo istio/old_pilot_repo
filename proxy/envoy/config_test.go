@@ -246,7 +246,7 @@ func addCircuitBreaker(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -256,7 +256,7 @@ func addRewrite(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -266,7 +266,7 @@ func addRedirect(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -276,7 +276,7 @@ func addTimeout(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -286,7 +286,7 @@ func addWeightedRoute(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -296,7 +296,7 @@ func addFaultRoute(r model.ConfigStore, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
+	if _, err = r.Create(msg); err != nil {
 		t.Fatal(err)
 	}
 }

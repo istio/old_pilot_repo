@@ -102,7 +102,7 @@ istioctl mixer command documentation.
 					return err
 				}
 				schema, _ := configClient.ConfigDescriptor().GetByType(config.Type)
-				rev, err := configClient.Post(spec)
+				rev, err := configClient.Create(spec)
 				if err != nil {
 					return err
 				}
@@ -143,7 +143,7 @@ istioctl mixer command documentation.
 					config.Revision = rev
 				}
 
-				newRev, err := configClient.Put(spec, config.Revision)
+				newRev, err := configClient.Update(spec, config.Revision)
 				if err != nil {
 					return err
 				}
@@ -186,10 +186,10 @@ istioctl mixer command documentation.
 				config, exists, rev := configClient.Get(typ.Type, args[1])
 				if exists {
 					configs = append(configs, model.Config{
-						Type:     typ.Type,
-						Key:      typ.Key(config),
-						Revision: rev,
-						Content:  config,
+						Type:            typ.Type,
+						Key:             typ.Key(config),
+						ResourceVersion: rev,
+						Spec:            config,
 					})
 				}
 			} else {
@@ -426,13 +426,13 @@ func printShortOutput(configList []model.Config) {
 func printYamlOutput(configList []model.Config) {
 	for _, c := range configList {
 		schema, _ := configClient.ConfigDescriptor().GetByType(c.Type)
-		out, err := schema.ToYAML(c.Content)
+		out, err := schema.ToYAML(c.Spec)
 		if err != nil {
 			glog.Warning(err)
 		}
 		fmt.Printf("type: %s\n", c.Type)
 		fmt.Printf("key: %s\n", c.Key)
-		fmt.Printf("revision: %s\n", c.Revision)
+		fmt.Printf("revision: %s\n", c.ResourceVersion)
 		fmt.Println("spec:")
 		lines := strings.Split(out, "\n")
 		for _, line := range lines {

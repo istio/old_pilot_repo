@@ -373,7 +373,7 @@ func TestSidecarListenerDiscovery(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err = registry.Post(msg); err != nil {
+				if _, err = registry.Create(msg); err != nil {
 					t.Fatal(err)
 				}
 			}

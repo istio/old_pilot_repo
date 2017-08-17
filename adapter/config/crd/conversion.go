@@ -20,8 +20,6 @@ import (
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/golang/protobuf/proto"
-
 	"istio.io/pilot/model"
 )
 
@@ -39,18 +37,36 @@ func configKey(typ, key string) string {
 	return key
 }
 
+func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
+	data, err := schema.FromJSONMap(object.GetSpec())
+	if err != nil {
+		return nil, err
+	}
+	meta := object.GetObjectMeta()
+	return &model.Config{
+		Type:            schema.Type,
+		Name:            meta.Name,
+		Namespace:       meta.Namespace,
+		Labels:          meta.Labels,
+		Annotations:     meta.Annotations,
+		ResourceVersion: meta.ResourceVersion,
+		Spec:            data,
+	}, nil
+}
+
 // modelToKube translates Istio config to k8s config JSON
-func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message,
-	revision string) (IstioObject, error) {
-	spec, err := schema.ToJSONMap(config)
+func modelToKube(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
+	spec, err := schema.ToJSONMap(config.Spec)
 	if err != nil {
 		return nil, err
 	}
 	out := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	out.SetObjectMeta(meta_v1.ObjectMeta{
-		Name:            configKey(schema.Type, schema.Key(config)),
-		Namespace:       namespace,
-		ResourceVersion: revision,
+		Name:            config.Name,
+		Namespace:       config.Namespace,
+		ResourceVersion: config.ResourceVersion,
+		Labels:          config.Labels,
+		Annotations:     config.Annotations,
 	})
 	out.SetSpec(spec)
 

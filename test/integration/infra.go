@@ -280,9 +280,9 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 
 	_, exists, rev := istioClient.Get(typ, schema.Key(v))
 	if exists {
-		_, err = istioClient.Put(v, rev)
+		_, err = istioClient.Update(v, rev)
 	} else {
-		_, err = istioClient.Post(v)
+		_, err = istioClient.Create(v)
 	}
 	if err != nil {
 		return err

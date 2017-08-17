@@ -76,9 +76,6 @@ func (descriptor ConfigDescriptor) Validate() error {
 	messages := make(map[string]bool)
 
 	for _, v := range descriptor {
-		if v.Key == nil {
-			errs = multierror.Append(errs, fmt.Errorf("missing the required key function for type: %q", v.Type))
-		}
 		if !IsDNS1123Label(v.Type) {
 			errs = multierror.Append(errs, fmt.Errorf("invalid type: %q", v.Type))
 		}
@@ -101,6 +98,7 @@ func (descriptor ConfigDescriptor) Validate() error {
 }
 
 // ValidateConfig ensures that the config object is well-defined
+// TODO: also check name and namespace
 func (descriptor ConfigDescriptor) ValidateConfig(typ string, obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("invalid nil configuration object")
