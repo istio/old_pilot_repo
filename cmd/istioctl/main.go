@@ -95,6 +95,9 @@ istioctl mixer command documentation.
 				return errors.New("nothing to create")
 			}
 			for _, config := range varr {
+				if config.Namespace == "" {
+					config.Namespace = namespace
+				}
 				rev, err := configClient.Create(config)
 				if err != nil {
 					return err
@@ -125,6 +128,9 @@ istioctl mixer command documentation.
 				return errors.New("nothing to replace")
 			}
 			for _, config := range varr {
+				if config.Namespace == "" {
+					config.Namespace = namespace
+				}
 				// fill up revision
 				if config.ResourceVersion == "" {
 					current, exists := configClient.Get(config.Type, config.Name, config.Namespace)
@@ -360,7 +366,7 @@ func readInputs() ([]model.Config, error) {
 // Print a simple list of names
 func printShortOutput(configList []model.Config) {
 	for _, c := range configList {
-		fmt.Printf("%v\n", c.Key)
+		fmt.Printf("%v\n", c.Key())
 	}
 }
 
@@ -368,7 +374,7 @@ func printShortOutput(configList []model.Config) {
 func printYamlOutput(configList []model.Config) {
 	for _, c := range configList {
 		yaml, _ := configClient.ConfigDescriptor().ToYAML(c)
-		fmt.Println(yaml)
+		fmt.Print(yaml)
 		fmt.Println("---")
 	}
 }
