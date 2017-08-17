@@ -257,6 +257,9 @@ istioctl mixer command documentation.
 			}
 			var errs error
 			for _, config := range varr {
+				if config.Namespace == "" {
+					config.Namespace = namespace
+				}
 				// compute key if necessary
 				if err = configClient.Delete(config.Type, config.Name, config.Namespace); err != nil {
 					errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", config.Key(), err))
