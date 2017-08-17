@@ -156,6 +156,16 @@ func (descriptor ConfigDescriptor) FromJSON(config JSONConfig) (*Config, error) 
 	}, nil
 }
 
+// FromJSON deserializes and validates a YAML config object
+func (descriptor ConfigDescriptor) FromYAML(content []byte) (*Config, error) {
+	out := JSONConfig{}
+	err := yaml.Unmarshal(content, &out)
+	if err != nil {
+		return nil, err
+	}
+	return descriptor.FromJSON(out)
+}
+
 // ToYAML serializes a config into a YAML form
 func (descriptor ConfigDescriptor) ToYAML(config Config) (string, error) {
 	schema, exists := descriptor.GetByType(config.Type)

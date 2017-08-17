@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
-
 	"github.com/golang/protobuf/ptypes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -234,12 +232,7 @@ func addConfig(r model.ConfigStore, file string, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := model.JSONConfig{}
-	err = yaml.Unmarshal(content, &out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	config, err := model.IstioConfigTypes.FromJSON(out)
+	config, err := model.IstioConfigTypes.FromYAML(content)
 	if err != nil {
 		t.Fatal(err)
 	}

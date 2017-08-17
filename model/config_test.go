@@ -191,9 +191,9 @@ func TestIstioRegistryRouteRules(t *testing.T) {
 		{
 			name: "Slice of unsorted RouteRules",
 			mockObjs: []Config{
-				{Name: "foo", Spec: routeRule1MatchNil},
-				{Name: "bar", Spec: routeRule3SourceMismatch},
-				{Name: "baz", Spec: routeRule2SourceEmpty},
+				{ConfigMeta: ConfigMeta{Name: "foo"}, Spec: routeRule1MatchNil},
+				{ConfigMeta: ConfigMeta{Name: "bar"}, Spec: routeRule3SourceMismatch},
+				{ConfigMeta: ConfigMeta{Name: "baz"}, Spec: routeRule2SourceEmpty},
 			},
 			want: map[string]*proxyconfig.RouteRule{
 				"//foo": routeRule1MatchNil,
@@ -220,7 +220,9 @@ func TestIstioRegistryIngressRules(t *testing.T) {
 	}
 
 	r.mock.EXPECT().List(IngressRule.Type, "").Return([]Config{{
-		Name: rule.Name,
+		ConfigMeta: ConfigMeta{
+			Name: rule.Name,
+		},
 		Spec: rule,
 	}}, nil)
 
@@ -244,12 +246,12 @@ func TestIstioRegistryRouteRulesBySource(t *testing.T) {
 	instances := []*ServiceInstance{serviceInstance1, serviceInstance2}
 
 	mockObjs := []Config{
-		{Name: "match-nil", Spec: routeRule1MatchNil},
-		{Name: "source-empty", Spec: routeRule2SourceEmpty},
-		{Name: "source-mismatch", Spec: routeRule3SourceMismatch},
-		{Name: "source-match", Spec: routeRule4SourceMatch},
-		{Name: "tag-subset-of-mismatch", Spec: routeRule5TagSubsetOfMismatch},
-		{Name: "tag-subset-of-match", Spec: routeRule6TagSubsetOfMatch},
+		{ConfigMeta: ConfigMeta{Name: "match-nil"}, Spec: routeRule1MatchNil},
+		{ConfigMeta: ConfigMeta{Name: "source-empty"}, Spec: routeRule2SourceEmpty},
+		{ConfigMeta: ConfigMeta{Name: "source-mismatch"}, Spec: routeRule3SourceMismatch},
+		{ConfigMeta: ConfigMeta{Name: "source-match"}, Spec: routeRule4SourceMatch},
+		{ConfigMeta: ConfigMeta{Name: "tag-subset-of-mismatch"}, Spec: routeRule5TagSubsetOfMismatch},
+		{ConfigMeta: ConfigMeta{Name: "tag-subset-of-match"}, Spec: routeRule6TagSubsetOfMatch},
 	}
 	want := []*proxyconfig.RouteRule{
 		routeRule6TagSubsetOfMatch,
@@ -284,9 +286,9 @@ func TestIstioRegistryPolicies(t *testing.T) {
 		{
 			name: "Slice of unsorted DestinationPolicy",
 			mockObjs: []Config{
-				{Name: "foo", Spec: dstPolicy1},
-				{Name: "bar", Spec: dstPolicy2},
-				{Name: "baz", Spec: dstPolicy3},
+				{ConfigMeta: ConfigMeta{Name: "foo"}, Spec: dstPolicy1},
+				{ConfigMeta: ConfigMeta{Name: "bar"}, Spec: dstPolicy2},
+				{ConfigMeta: ConfigMeta{Name: "baz"}, Spec: dstPolicy3},
 			},
 			want: []*proxyconfig.DestinationPolicy{
 				dstPolicy1, dstPolicy2, dstPolicy3,
