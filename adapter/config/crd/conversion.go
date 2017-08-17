@@ -23,20 +23,6 @@ import (
 	"istio.io/pilot/model"
 )
 
-// configKey assigns k8s CRD name to Istio config
-func configKey(typ, key string) string {
-	switch typ {
-	case model.RouteRule.Type, model.IngressRule.Type:
-		return key
-	case model.DestinationPolicy.Type:
-		// TODO: special key encoding for long hostnames-based keys
-		parts := strings.Split(key, ".")
-		return strings.Replace(parts[0], "-", "--", -1) +
-			"-" + strings.Replace(parts[1], "-", "--", -1)
-	}
-	return key
-}
-
 func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
 	data, err := schema.FromJSONMap(object.GetSpec())
 	if err != nil {
@@ -56,8 +42,8 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 	}, nil
 }
 
-// modelToKube translates Istio config to k8s config JSON
-func modelToKube(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
+// convertConfig translates Istio config to k8s config JSON
+func convertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
 	spec, err := schema.ToJSONMap(config.Spec)
 	if err != nil {
 		return nil, err

@@ -156,7 +156,7 @@ func (descriptor ConfigDescriptor) FromJSON(config JSONConfig) (*Config, error) 
 	}, nil
 }
 
-// FromJSON deserializes and validates a YAML config object
+// FromYAML deserializes and validates a YAML config object
 func (descriptor ConfigDescriptor) FromYAML(content []byte) (*Config, error) {
 	out := JSONConfig{}
 	err := yaml.Unmarshal(content, &out)

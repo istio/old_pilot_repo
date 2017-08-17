@@ -266,7 +266,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 
-	out, err := modelToKube(schema, config)
+	out, err := convertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}
@@ -299,7 +299,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 		return "", fmt.Errorf("revision is required")
 	}
 
-	out, err := modelToKube(schema, config)
+	out, err := convertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}

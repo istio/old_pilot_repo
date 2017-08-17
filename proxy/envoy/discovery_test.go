@@ -326,7 +326,6 @@ func TestRouteDiscoveryEgress(t *testing.T) {
 func TestSidecarListenerDiscovery(t *testing.T) {
 	testCases := []struct {
 		name string
-		typ  string
 		file string
 	}{
 		{name: "none"},
