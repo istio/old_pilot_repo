@@ -283,32 +283,83 @@ func TestGetMeshConfig(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl, ns)
-	name := "istio-config"
 
-	configMap := &v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
+	cases := []struct {
+		name      string
+		configMap *v1.ConfigMap
+		queryName string
+		wantErr   bool
+	}{
+		{
+			name:      "bad query name",
+			queryName: "bad-query-name-foo-bar",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-query-name"},
+				Data: map[string]string{
+					ConfigMapKey: "", // empty config
+				},
+			},
+			wantErr: true,
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+		{
+			name:      "bad config key",
+			queryName: "bad-config-key",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-key"},
+				Data: map[string]string{
+					"bad-key": "",
+				},
+			},
+			wantErr: true,
 		},
-		Data: map[string]string{
-			ConfigMapKey: "", // empty config
+		{
+			name:      "bad config data",
+			queryName: "bad-config-data",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-data"},
+				Data: map[string]string{
+					ConfigMapKey: "bad config",
+				},
+			},
+			wantErr: true,
 		},
-	}
-
-	_, err = cl.CoreV1().ConfigMaps(ns).Create(configMap)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
+		{
+			name:      "good",
+			queryName: "good",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "good"},
+				Data: map[string]string{
+					ConfigMapKey: "", // empty config
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	want := proxy.DefaultMeshConfig()
-	got, err := GetMeshConfig(cl, ns, name)
-	if err != nil {
-		t.Fatalf("GetMeshConfig returned an error: %v", err)
-	}
-	if !reflect.DeepEqual(got, &want) {
-		t.Fatalf("GetMeshConfig returned the wrong result: \ngot  %v \nwant %v", got, &want)
+
+	for _, c := range cases {
+		_, err = cl.CoreV1().ConfigMaps(ns).Create(c.configMap)
+		if err != nil {
+			t.Fatalf("%v: Create failed: %v", c.name, err)
+		}
+		got, err := GetMeshConfig(cl, ns, c.queryName)
+		gotErr := err != nil
+		if gotErr != c.wantErr {
+			t.Fatalf("%v: GetMeshConfig returned wrong error value: got %v want %v: err=%v", c.name, gotErr, c.wantErr, err)
+		}
+		if gotErr {
+			continue
+		}
+		if !reflect.DeepEqual(got, &want) {
+			t.Fatalf("%v: GetMeshConfig returned the wrong result: \ngot  %v \nwant %v", c.name, got, &want)
+		}
+		if err = cl.CoreV1().ConfigMaps(ns).Delete(c.configMap.Name, &metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("%v: Delete failed: %v", c.name, err)
+		}
 	}
 }
