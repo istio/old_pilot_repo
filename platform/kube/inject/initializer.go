@@ -299,7 +299,7 @@ func (i *Initializer) initializeDeployment(in, out interface{}) error {
 }
 
 func (i *Initializer) initializeStatefulSet(in, out interface{}) error {
-	obj := in.(*appsv1beta1.StatefulSet)
+	obj := out.(*appsv1beta1.StatefulSet)
 	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ func (i *Initializer) initializeStatefulSet(in, out interface{}) error {
 }
 
 func (i *Initializer) initializeJob(in, out interface{}) error {
-	obj := in.(*batchv1.Job)
+	obj := out.(*batchv1.Job)
 	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
@@ -327,7 +327,7 @@ func (i *Initializer) initializeJob(in, out interface{}) error {
 }
 
 func (i *Initializer) initializeDaemonSet(in, out interface{}) error {
-	obj := in.(*v1beta1.DaemonSet)
+	obj := out.(*v1beta1.DaemonSet)
 	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (i *Initializer) initializeDaemonSet(in, out interface{}) error {
 }
 
 func (i *Initializer) initializeReplicaSet(in, out interface{}) error {
-	obj := in.(*v1beta1.ReplicaSet)
+	obj := out.(*v1beta1.ReplicaSet)
 	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
@@ -355,7 +355,7 @@ func (i *Initializer) initializeReplicaSet(in, out interface{}) error {
 }
 
 func (i *Initializer) initializeReplicationController(in, out interface{}) error {
-	obj := in.(*v1.ReplicationController)
+	obj := out.(*v1.ReplicationController)
 	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
 		return err
 	}
@@ -369,7 +369,7 @@ func (i *Initializer) initializeReplicationController(in, out interface{}) error
 }
 
 func (i *Initializer) initializePod(in, out interface{}) error {
-	obj := in.(*v1.Pod)
+	obj := out.(*v1.Pod)
 	if err := i.modifyResource(&obj.ObjectMeta, nil, &obj.Spec); err != nil {
 		return err
 	}
