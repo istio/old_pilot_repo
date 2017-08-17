@@ -33,16 +33,16 @@ const (
 	// DefaultLbType defines the default load balancer policy
 	DefaultLbType = LbTypeRoundRobin
 
-	// LDSName is the name of LDS cluster
+	// LDSName is the name of listener-discovery-service (LDS) cluster
 	LDSName = "lds"
 
-	// RDSName is the name of RDS cluster
+	// RDSName is the name of route-discovery-service (RDS) cluster
 	RDSName = "rds"
 
-	// SDSName is the name of SDS cluster
+	// SDSName is the name of service-discovery-service (SDS) cluster
 	SDSName = "sds"
 
-	// CDSName is the name of CDS cluster
+	// CDSName is the name of cluster-discovery-service (CDS) cluster
 	CDSName = "cds"
 
 	// VirtualListenerName is the name for traffic capture listener
@@ -54,6 +54,9 @@ const (
 	// ClusterTypeStatic name for clusters of type 'static'
 	ClusterTypeStatic = "static"
 
+	// ClusterTypeOriginalDST name for clusters of type 'original_dst'
+	ClusterTypeOriginalDST = "original_dst"
+
 	// LbTypeRoundRobin is the name for roundrobin LB
 	LbTypeRoundRobin = "round_robin"
 
@@ -62,6 +65,9 @@ const (
 
 	// LbTypeRandom is the name for random LB
 	LbTypeRandom = "random"
+
+	// LbTypeOriginalDST is the name for LB of original_dst
+	LbTypeOriginalDST = "original_dst_lb"
 
 	// ClusterFeatureHTTP2 is the feature to use HTTP/2 for a cluster
 	ClusterFeatureHTTP2 = "http2"
