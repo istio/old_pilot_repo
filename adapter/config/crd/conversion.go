@@ -28,13 +28,23 @@ import (
 // configKey assigns k8s CRD name to Istio config
 func configKey(typ, key string) string {
 	switch typ {
-	case model.RouteRule, model.IngressRule, model.EgressRule:
+	case model.RouteRule, model.IngressRule:
 		return typ + "-" + key
 	case model.DestinationPolicy:
 		// TODO: special key encoding for long hostnames-based keys
 		parts := strings.Split(key, ".")
 		return typ + "-" + strings.Replace(parts[0], "-", "--", -1) +
 			"-" + strings.Replace(parts[1], "-", "--", -1)
+	case model.EgressRule:
+		escapedKey := key
+		// use letter 'e' as escape character:
+		// ee = e
+		// ed = .
+		// es = *
+		escapedKey = strings.Replace(escapedKey, "e", "ee", -1)
+		escapedKey = strings.Replace(escapedKey, ".", "ed", -1)
+		escapedKey = strings.Replace(escapedKey, "*", "es", -1)
+		return typ + "-" + escapedKey
 	}
 	return key
 }

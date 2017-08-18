@@ -32,3 +32,16 @@ func TestCamelKabob(t *testing.T) {
 		}
 	}
 }
+
+var convertedKeys = []struct{ typ, in, out string }{
+	{"egress-rule", "*.fox-news.com", "egress-rule-esedfox-neewsedcom"},
+}
+
+func TestConvertKey(t *testing.T) {
+	for _, key := range convertedKeys {
+		convertedKey := configKey(key.typ, key.in)
+		if convertedKey != key.out {
+			t.Errorf("configKey(%q, %q) => %q, want %q", key.typ, key.in, convertedKey, key.out)
+		}
+	}
+}

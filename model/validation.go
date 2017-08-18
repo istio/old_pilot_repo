@@ -763,24 +763,8 @@ func ValidateEgressRule(msg proto.Message) error {
 	}
 
 	var errs error
-	if rule.Name == "" {
-		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a name"))
-	}
-
-	if rule.Domains == nil || len(rule.Domains) == 0 {
-		return fmt.Errorf("egress rule must have a domains list")
-	}
-
-	domains := make(map[string]bool)
-	for _, domain := range rule.Domains {
-		if _, exists := domains[domain]; exists {
-			errs = multierror.Append(errs, fmt.Errorf("duplicate domain: %s", domain))
-		}
-		domains[domain] = true
-
-		if err := ValidateEgressRuleDomain(domain); err != nil {
-			errs = multierror.Append(errs, err)
-		}
+	if err := ValidateEgressRuleDomain(rule.Domain); err != nil {
+		errs = multierror.Append(errs, err)
 	}
 
 	if rule.Ports == nil || len(rule.Ports) == 0 {
@@ -837,8 +821,8 @@ func ValidateEgressRulePort(port *proxyconfig.EgressRule_Port) error {
 	}
 
 	protocol := Protocol(strings.ToUpper(port.Protocol))
-	if protocol != ProtocolHTTP && protocol != ProtocolHTTPS {
-		return fmt.Errorf("currently, only %s and %s protocols are supported", ProtocolHTTP, ProtocolHTTPS)
+	if protocol != ProtocolHTTP {
+		return fmt.Errorf("currently, only %s protocol is supported", ProtocolHTTP)
 	}
 
 	return nil

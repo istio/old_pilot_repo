@@ -270,7 +270,7 @@ var (
 		Validate:    ValidateEgressRule,
 		Key: func(config proto.Message) string {
 			rule := config.(*proxyconfig.EgressRule)
-			return rule.Name
+			return rule.Domain
 		},
 	}
 
