@@ -71,7 +71,7 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	if mesh.IngressService != "" {
 		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
 	}
-	glog.Infof("ANDRA STATUS publishService ", publishService)
+	glog.Infof("INGRESS STATUS publishService ", publishService)
 	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)
 
 	customIngressStatus := func(*betaext.Ingress) []v1.LoadBalancerIngress {

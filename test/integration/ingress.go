@@ -62,10 +62,10 @@ func (t *ingress) setup() error {
 			"tls.crt": crt,
 		},
 	})
-	/*
+
 	if err != nil {
 		return err
-	}*/
+	}
 
 	// parse and send yamls
 	yamlFile, err := ioutil.ReadFile("test/integration/testdata/ingress.yaml")
@@ -190,7 +190,6 @@ func (t *ingress) checkIngressStatus() status {
 }
 
 func (t *ingress) teardown() {
-	/*
 	if !t.Ingress {
 		return
 	}
@@ -204,5 +203,5 @@ func (t *ingress) teardown() {
 	}
 	if err := t.deleteAllConfigs(); err != nil {
 		glog.Warning(err)
-	}*/
+	}
 }

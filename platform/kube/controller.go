@@ -403,7 +403,7 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 	c.services.handler.Append(func(obj interface{}, event model.Event) error {
 		svc := *obj.(*v1.Service)
 
-		if svc.Namespace == "kube-system" || svc.Namespace == "istio-system" {
+		if svc.Namespace == meta_v1.NamespaceSystem {
 			return nil
 		}
 
@@ -422,7 +422,7 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 	c.endpoints.handler.Append(func(obj interface{}, event model.Event) error {
 		ep := *obj.(*v1.Endpoints)
 
-		if ep.Namespace == "kube-system" || ep.Namespace == "istio-system" {
+		if ep.Namespace == meta_v1.NamespaceSystem {
 			return nil
 		}
 

@@ -252,7 +252,7 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	pod := infra.apps[app][0]
 	cmd := fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
 		pod, kubeconfig, infra.Namespace, url, count, extra)
-	glog.Infof(cmd)
+	glog.Info(cmd)
 	request, err := util.Shell(cmd)
 
 	if err != nil {

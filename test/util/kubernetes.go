@@ -76,7 +76,7 @@ func GetAppPods(cl kubernetes.Interface, nslist []string) (map[string][]string, 
 	var items []v1.Pod
 
 	for _, ns := range nslist {
-		glog.Info("Checking all pods are running in namespace %s ...", ns)
+		glog.Infof("Checking all pods are running in namespace %s ...", ns)
 
 		for n := 0; ; n++ {
 			list, err := cl.CoreV1().Pods(ns).List(meta_v1.ListOptions{})
