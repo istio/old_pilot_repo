@@ -1,8 +1,13 @@
 reviewers:
   - ayj
+  - GregHanson
+  - ijsnellf
   - kyessenov
   - rshriram
   - sebastienvas
 approvers:
+  - ayj
+  - GregHanson
+  - ijsnellf
   - kyessenov
   - rshriram
