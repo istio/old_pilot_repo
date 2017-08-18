@@ -28,6 +28,7 @@ import (
 	"istio.io/pilot/test/util"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -102,7 +103,15 @@ func TestHasIstioInitializerNext(t *testing.T) {
 	}{
 		{
 			meta: &metav1.ObjectMeta{
-				Name:         "no-initializer",
+				Name:        "no-initializer",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{},
+			},
+			want: false,
+		},
+		{
+			meta: &metav1.ObjectMeta{
+				Name:         "empty-initializer",
 				Namespace:    "test-namespace",
 				Annotations:  map[string]string{},
 				Initializers: &metav1.Initializers{},
@@ -158,59 +167,63 @@ func TestHasIstioInitializerNext(t *testing.T) {
 func TestInitializerModifyResource(t *testing.T) {
 	cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer util.DeleteNamespace(cl, ns)
 	mesh := proxy.DefaultMeshConfig()
 
-	options := InitializerOptions{
-		Hub:             unitTestHub,
-		Tag:             unitTestTag,
-		Namespace:       ns,
-		InjectionPolicy: InjectionPolicyOptOut,
-	}
-	i := NewInitializer(cl, &mesh, options)
+	namespace := "test-namespace"
 
 	cases := []struct {
-		in        string
-		want      string
-		namespace string
+		in               string
+		want             string
+		objNamespace     string
+		managedNamespace string
 	}{
 		{
-			in:        "testdata/kube-system.yaml",
-			want:      "testdata/kube-system.yaml.injected",
-			namespace: "kube-system",
+			in:               "testdata/kube-system.yaml",
+			want:             "testdata/kube-system.yaml.injected",
+			managedNamespace: v1.NamespaceAll,
+			objNamespace:     "kube-system",
 		},
 		{
-			in:        "testdata/non-managed-namespace.yaml",
-			want:      "testdata/non-managed-namespace.yaml.injected",
-			namespace: ns + "-non-matching",
+			in:               "testdata/non-managed-namespace.yaml",
+			want:             "testdata/non-managed-namespace.yaml.injected",
+			managedNamespace: namespace,
+			objNamespace:     "non-matching",
 		},
 		{
-			in:        "testdata/single-initializer.yaml",
-			want:      "testdata/single-initializer.yaml.injected",
-			namespace: ns,
+			in:               "testdata/single-initializer.yaml",
+			want:             "testdata/single-initializer.yaml.injected",
+			managedNamespace: namespace,
+			objNamespace:     namespace,
 		},
 		{
-			in:        "testdata/multiple-initializer.yaml",
-			want:      "testdata/multiple-initializer.yaml.injected",
-			namespace: ns,
+			in:               "testdata/multiple-initializer.yaml",
+			want:             "testdata/multiple-initializer.yaml.injected",
+			managedNamespace: namespace,
+			objNamespace:     namespace,
 		},
 		{
-			in:        "testdata/not-required.yaml",
-			want:      "testdata/not-required.yaml.injected",
-			namespace: ns,
+			in:               "testdata/not-required.yaml",
+			want:             "testdata/not-required.yaml.injected",
+			managedNamespace: namespace,
+			objNamespace:     namespace,
 		},
 		{
-			in:        "testdata/required.yaml",
-			want:      "testdata/required.yaml.injected",
-			namespace: ns,
+			in:               "testdata/required.yaml",
+			want:             "testdata/required.yaml.injected",
+			managedNamespace: namespace,
+			objNamespace:     namespace,
 		},
 	}
 
 	for _, c := range cases {
+		options := InitializerOptions{
+			Hub:             unitTestHub,
+			Tag:             unitTestTag,
+			Namespace:       c.managedNamespace,
+			InjectionPolicy: InjectionPolicyOptOut,
+		}
+		i := NewInitializer(cl, &mesh, options)
+
 		raw, err := ioutil.ReadFile(c.in)
 		if err != nil {
 			t.Fatalf("ReadFile(%v) failed: %v", c.in, err)
@@ -220,7 +233,7 @@ func TestInitializerModifyResource(t *testing.T) {
 			t.Fatalf("Unmarshal(%v) failed: %v", c.in, err)
 		}
 		orig := deployment.ObjectMeta.Namespace
-		deployment.ObjectMeta.Namespace = c.namespace
+		deployment.ObjectMeta.Namespace = c.objNamespace
 		err = i.modifyResource(&deployment.ObjectMeta,
 			&deployment.Spec.Template.ObjectMeta, &deployment.Spec.Template.Spec)
 		if err != nil {

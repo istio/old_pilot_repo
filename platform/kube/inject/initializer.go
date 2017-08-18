@@ -245,10 +245,7 @@ func (i *Initializer) modifyResource(objectMeta *metav1.ObjectMeta, templateObje
 
 	glog.Infof("Initializing %s/%s", objectMeta.Namespace, objectMeta.Name)
 
-	if err := injectIntoSpec(&i.params, spec); err != nil {
-		return err
-	}
-
+	injectIntoSpec(&i.params, spec)
 	addAnnotation(objectMeta, i.params.Version)
 	// templated annotation to avoid double-injection
 	if templateObjectMeta != nil {

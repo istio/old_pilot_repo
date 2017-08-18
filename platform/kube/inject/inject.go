@@ -229,7 +229,7 @@ func addAnnotation(objectMeta *metav1.ObjectMeta, version string) {
 	}
 }
 
-func injectIntoSpec(p *Params, spec *v1.PodSpec) error {
+func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 	// proxy initContainer 1.6 spec
 	initArgs := []string{
 		"-p", fmt.Sprintf("%d", p.Mesh.ProxyListenPort),
@@ -384,8 +384,6 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) error {
 	}
 
 	spec.Containers = append(spec.Containers, sidecar)
-
-	return nil
 }
 
 // IntoResourceFile injects the istio proxy into the specified
@@ -395,9 +393,7 @@ func IntoResourceFile(p *Params, in io.Reader, out io.Writer) error {
 		if !injectRequired(DefaultInjectionPolicy, objectMeta) {
 			return nil
 		}
-		if err := injectIntoSpec(p, spec); err != nil {
-			return err
-		}
+		injectIntoSpec(p, spec)
 		addAnnotation(objectMeta, p.Version)
 		addAnnotation(templateObjectMeta, p.Version)
 		return nil

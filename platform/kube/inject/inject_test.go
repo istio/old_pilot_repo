@@ -190,9 +190,10 @@ func TestIntoResourceFile(t *testing.T) {
 
 func TestInjectRequired(t *testing.T) {
 	cases := []struct {
-		policy InjectionPolicy
-		meta   *metav1.ObjectMeta
-		want   bool
+		policy                         InjectionPolicy
+		meta                           *metav1.ObjectMeta
+		want                           bool
+		checkDeprecatedAlphaAnnotation bool
 	}{
 		{
 			policy: InjectionPolicyOptOut,
@@ -266,9 +267,22 @@ func TestInjectRequired(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			policy: InjectionPolicyOptOut,
+			meta: &metav1.ObjectMeta{
+				Name:      "no-policy",
+				Namespace: "test-namespace",
+				Annotations: map[string]string{
+					deprecatedIstioSidecarAnnotationSidecarKey: deprecatedIstioSidecarAnnotationSidecarValue,
+				},
+			},
+			want: false,
+			checkDeprecatedAlphaAnnotation: true,
+		},
 	}
 
 	for _, c := range cases {
+		checkDeprecatedAlphaAnnotation = c.checkDeprecatedAlphaAnnotation
 		if got := injectRequired(c.policy, c.meta); got != c.want {
 			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
 		}
