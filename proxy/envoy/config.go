@@ -24,6 +24,8 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 
+	"sort"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
@@ -159,7 +161,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 	managementPorts := env.ManagementPorts(sidecar.IPAddress)
 
 	inbound, inClusters := buildInboundListeners(env.Mesh, sidecar, instances)
-	outbound, outClusters := buildOutboundListeners(env.Mesh, sidecar, instances, services, env)
+	outbound, outClusters := buildOutboundListeners(env.Mesh, sidecar, env, instances, services, env)
 	mgmtListeners, mgmtClusters := buildMgmtPortListeners(env.Mesh, managementPorts, sidecar.IPAddress)
 
 	listeners := append(inbound, outbound...)
@@ -306,9 +308,18 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 }
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
-func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node, instances []*model.ServiceInstance,
-	services []*model.Service, config model.IstioConfigStore) (Listeners, Clusters) {
-	listeners, clusters := buildOutboundTCPListeners(mesh, services)
+//<<<<<<< HEAD
+//func buildOutboundListeners(instances []*model.ServiceInstance, services []*model.Service,
+//	env proxy.Environment, mesh *proxyconfig.ProxyMeshConfig) (Listeners, Clusters) {
+//	listeners, clusters := buildOutboundTCPListeners(mesh, env, services)
+//
+//	httpOutbound := buildOutboundHTTPRoutes(instances, services, mesh, env.IstioConfigStore)
+//=======
+func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node, env proxy.Environment,
+	instances []*model.ServiceInstance,  services []*model.Service,
+	config model.IstioConfigStore) (Listeners, Clusters) {
+
+	listeners, clusters := buildOutboundTCPListeners(mesh, env, services)
 
 	// note that outbound HTTP routes are supplied through RDS
 	httpOutbound := buildOutboundHTTPRoutes(mesh, sidecar, instances, services, config)
@@ -439,25 +450,69 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*model.Service) (Listeners, Clusters) {
+func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment, services []*model.Service) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
+
+	routes := make(map[int][]*TCPRoute)
 	for _, service := range services {
 		if service.External() {
 			continue // TODO TCP external services not currently supported
 		}
+
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS:
+				instances := env.Instances(service.Hostname, []string{servicePort.Name}, nil)
+				if len(instances) == 0 {
+					continue
+				}
+
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				route := buildTCPRoute(cluster, []string{service.Address})
-				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-				listener := buildTCPListener(config, service.Address, servicePort.Port)
+				for _, instance := range instances {
+					// TODO: could reduce number of TCPRoutes by grouping them together by port
+					route := buildTCPRoute(cluster,
+						[]string{instance.Endpoint.Address}, fmt.Sprint(instance.Endpoint.Port))
+					routes[servicePort.Port] = append(routes[servicePort.Port], route)
+				}
+
 				tcpClusters = append(tcpClusters, cluster)
-				tcpListeners = append(tcpListeners, listener)
+
+				//addrs := make([]string, 0, len(instances))
+				//for _, instance := range instances {
+				//	addrs = append(addrs, instance.Endpoint.Address)
+				//}
+				//
+				//cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+				//route := buildTCPRoute(cluster, addrs) // TODO: instance ports may differ from service port
+				//routes[servicePort.Port] = append(routes[servicePort.Port], route)
+				//tcpClusters = append(tcpClusters, cluster)
 			}
 		}
 	}
+
+	// create a listener per port
+	for port, routes := range routes {
+		sort.Sort(TCPRouteByRoute(routes))
+		config := &TCPRouteConfig{Routes: routes}
+		listener := buildTCPListener(config, "0.0.0.0", port)
+		tcpListeners = append(tcpListeners, listener)
+	}
+
+	//for _, service := range services {
+	//	for _, servicePort := range service.Ports {
+	//		switch servicePort.Protocol {
+	//		case model.ProtocolTCP, model.ProtocolHTTPS:
+	//
+	//			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+	//			route := buildTCPRoute(cluster, service.Address)
+	//			config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
+	//			listener := buildTCPListener(config, service.Address, servicePort.Port)
+	//			tcpClusters = append(tcpClusters, cluster)
+	//			tcpListeners = append(tcpListeners, listener)
+	//		}
+	//	}
+	//}
 	return tcpListeners, tcpClusters
 }
 
@@ -509,7 +564,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listener := buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address}, "")},
 			}, endpoint.Address, endpoint.Port)
 
 			// set server-side mixer filter config
@@ -563,7 +618,7 @@ func buildMgmtPortListeners(mesh *proxyconfig.ProxyMeshConfig, managementPorts m
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP, model.ProtocolHTTPS:
 			cluster := buildInboundCluster(mPort.Port, model.ProtocolTCP, mesh.ConnectTimeout)
 			listener := buildTCPListener(&TCPRouteConfig{
-				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP})},
+				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP}, "")},
 			}, managementIP, mPort.Port)
 
 			clusters = append(clusters, cluster)
