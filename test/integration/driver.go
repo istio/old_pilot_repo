@@ -211,6 +211,12 @@ func runTests(envs ...infra) {
 				} else if strings.HasPrefix(pod, "istio-mixer") {
 					log("Mixer log", pod)
 					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, "mixer"))
+				} else if strings.HasPrefix(pod, "istio-ingress") {
+					log("Ingress log", pod)
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
+				} else if strings.HasPrefix(pod, "istio-egress") {
+					log("Egress log", pod)
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
 				} else {
 					log("Proxy log", pod)
 					glog.Info(util.FetchLogs(client, pod, istio.Namespace, inject.ProxyContainerName))

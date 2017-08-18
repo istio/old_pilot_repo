@@ -75,8 +75,13 @@ func (a *accessLogs) check(infra *infra) error {
 				pod := infra.apps[app][0]
 				container := inject.ProxyContainerName
 				ns := infra.Namespace
-				if app == "mixer" {
+				switch app {
+				case "mixer":
 					container = "mixer"
+					ns = infra.IstioNamespace
+				case "ingress":
+					ns = infra.IstioNamespace
+				case "egress":
 					ns = infra.IstioNamespace
 				}
 				logs := util.FetchLogs(client, pod, ns, container)
