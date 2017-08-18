@@ -5,6 +5,7 @@ metadata:
 data:
   mesh: |-
     discoveryAddress: istio-pilot.{{.IstioNamespace}}.svc.cluster.local:8080
+    egressProxyAddress: istio-egress.{{.IstioNamespace}}.svc.cluster.local:80
 {{if .Mixer}}
     mixerAddress: istio-mixer.{{.IstioNamespace}}.svc.cluster.local:9091
 {{end}}
