@@ -51,6 +51,7 @@ const (
 var ignoredNamespaces = []string{
 	"kube-system",
 	"kube-public",
+	"istio-system",
 }
 
 // InitializerOptions stores the configurable options for an initializer
@@ -141,24 +142,6 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 			i.clientset.ExtensionsV1beta1().RESTClient(),
 			&v1beta1.DaemonSet{},
 			i.initializeDaemonSet,
-		},
-		{
-			"replicasets",
-			i.clientset.ExtensionsV1beta1().RESTClient(),
-			&v1beta1.ReplicaSet{},
-			i.initializeReplicaSet,
-		},
-		{
-			"replicationcontrollers",
-			i.clientset.CoreV1().RESTClient(),
-			&v1.ReplicationController{},
-			i.initializeReplicationController,
-		},
-		{
-			"pods",
-			i.clientset.CoreV1().RESTClient(),
-			&v1.Pod{},
-			i.initializePod,
 		},
 	}
 
@@ -337,45 +320,6 @@ func (i *Initializer) initializeDaemonSet(in, out interface{}) error {
 		return err
 	}
 	_, err = i.clientset.ExtensionsV1beta1().DaemonSets(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
-	return err
-}
-
-func (i *Initializer) initializeReplicaSet(in, out interface{}) error {
-	obj := out.(*v1beta1.ReplicaSet)
-	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, obj, v1beta1.ReplicaSet{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.ExtensionsV1beta1().ReplicaSets(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
-	return err
-}
-
-func (i *Initializer) initializeReplicationController(in, out interface{}) error {
-	obj := out.(*v1.ReplicationController)
-	if err := i.modifyResource(&obj.ObjectMeta, &obj.Spec.Template.ObjectMeta, &obj.Spec.Template.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, out, v1.ReplicationController{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.CoreV1().ReplicationControllers(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
-	return err
-}
-
-func (i *Initializer) initializePod(in, out interface{}) error {
-	obj := out.(*v1.Pod)
-	if err := i.modifyResource(&obj.ObjectMeta, nil, &obj.Spec); err != nil {
-		return err
-	}
-	patchBytes, err := i.createTwoWayMergePatch(in, obj, v1.Pod{})
-	if err != nil {
-		return err
-	}
-	_, err = i.clientset.CoreV1().Pods(obj.Namespace).Patch(obj.Name, patchType, patchBytes)
 	return err
 }
 
