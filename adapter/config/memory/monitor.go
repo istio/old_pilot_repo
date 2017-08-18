@@ -77,6 +77,7 @@ func (m *configstoreMonitor) run(stop <-chan struct{}) {
 			if _, ok := <-m.eventCh; ok {
 				close(m.eventCh)
 			}
+			return
 		case ce, ok := <-m.eventCh:
 			if ok {
 				m.processConfigEvent(ce)
