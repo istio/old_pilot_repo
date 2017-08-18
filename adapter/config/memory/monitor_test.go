@@ -23,52 +23,51 @@ import (
 )
 
 func TestEventConsistency(t *testing.T) {
-	// Create a Config Store
 	store := memory.Make(mock.Types)
-
-	// Create a controller
 	controller := memory.NewController(store)
 
-	testConfig := mock.Make(0)
-	testEvent := model.EventAdd
+	testConfig := mock.Make(TestNamespace, 0)
+	var testEvent model.Event
 
-	ch := make(chan bool)
+	done := make(chan bool)
 
-	// Append notify handlers to the controller
-	controller.RegisterEventHandler(mock.Type, func(config model.Config, event model.Event) {
+	controller.RegisterEventHandler(model.MockConfig.Type, func(config model.Config, event model.Event) {
 		if event != testEvent {
 			t.Errorf("desired %v, but %v", testEvent, event)
 		}
-		if config.Key != testConfig.Key {
-			t.Errorf("desired %v, but %v", testConfig.Key, config.Key)
+		if !mock.Compare(testConfig, config) {
+			t.Errorf("desired %v, but %v", testConfig, config)
 		}
-		ch <- true
+		done <- true
 	})
 
 	stop := make(<-chan struct{})
 	go controller.Run(stop)
 
-	var revision string
 	// Test Add Event
-	if rev, err := controller.Post(testConfig); err != nil {
+	testEvent = model.EventAdd
+	if rev, err := controller.Create(testConfig); err != nil {
 		t.Error(err)
+		return
 	} else {
-		revision = rev
+		testConfig.ResourceVersion = rev
 	}
-
-	<-ch
-	testEvent = model.EventUpdate
+	<-done
 
 	// Test Update Event
-	if _, err := controller.Put(testConfig, revision); err != nil {
+	testEvent = model.EventUpdate
+	if _, err := controller.Update(testConfig); err != nil {
 		t.Error(err)
+		return
 	}
-
-	<-ch
-	testEvent = model.EventDelete
+	<-done
 
 	// Test Delete Event
-	if err := controller.Delete(mock.Type, testConfig.Key); err != nil {
+	testEvent = model.EventDelete
+	if err := controller.Delete(model.MockConfig.Type, testConfig.Name, TestNamespace); err != nil {
 		t.Error(err)
+		return
 	}
+	<-done
+	close(done)
 }

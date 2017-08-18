@@ -21,20 +21,25 @@ import (
 	"istio.io/pilot/test/mock"
 )
 
+const (
+	// TestNamespace specifies the namespace for testing
+	TestNamespace = "istio-memory-test"
+)
+
 func TestControllerEvents(t *testing.T) {
 	store := memory.Make(mock.Types)
 	ctl := memory.NewController(store)
-	mock.CheckCacheEvents(ctl, ctl, 5, t)
+	mock.CheckCacheEvents(ctl, ctl, TestNamespace, 5, t)
 }
 
 func TestControllerCacheFreshness(t *testing.T) {
 	store := memory.Make(mock.Types)
 	ctl := memory.NewController(store)
-	mock.CheckCacheFreshness(ctl, t)
+	mock.CheckCacheFreshness(ctl, TestNamespace, t)
 }
 
 func TestControllerClientSync(t *testing.T) {
 	store := memory.Make(mock.Types)
 	ctl := memory.NewController(store)
-	mock.CheckCacheSync(store, ctl, 5, t)
+	mock.CheckCacheSync(store, ctl, TestNamespace, 5, t)
 }

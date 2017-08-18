@@ -8,16 +8,19 @@ go_library(
         "monitor.go",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//model:go_default_library"],
+    deps = [
+        "//model:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
+    ],
 )
 
 go_test(
     name = "go_default_xtest",
     size = "small",
     srcs = [
-	"config_test.go",
+        "config_test.go",
         "controller_test.go",
-	"monitor_test.go",
+        "monitor_test.go",
     ],
     deps = [
         ":go_default_library",

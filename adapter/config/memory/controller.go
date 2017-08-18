@@ -15,7 +15,8 @@
 package memory
 
 import (
-	"github.com/golang/protobuf/proto"
+	"errors"
+
 	"istio.io/pilot/model"
 )
 
@@ -50,56 +51,43 @@ func (c *controller) ConfigDescriptor() model.ConfigDescriptor {
 	return c.configStore.ConfigDescriptor()
 }
 
-func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
-	return c.configStore.Get(typ, key)
+func (c *controller) Get(typ, key, namespace string) (*model.Config, bool) {
+	return c.configStore.Get(typ, key, namespace)
 }
 
-func (c *controller) Post(val proto.Message) (revision string, err error) {
-	if revision, err = c.configStore.Post(val); err == nil {
+func (c *controller) Create(config model.Config) (revision string, err error) {
+	if revision, err = c.configStore.Create(config); err == nil {
 		c.monitor.ScheduleProcessEvent(ConfigEvent{
-			config: c.convertToConfig(val, revision),
+			config: config,
 			event:  model.EventAdd,
 		})
 	}
 	return
 }
 
-func (c *controller) Put(val proto.Message, oldRevision string) (newRevision string, err error) {
-	if newRevision, err = c.configStore.Put(val, oldRevision); err == nil {
+func (c *controller) Update(config model.Config) (newRevision string, err error) {
+	if newRevision, err = c.configStore.Update(config); err == nil {
 		c.monitor.ScheduleProcessEvent(ConfigEvent{
-			config: c.convertToConfig(val, newRevision),
+			config: config,
 			event:  model.EventUpdate,
 		})
 	}
 	return
 }
 
-func (c *controller) Delete(typ, key string) (err error) {
-	if err = c.configStore.Delete(typ, key); err == nil {
-		c.monitor.ScheduleProcessEvent(ConfigEvent{
-			config: model.Config{
-				Type: typ,
-				Key:  key,
-			},
-			event: model.EventDelete,
-		})
+func (c *controller) Delete(typ, key, namespace string) (err error) {
+	if config, exists := c.Get(typ, key, namespace); exists {
+		if err = c.configStore.Delete(typ, key, namespace); err == nil {
+			c.monitor.ScheduleProcessEvent(ConfigEvent{
+				config: *config,
+				event:  model.EventDelete,
+			})
+			return
+		}
 	}
-	return
+	return errors.New("Delete failure: config" + key + "does not exist")
 }
 
-func (c *controller) List(typ string) ([]model.Config, error) {
-	return c.configStore.List(typ)
-}
-
-func (c *controller) convertToConfig(val proto.Message, rev string) model.Config {
-	schema, _ := c.configStore.ConfigDescriptor().GetByMessageName(proto.MessageName(val))
-	typ := schema.Type
-	key := schema.Key(val)
-
-	return model.Config{
-		Type:     typ,
-		Key:      key,
-		Revision: rev,
-		Content:  val,
-	}
+func (c *controller) List(typ, namespace string) ([]model.Config, error) {
+	return c.configStore.List(typ, namespace)
 }
