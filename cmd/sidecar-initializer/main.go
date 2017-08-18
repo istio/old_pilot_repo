@@ -43,14 +43,14 @@ func getRootCmd() *cobra.Command {
 		resyncPeriod time.Duration
 	}{}
 
-	root := &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:   "sidecar-initializer",
 		Short: "Kubernetes initializer for Istio sidecar",
 		RunE: func(*cobra.Command, []string) error {
 			switch inject.InjectionPolicy(flags.policy) {
 			case inject.InjectionPolicyOff, inject.InjectionPolicyOptIn, inject.InjectionPolicyOptOut:
 			default:
-				return fmt.Errorf("unknown namespace injection policy: %v", flags.policy)
+				return fmt.Errorf("unknown injection policy: %v", flags.policy)
 			}
 
 			client, err := kube.CreateInterface(flags.kubeconfig)
@@ -85,23 +85,23 @@ func getRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&flags.hub, "hub", "docker.io/istio", "Docker hub")
-	root.PersistentFlags().StringVar(&flags.tag, "tag", "0.2", "Docker tag")
-	root.PersistentFlags().StringVar(&flags.namespace, "namespace",
+	rootCmd.PersistentFlags().StringVar(&flags.hub, "hub", "docker.io/istio", "Docker hub")
+	rootCmd.PersistentFlags().StringVar(&flags.tag, "tag", "0.2", "Docker tag")
+	rootCmd.PersistentFlags().StringVar(&flags.namespace, "namespace",
 		v1.NamespaceAll, "Namespace managed by initializer")
-	root.PersistentFlags().StringVar(&flags.policy, "policy",
+	rootCmd.PersistentFlags().StringVar(&flags.policy, "policy",
 		string(inject.InjectionPolicyOff), "default injection policy")
 
-	root.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
+	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	root.PersistentFlags().StringVar(&flags.meshconfig, "meshconfig", "/etc/istio/config/mesh",
+	rootCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		fmt.Sprintf("File name for Istio mesh configuration"))
-	root.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 6*time.Minute,
+	rootCmd.PersistentFlags().DurationVar(&flags.resyncPeriod, "resync", 6*time.Minute,
 		"Initializers resync interval")
 
-	cmd.AddFlags(root)
+	cmd.AddFlags(rootCmd)
 
-	return root
+	return rootCmd
 }
 
 func main() {

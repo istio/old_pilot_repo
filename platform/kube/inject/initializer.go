@@ -162,8 +162,10 @@ func NewInitializer(cl kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig, 
 		},
 	}
 
-	for _, kind := range kinds {
-		kind := kind // capture the current value of `kind`
+	// Use loop index to avoid stale range values. See
+	// https://github.com/golang/go/wiki/CommonMistakes#using-goroutines-on-loop-iterator-variables.
+	for k := range kinds {
+		kind := kinds[k]
 
 		watchList := cache.NewListWatchFromClient(kind.getter, kind.resource,
 			i.options.Namespace, fields.Everything())

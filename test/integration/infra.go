@@ -98,12 +98,9 @@ func (infra *infra) setup() error {
 
 		// NOTE: InitializerConfiguration is cluster-scoped and may be
 		// created and used by other tests in the same test
-		// cluster. Do not immediately fail on creation
-		// error. Likewise, do not delete the initializer on test
-		// clean-up.
+		// cluster.
 		if err := deploy("initializer-config.yaml.tmpl"); err != nil {
-			// only log if error is AlreadyExists
-			glog.Infof("sidecar.initializer.istio.io already exists: %v", err)
+			return err
 		}
 	} else {
 		infra.InjectionPolicy = inject.InjectionPolicyOff

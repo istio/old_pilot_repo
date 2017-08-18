@@ -28,7 +28,7 @@ spec:
       containers:
         - name: sidecar-initializer
           image: {{.Hub}}/sidecar_initializer:{{.Tag}}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args:
             - --hub={{.Hub}}
             - --tag={{.Tag}}
