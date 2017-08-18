@@ -117,6 +117,12 @@ func main() {
 	params.Ingress = true
 	params.Egress = true
 	params.Zipkin = true
+
+	if len(params.Namespace) != 0 && authmode == "both" {
+		glog.Infof("When namespace(=%s) is specified, auth mode(=%s) must be one of enable or disable.",
+			params.Namespace, authmode)
+		return
+	}
 	switch authmode {
 	case "enable":
 		runTests(setAuth(params))
@@ -295,7 +301,7 @@ func parallel(fs map[string]func() status) error {
 
 // connect to K8S cluster and register TPRs
 func setupClient() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, "dummy")
+	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
 	if err != nil {
 		return err
 	}
