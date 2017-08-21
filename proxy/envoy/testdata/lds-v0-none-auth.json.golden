@@ -33,12 +33,11 @@
          "config": {
           "mixer_attributes": {
            "target.ip": "10.1.1.0",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://"
+           "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://"
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -85,12 +84,11 @@
          "config": {
           "mixer_attributes": {
            "target.ip": "10.1.1.0",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://"
+           "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://"
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -137,12 +135,11 @@
          "config": {
           "mixer_attributes": {
            "target.ip": "10.1.1.0",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://"
+           "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://"
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -228,12 +225,11 @@
          "config": {
           "mixer_attributes": {
            "target.ip": "10.1.1.0",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://"
+           "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://"
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -265,6 +261,16 @@
     "name": "tcp_10.1.1.0_1090",
     "filters": [
      {
+      "type": "both",
+      "name": "mixer",
+      "config": {
+       "mixer_attributes": {
+        "target.ip": "10.1.1.0",
+        "target.uid": "kubernetes://v0.default"
+       }
+      }
+     },
+     {
       "type": "read",
       "name": "tcp_proxy",
       "config": {
@@ -288,6 +294,30 @@
      "ca_cert_file": "/etc/certs/root-cert.pem",
      "require_client_certificate": true
     },
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.0:3333",
+    "name": "tcp_10.1.1.0_3333",
+    "filters": [
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.3333",
+          "destination_ip_list": [
+           "10.1.1.0/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
     "bind_to_port": false
    },
    {
@@ -331,12 +361,11 @@
          "config": {
           "mixer_attributes": {
            "target.ip": "10.1.1.0",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://"
+           "target.uid": "kubernetes://v0.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://"
+           "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
          }
@@ -361,6 +390,30 @@
      "ca_cert_file": "/etc/certs/root-cert.pem",
      "require_client_certificate": true
     },
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.0:9999",
+    "name": "tcp_10.1.1.0_9999",
+    "filters": [
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.9999",
+          "destination_ip_list": [
+           "10.1.1.0/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
     "bind_to_port": false
    },
    {

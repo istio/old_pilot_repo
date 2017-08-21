@@ -1,6 +1,9 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
+  annotations:
+    alpha.istio.io/sidecar: injected(deprecated)
+    status.sidecar.istio.io: injected-version-12345678
   creationTimestamp: null
   name: hello
 spec:
@@ -9,8 +12,8 @@ spec:
   template:
     metadata:
       annotations:
-        alpha.istio.io/sidecar: injected
-        alpha.istio.io/version: "12345678"
+        alpha.istio.io/sidecar: injected(deprecated)
+        status.sidecar.istio.io: injected-version-12345678
       creationTimestamp: null
       labels:
         app: hello
@@ -71,7 +74,8 @@ spec:
           privileged: true
       - args:
         - -c
-        - sysctl -w kernel.core_pattern=/tmp/core.%e.%p.%t && ulimit -c unlimited
+        - sysctl -w kernel.core_pattern=/etc/istio/proxy/core.%e.%p.%t && ulimit -c
+          unlimited
         command:
         - /bin/sh
         image: alpine

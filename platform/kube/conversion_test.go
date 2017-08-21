@@ -15,11 +15,13 @@
 package kube
 
 import (
+	"reflect"
 	"testing"
 
 	"istio.io/pilot/model"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var (
@@ -56,12 +58,22 @@ func TestConvertProtocol(t *testing.T) {
 func TestServiceConversion(t *testing.T) {
 	serviceName := "service1"
 	namespace := "default"
+	saA := "serviceaccountA"
+	saB := "serviceaccountB"
+	saC := "serviceaccountC@cloudservices.gserviceaccount.com"
+	saD := "serviceaccountD@developer.gserviceaccount.com"
+
 	ip := "10.0.0.1"
 
 	localSvc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				KubeServiceAccountsOnVMAnnotation:      saA + "," + saB,
+				CanonicalServiceAccountsOnVMAnnotation: saC + "," + saD,
+				"other/annotation":                     "test",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: ip,
@@ -101,6 +113,20 @@ func TestServiceConversion(t *testing.T) {
 
 	if service.Address != ip {
 		t.Errorf("service IP incorrect => %q, want %q", service.Address, ip)
+	}
+
+	sa := service.ServiceAccounts
+	if sa == nil || len(sa) != 4 {
+		t.Errorf("number of service accounts is incorrect")
+	}
+	expected := []string{
+		"spiffe://company.com/ns/default/sa/" + saA,
+		"spiffe://company.com/ns/default/sa/" + saB,
+		"spiffe://" + saC,
+		"spiffe://" + saD,
+	}
+	if !reflect.DeepEqual(sa, expected) {
+		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
 	}
 }
 
@@ -199,5 +225,92 @@ func TestInvalidExternalServiceConversion(t *testing.T) {
 
 	if svc := convertService(extSvc, domainSuffix); svc != nil {
 		t.Errorf("converted a service without an external name")
+	}
+}
+
+func TestProbesToPortsConversion(t *testing.T) {
+
+	expected := model.PortList{
+		{
+			Name:     "mgmt-3306",
+			Port:     3306,
+			Protocol: model.ProtocolTCP,
+		},
+		{
+			Name:     "mgmt-9080",
+			Port:     9080,
+			Protocol: model.ProtocolHTTP,
+		},
+	}
+
+	handlers := []v1.Handler{
+		{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.IntOrString{StrVal: "mysql", Type: intstr.String},
+			},
+		},
+		{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.IntOrString{IntVal: 3306, Type: intstr.Int},
+			},
+		},
+		{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/foo",
+				Port: intstr.IntOrString{StrVal: "http-two", Type: intstr.String},
+			},
+		},
+		{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/foo",
+				Port: intstr.IntOrString{IntVal: 9080, Type: intstr.Int},
+			},
+		},
+	}
+
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "scooby",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "mysql",
+						ContainerPort: 3306,
+					},
+					{
+						Name:          "http-two",
+						ContainerPort: 9080,
+					},
+					{
+						Name:          "http",
+						ContainerPort: 80,
+					},
+				},
+				LivenessProbe:  &v1.Probe{},
+				ReadinessProbe: &v1.Probe{},
+			},
+		},
+	}
+
+	for _, handler1 := range handlers {
+		for _, handler2 := range handlers {
+			if (handler1.TCPSocket != nil && handler2.TCPSocket != nil) ||
+				(handler1.HTTPGet != nil && handler2.HTTPGet != nil) {
+				continue
+			}
+
+			podSpec.Containers[0].LivenessProbe.Handler = handler1
+			podSpec.Containers[0].ReadinessProbe.Handler = handler2
+
+			mgmtPorts, err := convertProbesToPorts(podSpec)
+			if err != nil {
+				t.Errorf("Failed to convert Probes to Ports: %v", err)
+			}
+
+			if !reflect.DeepEqual(mgmtPorts, expected) {
+				t.Errorf("incorrect number of management ports => %v, want %v",
+					len(mgmtPorts), len(expected))
+			}
+		}
 	}
 }

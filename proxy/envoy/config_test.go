@@ -15,14 +15,12 @@
 package envoy
 
 import (
-	"fmt"
 	"io/ioutil"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -229,74 +227,17 @@ const (
 	rewriteRouteRule  = "testdata/rewrite-route.yaml.golden"
 )
 
-func configObjectFromYAML(kind, file string) (proto.Message, error) {
-	schema, ok := model.IstioConfigTypes.GetByType(kind)
-	if !ok {
-		return nil, fmt.Errorf("Missing kind %q", kind)
-	}
+func addConfig(r model.ConfigStore, file string, t *testing.T) {
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	return schema.FromYAML(string(content))
-}
-
-func addCircuitBreaker(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.DestinationPolicy, cbPolicy)
+	config, err := model.IstioConfigTypes.FromYAML(content)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = r.Post(msg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func addRewrite(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.RouteRule, rewriteRouteRule)
+	_, err = r.Create(*config)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = r.Post(msg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func addRedirect(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.RouteRule, redirectRouteRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = r.Post(msg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func addTimeout(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.RouteRule, timeoutRouteRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = r.Post(msg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func addWeightedRoute(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.RouteRule, weightedRouteRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = r.Post(msg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func addFaultRoute(r model.ConfigStore, t *testing.T) {
-	msg, err := configObjectFromYAML(model.RouteRule, faultRouteRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = r.Post(msg); err != nil {
 		t.Fatal(err)
 	}
 }
