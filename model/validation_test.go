@@ -886,8 +886,17 @@ func TestValidateEgressRule(t *testing.T) {
 					&proxyconfig.EgressRule_Port{Port: 80, Protocol: "http"},
 					&proxyconfig.EgressRule_Port{Port: 8080, Protocol: "http"},
 				},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: true},
+		{name: "egress rule with use_egress_proxy = true, not yet implemented",
+			in: &proxyconfig.EgressRule{
+				Domain: "*cnn.com",
+				Ports: []*proxyconfig.EgressRule_Port{
+					&proxyconfig.EgressRule_Port{Port: 80, Protocol: "http"},
+					&proxyconfig.EgressRule_Port{Port: 8080, Protocol: "http"},
+				},
+				UseEgressProxy: true},
+			valid: false},
 		{name: "valid egress rule",
 			in: &proxyconfig.EgressRule{
 				Domain: "edition.cnn.com",
@@ -904,7 +913,7 @@ func TestValidateEgressRule(t *testing.T) {
 					&proxyconfig.EgressRule_Port{Port: 80, Protocol: "http"},
 					&proxyconfig.EgressRule_Port{Port: 8080, Protocol: "http"},
 				},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: false},
 		{name: "empty ports",
 			in: &proxyconfig.EgressRule{
@@ -920,7 +929,7 @@ func TestValidateEgressRule(t *testing.T) {
 					&proxyconfig.EgressRule_Port{Port: 8080, Protocol: "http"},
 					&proxyconfig.EgressRule_Port{Port: 80, Protocol: "http"},
 				},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: false},
 	}
 

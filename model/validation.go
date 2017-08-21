@@ -778,6 +778,10 @@ func ValidateEgressRule(msg proto.Message) error {
 		}
 	}
 
+	if rule.UseEgressProxy {
+		errs = multierror.Append(errs, fmt.Errorf("directing traffic through egress proxy is not implemented yet"))
+	}
+
 	return errs
 }
 
