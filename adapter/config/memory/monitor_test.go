@@ -15,9 +15,6 @@
 package memory_test
 
 import (
-	"bufio"
-	"fmt"
-	"os"
 	"testing"
 
 	"istio.io/pilot/adapter/config/memory"
@@ -26,60 +23,51 @@ import (
 )
 
 func TestEventConsistency(t *testing.T) {
-	// Create a Config Store
 	store := memory.Make(mock.Types)
-
-	// Create a controller
 	controller := memory.NewController(store)
 
-	recFile := "/tmp/events.log"
-	f, err := os.Create(recFile)
-	if err != nil {
-		t.Errorf("Fail to open file %s", recFile)
-	}
-	w := bufio.NewWriter(f)
+	testConfig := mock.Make(TestNamespace, 0)
+	var testEvent model.Event
 
-	// Append notify handlers to the controller
-	controller.RegisterEventHandler(mock.Type, func(config model.Config, event model.Event) {
-		switch event {
-		case model.EventAdd:
-			fmt.Fprintf(w, "Added\n")
-		case model.EventUpdate:
-			fmt.Fprintf(w, "Updated\n")
-		case model.EventDelete:
-			fmt.Fprintf(w, "Deleted\n")
+	done := make(chan bool)
+
+	controller.RegisterEventHandler(model.MockConfig.Type, func(config model.Config, event model.Event) {
+		if event != testEvent {
+			t.Errorf("desired %v, but %v", testEvent, event)
 		}
+		if !mock.Compare(testConfig, config) {
+			t.Errorf("desired %v, but %v", testConfig, config)
+		}
+		done <- true
 	})
 
 	stop := make(<-chan struct{})
 	go controller.Run(stop)
-	mock.CheckMapInvariant(controller, t, 10)
-	if err = w.Flush(); err != nil {
-		t.Error(err)
-	}
-	if err = f.Close(); err != nil {
-		t.Error(err)
-	}
 
-	added, updated, deleted := 0, 0, 0
-	f, err = os.Open(recFile)
-	if err != nil {
-		t.Errorf("Fail to open file %s", recFile)
+	// Test Add Event
+	testEvent = model.EventAdd
+	if rev, err := controller.Create(testConfig); err != nil {
+		t.Error(err)
+		return
+	} else {
+		testConfig.ResourceVersion = rev
 	}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		event := scanner.Text()
-		switch event {
-		case "Added":
-			added++
-		case "Updated":
-			updated++
-		case "Deleted":
-			deleted++
-		}
-	}
+	<-done
 
-	if added != 10 || updated != 10 || deleted != 10 {
-		t.Errorf("Event record check fails, %d %d %d", added, updated, deleted)
+	// Test Update Event
+	testEvent = model.EventUpdate
+	if _, err := controller.Update(testConfig); err != nil {
+		t.Error(err)
+		return
 	}
+	<-done
+
+	// Test Delete Event
+	testEvent = model.EventDelete
+	if err := controller.Delete(model.MockConfig.Type, testConfig.Name, TestNamespace); err != nil {
+		t.Error(err)
+		return
+	}
+	<-done
+	close(done)
 }

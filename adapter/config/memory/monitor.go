@@ -15,16 +15,15 @@
 package memory
 
 import (
-	"reflect"
-	"sort"
-	"time"
-
 	"github.com/golang/glog"
 
 	"istio.io/pilot/model"
 )
 
-type configs []model.Config
+const (
+	// BufferSize specifies the buffer size of event channel
+	BufferSize = 10
+)
 
 // Handler specifies a function to apply on a Config for a given event type
 type Handler func(model.Config, model.Event)
@@ -33,103 +32,74 @@ type Handler func(model.Config, model.Event)
 type Monitor interface {
 	Start(<-chan struct{})
 	AppendEventHandler(string, Handler)
-	UpdateConfigRecord()
+	ScheduleProcessEvent(ConfigEvent)
 }
 
-type configsMonitor struct {
-	store              model.ConfigStore
-	configCachedRecord map[string]configs
-	handlers           map[string][]Handler
-	period             time.Duration
+// ConfigEvent defines the event to be processed
+type ConfigEvent struct {
+	config model.Config
+	event  model.Event
 }
 
-// NewConfigsMonitor returns new Monitor implementation
-func NewConfigsMonitor(store model.ConfigStore, period time.Duration) Monitor {
-	cache := make(map[string]configs)
+type configstoreMonitor struct {
+	store    model.ConfigStore
+	handlers map[string][]Handler
+	eventCh  chan ConfigEvent
+}
+
+// NewConfigStoreMonitor returns new Monitor implementation
+func NewConfigStoreMonitor(store model.ConfigStore) Monitor {
 	handlers := make(map[string][]Handler)
 
 	for _, typ := range store.ConfigDescriptor().Types() {
-		cache[typ] = make(configs, 0)
 		handlers[typ] = make([]Handler, 0)
 	}
 
-	return &configsMonitor{
-		store:              store,
-		period:             period,
-		configCachedRecord: cache,
-		handlers:           handlers,
+	return &configstoreMonitor{
+		store:    store,
+		handlers: handlers,
+		eventCh:  make(chan ConfigEvent, BufferSize),
 	}
 }
 
-func (m *configsMonitor) Start(stop <-chan struct{}) {
+func (m *configstoreMonitor) ScheduleProcessEvent(configEvent ConfigEvent) {
+	m.eventCh <- configEvent
+}
+
+func (m *configstoreMonitor) Start(stop <-chan struct{}) {
 	m.run(stop)
 }
 
-func (m *configsMonitor) run(stop <-chan struct{}) {
-	ticker := time.NewTicker(m.period)
+func (m *configstoreMonitor) run(stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
-			ticker.Stop()
-		case <-ticker.C:
-			m.UpdateConfigRecord()
-		}
-	}
-}
-
-func (m *configsMonitor) UpdateConfigRecord() {
-	for _, typ := range m.store.ConfigDescriptor().Types() {
-		newConfigs, err := m.store.List(typ)
-		if err != nil {
-			glog.Warningf("Unable to fetch configs of type: %s", typ)
+			if _, ok := <-m.eventCh; ok {
+				close(m.eventCh)
+			}
 			return
+		case ce, ok := <-m.eventCh:
+			if ok {
+				m.processConfigEvent(ce)
+			}
 		}
-		newRecord := configs(newConfigs)
-		newRecord.normalize()
-		m.compareToCache(typ, m.configCachedRecord[typ], newRecord)
-		m.configCachedRecord[typ] = newRecord
 	}
 }
 
-func (m *configsMonitor) compareToCache(typ string, oldRec, newRec configs) {
-	io, in := 0, 0
-	for io < len(oldRec) && in < len(newRec) {
-		if reflect.DeepEqual(oldRec[io], newRec[in]) {
-		} else if oldRec[io].Key == newRec[in].Key {
-			// An update event
-			m.applyHandlers(typ, newRec[in], model.EventUpdate)
-		} else if oldRec[io].Key < newRec[in].Key {
-			// A delete event
-			m.applyHandlers(typ, oldRec[io], model.EventDelete)
-			in--
-		} else {
-			// An add event
-			m.applyHandlers(typ, newRec[in], model.EventAdd)
-			io--
-		}
-		io++
-		in++
+func (m *configstoreMonitor) processConfigEvent(ce ConfigEvent) {
+	if _, exists := m.handlers[ce.config.Type]; !exists {
+		glog.Warningf("Config Type %s does not exist in config store", ce.config.Type)
+		return
 	}
-
-	for ; io < len(oldRec); io++ {
-		m.applyHandlers(typ, oldRec[io], model.EventDelete)
-	}
-
-	for ; in < len(newRec); in++ {
-		m.applyHandlers(typ, newRec[in], model.EventAdd)
-	}
+	m.applyHandlers(ce.config, ce.event)
 }
 
-func (m *configsMonitor) AppendEventHandler(typ string, h Handler) {
+func (m *configstoreMonitor) AppendEventHandler(typ string, h Handler) {
 	m.handlers[typ] = append(m.handlers[typ], h)
 }
 
-func (m *configsMonitor) applyHandlers(typ string, config model.Config, e model.Event) {
-	for _, f := range m.handlers[typ] {
+func (m *configstoreMonitor) applyHandlers(config model.Config, e model.Event) {
+	for _, f := range m.handlers[config.Type] {
 		f(config, e)
 	}
-}
-
-func (list configs) normalize() {
-	sort.Slice(list, func(i, j int) bool { return list[i].Key < list[j].Key })
 }

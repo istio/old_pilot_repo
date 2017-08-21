@@ -99,9 +99,16 @@ var (
 					glog.V(2).Infof("obtained private IP %v", ipAddr)
 				}
 
-				sidecar.IPAddress = ipAddr
-				var role proxy.Role = sidecar
-				watcher := envoy.NewWatcher(&mesh, role, configpath)
+				role.IPAddress = ipAddr
+				role.Type = proxy.Sidecar
+				if len(args) > 0 {
+					role.Type = proxy.NodeType(args[0])
+				}
+
+				watcher, err := envoy.NewWatcher(&mesh, role, configpath)
+				if err != nil {
+					return err
+				}
 				ctx, cancel := context.WithCancel(context.Background())
 				go watcher.Run(ctx)
 				stop := make(chan struct{})

@@ -16,6 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: setup
 setup: platform/kube/config
+	@bin/install-prereqs.sh
 	@bin/init.sh
 
 .PHONY: build
@@ -33,6 +34,14 @@ test: build
 .PHONY: lint
 lint: build
 	@bin/check.sh
+
+.PHONY: gazelle
+gazelle:
+	@bin/gazelle
+
+.PHONY: racetest
+racetest:
+	@bazel test --features=race //...
 
 platform/kube/config:
 	@ln -s ~/.kube/config platform/kube/

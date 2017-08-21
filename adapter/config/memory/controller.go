@@ -15,9 +15,8 @@
 package memory
 
 import (
-	"time"
+	"errors"
 
-	"github.com/golang/protobuf/proto"
 	"istio.io/pilot/model"
 )
 
@@ -27,10 +26,12 @@ type controller struct {
 }
 
 // NewController return an implementation of model.ConfigStoreCache
+// This is a client-side monitor that dispatches events as the changes are being
+// made on the client.
 func NewController(cs model.ConfigStore) model.ConfigStoreCache {
 	out := &controller{
 		configStore: cs,
-		monitor:     NewConfigsMonitor(cs, time.Second*1),
+		monitor:     NewConfigStoreMonitor(cs),
 	}
 	return out
 }
@@ -52,31 +53,43 @@ func (c *controller) ConfigDescriptor() model.ConfigDescriptor {
 	return c.configStore.ConfigDescriptor()
 }
 
-func (c *controller) Get(typ, key string) (proto.Message, bool, string) {
-	return c.configStore.Get(typ, key)
+func (c *controller) Get(typ, key, namespace string) (*model.Config, bool) {
+	return c.configStore.Get(typ, key, namespace)
 }
 
-func (c *controller) Post(val proto.Message) (out string, err error) {
-	if out, err = c.configStore.Post(val); err == nil {
-		c.monitor.UpdateConfigRecord()
+func (c *controller) Create(config model.Config) (revision string, err error) {
+	if revision, err = c.configStore.Create(config); err == nil {
+		c.monitor.ScheduleProcessEvent(ConfigEvent{
+			config: config,
+			event:  model.EventAdd,
+		})
 	}
 	return
 }
 
-func (c *controller) Put(val proto.Message, revision string) (out string, err error) {
-	if out, err = c.configStore.Put(val, revision); err == nil {
-		c.monitor.UpdateConfigRecord()
+func (c *controller) Update(config model.Config) (newRevision string, err error) {
+	if newRevision, err = c.configStore.Update(config); err == nil {
+		c.monitor.ScheduleProcessEvent(ConfigEvent{
+			config: config,
+			event:  model.EventUpdate,
+		})
 	}
 	return
 }
 
-func (c *controller) Delete(typ, key string) (err error) {
-	if err = c.configStore.Delete(typ, key); err == nil {
-		c.monitor.UpdateConfigRecord()
+func (c *controller) Delete(typ, key, namespace string) (err error) {
+	if config, exists := c.Get(typ, key, namespace); exists {
+		if err = c.configStore.Delete(typ, key, namespace); err == nil {
+			c.monitor.ScheduleProcessEvent(ConfigEvent{
+				config: *config,
+				event:  model.EventDelete,
+			})
+			return
+		}
 	}
-	return
+	return errors.New("Delete failure: config" + key + "does not exist")
 }
 
-func (c *controller) List(typ string) ([]model.Config, error) {
-	return c.configStore.List(typ)
+func (c *controller) List(typ, namespace string) ([]model.Config, error) {
+	return c.configStore.List(typ, namespace)
 }

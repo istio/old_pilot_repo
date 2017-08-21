@@ -70,6 +70,7 @@ var (
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
 			if flags.serviceregistry == proxy.KubernetesRegistry {
+
 				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
@@ -105,10 +106,10 @@ var (
 				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
 				var configController model.ConfigStoreCache
 				if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-					configController = crd.NewController(configClient, flags.controllerOptions.ResyncPeriod)
+					configController = crd.NewController(configClient, flags.controllerOptions)
 				} else {
 					configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
-						crd.NewController(configClient, flags.controllerOptions.ResyncPeriod),
+						crd.NewController(configClient, flags.controllerOptions),
 						ingress.NewController(client, mesh, flags.controllerOptions),
 					})
 					if err != nil {
@@ -116,17 +117,18 @@ var (
 					}
 				}
 
-				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
-				var configController model.ConfigStoreCache
-				if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-					configController = crd.NewController(configClient, flags.controllerOptions)
-				} else {
-					configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
-						crd.NewController(configClient, flags.controllerOptions),
-						ingress.NewController(client, mesh, flags.controllerOptions),
-					})
+				environment := proxy.Environment{
+					ServiceDiscovery: serviceController,
+					ServiceAccounts:  serviceController,
+					IstioConfigStore: model.MakeIstioStore(configController),
+					SecretRegistry:   kube.MakeSecretRegistry(client),
+					Mesh:             mesh,
 				}
-
+				discovery, err := envoy.NewDiscoveryService(
+					serviceController,
+					configController,
+					environment,
+					flags.discoveryOptions)
 				if err != nil {
 					return fmt.Errorf("failed to create discovery service: %v", err)
 				}
@@ -140,7 +142,6 @@ var (
 				go ingressSyncer.Run(stop)
 				cmd.WaitSignal(stop)
 
-				return nil
 			} else if flags.serviceregistry == proxy.ConsulRegistry {
 				mesh := proxy.DefaultMeshConfig()
 
@@ -153,8 +154,8 @@ var (
 				}
 
 				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
-					model.RouteRuleDescriptor,
-					model.DestinationPolicyDescriptor,
+					model.RouteRule,
+					model.DestinationPolicy,
 				}))
 
 				environment := proxy.Environment{
@@ -163,7 +164,6 @@ var (
 					IstioConfigStore: model.MakeIstioStore(configController),
 					Mesh:             &mesh,
 				}
-
 				discovery, err := envoy.NewDiscoveryService(
 					serviceController,
 					configController,
@@ -179,7 +179,6 @@ var (
 				go discovery.Run()
 				cmd.WaitSignal(stop)
 			}
-
 			return nil
 		},
 	}
@@ -207,7 +206,6 @@ func init() {
 		"Enable profiling via web interface host:port/debug/pprof")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
-
 	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.config, "consulconfig", "",
 		"Consul Config file for discovery")
 	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.serverURL, "consulserverURL", "",
