@@ -45,8 +45,7 @@ func buildEgressRoutes(mesh *proxyconfig.ProxyMeshConfig, services model.Service
 	}
 	port := proxy.ParsePort(mesh.EgressProxyAddress)
 	configs := HTTPRouteConfigs{port: &HTTPRouteConfig{VirtualHosts: vhosts}}
-	configs.normalize()
-	return configs
+	return configs.normalize()
 }
 
 // buildEgressRoute translates an egress rule to an Envoy route

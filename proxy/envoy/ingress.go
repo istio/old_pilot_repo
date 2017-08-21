@@ -119,8 +119,7 @@ func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 	}
 
 	configs := HTTPRouteConfigs{80: rc, 443: rcTLS}
-	configs.normalize()
-	return configs, tlsAll
+	return configs.normalize(), tlsAll
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
