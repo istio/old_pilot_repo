@@ -181,6 +181,10 @@ func buildHTTPRoute(rule *proxyconfig.RouteRule, port *model.Port) *HTTPRoute {
 		}
 	}
 
+	if rule.WebSocketUpgrade {
+		route.WebSocketUpgrade = true
+	}
+
 	return route
 }
 
