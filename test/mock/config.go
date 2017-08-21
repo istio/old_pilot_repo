@@ -55,7 +55,7 @@ var (
 	ExampleEgressRule = &proxyconfig.EgressRule{
 	        Domain:			"*.cnn.com",
 		Ports:                   []*proxyconfig.EgressRule_Port{{Port: 80, Protocol: "http"}},
-		UseEgressProxy:          true,
+		UseEgressProxy:          false,
 	}
 
 	// ExampleDestinationPolicy is an example destination policy
