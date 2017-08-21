@@ -61,8 +61,8 @@ type infra struct {
 	namespaceCreated bool
 
 	// sidecar initializer
-	UseInitializer  bool
-	InjectionPolicy inject.InjectionPolicy
+	UseInitializer bool
+	InjectConfig   *inject.Config
 }
 
 func (infra *infra) setup() error {
@@ -92,17 +92,33 @@ func (infra *infra) setup() error {
 	if err := deploy("config.yaml.tmpl"); err != nil {
 		return err
 	}
-	if infra.UseInitializer {
-		infra.InjectionPolicy = inject.InjectionPolicyOptOut
 
-		// NOTE: InitializerConfiguration is cluster-scoped and may be
-		// created and used by other tests in the same test
-		// cluster.
+	mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
+	if err != nil {
+		return err
+	}
+
+	infra.InjectConfig = &inject.Config{
+		Policy:    inject.InjectionPolicyOptOut,
+		Namespace: infra.Namespace,
+		Params: inject.Params{
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
+			Verbosity:         infra.Verbosity,
+			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
+			EnableCoreDump:    true,
+			Version:           "integration-test",
+			Mesh:              mesh,
+			MeshConfigMapName: "istio",
+		},
+	}
+
+	// NOTE: InitializerConfiguration is cluster-scoped and may be
+	// created and used by other tests in the same test cluster.
+	if infra.UseInitializer {
 		if err := deploy("initializer-config.yaml.tmpl"); err != nil {
 			return err
 		}
-	} else {
-		infra.InjectionPolicy = inject.InjectionPolicyOff
 	}
 
 	// TODO - Initializer configs can block initializers from being
@@ -127,6 +143,11 @@ func (infra *infra) setup() error {
 		glog.Infof("Sidecar initializer could not be deleted: %v", err)
 	}
 
+	if yaml, err := fill("initializer-configmap.yaml.tmpl", &infra.InjectConfig); err != nil {
+		return err
+	} else if err = infra.kubeApply(yaml); err != nil {
+		return err
+	}
 	if err := deploy("initializer.yaml.tmpl"); err != nil {
 		return err
 	}
@@ -205,22 +226,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 	writer := new(bytes.Buffer)
 
 	if injectProxy && !infra.UseInitializer {
-		mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
-		if err != nil {
-			return err
-		}
-
-		p := &inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
-			Verbosity:         infra.Verbosity,
-			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
-			EnableCoreDump:    true,
-			Version:           "integration-test",
-			Mesh:              mesh,
-			MeshConfigMapName: "istio",
-		}
-		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
+		if err := inject.IntoResourceFile(infra.InjectConfig, strings.NewReader(w), writer); err != nil {
 			return err
 		}
 	} else {

@@ -47,6 +47,9 @@ rules:
 - apiGroups: ["*"]
   resources: ["deployments", "statefulsets", "jobs", "daemonsets", "replicasets", "replicationcontrollers", "pods"]
   verbs: ["initialize", "patch", "watch", "list"]
+- apiGroups: ["*"]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
 ---
 # Grant permissions to the Pilot/discovery.
 kind: ClusterRoleBinding
