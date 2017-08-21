@@ -423,7 +423,7 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 		}
 	}
 
-	addExternalTrafficVirtualHosts(&httpConfigs, config.EgressRules(), mesh.EgressProxyAddress)
+	addExternalTrafficVirtualHosts(&httpConfigs, config.EgressRules(), mesh)
 
 	httpConfigs.normalize()
 	return httpConfigs
@@ -538,33 +538,40 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 	return listeners, clusters
 }
 
-func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, egressProxyAddress string, port *model.Port) *VirtualHost {
+func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
+	var externalTrafficCluster *Cluster
 
-	egressCluster := buildOutboundCluster("istio-egress.default", port, nil)
-	egressCluster.ServiceName = ""
-	egressCluster.Type = ClusterTypeStrictDNS
-	egressCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", egressProxyAddress)}}
+	if rule.UseEgressProxy {
+		externalTrafficCluster = buildOutboundCluster("istio-egress.default", port, nil)
+		externalTrafficCluster.ServiceName = ""
+		externalTrafficCluster.Type = ClusterTypeStrictDNS
+		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
+	} else {
+		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster", mesh.ConnectTimeout)
+	}
 
-	egressRoute := buildDefaultRoute(egressCluster)
+	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
 	return &VirtualHost{
 		Name:    rule.Domain,
 		Domains: []string{rule.Domain},
-		Routes:  []*HTTPRoute{egressRoute},
+		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
 }
 
 // buildExternalTrafficVirtualHosts builds virtual hosts from egress rule
-func buildExternalTrafficVirtualHostsOnPort(rule *proxyconfig.EgressRule, egressProxyAddress string, port *model.Port) []*VirtualHost {
+func buildExternalTrafficVirtualHostsOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
+	port *model.Port) []*VirtualHost {
 	hosts := make([]*VirtualHost, 0)
 
-	host := buildExternalTrafficVirtualHostOnPort(rule, egressProxyAddress, port)
+	host := buildExternalTrafficVirtualHostOnPort(rule, mesh, port)
 	hosts = append(hosts, host)
 
 	return hosts
 }
 
-func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules map[string]*proxyconfig.EgressRule, egressProxyAddress string) {
+func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules map[string]*proxyconfig.EgressRule,
+	mesh *proxyconfig.ProxyMeshConfig) {
 	for _, rule := range egressRules {
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
@@ -575,7 +582,7 @@ func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules m
 			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			httpConfig := httpConfigs.EnsurePort(intPort)
 			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildExternalTrafficVirtualHostsOnPort(rule, egressProxyAddress, modelPort)...)
+				buildExternalTrafficVirtualHostsOnPort(rule, mesh, modelPort)...)
 		}
 	}
 }
