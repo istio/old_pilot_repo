@@ -43,8 +43,7 @@ func TestConfigDescriptorValidate(t *testing.T) {
 		name: "Invalid DNS11234Label in ConfigDescriptor",
 		descriptor: ConfigDescriptor{ProtoSchema{
 			Type:        badLabel,
-			MessageName: RouteRuleDescriptor.MessageName,
-			Key:         func(config proto.Message) string { return "key" },
+			MessageName: RouteRule.MessageName,
 		}},
 		wantErr: true,
 	}, {
@@ -52,19 +51,18 @@ func TestConfigDescriptorValidate(t *testing.T) {
 		descriptor: ConfigDescriptor{ProtoSchema{
 			Type:        goodLabel,
 			MessageName: "nonexistent",
-			Key:         func(config proto.Message) string { return "key" },
 		}},
 		wantErr: true,
 	}, {
 		name: "Missing key function",
 		descriptor: ConfigDescriptor{ProtoSchema{
-			Type:        RouteRuleDescriptor.Type,
-			MessageName: RouteRuleDescriptor.MessageName,
+			Type:        RouteRule.Type,
+			MessageName: RouteRule.MessageName,
 		}},
 		wantErr: true,
 	}, {
 		name:       "Duplicate type and message",
-		descriptor: ConfigDescriptor{RouteRuleDescriptor, RouteRuleDescriptor},
+		descriptor: ConfigDescriptor{RouteRule, RouteRule},
 		wantErr:    true,
 	}}
 
@@ -84,7 +82,7 @@ func TestConfigDescriptorValidateConfig(t *testing.T) {
 	}{
 		{
 			name:    "bad configuration object",
-			typ:     RouteRule,
+			typ:     RouteRule.Type,
 			config:  nil,
 			wantErr: true,
 		},
@@ -96,13 +94,13 @@ func TestConfigDescriptorValidateConfig(t *testing.T) {
 		},
 		{
 			name:    "non-proto object configuration",
-			typ:     RouteRule,
+			typ:     RouteRule.Type,
 			config:  "non-proto objection configuration",
 			wantErr: true,
 		},
 		{
 			name: "message type and kind mismatch",
-			typ:  RouteRule,
+			typ:  RouteRule.Type,
 			config: &proxyconfig.DestinationPolicy{
 				Destination: "foo",
 			},
@@ -110,13 +108,13 @@ func TestConfigDescriptorValidateConfig(t *testing.T) {
 		},
 		{
 			name:    "ProtoSchema validation1",
-			typ:     RouteRule,
+			typ:     RouteRule.Type,
 			config:  &proxyconfig.RouteRule{},
 			wantErr: true,
 		},
 		{
 			name: "ProtoSchema validation2",
-			typ:  RouteRule,
+			typ:  RouteRule.Type,
 			config: &proxyconfig.RouteRule{
 				Destination: "foo",
 				Name:        "test",

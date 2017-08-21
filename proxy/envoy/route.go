@@ -90,6 +90,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *C
 		ServiceName: key,
 		Type:        SDSName,
 		LbType:      DefaultLbType,
+		outbound:    true,
 		hostname:    hostname,
 		port:        port,
 		tags:        tags,
@@ -258,15 +259,6 @@ func buildVirtualHost(svc *model.Service, port *model.Port, suffix []string, rou
 	}
 }
 
-// sharedInstanceHost computes the shared subdomain suffix for co-located instances
-func sharedInstanceHost(instances []*model.ServiceInstance) []string {
-	hostnames := make([][]string, 0)
-	for _, instance := range instances {
-		hostnames = append(hostnames, strings.Split(instance.Service.Hostname, "."))
-	}
-	return sharedHost(hostnames...)
-}
-
 // sharedHost computes the shared host name suffix for instances.
 // Each host name is split into its domains.
 func sharedHost(parts ...[]string) []string {
@@ -317,4 +309,14 @@ func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
 		route.DestinationIPList = append(route.DestinationIPList, addr+"/32")
 	}
 	return route
+}
+
+// nolint: deadcode, megacheck
+func buildOriginalDSTCluster(name string, timeout *duration.Duration) *Cluster {
+	return &Cluster{
+		Name:             OutboundClusterPrefix + name,
+		Type:             ClusterTypeOriginalDST,
+		ConnectTimeoutMs: protoDurationToMS(timeout),
+		LbType:           LbTypeOriginalDST,
+	}
 }

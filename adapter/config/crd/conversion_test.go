@@ -19,8 +19,8 @@ import "testing"
 var (
 	camelKabobs = []struct{ in, out string }{
 		{"ExampleNameX", "example-name-x"},
-		{"example1", "example1"},
-		{"exampleXY", "example-x-y"},
+		{"Example1", "example1"},
+		{"ExampleXY", "example-x-y"},
 	}
 )
 
@@ -30,18 +30,9 @@ func TestCamelKabob(t *testing.T) {
 		if s != tt.out {
 			t.Errorf("camelCaseToKabobCase(%q) => %q, want %q", tt.in, s, tt.out)
 		}
-	}
-}
-
-var convertedKeys = []struct{ typ, in, out string }{
-	{"egress-rule", "*.fox-news.com", "egress-rule-esedfox-neewsedcom"},
-}
-
-func TestConvertKey(t *testing.T) {
-	for _, key := range convertedKeys {
-		convertedKey := configKey(key.typ, key.in)
-		if convertedKey != key.out {
-			t.Errorf("configKey(%q, %q) => %q, want %q", key.typ, key.in, convertedKey, key.out)
+		u := kabobCaseToCamelCase(tt.out)
+		if u != tt.in {
+			t.Errorf("kabobToCamel(%q) => %q, want %q", tt.out, u, tt.in)
 		}
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"net"
 
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // Mock values
@@ -42,6 +43,30 @@ var (
 	}
 	HostInstanceV0 = MakeIP(HelloService, 0)
 	HostInstanceV1 = MakeIP(HelloService, 1)
+	ProxyV0        = proxy.Node{
+		Type:      proxy.Sidecar,
+		IPAddress: HostInstanceV0,
+		ID:        "v0.default",
+		Domain:    "default.svc.cluster.local",
+	}
+	ProxyV1 = proxy.Node{
+		Type:      proxy.Sidecar,
+		IPAddress: HostInstanceV1,
+		ID:        "v1.default",
+		Domain:    "default.svc.cluster.local",
+	}
+	Ingress = proxy.Node{
+		Type:      proxy.Ingress,
+		IPAddress: "10.3.3.3",
+		ID:        "ingress.default",
+		Domain:    "default.svc.cluster.local",
+	}
+	Egress = proxy.Node{
+		Type:      proxy.Egress,
+		IPAddress: "10.3.3.4",
+		ID:        "egress.default",
+		Domain:    "default.svc.cluster.local",
+	}
 )
 
 // MakeService creates a mock service
@@ -186,6 +211,19 @@ func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) []*model.Servic
 		}
 	}
 	return out
+}
+
+// ManagementPorts implements discovery interface
+func (sd *ServiceDiscovery) ManagementPorts(addr string) model.PortList {
+	return model.PortList{{
+		Name:     "http",
+		Port:     3333,
+		Protocol: model.ProtocolHTTP,
+	}, {
+		Name:     "custom",
+		Port:     9999,
+		Protocol: model.ProtocolTCP,
+	}}
 }
 
 // GetIstioServiceAccounts gets the Istio service accounts for a service hostname.

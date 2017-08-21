@@ -16,76 +16,59 @@ package crd
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"istio.io/pilot/model"
 )
 
-// configKey assigns k8s CRD name to Istio config
-func configKey(typ, key string) string {
-	switch typ {
-	case model.RouteRule, model.IngressRule:
-		return typ + "-" + key
-	case model.DestinationPolicy:
-		// TODO: special key encoding for long hostnames-based keys
-		parts := strings.Split(key, ".")
-		return typ + "-" + strings.Replace(parts[0], "-", "--", -1) +
-			"-" + strings.Replace(parts[1], "-", "--", -1)
-	case model.EgressRule:
-		escapedKey := key
-		// use letter 'e' as escape character:
-		// ee = e
-		// ed = .
-		// es = *
-		escapedKey = strings.Replace(escapedKey, "e", "ee", -1)
-		escapedKey = strings.Replace(escapedKey, ".", "ed", -1)
-		escapedKey = strings.Replace(escapedKey, "*", "es", -1)
-		return typ + "-" + escapedKey
-	}
-	return key
-}
-
-// modelToKube translates Istio config to k8s config JSON
-func modelToKube(schema model.ProtoSchema, namespace string, config proto.Message) (*IstioKind, error) {
-	spec, err := schema.ToJSONMap(config)
+func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
+	data, err := schema.FromJSONMap(object.GetSpec())
 	if err != nil {
 		return nil, err
 	}
-	out := &IstioKind{
-		TypeMeta: meta_v1.TypeMeta{
-			Kind: IstioKindName,
+	meta := object.GetObjectMeta()
+	return &model.Config{
+		ConfigMeta: model.ConfigMeta{
+			Type:            schema.Type,
+			Name:            meta.Name,
+			Namespace:       meta.Namespace,
+			Labels:          meta.Labels,
+			Annotations:     meta.Annotations,
+			ResourceVersion: meta.ResourceVersion,
 		},
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name:      configKey(schema.Type, schema.Key(config)),
-			Namespace: namespace,
-		},
-		Spec: spec,
+		Spec: data,
+	}, nil
+}
+
+// convertConfig translates Istio config to k8s config JSON
+func convertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
+	spec, err := schema.ToJSONMap(config.Spec)
+	if err != nil {
+		return nil, err
 	}
+	out := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
+	out.SetObjectMeta(meta_v1.ObjectMeta{
+		Name:            config.Name,
+		Namespace:       config.Namespace,
+		ResourceVersion: config.ResourceVersion,
+		Labels:          config.Labels,
+		Annotations:     config.Annotations,
+	})
+	out.SetSpec(spec)
 
 	return out, nil
 }
 
-// convertConfig extracts Istio config data from k8s CRD
-func (cl *Client) convertConfig(item *IstioKind) (model.Config, error) {
-	for _, schema := range cl.ConfigDescriptor() {
-		if strings.HasPrefix(item.ObjectMeta.Name, schema.Type) {
-			data, err := schema.FromJSONMap(item.Spec)
-			if err != nil {
-				return model.Config{}, err
-			}
-			return model.Config{
-				Type:     schema.Type,
-				Key:      schema.Key(data),
-				Revision: item.ObjectMeta.ResourceVersion,
-				Content:  data,
-			}, nil
-		}
+// camelCaseToKabobCase converts "my-name" to "MyName"
+func kabobCaseToCamelCase(s string) string {
+	words := strings.Split(s, "-")
+	out := ""
+	for _, word := range words {
+		out = out + strings.Title(word)
 	}
-	return model.Config{}, fmt.Errorf("missing schema")
+	return out
 }
 
 // camelCaseToKabobCase converts "MyName" to "my-name"
