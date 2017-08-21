@@ -61,5 +61,26 @@ func (t *tcp) run() error {
 			}
 		}
 	}
+
+	if t.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
+		// An app without auth-enabled Envoy should not be able to talk to an auth-enabled app.
+		src := "t"
+		dst := "a"
+		for _, port := range []string{":90", ":9090"} {
+			for _, domain := range []string{"", "." + t.Namespace} {
+				name := fmt.Sprintf("TCP connection from %s to %s%s%s", src, dst, domain, port)
+				funcs[name] = (func(src, dst, port, domain string) func() status {
+					url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
+					return func() status {
+						resp := t.clientRequest(src, url, 1, "")
+						if len(resp.code) == 0 || resp.code[0] != httpOk {
+							return nil
+						}
+						return errAgain
+					}
+				})(src, dst, port, domain)
+			}
+		}
+	}
 	return parallel(funcs)
 }
