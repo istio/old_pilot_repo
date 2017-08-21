@@ -65,6 +65,6 @@ cat <<EOF
 EOF
 
 for crd in $CRDS; do
-  sed -e "1,20d;s/IstioKind/$crd/g" adapter/config/crd/config.go
+  sed -e "s/IstioKind/$crd/g" adapter/config/crd/config.go
 done
 
