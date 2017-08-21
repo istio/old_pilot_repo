@@ -763,7 +763,7 @@ func ValidateEgressRule(msg proto.Message) error {
 	}
 
 	if rule.Ports == nil || len(rule.Ports) == 0 {
-		return fmt.Errorf("egress rule must have a ports list")
+		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a ports list"))
 	}
 
 	ports := make(map[int32]bool)
