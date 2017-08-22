@@ -380,7 +380,7 @@ func (ds *DiscoveryService) ListAllEndpoints(request *restful.Request, response 
 	}
 }
 
-// ListEndpoints responds to SDS requests
+// ListEndpoints responds to EDS requests
 func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *restful.Response) {
 	key := request.Request.URL.String()
 	out, cached := ds.sdsCache.cachedDiscoveryResponse(key)
@@ -396,7 +396,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 		}
 		var err error
 		if out, err = json.MarshalIndent(hosts{Hosts: hostArray}, " ", " "); err != nil {
-			errorResponse(response, http.StatusInternalServerError, "SDS " + err.Error())
+			errorResponse(response, http.StatusInternalServerError, "EDS " + err.Error())
 			return
 		}
 		ds.sdsCache.updateCachedDiscoveryResponse(key, out)
@@ -406,6 +406,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 
 func (ds *DiscoveryService) parseDiscoveryRequest(request *restful.Request) (string, string, proxy.Node, error) {
 	cluster := request.PathParameter(ServiceCluster)
+	// request has to match the IstioServiceCluster (default is "istio-proxy")
 	if cluster != ds.Mesh.IstioServiceCluster {
 		return cluster, "", proxy.Node{}, fmt.Errorf("unexpected %s %q", ServiceCluster, cluster)
 	}
@@ -428,7 +429,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 			errorResponse(response, http.StatusNotFound, "CDS " + err.Error())
 			return
 		}
-		glog.V(3).Infof("CDS Discovery request to ListClusters for service_cluster %s, service_node %s, role %s",
+		glog.V(5).Infof("CDS Discovery request to ListClusters for service_cluster %s, service_node %s, role %s",
 			cluster, node, role.Type)
 
 		clusters := buildClusters(ds.Environment, role)
@@ -451,7 +452,7 @@ func (ds *DiscoveryService) ListListeners(request *restful.Request, response *re
 			errorResponse(response, http.StatusNotFound, "LDS " + err.Error())
 			return
 		}
-		glog.V(3).Infof("LDS Discovery request to ListListeners for service_cluster %s, service_node %s, role %s",
+		glog.V(5).Infof("LDS Discovery request to ListListeners for service_cluster %s, service_node %s, role %s",
 			cluster, node, role.Type)
 
 
@@ -478,7 +479,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			errorResponse(response, http.StatusNotFound, "RDS " + err.Error())
 			return
 		}
-		glog.V(3).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s",
+		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s",
 			cluster, node, role.Type)
 
 		// route-config-name holds the listener port
@@ -494,7 +495,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		routeConfig, ok := httpRouteConfigs[port]
 		if !ok {
 			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("rds Missing route config for port %d", port))
+				fmt.Sprintf("RDS Missing route config for port %d", port))
 			return
 		}
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
@@ -517,7 +518,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 		return
 	}
 
-	glog.V(3).Infof("ListSecrets Discovery request to ListSecret for service_cluster %s, service_node %s, role %s",
+	glog.V(5).Infof("ListSecrets Discovery request to ListSecret for service_cluster %s, service_node %s, role %s",
 		cluster, node, role.Type)
 
 	if role.Type != proxy.Ingress {
@@ -528,7 +529,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 	_, secret := buildIngressRoutes(ds.Mesh, ds, ds)
 
 	if secret == "" {
-		glog.V(3).Infof("Secret is not set")
+		glog.V(5).Infof("Secret is not set")
 		writeResponse(response, nil)
 		return
 	}

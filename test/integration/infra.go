@@ -56,7 +56,7 @@ type infra struct {
 	Ingress bool
 	Egress  bool
 	Zipkin  bool
-	DlvPort int
+	DebugPort int
 
 	// check proxy logs
 	checkLogs bool
@@ -252,7 +252,6 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	pod := infra.apps[app][0]
 	cmd := fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
 		pod, kubeconfig, infra.Namespace, url, count, extra)
-	glog.Info(cmd)
 	request, err := util.Shell(cmd)
 
 	if err != nil {
@@ -316,7 +315,7 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 	}
 
 	glog.Info("Sleeping for the config to propagate")
-	time.Sleep(3 * time.Second)
+	time.Sleep(10 * time.Second)
 	return nil
 }
 

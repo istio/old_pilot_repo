@@ -89,7 +89,7 @@ func init() {
 	// If specified, only run one test
 	flag.StringVar(&testType, "testtype", "", "Select test to run (default is all tests)")
 
-	flag.IntVar(&params.DlvPort, "dlvport", 0, "Dlv port for debugging")
+	flag.IntVar(&params.DebugPort, "debugport", 0, "Debugging port")
 }
 
 type test interface {

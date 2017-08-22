@@ -17,7 +17,8 @@ package ingress
 import (
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/golang/glog"
+
 	"k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,11 +27,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/ingress/core/pkg/ingress/status"
 	"k8s.io/ingress/core/pkg/ingress/store"
+	betaext "k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"
-	"github.com/golang/glog"
-	betaext "k8s.io/api/extensions/v1beta1"
 )
 
 const ingressElectionID = "istio-ingress-controller-leader"
@@ -71,7 +72,7 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	if mesh.IngressService != "" {
 		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
 	}
-	glog.Infof("INGRESS STATUS publishService ", publishService)
+	glog.V(2).Infof("INGRESS STATUS publishService %s", publishService)
 	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)
 
 	customIngressStatus := func(*betaext.Ingress) []v1.LoadBalancerIngress {

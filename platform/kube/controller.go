@@ -38,7 +38,7 @@ const (
 	NodeRegionLabel = "failure-domain.beta.kubernetes.io/region"
 	// NodeZoneLabel is the well-known label for kubernetes node zone
 	NodeZoneLabel = "failure-domain.beta.kubernetes.io/zone"
-	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
+	// Namespace used by default for Istio cluster-wide installation
 	IstioNamespace string = "istio-system"
 )
 
@@ -403,6 +403,7 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 	c.services.handler.Append(func(obj interface{}, event model.Event) error {
 		svc := *obj.(*v1.Service)
 
+		// Do not handle "kube-system" services
 		if svc.Namespace == meta_v1.NamespaceSystem {
 			return nil
 		}
@@ -422,6 +423,7 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 	c.endpoints.handler.Append(func(obj interface{}, event model.Event) error {
 		ep := *obj.(*v1.Endpoints)
 
+		// Do not handle "kube-system" endpoints
 		if ep.Namespace == meta_v1.NamespaceSystem {
 			return nil
 		}
