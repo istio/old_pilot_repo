@@ -113,6 +113,8 @@ func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 		DiscoveryAddress:   "istio-pilot:8080",
 		EgressProxyAddress: "istio-egress:80",
 
+		AccessLogFile:          "/dev/stdout",
+		ErrorLogFile:           "/dev/stderr",
 		ProxyListenPort:        15001,
 		ProxyAdminPort:         15000,
 		DrainDuration:          ptypes.DurationProto(2 * time.Second),
