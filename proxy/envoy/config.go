@@ -158,7 +158,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 	services := env.Services()
 	managementPorts := env.ManagementPorts(sidecar.IPAddress)
 
-	inbound, inClusters := buildInboundListeners(env.Mesh, sidecar, instances)
+	inbound, inClusters := buildInboundListeners(env.Mesh, sidecar, instances, env)
 	outbound, outClusters := buildOutboundListeners(env.Mesh, sidecar, instances, services, env)
 	mgmtListeners, mgmtClusters := buildMgmtPortListeners(env.Mesh, managementPorts, sidecar.IPAddress)
 
@@ -466,7 +466,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 // all inbound clusters since they are statically declared in the proxy
 // configuration and do not utilize CDS.
 func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node,
-	instances []*model.ServiceInstance) (Listeners, Clusters) {
+	instances []*model.ServiceInstance, config model.IstioConfigStore) (Listeners, Clusters) {
 	listeners := make(Listeners, 0, len(instances))
 	clusters := make(Clusters, 0, len(instances))
 
@@ -501,6 +501,19 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				Name:    fmt.Sprintf("inbound|%d", endpoint.Port),
 				Domains: []string{"*"},
 				Routes:  []*HTTPRoute{route},
+			}
+
+			// Websocket enabled routes need to have an explicit use_websocket : true
+			// This setting needs to be enabled on Envoys at both sender and receiver end
+			if protocol == model.ProtocolHTTP {
+				// get all the route rules applicable to the instances
+				rules := config.RouteRulesByDestination(instances)
+				for _, rule := range rules {
+					if rule.WebsocketUpgrade {
+						websocket_route := buildInboundWebsocketRoute(rule, cluster)
+						host.Routes = append(host.Routes, websocket_route)
+					}
+				}
 			}
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
