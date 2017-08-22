@@ -46,7 +46,7 @@ const (
 	CDSName = "cds"
 
 	// RDSAll is the special name for HTTP PROXY route
-	RDSAll = "all"
+	RDSAll = "http_proxy"
 
 	// VirtualListenerName is the name for traffic capture listener
 	VirtualListenerName = "virtual"
