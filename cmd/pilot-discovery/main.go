@@ -28,7 +28,6 @@ import (
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/adapter/config/ingress"
-	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/consul"
@@ -153,10 +152,19 @@ var (
 					return fmt.Errorf("failed to create Consul controller: %v", err)
 				}
 
-				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
+				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 					model.RouteRule,
 					model.DestinationPolicy,
-				}))
+				})
+				if err != nil {
+					return multierror.Prefix(err, "failed to open a config client.")
+				}
+
+				if err = configClient.RegisterResources(); err != nil {
+					return multierror.Prefix(err, "failed to register custom resources.")
+				}
+
+				configController := crd.NewController(configClient, flags.controllerOptions)
 
 				environment := proxy.Environment{
 					ServiceDiscovery: serviceController,
