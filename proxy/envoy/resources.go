@@ -225,7 +225,7 @@ type HTTPRoute struct {
 	RetryPolicy  *RetryPolicy      `json:"retry_policy,omitempty"`
 	OpaqueConfig map[string]string `json:"opaque_config,omitempty"`
 
-	AutoHostRewrite bool `json:"auto_host_rewrite,omitempty"`
+	AutoHostRewrite  bool `json:"auto_host_rewrite,omitempty"`
 	WebsocketUpgrade bool `json:"use_websocket,omitempty"`
 
 	// clusters contains the set of referenced clusters in the route; the field is special

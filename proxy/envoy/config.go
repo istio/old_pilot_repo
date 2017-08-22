@@ -510,8 +510,8 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				rules := config.RouteRulesByDestination(instances)
 				for _, rule := range rules {
 					if rule.WebsocketUpgrade {
-						websocket_route := buildInboundWebsocketRoute(rule, cluster)
-						host.Routes = append(host.Routes, websocket_route)
+						websocketRoute := buildInboundWebsocketRoute(rule, cluster)
+						host.Routes = append(host.Routes, websocketRoute)
 					}
 				}
 			}
