@@ -210,7 +210,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
-			buildHTTPListener(env.Mesh, sidecar, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), true, false))
+			buildHTTPListener(env.Mesh, sidecar, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
 	}
 
 	return listeners.normalize(), clusters.normalize()
@@ -218,7 +218,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 
 // buildRDSRoutes supplies RDS-enabled HTTP routes
 // The route name is assumed to be the port number used by the route in the
-// listener, or the special empty value for _all routes_.
+// listener, or the special value for _all routes_.
 // TODO: this can be optimized by querying for a specific HTTP port in the table
 func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName string,
 	discovery model.ServiceDiscovery, config model.IstioConfigStore) *HTTPRouteConfig {
@@ -248,11 +248,10 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName
 	return configs[port]
 }
 
-// buildHTTPListener constructs a listener for the network interface address and port
-// Use "0.0.0.0" IP address to listen on all interfaces
-// RDS parameter controls whether to use RDS for the route updates.
+// buildHTTPListener constructs a listener for the network interface address and port.
+// Set RDS parameter to a non-empty value to enable RDS for the matching route name.
 func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds bool, useRemoteAddress bool) *Listener {
+	ip string, port int, rds string, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -288,10 +287,10 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, route
 		}
 	}
 
-	if rds {
+	if rds != "" {
 		config.RDS = &RDS{
 			Cluster:         RDSName,
-			RouteConfigName: fmt.Sprintf("%d", port),
+			RouteConfigName: rds,
 			RefreshDelayMs:  protoDurationToMS(mesh.DiscoveryRefreshDelay),
 		}
 	} else {
@@ -342,7 +341,8 @@ func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Nod
 	// note that outbound HTTP routes are supplied through RDS
 	httpOutbound := buildOutboundHTTPRoutes(mesh, sidecar, instances, services, config)
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners, buildHTTPListener(mesh, sidecar, routeConfig, WildcardAddress, port, true, false))
+		listeners = append(listeners,
+			buildHTTPListener(mesh, sidecar, routeConfig, WildcardAddress, port, fmt.Sprintf("%d", port), false))
 		clusters = append(clusters, routeConfig.clusters()...)
 	}
 
@@ -533,7 +533,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, false, false))
+				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, "", false))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listener := buildTCPListener(&TCPRouteConfig{

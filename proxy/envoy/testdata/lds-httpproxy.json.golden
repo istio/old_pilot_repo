@@ -16,7 +16,7 @@
        },
        "rds": {
         "cluster": "rds",
-        "route_config_name": "15002",
+        "route_config_name": "all",
         "refresh_delay_ms": 10
        },
        "filters": [
