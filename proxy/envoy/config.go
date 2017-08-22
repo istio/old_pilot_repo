@@ -553,8 +553,8 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
 	return &VirtualHost{
-		Name:    rule.Domain,
-		Domains: []string{rule.Domain},
+		Name:    rule.Name,
+		Domains: rule.Domains,
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
 }
