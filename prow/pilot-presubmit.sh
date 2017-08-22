@@ -50,6 +50,9 @@ bazel build //...
 echo '=== Go Build ==='
 ./bin/init.sh
 
+echo '=== Code Format Check ==='
+./bin/fmt.sh
+
 echo '=== Code Check ==='
 ./bin/check.sh
 
