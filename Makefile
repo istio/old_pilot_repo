@@ -24,7 +24,8 @@ fmt:
 	@bin/fmt.sh
 
 .PHONY: build
-build:	
+build: kubeconfig
+	@bin/install-prereqs.sh
 	@bazel build //...
 
 .PHONY: clean
@@ -52,5 +53,5 @@ racetest:
 	@bazel test --features=race //...
 
 kubeconfig:
-	@ln -s ~/.kube/config platform/kube/
+	@bin/kubeconfig.sh
 
