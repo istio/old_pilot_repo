@@ -217,33 +217,35 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 }
 
 // buildRDSRoutes supplies RDS-enabled HTTP routes
+// The route name is assumed to be the port number used by the route in the
+// listener, or the special empty value for _all routes_.
 // TODO: this can be optimized by querying for a specific HTTP port in the table
 func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName string,
 	discovery model.ServiceDiscovery, config model.IstioConfigStore) *HTTPRouteConfig {
+	var configs HTTPRouteConfigs
+	switch role.Type {
+	case proxy.Ingress:
+		configs, _ = buildIngressRoutes(mesh, discovery, config)
+	case proxy.Egress:
+		configs = buildEgressRoutes(mesh, discovery)
+	case proxy.Sidecar:
+		instances := discovery.HostInstances(map[string]bool{role.IPAddress: true})
+		services := discovery.Services()
+		configs = buildOutboundHTTPRoutes(mesh, role, instances, services, config)
+	default:
+		return nil
+	}
+
+	if routeName == RDSAll {
+		return configs.combine()
+	}
+
 	port, err := strconv.Atoi(routeName)
 	if err != nil {
 		return nil
 	}
 
-	switch role.Type {
-	case proxy.Ingress:
-		httpRouteConfigs, _ := buildIngressRoutes(mesh, discovery, config)
-		return httpRouteConfigs[port]
-
-	case proxy.Egress:
-		return buildEgressRoutes(mesh, discovery)[port]
-
-	case proxy.Sidecar:
-		instances := discovery.HostInstances(map[string]bool{role.IPAddress: true})
-		services := discovery.Services()
-		routes := buildOutboundHTTPRoutes(mesh, role, instances, services, config)
-		if port == int(mesh.ProxyHttpPort) {
-			return routes.combine()
-		}
-		return routes[port]
-	}
-
-	return nil
+	return configs[port]
 }
 
 // buildHTTPListener constructs a listener for the network interface address and port

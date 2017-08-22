@@ -436,7 +436,7 @@ func TestListenerDiscoveryHttpProxy(t *testing.T) {
 	url := fmt.Sprintf("/v1/listeners/%s/%s", ds.Mesh.IstioServiceCluster, mock.ProxyV0.ServiceNode())
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-httpproxy.json", t)
-	url = fmt.Sprintf("/v1/routes/15002/%s/%s", ds.Mesh.IstioServiceCluster, mock.ProxyV0.ServiceNode())
+	url = fmt.Sprintf("/v1/routes/%s/%s/%s", RDSAll, ds.Mesh.IstioServiceCluster, mock.ProxyV0.ServiceNode())
 	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-httpproxy.json", t)
 }

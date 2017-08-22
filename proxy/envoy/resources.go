@@ -45,6 +45,9 @@ const (
 	// CDSName is the name of cluster-discovery-service (CDS) cluster
 	CDSName = "cds"
 
+	// RDSAll is the special name for HTTP PROXY route
+	RDSAll = "all"
+
 	// VirtualListenerName is the name for traffic capture listener
 	VirtualListenerName = "virtual"
 
