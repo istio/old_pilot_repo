@@ -549,6 +549,9 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
 		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
+		if port.Protocol == model.ProtocolHTTPS {
+			externalTrafficCluster.SSLContext = &SSLContextExternal{}
+		}
 	}
 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
