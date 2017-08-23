@@ -74,7 +74,7 @@ spec:
       - name: discovery
         image: {{.Hub}}/pilot:{{.Tag}}
         imagePullPolicy: IfNotPresent
-        args: ["discovery", "-v", "{{.Verbosity}}"]
+        args: ["discovery", "-v", "{{.Verbosity}}", "-a", "{{.Namespace}}"]
         ports:
         - containerPort: 8080
 {{if .DebugPort}}

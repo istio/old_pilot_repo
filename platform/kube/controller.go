@@ -45,6 +45,7 @@ const (
 type ControllerOptions struct {
 	// Namespace to restrict controller to (empty to disable restriction)
 	Namespace    string
+	AppNamespace    string
 	ResyncPeriod time.Duration
 	DomainSuffix string
 }
@@ -125,7 +126,7 @@ func (c *Controller) notify(obj interface{}, event model.Event) error {
 	if err != nil {
 		glog.V(2).Infof("Error retrieving key: %v", err)
 	} else {
-		glog.V(2).Infof("Event %s: key %#v", event, k)
+		glog.V(6).Infof("Event %s: key %#v", event, k)
 	}
 	return nil
 }

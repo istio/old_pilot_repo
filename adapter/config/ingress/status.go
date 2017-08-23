@@ -59,10 +59,10 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses(meta_v1.NamespaceAll).List(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).List(opts)
 			},
 			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses(meta_v1.NamespaceAll).Watch(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).Watch(opts)
 			},
 		},
 		&v1beta1.Ingress{}, options.ResyncPeriod, cache.Indexers{},
