@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -63,6 +62,10 @@ type infra struct {
 
 	namespaceCreated bool
 	istioNamespaceCreated bool
+
+	// sidecar initializer
+	UseInitializer  bool
+	InjectionPolicy inject.InjectionPolicy
 }
 
 func (infra *infra) setup() error {
@@ -109,12 +112,54 @@ func (infra *infra) setup() error {
 		return err
 	}
 
+	if infra.UseInitializer {
+		infra.InjectionPolicy = inject.InjectionPolicyOptOut
+
+		// NOTE: InitializerConfiguration is cluster-scoped and may be
+		// created and used by other tests in the same test
+		// cluster.
+		if err := deploy("initializer-config.yaml.tmpl", infra.IstioNamespace); err != nil {
+			return err
+		}
+	} else {
+		infra.InjectionPolicy = inject.InjectionPolicyOff
+	}
+
+	// TODO - Initializer configs can block initializers from being
+	// deployed. The workaround is to explicitly set the initializer
+	// field of the deployment to an empty list, thus bypassing the
+	// initializers. This works when the deployment is first created,
+	// but Subsequent modifications with 'apply' fail with the
+	// message:
+	//
+	// 		The Deployment "istio-sidecar-initializer" is invalid:
+	// 		metadata.initializers: Invalid value: "null": field is
+	// 		immutable once initialization has completed.
+	//
+	// Delete any existing initializer deployment from previous test
+	// runs first before trying to (re)create it.
+	//
+	// See github.com/kubernetes/kubernetes/issues/49048 for k8s
+	// tracking issue.
+	if infra.UseInitializer {
+		if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
+			return err
+		} else if err = infra.kubeDelete(yaml); err != nil {
+			glog.Infof("Sidecar initializer could not be deleted: %v", err)
+		}
+
+		if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
+			return err
+		}
+	}
+
 	if err := deploy("pilot.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
 	if err := deploy("mixer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
+
 	if infra.Auth != proxyconfig.ProxyMeshConfig_NONE {
 		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
@@ -174,6 +219,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		"port6":      strconv.Itoa(port6),
 		"version":    version,
 		"istioNamespace": infra.IstioNamespace,
+		"injectProxy": strconv.FormatBool(injectProxy),
 	})
 	if err != nil {
 		return err
@@ -181,7 +227,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 
 	writer := new(bytes.Buffer)
 
-	if injectProxy {
+	if injectProxy && !infra.UseInitializer {
 		mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
 		if err != nil {
 			return err
@@ -223,6 +269,11 @@ func (infra *infra) teardown() {
 func (infra *infra) kubeApply(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
 		kubeconfig, namespace), yaml)
+}
+
+func (infra *infra) kubeDelete(yaml string) error {
+	return util.RunInput(fmt.Sprintf("kubectl delete --kubeconfig %s -n %s -f -",
+		kubeconfig, infra.Namespace), yaml)
 }
 
 type response struct {
@@ -284,31 +335,28 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	return out
 }
 
-func (infra *infra) applyConfig(inFile string, data map[string]string, typ string) error {
+func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 	config, err := fill(inFile, data)
 	if err != nil {
 		return err
 	}
 
-	schema, ok := model.IstioConfigTypes.GetByType(typ)
-	if !ok {
-		return fmt.Errorf("Invalid type %s", typ)
-	}
-	v, err := schema.FromYAML(config)
+	v, err := model.IstioConfigTypes.FromYAML([]byte(config))
 	if err != nil {
 		return err
 	}
 
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, infra.Namespace)
+	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
 	if err != nil {
 		return err
 	}
 
-	_, exists, rev := istioClient.Get(typ, schema.Key(v))
+	old, exists := istioClient.Get(v.Type, v.Name, v.Namespace)
 	if exists {
-		_, err = istioClient.Put(v, rev)
+		v.ResourceVersion = old.ResourceVersion
+		_, err = istioClient.Update(*v)
 	} else {
-		_, err = istioClient.Post(v)
+		_, err = istioClient.Create(*v)
 	}
 	if err != nil {
 		return err
@@ -320,18 +368,18 @@ func (infra *infra) applyConfig(inFile string, data map[string]string, typ strin
 }
 
 func (infra *infra) deleteAllConfigs() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, infra.Namespace)
+	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
 	if err != nil {
 		return err
 	}
 	for _, desc := range istioClient.ConfigDescriptor() {
-		configs, err := istioClient.List(desc.Type)
+		configs, err := istioClient.List(desc.Type, infra.Namespace)
 		if err != nil {
 			return err
 		}
 		for _, config := range configs {
-			glog.Infof("Delete config %s %s", desc.Type, config.Key)
-			if err = istioClient.Delete(desc.Type, config.Key); err != nil {
+			glog.Infof("Delete config %s", config.Key())
+			if err = istioClient.Delete(desc.Type, config.Name, config.Namespace); err != nil {
 				return err
 			}
 		}

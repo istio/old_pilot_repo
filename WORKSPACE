@@ -263,33 +263,32 @@ go_repository(
 
 go_repository(
     name = "io_k8s_api",
-    build_file_name = "BUILD.bazel",
     build_file_generation = "on",
+    build_file_name = "BUILD.bazel",
     commit = "4d5cc6efc5e84aa19fb1bd3f911c16a6723c1bb7",
     importpath = "k8s.io/api",
 )
 
 go_repository(
     name = "io_k8s_apimachinery",
-    build_file_name = "BUILD.bazel",
     build_file_generation = "on",
+    build_file_name = "BUILD.bazel",
     commit = "6134cb2da6d90597b0434e349f90f94fafc9ae51",
     importpath = "k8s.io/apimachinery",
 )
 
 go_repository(
     name = "io_k8s_apiserver",
-    build_file_name = "BUILD.bazel",
     build_file_generation = "on",
+    build_file_name = "BUILD.bazel",
     commit = "ab57ed5a72c3b67058f665d660e23bae18339fc2",
     importpath = "k8s.io/apiserver",
 )
 
-
 go_repository(
     name = "io_k8s_client_go",
-    build_file_name = "BUILD.bazel",
     build_file_generation = "on",
+    build_file_name = "BUILD.bazel",
     commit = "7c69e980210777a6292351ac6873de083526f08e",  # Jul 18, 2017
     importpath = "k8s.io/client-go",
 )
@@ -298,8 +297,8 @@ go_repository(
 
 go_repository(
     name = "io_k8s_apiextensions_apiserver",
-    build_file_name = "BUILD.bazel",
     build_file_generation = "on",
+    build_file_name = "BUILD.bazel",
     commit = "c682349b0d1c12975d8e24a9799b66747255d7a5",
     importpath = "k8s.io/apiextensions-apiserver",
 )
@@ -394,25 +393,25 @@ go_repository(
 
 go_repository(
     name = "com_github_hashicorp_go_rootcerts",
-    commit = "6bb64b370b90e7ef1fa532be9e591a81c3493e00", # May 3 2016
+    commit = "6bb64b370b90e7ef1fa532be9e591a81c3493e00",  # May 3 2016
     importpath = "github.com/hashicorp/go-rootcerts",
 )
 
 go_repository(
     name = "com_github_hashicorp_go_cleanhttp",
-    commit = "3573b8b52aa7b37b9358d966a898feb387f62437", # Feb 10 2017
+    commit = "3573b8b52aa7b37b9358d966a898feb387f62437",  # Feb 10 2017
     importpath = "github.com/hashicorp/go-cleanhttp",
 )
 
 go_repository(
     name = "com_github_hashicorp_serf",
-    commit = "d6574a5bb1226678d7010325fb6c985db20ee458", # Feb 6 2017 v0.8.1
+    commit = "d6574a5bb1226678d7010325fb6c985db20ee458",  # Feb 6 2017 v0.8.1
     importpath = "github.com/hashicorp/serf",
 )
 
 go_repository(
     name = "com_github_hashicorp_consul",
-    commit = "f4360770d8e7b852e2d05835b583d20799e58133", # Jun 9 2017 v0.8.4
+    commit = "f4360770d8e7b852e2d05835b583d20799e58133",  # Jun 9 2017 v0.8.4
     importpath = "github.com/hashicorp/consul",
 )
 
@@ -470,7 +469,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "af5afdafc95826a5716facc2ea025f1e27bb8225",  # June 8, 2017
+    commit = "846cbe55455f0b3b2ed742b52edc520cc94326a9",  # Aug 18, 2017
     remote = "https://github.com/istio/api.git",
 )
 

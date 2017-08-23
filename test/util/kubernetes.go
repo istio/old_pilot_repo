@@ -91,6 +91,17 @@ func GetAppPods(cl kubernetes.Interface, nslist []string) (map[string][]string, 
 					glog.Infof("Pod %s.%s has status %s", pod.Name, ns, pod.Status.Phase)
 					ready = false
 					break
+				} else {
+					for _, container := range pod.Status.ContainerStatuses {
+						if !container.Ready {
+							glog.Infof("Container %s in Pod %s in namespace % s is not ready", container.Name, pod.Name, ns)
+							ready = false
+							break
+						}
+					}
+					if !ready {
+						break
+					}
 				}
 			}
 

@@ -27,16 +27,25 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig, ingress proxy.Node) Listeners {
-	listener := buildHTTPListener(mesh, ingress, nil, WildcardAddress, 443, true, true)
-	listener.SSLContext = &SSLContext{
-		CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
-		PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
+func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig,
+	discovery model.ServiceDiscovery,
+	config model.IstioConfigStore,
+	ingress proxy.Node) Listeners {
+	listeners := Listeners{
+		buildHTTPListener(mesh, ingress, nil, WildcardAddress, 80, "80", true),
 	}
 
-	listeners := Listeners{
-		buildHTTPListener(mesh, ingress, nil, WildcardAddress, 80, true, true),
-		listener}
+	// lack of SNI in Envoy implies that TLS secrets are attached to listeners
+	// therefore, we should first check that TLS endpoint is needed before shipping TLS listener
+	_, secret := buildIngressRoutes(mesh, discovery, config)
+	if secret != "" {
+		listener := buildHTTPListener(mesh, ingress, nil, WildcardAddress, 443, "443", true)
+		listener.SSLContext = &SSLContext{
+			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
+			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
+		}
+		listeners = append(listeners, listener)
+	}
 
 	return listeners
 }
@@ -117,8 +126,7 @@ func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 	}
 
 	configs := HTTPRouteConfigs{80: rc, 443: rcTLS}
-	configs.normalize()
-	return configs, tlsAll
+	return configs.normalize(), tlsAll
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
@@ -154,7 +162,7 @@ func buildIngressRoute(mesh *proxyconfig.ProxyMeshConfig, ingress *proxyconfig.I
 	for _, route := range routes {
 		// enable mixer check on the route
 		if mesh.MixerAddress != "" {
-			route.OpaqueConfig = buildMixerInboundOpaqueConfig()
+			route.OpaqueConfig = buildMixerOpaqueConfig(true, true)
 		}
 
 		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {

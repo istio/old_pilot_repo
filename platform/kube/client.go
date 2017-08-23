@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -91,7 +90,7 @@ func MakeSecretRegistry(client kubernetes.Interface) model.SecretRegistry {
 
 func (sr *kubeSecretRegistry) GetTLSSecret(uri string) (*model.TLSSecret, error) {
 
-	glog.V(3).Infof("Get TLS secrets for %s", uri)
+	glog.V(5).Infof("Get TLS secrets for %s", uri)
 	parts := strings.Split(uri, ".")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("URI %q does not match <name>.<namespace>", uri)
@@ -112,7 +111,7 @@ func (sr *kubeSecretRegistry) GetTLSSecret(uri string) (*model.TLSSecret, error)
 		return nil, err
 	}
 
-	glog.V(3).Infof("Get TLS secrets for %s SUCCESS", uri)
+	glog.V(5).Infof("Get TLS secrets for %s SUCCESS", uri)
 	return &model.TLSSecret{
 		Certificate: cert,
 		PrivateKey:  key,
