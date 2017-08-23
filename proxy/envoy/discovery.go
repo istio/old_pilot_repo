@@ -222,9 +222,9 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 
 	if configCache != nil {
 		configHandler := func(model.Config, model.Event) { out.clearCache() }
-		configCache.RegisterEventHandler(model.RouteRule, configHandler)
-		configCache.RegisterEventHandler(model.IngressRule, configHandler)
-		configCache.RegisterEventHandler(model.DestinationPolicy, configHandler)
+		configCache.RegisterEventHandler(model.RouteRule.Type, configHandler)
+		configCache.RegisterEventHandler(model.IngressRule.Type, configHandler)
+		configCache.RegisterEventHandler(model.DestinationPolicy.Type, configHandler)
 	}
 
 	return out, nil
@@ -473,22 +473,8 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			return
 		}
 
-		// route-config-name holds the listener port
 		routeConfigName := request.PathParameter(RouteConfigName)
-		port, err := strconv.Atoi(routeConfigName)
-		if err != nil {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Unexpected %s %q", RouteConfigName, routeConfigName))
-			return
-		}
-
-		httpRouteConfigs := buildRDSRoutes(ds.Mesh, role, ds, ds)
-		routeConfig, ok := httpRouteConfigs[port]
-		if !ok {
-			errorResponse(response, http.StatusNotFound,
-				fmt.Sprintf("Missing route config for port %d", port))
-			return
-		}
+		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, err.Error())
 			return

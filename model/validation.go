@@ -76,11 +76,11 @@ func (descriptor ConfigDescriptor) Validate() error {
 	messages := make(map[string]bool)
 
 	for _, v := range descriptor {
-		if v.Key == nil {
-			errs = multierror.Append(errs, fmt.Errorf("missing the required key function for type: %q", v.Type))
-		}
 		if !IsDNS1123Label(v.Type) {
 			errs = multierror.Append(errs, fmt.Errorf("invalid type: %q", v.Type))
+		}
+		if !IsDNS1123Label(v.Plural) {
+			errs = multierror.Append(errs, fmt.Errorf("invalid plural: %q", v.Type))
 		}
 		if proto.MessageType(v.MessageName) == nil {
 			errs = multierror.Append(errs, fmt.Errorf("cannot discover proto message type: %q", v.MessageName))
@@ -98,6 +98,7 @@ func (descriptor ConfigDescriptor) Validate() error {
 }
 
 // ValidateConfig ensures that the config object is well-defined
+// TODO: also check name and namespace
 func (descriptor ConfigDescriptor) ValidateConfig(typ string, obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("invalid nil configuration object")
@@ -646,12 +647,6 @@ func ValidateRouteRule(msg proto.Message) error {
 	}
 
 	var errs error
-	if value.Name == "" {
-		errs = multierror.Append(errs, fmt.Errorf("route rule must have a name"))
-	}
-	if !IsDNS1123Label(value.Name) {
-		errs = multierror.Append(errs, fmt.Errorf("route rule name must be a host name label"))
-	}
 	if value.Destination == "" {
 		errs = multierror.Append(errs, fmt.Errorf("route rule must have a destination service"))
 	}

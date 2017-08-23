@@ -79,9 +79,9 @@ var (
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 
 			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-				model.RouteRuleDescriptor,
-				model.DestinationPolicyDescriptor,
-			}, flags.controllerOptions.Namespace)
+				model.RouteRule,
+				model.DestinationPolicy,
+			})
 			if err != nil {
 				return multierror.Prefix(err, "failed to open a config client.")
 			}
@@ -93,10 +93,10 @@ var (
 			serviceController := kube.NewController(client, mesh, flags.controllerOptions)
 			var configController model.ConfigStoreCache
 			if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-				configController = crd.NewController(configClient, flags.controllerOptions.ResyncPeriod)
+				configController = crd.NewController(configClient, flags.controllerOptions)
 			} else {
 				configController, err = aggregate.MakeCache([]model.ConfigStoreCache{
-					crd.NewController(configClient, flags.controllerOptions.ResyncPeriod),
+					crd.NewController(configClient, flags.controllerOptions),
 					ingress.NewController(client, mesh, flags.controllerOptions),
 				})
 				if err != nil {
