@@ -541,13 +541,14 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
+	protocolSuffix := string(port.Protocol)
 	if rule.UseEgressProxy {
-		externalTrafficCluster = buildOutboundCluster("istio-egress.default", port, nil)
+		externalTrafficCluster = buildOutboundCluster("istio-egress.default-"+protocolSuffix, port, nil)
 		externalTrafficCluster.ServiceName = ""
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
-		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster", mesh.ConnectTimeout)
+		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
 	}
 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
