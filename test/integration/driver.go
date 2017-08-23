@@ -86,6 +86,10 @@ func init() {
 
 	// If specified, only run one test
 	flag.StringVar(&testType, "testtype", "", "Select test to run (default is all tests)")
+
+	// Keep disabled until default no-op initializer is distributed
+	// and running in test clusters.
+	flag.BoolVar(&params.UseInitializer, "use-initializer", false, "Use k8s sidecar initializer")
 }
 
 type test interface {
@@ -301,7 +305,7 @@ func parallel(fs map[string]func() status) error {
 
 // connect to K8S cluster and register TPRs
 func setupClient() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, "dummy")
+	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
 	if err != nil {
 		return err
 	}
