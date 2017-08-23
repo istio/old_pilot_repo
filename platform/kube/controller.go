@@ -45,7 +45,7 @@ const (
 type ControllerOptions struct {
 	// Namespace to restrict controller to (empty to disable restriction)
 	Namespace    string
-	AppNamespace    string
+	AppNamespace string
 	ResyncPeriod time.Duration
 	DomainSuffix string
 }
