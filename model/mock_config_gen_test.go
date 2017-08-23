@@ -1,1 +1,0 @@
-/Users/andracis/gows/src/istio.io/pilot/bazel-genfiles/model/mock_config_gen_test.go
