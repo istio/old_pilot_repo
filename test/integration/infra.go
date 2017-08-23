@@ -41,9 +41,9 @@ type infra struct {
 	MixerImage string
 	CaImage    string
 
-	Namespace string
+	Namespace      string
 	IstioNamespace string
-	Verbosity int
+	Verbosity      int
 
 	// map from app to pods
 	apps map[string][]string
@@ -51,16 +51,16 @@ type infra struct {
 	Auth proxyconfig.ProxyMeshConfig_AuthPolicy
 
 	// switches for infrastructure components
-	Mixer   bool
-	Ingress bool
-	Egress  bool
-	Zipkin  bool
+	Mixer     bool
+	Ingress   bool
+	Egress    bool
+	Zipkin    bool
 	DebugPort int
 
 	// check proxy logs
 	checkLogs bool
 
-	namespaceCreated bool
+	namespaceCreated      bool
 	istioNamespaceCreated bool
 
 	// sidecar initializer
@@ -207,19 +207,19 @@ func (infra *infra) deployApps() error {
 func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, port4, port5, port6 int,
 	version string, injectProxy bool) error {
 	w, err := fill("app.yaml.tmpl", map[string]string{
-		"Hub":        infra.Hub,
-		"Tag":        infra.Tag,
-		"service":    svcName,
-		"deployment": deployment,
-		"port1":      strconv.Itoa(port1),
-		"port2":      strconv.Itoa(port2),
-		"port3":      strconv.Itoa(port3),
-		"port4":      strconv.Itoa(port4),
-		"port5":      strconv.Itoa(port5),
-		"port6":      strconv.Itoa(port6),
-		"version":    version,
+		"Hub":            infra.Hub,
+		"Tag":            infra.Tag,
+		"service":        svcName,
+		"deployment":     deployment,
+		"port1":          strconv.Itoa(port1),
+		"port2":          strconv.Itoa(port2),
+		"port3":          strconv.Itoa(port3),
+		"port4":          strconv.Itoa(port4),
+		"port5":          strconv.Itoa(port5),
+		"port6":          strconv.Itoa(port6),
+		"version":        version,
 		"istioNamespace": infra.IstioNamespace,
-		"injectProxy": strconv.FormatBool(injectProxy),
+		"injectProxy":    strconv.FormatBool(injectProxy),
 	})
 	if err != nil {
 		return err

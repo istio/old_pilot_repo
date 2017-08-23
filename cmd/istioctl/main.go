@@ -30,14 +30,14 @@ import (
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
-	"istio.io/pilot/tools/version"
 	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/tools/version"
 )
 
 var (
-	kubeconfig string
-	namespace  string
-	istioNamespace  string
+	kubeconfig     string
+	namespace      string
+	istioNamespace string
 
 	configClient model.ConfigStore
 

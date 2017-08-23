@@ -19,7 +19,9 @@ import (
 
 	"github.com/golang/glog"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	betaext "k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/ingress/core/pkg/ingress/status"
 	"k8s.io/ingress/core/pkg/ingress/store"
-	betaext "k8s.io/api/extensions/v1beta1"
-	v1 "k8s.io/api/core/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"

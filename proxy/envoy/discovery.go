@@ -396,7 +396,7 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 		}
 		var err error
 		if out, err = json.MarshalIndent(hosts{Hosts: hostArray}, " ", " "); err != nil {
-			errorResponse(response, http.StatusInternalServerError, "EDS " + err.Error())
+			errorResponse(response, http.StatusInternalServerError, "EDS "+err.Error())
 			return
 		}
 		ds.sdsCache.updateCachedDiscoveryResponse(key, out)
@@ -426,7 +426,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	if !cached {
 		cluster, node, role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
-			errorResponse(response, http.StatusNotFound, "CDS " + err.Error())
+			errorResponse(response, http.StatusNotFound, "CDS "+err.Error())
 			return
 		}
 		glog.V(5).Infof("CDS Discovery request to ListClusters for service_cluster %s, service_node %s, role %s",
@@ -434,7 +434,7 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 
 		clusters := buildClusters(ds.Environment, role)
 		if out, err = json.MarshalIndent(ClusterManager{Clusters: clusters}, " ", " "); err != nil {
-			errorResponse(response, http.StatusInternalServerError, "CDS " + err.Error())
+			errorResponse(response, http.StatusInternalServerError, "CDS "+err.Error())
 			return
 		}
 		ds.cdsCache.updateCachedDiscoveryResponse(key, out)
@@ -449,17 +449,16 @@ func (ds *DiscoveryService) ListListeners(request *restful.Request, response *re
 	if !cached {
 		cluster, node, role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
-			errorResponse(response, http.StatusNotFound, "LDS " + err.Error())
+			errorResponse(response, http.StatusNotFound, "LDS "+err.Error())
 			return
 		}
 		glog.V(5).Infof("LDS Discovery request to ListListeners for service_cluster %s, service_node %s, role %s",
 			cluster, node, role.Type)
 
-
 		listeners := buildListeners(ds.Environment, role)
 		out, err = json.MarshalIndent(ldsResponse{Listeners: listeners}, " ", " ")
 		if err != nil {
-			errorResponse(response, http.StatusInternalServerError, "LDS " + err.Error())
+			errorResponse(response, http.StatusInternalServerError, "LDS "+err.Error())
 			return
 		}
 		ds.ldsCache.updateCachedDiscoveryResponse(key, out)
@@ -476,7 +475,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 	if !cached {
 		cluster, node, role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
-			errorResponse(response, http.StatusNotFound, "RDS " + err.Error())
+			errorResponse(response, http.StatusNotFound, "RDS "+err.Error())
 			return
 		}
 		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s",
@@ -485,7 +484,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		routeConfigName := request.PathParameter(RouteConfigName)
 		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
-			errorResponse(response, http.StatusInternalServerError, "RDS " + err.Error())
+			errorResponse(response, http.StatusInternalServerError, "RDS "+err.Error())
 			return
 		}
 		ds.rdsCache.updateCachedDiscoveryResponse(key, out)
@@ -500,7 +499,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 	cluster, node, role, err := ds.parseDiscoveryRequest(request)
 
 	if err != nil {
-		errorResponse(response, http.StatusNotFound, "ListSecrets " + err.Error())
+		errorResponse(response, http.StatusNotFound, "ListSecrets "+err.Error())
 		return
 	}
 
@@ -529,7 +528,7 @@ func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restf
 
 	out, err := json.Marshal(tls)
 	if err != nil {
-		errorResponse(response, http.StatusInternalServerError, "ListSecrets " + err.Error())
+		errorResponse(response, http.StatusInternalServerError, "ListSecrets "+err.Error())
 	}
 	writeResponse(response, out)
 }
