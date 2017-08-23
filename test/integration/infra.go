@@ -363,7 +363,7 @@ func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 	}
 
 	glog.Info("Sleeping for the config to propagate")
-	time.Sleep(10 * time.Second)
+	time.Sleep(3 * time.Second)
 	return nil
 }
 
