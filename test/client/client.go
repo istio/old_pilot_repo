@@ -31,6 +31,7 @@ import (
 	"github.com/golang/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/gorilla/websocket"
 
 	pb "istio.io/pilot/test/grpcecho"
 )
@@ -42,6 +43,7 @@ var (
 	url       string
 	headerKey string
 	headerVal string
+	msg       string
 
 	caFile string
 )
@@ -57,6 +59,7 @@ func init() {
 	flag.StringVar(&headerKey, "key", "", "Header key (use Host for authority)")
 	flag.StringVar(&headerVal, "val", "", "Header value")
 	flag.StringVar(&caFile, "ca", "/cert.crt", "CA root cert file")
+	flag.StringVar(&msg, "msg", "hello world!", "message to send (for websockets)")
 }
 
 func makeHTTPRequest(client *http.Client) func(int) func() error {
@@ -99,6 +102,42 @@ func makeHTTPRequest(client *http.Client) func(int) func() error {
 					log.Printf("[%d body] %s\n", i, line)
 				}
 			}
+
+			return nil
+		}
+	}
+}
+
+func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
+	return func(i int) func() error {
+		return func() error {
+			log.Printf("[%d] Url=%s\n", i, url)
+			var req http.Header
+			if headerKey == hostKey {
+				req.Add("Host", headerVal)
+				log.Printf("[%d] Host=%s\n", i, headerVal)
+			} else if headerKey != "" {
+				req.Add(headerKey, headerVal)
+				log.Printf("[%d] Header=%s:%s\n", i, headerKey, headerVal)
+			}
+
+			conn, _, err := client.Dial(url, req)
+			if err != nil {
+				// timeout or bad handshake
+				return err
+			}
+			defer conn.close()
+
+			err = conn.WriteMessage(websocket.TextMessage, []byte(msg))
+			if err != nil {
+				return err
+			}
+
+			_, line, err := conn.ReadMessage()
+			if err != nil {
+				return err
+			}
+			log.Printf("[%d body] %s\n", i, line)
 
 			return nil
 		}
@@ -182,6 +221,15 @@ func main() {
 		}()
 		client := pb.NewEchoTestServiceClient(conn)
 		f = makeGRPCRequest(client)
+	} else if strings.HasPrefix(url, "ws://") || strings.HasPrefix(url, "wss://") {
+		/* #nosec */
+		client := &websocket.Dialer{
+			TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+			},
+			HandshakeTimeout: timeout,
+		}
+		f = makeWebSocketRequest(client)
 	} else {
 		log.Fatalf("Unrecognized protocol %q", url)
 	}

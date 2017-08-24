@@ -17,7 +17,7 @@ syntax = "proto3";
 package grpecho;
 
 service EchoTestService {
-  rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc GRPCEcho(EchoRequest) returns (EchoResponse);
 }
 
 message EchoRequest {

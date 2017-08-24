@@ -38,6 +38,7 @@ import (
 	"syscall"
 
 	flag "github.com/spf13/pflag"
+	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -53,6 +54,8 @@ var (
 
 	crt, key string
 )
+
+var upgrader = websocket.Upgrader{} //defaults
 
 func init() {
 	flag.IntSliceVar(&ports, "port", []int{8080}, "HTTP/1.1 ports")
@@ -74,19 +77,7 @@ type codeAndSlices struct {
 	slices           int
 }
 
-func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	body := bytes.Buffer{}
-
-	if err := r.ParseForm(); err != nil {
-		body.WriteString("ParseForm() error: " + err.Error() + "\n")
-	}
-
-	// If the request has form ?codes=code[:chance][,code[:chance]]* return those codes, rather than 200
-	// For example, ?codes=500:1,200:1 returns 500 1/2 times and 200 1/2 times
-	// For example, ?codes=500:90,200:10 returns 500 90% of times and 200 10% of times
-	if err := setResponseFromCodes(r, w); err != nil {
-		body.WriteString("codes error: " + err.Error() + "\n")
-	}
+func (h handler) addResponsePayload(r *http.Request, body *bytes.Buffer) {
 
 	body.WriteString("ServiceVersion=" + version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
@@ -104,6 +95,28 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if hostname, err := os.Hostname(); err == nil {
 		body.WriteString(fmt.Sprintf("Hostname=%v\n", hostname))
 	}
+}
+
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/websocket") {
+		h.WebSocketEcho(w, r)
+		return
+	}
+
+	body := bytes.Buffer{}
+
+	if err := r.ParseForm(); err != nil {
+		body.WriteString("ParseForm() error: " + err.Error() + "\n")
+	}
+
+	// If the request has form ?codes=code[:chance][,code[:chance]]* return those codes, rather than 200
+	// For example, ?codes=500:1,200:1 returns 500 1/2 times and 200 1/2 times
+	// For example, ?codes=500:90,200:10 returns 500 90% of times and 200 10% of times
+	if err := setResponseFromCodes(r, w); err != nil {
+		body.WriteString("codes error: " + err.Error() + "\n")
+	}
+
+	h.addResponsePayload(r, &body)
 
 	w.Header().Set("Content-Type", "application/text")
 	if _, err := w.Write(body.Bytes()); err != nil {
@@ -111,7 +124,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h handler) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+func (h handler) GRPCEcho(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
 	body := bytes.Buffer{}
 	md, ok := metadata.FromContext(ctx)
 	if ok {
@@ -123,6 +136,35 @@ func (h handler) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRespons
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Echo=" + req.GetMessage())
 	return &pb.EchoResponse{Message: body.String()}, nil
+}
+
+func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
+	body := bytes.Buffer{}
+	h.addResponsePayload(r, &body) // create resp payload apriori
+
+	// adapted from https://github.com/gorilla/websocket/blob/master/examples/echo/server.go
+	// First send upgrade headers
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+
+	defer c.Close()
+
+	// ping
+	mt, message, err := c.ReadMessage()
+	if err != nil {
+		log.Println("websocket-echo-read:", err)
+		return
+	}
+
+	// pong
+	body.WriteString(message)
+	err = c.WriteMessage(mt, body.Bytes())
+	if err != nil {
+		log.Println("websocket-echo-write:", err)
+		return
+	}
 }
 
 func runHTTP(port int) {

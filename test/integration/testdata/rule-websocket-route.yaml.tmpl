@@ -1,0 +1,18 @@
+type: route-rule
+name: websocket-route
+namespace: {{.Namespace}}
+spec:
+  destination: {{.Destination}}.{{.Namespace}}.svc.cluster.local
+  name: content-route
+  precedence: 4
+  match:
+    source: {{.Source}}.{{.Namespace}}.svc.cluster.local
+    sourceTags:
+      version: v1
+    httpHeaders:
+      uri:
+        prefix: "/websocket"
+  route:
+    - tags:
+         version: v1
+  websocket_upgrade: true
