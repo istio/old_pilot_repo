@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -52,6 +53,10 @@ func init() {
 	rootCmd.AddCommand(registerCmd)
 }
 
+func namePort(port int32) string {
+	return fmt.Sprintf("%d", port)
+}
+
 func registerSvc(svcName string, ip string, portsList []int32) error {
 	client, err := kube.CreateInterface(kubeconfig)
 	if err != nil {
@@ -65,7 +70,7 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 		svc := v1.Service{}
 		svc.Name = svcName
 		for _, p := range portsList {
-			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Port: p})
+			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Name: namePort(p), Port: p})
 		}
 		_, err = client.CoreV1().Services(namespace).Create(&svc)
 		if err != nil {
@@ -84,26 +89,27 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 			return err
 		}
 	}
-	glog.Infof("Found endpoints %+v", eps)
+	glog.Infof("Before: found endpoints %+v", eps)
 	for _, ss := range eps.Subsets {
 		glog.Infof("On ports %+v", ss.Ports)
 		for _, ip := range ss.Addresses {
 			glog.Infof("Found %+v", ip)
 		}
 	}
-	// TODO: ports need names (what for?)
+	// TODO: if port numbers match existing entry, reuse
 	newSubSet := v1.EndpointSubset{}
 	newSubSet.Addresses = []v1.EndpointAddress{
 		v1.EndpointAddress{IP: ip},
 	}
 	for _, p := range portsList {
-		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Port: p})
+		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: namePort(p), Port: p})
 	}
 	eps.Subsets = append(eps.Subsets, newSubSet)
-	_, err = client.CoreV1().Endpoints(namespace).Update(eps)
+	eps, err = client.CoreV1().Endpoints(namespace).Update(eps)
 	if err != nil {
 		glog.Error("Update failed with: ", err)
 		return err
 	}
+	glog.Infof("Successfully updated %v", eps)
 	return nil
 }
