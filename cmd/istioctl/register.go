@@ -20,9 +20,10 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"istio.io/pilot/platform/kube"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"istio.io/pilot/platform/kube"
 )
 
 var (
@@ -80,7 +81,8 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 	}
 	eps, err = client.CoreV1().Endpoints(namespace).Get(svcName, getOpt)
 	if err != nil {
-		glog.Warningf("Got '%v' looking up endpoints for '%s' in namespace '%s', attempting to create them", err, svcName, namespace)
+		glog.Warningf("Got '%v' looking up endpoints for '%s' in namespace '%s', attempting to create them",
+			err, svcName, namespace)
 		endP := v1.Endpoints{}
 		endP.Name = svcName // same but does it need to be
 		eps, err = client.CoreV1().Endpoints(namespace).Create(&endP)
@@ -99,7 +101,7 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 	// TODO: if port numbers match existing entry, reuse
 	newSubSet := v1.EndpointSubset{}
 	newSubSet.Addresses = []v1.EndpointAddress{
-		v1.EndpointAddress{IP: ip},
+		{IP: ip},
 	}
 	for _, p := range portsList {
 		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: namePort(p), Port: p})
