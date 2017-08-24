@@ -15,7 +15,6 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -27,25 +26,25 @@ import (
 	"istio.io/pilot/platform/kube"
 )
 
+var (
+	// For most common ports allow the protocol to be guessed, this isn't meant
+	// to replace /etc/services. Fully qualified proto[-extra]:port is the
+	// recommended usage.
+	portsToName = map[int32]string{
+		80:   "http",
+		443:  "https",
+		3306: "mysql",
+		8080: "http",
+	}
+)
+
+// namedPort defines the Port and Name tuple needed for services and endpoints.
 type namedPort struct {
 	Port int32
 	Name string
 }
 
-func (p *namedPort) String() string {
-	return fmt.Sprintf("%s:%d", p.Name, p.Port)
-}
-
-var (
-	// For most common ports allow the protocol to be guessed
-	portsToName = map[int32]string{
-		80:   "http",
-		443:  "https",
-		8000: "http",
-		8080: "http",
-	}
-)
-
+// str2NamedPort parses a proto:port string into a namePort struct.
 func str2NamedPort(str string) (namedPort, error) {
 	var r namedPort
 	idx := strings.Index(str, ":")
@@ -87,7 +86,7 @@ var (
 			}
 			glog.Infof("Registering for service '%s' ip '%s', ports list %v",
 				svcName, ip, portsList)
-			return registerSvc(svcName, ip, portsList)
+			return registerEndpoints(svcName, ip, portsList)
 		},
 	}
 )
@@ -96,12 +95,25 @@ func init() {
 	rootCmd.AddCommand(registerCmd)
 }
 
-func registerSvc(svcName string, ip string, portsList []namedPort) error {
+// samePorts returns true if the numerical part of the ports is the same.
+// The arrays aren't necessarily sorted so we (re)use a map.
+func samePorts(ep []v1.EndpointPort, portsMap map[int32]bool) bool {
+	if len(ep) != len(portsMap) {
+		return false
+	}
+	for _, e := range ep {
+		if !portsMap[e.Port] {
+			return false
+		}
+	}
+	return true
+}
+
+func registerEndpoints(svcName string, ip string, portsList []namedPort) error {
 	client, err := kube.CreateInterface(kubeconfig)
 	if err != nil {
 		return err
 	}
-	var eps *v1.Endpoints
 	getOpt := meta_v1.GetOptions{IncludeUninitialized: true}
 	_, err = client.Core().Services(namespace).Get(svcName, getOpt)
 	if err != nil {
@@ -117,7 +129,7 @@ func registerSvc(svcName string, ip string, portsList []namedPort) error {
 			return err
 		}
 	}
-	eps, err = client.CoreV1().Endpoints(namespace).Get(svcName, getOpt)
+	eps, err := client.CoreV1().Endpoints(namespace).Get(svcName, getOpt)
 	if err != nil {
 		glog.Warningf("Got '%v' looking up endpoints for '%s' in namespace '%s', attempting to create them",
 			err, svcName, namespace)
@@ -129,29 +141,51 @@ func registerSvc(svcName string, ip string, portsList []namedPort) error {
 			return err
 		}
 	}
+	// To check equality:
+	portsMap := make(map[int32]bool, len(portsList))
+	for _, e := range portsList {
+		portsMap[e.Port] = true
+	}
+
 	glog.V(2).Infof("Before: found endpoints %+v", eps)
-	if glog.V(1) {
-		for _, ss := range eps.Subsets {
-			glog.Infof("On ports %+v", ss.Ports)
-			for _, ip := range ss.Addresses {
-				glog.Infof("Found %+v", ip)
+	matchingSubset := 0
+	for _, ss := range eps.Subsets {
+		glog.V(1).Infof("On ports %+v", ss.Ports)
+		for _, ip := range ss.Addresses {
+			glog.V(1).Infof("Found %+v", ip)
+		}
+		if samePorts(ss.Ports, portsMap) {
+			matchingSubset++
+			glog.Infof("Found matching ports list in existing subset %v", ss.Ports)
+			if matchingSubset != 1 {
+				glog.Errorf("Unexpected match in %d subsets", matchingSubset)
 			}
+			ss.Addresses = append(ss.Addresses, v1.EndpointAddress{IP: ip})
 		}
 	}
-	// TODO: if port numbers match existing entry, reuse
-	newSubSet := v1.EndpointSubset{}
-	newSubSet.Addresses = []v1.EndpointAddress{
-		{IP: ip},
+	if matchingSubset == 0 {
+		newSubSet := v1.EndpointSubset{}
+		newSubSet.Addresses = []v1.EndpointAddress{
+			{IP: ip},
+		}
+		for _, p := range portsList {
+			newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: p.Name, Port: p.Port})
+		}
+		eps.Subsets = append(eps.Subsets, newSubSet)
+		glog.Infof("No pre existing matching ports list found, created new subset %v", newSubSet)
 	}
-	for _, p := range portsList {
-		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: p.Name, Port: p.Port})
-	}
-	eps.Subsets = append(eps.Subsets, newSubSet)
 	eps, err = client.CoreV1().Endpoints(namespace).Update(eps)
 	if err != nil {
 		glog.Error("Update failed with: ", err)
 		return err
 	}
-	glog.Infof("Successfully updated %v", eps)
+	total := 0
+	for _, ss := range eps.Subsets {
+		total += len(ss.Ports) * len(ss.Addresses)
+	}
+	glog.Infof("Successfully updated %s, now with %d endpoints", eps.Name, total)
+	if glog.V(1) {
+		glog.Infof("Details: %v", eps)
+	}
 	return nil
 }
