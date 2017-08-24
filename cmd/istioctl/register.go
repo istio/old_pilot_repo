@@ -125,15 +125,17 @@ func registerSvc(svcName string, ip string, portsList []namedPort) error {
 		endP.Name = svcName // same but does it need to be
 		eps, err = client.CoreV1().Endpoints(namespace).Create(&endP)
 		if err != nil {
-			glog.Error("Bailing with: ", err)
+			glog.Error("Unable to create endpoint: ", err)
 			return err
 		}
 	}
-	glog.Infof("Before: found endpoints %+v", eps)
-	for _, ss := range eps.Subsets {
-		glog.Infof("On ports %+v", ss.Ports)
-		for _, ip := range ss.Addresses {
-			glog.Infof("Found %+v", ip)
+	glog.V(2).Infof("Before: found endpoints %+v", eps)
+	if glog.V(1) {
+		for _, ss := range eps.Subsets {
+			glog.Infof("On ports %+v", ss.Ports)
+			for _, ip := range ss.Addresses {
+				glog.Infof("Found %+v", ip)
+			}
 		}
 	}
 	// TODO: if port numbers match existing entry, reuse
