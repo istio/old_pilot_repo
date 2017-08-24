@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -26,22 +27,63 @@ import (
 	"istio.io/pilot/platform/kube"
 )
 
+type namedPort struct {
+	Port int32
+	Name string
+}
+
+func (p *namedPort) String() string {
+	return fmt.Sprintf("%s:%d", p.Name, p.Port)
+}
+
+var (
+	// For most common ports allow the protocol to be guessed
+	portsToName = map[int32]string{
+		80:   "http",
+		443:  "https",
+		8000: "http",
+		8080: "http",
+	}
+)
+
+func str2NamedPort(str string) (namedPort, error) {
+	var r namedPort
+	idx := strings.Index(str, ":")
+	if idx >= 0 {
+		r.Name = str[:idx]
+		str = str[idx+1:]
+	}
+	p, err := strconv.Atoi(str)
+	if err != nil {
+		return r, err
+	}
+	r.Port = int32(p)
+	if len(r.Name) == 0 {
+		name, found := portsToName[r.Port]
+		r.Name = name
+		if !found {
+			r.Name = str
+		}
+	}
+	return r, nil
+}
+
 var (
 	registerCmd = &cobra.Command{
-		Use:   "register <svcname> <ip> <ports...>",
+		Use:   "register <svcname> <ip> [name1:]port1 [name2:]port2 ...",
 		Short: "Registers a service instance (VM)",
 		Args:  cobra.MinimumNArgs(3),
 		RunE: func(c *cobra.Command, args []string) error {
 			svcName := args[0]
 			ip := args[1]
 			portsListStr := args[2:]
-			portsList := make([]int32, len(portsListStr))
+			portsList := make([]namedPort, len(portsListStr))
 			for i := range portsListStr {
-				p, err := strconv.Atoi(portsListStr[i])
+				p, err := str2NamedPort(portsListStr[i])
 				if err != nil {
 					return err
 				}
-				portsList[i] = int32(p)
+				portsList[i] = p
 			}
 			glog.Infof("Registering for service '%s' ip '%s', ports list %v",
 				svcName, ip, portsList)
@@ -54,11 +96,7 @@ func init() {
 	rootCmd.AddCommand(registerCmd)
 }
 
-func namePort(port int32) string {
-	return fmt.Sprintf("%d", port)
-}
-
-func registerSvc(svcName string, ip string, portsList []int32) error {
+func registerSvc(svcName string, ip string, portsList []namedPort) error {
 	client, err := kube.CreateInterface(kubeconfig)
 	if err != nil {
 		return err
@@ -71,7 +109,7 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 		svc := v1.Service{}
 		svc.Name = svcName
 		for _, p := range portsList {
-			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Name: namePort(p), Port: p})
+			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Name: p.Name, Port: p.Port})
 		}
 		_, err = client.CoreV1().Services(namespace).Create(&svc)
 		if err != nil {
@@ -104,7 +142,7 @@ func registerSvc(svcName string, ip string, portsList []int32) error {
 		{IP: ip},
 	}
 	for _, p := range portsList {
-		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: namePort(p), Port: p})
+		newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: p.Name, Port: p.Port})
 	}
 	eps.Subsets = append(eps.Subsets, newSubSet)
 	eps, err = client.CoreV1().Endpoints(namespace).Update(eps)
