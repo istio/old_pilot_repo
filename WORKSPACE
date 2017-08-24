@@ -331,6 +331,12 @@ go_repository(
     importpath = "github.com/hashicorp/go-multierror",
 )
 
+go_repository(
+    name = "com_github_gorilla_websocket",
+    commit = "a69d9f6de432e2c6b296a947d8a5ee88f68522cf",
+    importpath = "github.com/gorilla/websocket",
+)
+
 # likely you need to update those next 2 at the same time:
 
 go_repository(

@@ -10,4 +10,3 @@ spec:
         exact: world.com
       uri:
         exact: "/hello"
-  websocketUpgrade: true

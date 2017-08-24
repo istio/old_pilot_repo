@@ -37,8 +37,8 @@ import (
 	"strings"
 	"syscall"
 
-	flag "github.com/spf13/pflag"
 	"github.com/gorilla/websocket"
+	flag "github.com/spf13/pflag"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -124,7 +124,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h handler) GRPCEcho(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+func (h handler) GrpcEcho(ctx context.Context, req *pb.GrpcEchoRequest) (*pb.GrpcEchoResponse, error) {
 	body := bytes.Buffer{}
 	md, ok := metadata.FromContext(ctx)
 	if ok {
@@ -135,7 +135,7 @@ func (h handler) GRPCEcho(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 	body.WriteString("ServiceVersion=" + version + "\n")
 	body.WriteString("ServicePort=" + strconv.Itoa(h.port) + "\n")
 	body.WriteString("Echo=" + req.GetMessage())
-	return &pb.EchoResponse{Message: body.String()}, nil
+	return &pb.GrpcEchoResponse{Message: body.String()}, nil
 }
 
 func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +149,7 @@ func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// nolint: errcheck
 	defer c.Close()
 
 	// ping
@@ -159,7 +160,7 @@ func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// pong
-	body.WriteString(message)
+	body.Write(message)
 	err = c.WriteMessage(mt, body.Bytes())
 	if err != nil {
 		log.Println("websocket-echo-write:", err)
@@ -194,7 +195,7 @@ func runGRPC(port int) {
 	} else {
 		grpcServer = grpc.NewServer()
 	}
-	pb.RegisterEchoTestServiceServer(grpcServer, &h)
+	pb.RegisterGrpcEchoTestServiceServer(grpcServer, &h)
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Println(err.Error())
 	}

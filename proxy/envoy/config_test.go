@@ -225,6 +225,7 @@ const (
 	faultRouteRule    = "testdata/fault-route.yaml.golden"
 	redirectRouteRule = "testdata/redirect-route.yaml.golden"
 	rewriteRouteRule  = "testdata/rewrite-route.yaml.golden"
+	websocketRouteRule  = "testdata/websocket-route.yaml.golden"
 )
 
 func addConfig(r model.ConfigStore, file string, t *testing.T) {

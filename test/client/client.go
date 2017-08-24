@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/golang/sync/errgroup"
+	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/gorilla/websocket"
 
 	pb "istio.io/pilot/test/grpcecho"
 )
@@ -126,7 +126,8 @@ func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
 				// timeout or bad handshake
 				return err
 			}
-			defer conn.close()
+			// nolint: errcheck
+			defer conn.Close()
 
 			err = conn.WriteMessage(websocket.TextMessage, []byte(msg))
 			if err != nil {
@@ -144,12 +145,12 @@ func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
 	}
 }
 
-func makeGRPCRequest(client pb.EchoTestServiceClient) func(int) func() error {
+func makeGRPCRequest(client pb.GrpcEchoTestServiceClient) func(int) func() error {
 	return func(i int) func() error {
 		return func() error {
-			req := &pb.EchoRequest{Message: fmt.Sprintf("request #%d", i)}
+			req := &pb.GrpcEchoRequest{Message: fmt.Sprintf("request #%d", i)}
 			log.Printf("[%d] grpcecho.Echo(%v)\n", i, req)
-			resp, err := client.Echo(context.Background(), req)
+			resp, err := client.GrpcEcho(context.Background(), req)
 			if err != nil {
 				return err
 			}
@@ -219,13 +220,13 @@ func main() {
 				log.Println(err)
 			}
 		}()
-		client := pb.NewEchoTestServiceClient(conn)
+		client := pb.NewGrpcEchoTestServiceClient(conn)
 		f = makeGRPCRequest(client)
 	} else if strings.HasPrefix(url, "ws://") || strings.HasPrefix(url, "wss://") {
 		/* #nosec */
 		client := &websocket.Dialer{
 			TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
+				InsecureSkipVerify: true,
 			},
 			HandshakeTimeout: timeout,
 		}
