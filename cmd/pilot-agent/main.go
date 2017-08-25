@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"istio.io/pilot/cmd"
+	"istio.io/pilot/platform"
 	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
@@ -34,7 +35,7 @@ var (
 	configpath      string
 	meshconfig      string
 	role            proxy.Node
-	serviceregistry proxy.ServiceRegistry
+	serviceregistry platform.ServiceRegistry
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -62,9 +63,9 @@ var (
 
 			// set values from registry platform
 			if role.IPAddress == "" {
-				if serviceregistry == proxy.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.IPAddress = os.Getenv("INSTANCE_IP")
-				} else if serviceregistry == proxy.ConsulRegistry {
+				} else if serviceregistry == platform.ConsulRegistry {
 					ipAddr := "127.0.0.1"
 					if ok := consul.WaitForPrivateNetwork(); ok {
 						ipAddr = consul.GetPrivateIP().String()
@@ -75,12 +76,12 @@ var (
 				}
 			}
 			if role.ID == "" {
-				if serviceregistry == proxy.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
 				}
 			}
 			if role.Domain == "" {
-				if serviceregistry == proxy.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
 				}
 			}
@@ -102,9 +103,10 @@ var (
 )
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry", string(proxy.KubernetesRegistry),
+	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry",
+		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
-			string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
+			string(platform.KubernetesRegistry), string(platform.ConsulRegistry)))
 	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",

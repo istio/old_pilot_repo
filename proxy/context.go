@@ -45,16 +45,6 @@ type Environment struct {
 	Mesh *proxyconfig.ProxyMeshConfig
 }
 
-// ServiceRegistry defines underlying platform supporting service regisgtry
-type ServiceRegistry string
-
-const (
-	// KubernetesRegistry environment flag
-	KubernetesRegistry ServiceRegistry = "Kubernetes"
-	// ConsulRegistry environment flag
-	ConsulRegistry ServiceRegistry = "Consul"
-)
-
 // Node defines the proxy attributes used by xDS identification
 type Node struct {
 	// Type specifies the node type

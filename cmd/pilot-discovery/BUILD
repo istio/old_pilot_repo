@@ -12,6 +12,7 @@ go_library(
         "//adapter/config/memory:go_default_library",
         "//cmd:go_default_library",
         "//model:go_default_library",
+        "//platform:go_default_library",
         "//platform/consul:go_default_library",
         "//platform/kube:go_default_library",
         "//proxy:go_default_library",

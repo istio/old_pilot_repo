@@ -31,6 +31,7 @@ import (
 	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform"
 	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/proxy"
@@ -52,7 +53,7 @@ type args struct {
 	controllerOptions kube.ControllerOptions
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
-	serviceregistry proxy.ServiceRegistry
+	serviceregistry platform.ServiceRegistry
 	consulargs      ConsulArgs
 }
 
@@ -85,7 +86,7 @@ var (
 			stop := make(chan struct{})
 
 			// Set up values for input to discovery service in different platforms
-			if flags.serviceregistry == proxy.KubernetesRegistry {
+			if flags.serviceregistry == platform.KubernetesRegistry {
 
 				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
@@ -132,7 +133,7 @@ var (
 				ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 
 				go ingressSyncer.Run(stop)
-			} else if flags.serviceregistry == proxy.ConsulRegistry {
+			} else if flags.serviceregistry == platform.ConsulRegistry {
 				glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
 				consulController, err := consul.NewController(
@@ -173,9 +174,9 @@ var (
 
 func init() {
 	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.serviceregistry), "serviceregistry",
-		string(proxy.KubernetesRegistry),
+		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
-			string(proxy.KubernetesRegistry), string(proxy.ConsulRegistry)))
+			string(platform.KubernetesRegistry), string(platform.ConsulRegistry)))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
