@@ -154,7 +154,7 @@ func RegisterEndpoint(client kubernetes.Interface, namespace string, svcName str
 
 	glog.V(2).Infof("Before: found endpoints %+v", eps)
 	matchingSubset := 0
-	for _, ss := range eps.Subsets {
+	for i, ss := range eps.Subsets {
 		glog.V(1).Infof("On ports %+v", ss.Ports)
 		for _, ip := range ss.Addresses {
 			glog.V(1).Infof("Found %+v", ip)
@@ -165,7 +165,7 @@ func RegisterEndpoint(client kubernetes.Interface, namespace string, svcName str
 			if matchingSubset != 1 {
 				glog.Errorf("Unexpected match in %d subsets", matchingSubset)
 			}
-			ss.Addresses = append(ss.Addresses, v1.EndpointAddress{IP: ip})
+			eps.Subsets[i].Addresses = append(ss.Addresses, v1.EndpointAddress{IP: ip})
 		}
 	}
 	if matchingSubset == 0 {
