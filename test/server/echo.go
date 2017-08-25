@@ -55,7 +55,12 @@ var (
 	crt, key string
 )
 
-var upgrader = websocket.Upgrader{} //defaults
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+	// allow all connections by default
+	return true
+	},
+} //defaults
 
 func init() {
 	flag.IntSliceVar(&ports, "port", []int{8080}, "HTTP/1.1 ports")
@@ -146,6 +151,7 @@ func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
 	// First send upgrade headers
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Println("websocket-echo upgrade failed:", err)
 		return
 	}
 
@@ -155,7 +161,7 @@ func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
 	// ping
 	mt, message, err := c.ReadMessage()
 	if err != nil {
-		log.Println("websocket-echo-read:", err)
+		log.Println("websocket-echo read failed:", err)
 		return
 	}
 
@@ -163,7 +169,7 @@ func (h handler) WebSocketEcho(w http.ResponseWriter, r *http.Request) {
 	body.Write(message)
 	err = c.WriteMessage(mt, body.Bytes())
 	if err != nil {
-		log.Println("websocket-echo-write:", err)
+		log.Println("websocket-echo write failed:", err)
 		return
 	}
 }
