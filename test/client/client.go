@@ -111,8 +111,9 @@ func makeHTTPRequest(client *http.Client) func(int) func() error {
 func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
 	return func(i int) func() error {
 		return func() error {
+			req := make(http.Header)
+
 			log.Printf("[%d] Url=%s\n", i, url)
-			var req http.Header
 			if headerKey == hostKey {
 				req.Add("Host", headerVal)
 				log.Printf("[%d] Host=%s\n", i, headerVal)
