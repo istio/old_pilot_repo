@@ -20,9 +20,8 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/api/core/v1"
-
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"

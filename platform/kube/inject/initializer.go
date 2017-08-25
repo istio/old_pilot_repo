@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 
 	"github.com/golang/glog"
-
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -46,12 +46,6 @@ var ignoredNamespaces = []string{
 	"kube-system", // v1.NamespaceSystem
 	"kube-public", // v1.NamespacePublic
 	"istio-system",
-}
-
-// InitializerOptions stores the configurable options for an initializer
-type InitializerOptions struct {
-	// TODO - pull from ConfigMap?
-
 }
 
 // Initializer implements a k8s initializer for transparently
@@ -80,6 +74,8 @@ var (
 		{v1beta1.SchemeGroupVersion, &v1beta1.ReplicaSet{}, "replicasets", "/apis"},
 
 		{batchv1.SchemeGroupVersion, &batchv1.Job{}, "jobs", "/apis"},
+		{v2alpha1.SchemeGroupVersion, &v2alpha1.CronJob{}, "cronjobs", "/apis"},
+		// TODO JobTemplate requires different reflection logic to populate the PodTemplateSpec
 
 		{appsv1beta1.SchemeGroupVersion, &appsv1beta1.StatefulSet{}, "statefulsets", "/apis"},
 	}
@@ -187,8 +183,13 @@ func (i *Initializer) initialize(in interface{}, patcher patcherFunc) error {
 		return nil
 	}
 
-	glog.V(2).Infof("ObjectMeta initializer info %v/%v policy:%q status:%q %v",
-		obj.GetNamespace(), obj.GetName(),
+	gvk, _, err := injectScheme.ObjectKind(in.(runtime.Object))
+	if err != nil {
+		return err
+	}
+
+	glog.V(2).Infof("ObjectMeta initializer info %v %v/%v policy:%q status:%q %v",
+		gvk, obj.GetNamespace(), obj.GetName(),
 		obj.GetAnnotations()[istioSidecarAnnotationPolicyKey],
 		obj.GetAnnotations()[istioSidecarAnnotationStatusKey],
 		obj.GetInitializers())
@@ -226,10 +227,6 @@ func (i *Initializer) initialize(in interface{}, patcher patcherFunc) error {
 		return err
 	}
 	currData, err := json.Marshal(out)
-	if err != nil {
-		return err
-	}
-	gvk, _, err := injectScheme.ObjectKind(in.(runtime.Object))
 	if err != nil {
 		return err
 	}

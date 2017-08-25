@@ -27,11 +27,6 @@ import (
 	"strconv"
 	"time"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/model"
-	"istio.io/pilot/proxy"
-	"istio.io/pilot/tools/version"
-
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -41,6 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
+
+	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
+	"istio.io/pilot/tools/version"
 )
 
 // TODO - Temporally retain the deprecated alpha annotations to ease

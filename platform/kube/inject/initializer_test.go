@@ -23,10 +23,6 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-
-	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/proxy"
-	"istio.io/pilot/test/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/proxy"
+	"istio.io/pilot/test/util"
 )
 
 func makeClient(t *testing.T) (*rest.Config, kubernetes.Interface) {

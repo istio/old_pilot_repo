@@ -17,11 +17,10 @@ package main
 import (
 	"os"
 
-	"k8s.io/api/core/v1"
-
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/platform/kube"

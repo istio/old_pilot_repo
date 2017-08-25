@@ -19,6 +19,7 @@ go_library(
         "@io_istio_api//:go_default_library",
         "@io_k8s_api//apps/v1beta1:go_default_library",
         "@io_k8s_api//batch/v1:go_default_library",
+        "@io_k8s_api//batch/v2alpha1:go_default_library",
         "@io_k8s_api//core/v1:go_default_library",
         "@io_k8s_api//extensions/v1beta1:go_default_library",
         "@io_k8s_apimachinery//pkg/api/meta:go_default_library",
