@@ -518,17 +518,17 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 		// services' kubeproxy to our specific endpoint IP.
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-			route := buildDefaultRoute(cluster)
+			defaultroute := buildDefaultRoute(cluster)
 
 			// set server-side mixer filter config for inbound HTTP routes
 			if mesh.MixerAddress != "" {
-				route.OpaqueConfig = buildMixerOpaqueConfig(true, false)
+				defaultroute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
 			}
 
 			host := &VirtualHost{
 				Name:    fmt.Sprintf("inbound|%d", endpoint.Port),
 				Domains: []string{"*"},
-				Routes:  []*HTTPRoute{route},
+				Routes:  []*HTTPRoute{},
 			}
 
 			// Websocket enabled routes need to have an explicit use_websocket : true
@@ -539,11 +539,20 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				for _, rule := range rules {
 					if rule.WebsocketUpgrade {
 						websocketRoute := buildInboundWebsocketRoute(rule, cluster)
+
+						// set server-side mixer filter config for inbound HTTP routes
+						// Note: websocket routes do not call the filter chain. Will be
+						// resolved in future.
+						if mesh.MixerAddress != "" {
+							websocketRoute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
+						}
+
 						host.Routes = append(host.Routes, websocketRoute)
 					}
 				}
 			}
 
+			host.Routes = append(host.Routes, defaultroute)
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, "", false))
