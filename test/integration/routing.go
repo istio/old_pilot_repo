@@ -90,28 +90,6 @@ func (t *routing) run() error {
 	}
 	glog.Info("Success!")
 
-	// In case of websockets, the server does not return headers as part of response.
-	// After upgrading to websocket connection, it waits for a dummy message from the
-	// client over the websocket connection. It then returns all the headers as
-	// part of the response message which is then printed out by the client.
-	// So the verify checks here are really parsing the output of a websocket message
-	// i.e., we are effectively checking websockets beyond just the upgrade.
-	glog.Info("Routing 100 percent to c-v1 with websocket upgrades and verifying...")
-	if err := t.applyConfig("rule-websocket-route.yaml.tmpl", map[string]string{
-		"Destination": "c",
-		"Namespace":   t.Namespace,
-	}); err != nil {
-		return err
-	}
-	if err := t.verifyRouting("ws", "a", "c/websocket", "version", "v1",
-		100, map[string]int{
-			"v1": 100,
-			"v2": 0,
-		}); err != nil {
-		return err
-	}
-	glog.Info("Success!")
-
 	glog.Info("Routing 100 percent to c-v2 using regex header based routing and verifying...")
 	if err := t.applyConfig("rule-regex-route.yaml.tmpl", map[string]string{
 		"Source":      "a",
@@ -155,6 +133,28 @@ func (t *routing) run() error {
 		return err
 	}
 	if err := t.verifyRedirect("a", "c", redirectHost, redirectPath, "testredirect", "enabled", 200); err != nil {
+		return err
+	}
+	glog.Info("Success!")
+
+	// In case of websockets, the server does not return headers as part of response.
+	// After upgrading to websocket connection, it waits for a dummy message from the
+	// client over the websocket connection. It then returns all the headers as
+	// part of the response message which is then printed out by the client.
+	// So the verify checks here are really parsing the output of a websocket message
+	// i.e., we are effectively checking websockets beyond just the upgrade.
+	glog.Info("Routing 100 percent to c-v1 with websocket upgrades and verifying...")
+	if err := t.applyConfig("rule-websocket-route.yaml.tmpl", map[string]string{
+		"Destination": "c",
+		"Namespace":   t.Namespace,
+	}); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("ws", "a", "c", "testwebsocket", "enabled",
+		100, map[string]int{
+			"v1": 100,
+			"v2": 0,
+		}); err != nil {
 		return err
 	}
 	glog.Info("Success!")

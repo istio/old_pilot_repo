@@ -3,12 +3,11 @@ name: websocket-route
 namespace: {{.Namespace}}
 spec:
   destination: {{.Destination}}.{{.Namespace}}.svc.cluster.local
-  name: websocket-route
-  precedence: 4
+  precedence: 6
   match:
     httpHeaders:
-      uri:
-        prefix: "/websocket"
+      testwebsocket:
+        exact: enabled
   route:
     - tags:
          version: v1

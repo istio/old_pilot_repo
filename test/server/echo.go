@@ -98,7 +98,7 @@ func (h handler) addResponsePayload(r *http.Request, body *bytes.Buffer) {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/websocket") {
+	if r.Header.Get("testwebsocket") != "" {
 		h.WebSocketEcho(w, r)
 		return
 	}
