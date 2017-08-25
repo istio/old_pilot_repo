@@ -86,13 +86,21 @@ var (
 			}
 			glog.Infof("Registering for service '%s' ip '%s', ports list %v",
 				svcName, ip, portsList)
-			return registerEndpoints(svcName, ip, portsList)
+			glog.Infof("%d labels (%v) and %d annotations (%v)",
+				len(labels), labels, len(annotations), annotations)
+			return registerEndpoint(svcName, ip, portsList)
 		},
 	}
+	labels      []string
+	annotations []string
 )
 
 func init() {
 	rootCmd.AddCommand(registerCmd)
+	registerCmd.PersistentFlags().StringSliceVarP(&labels, "labels", "l",
+		nil, "List of labels to apply if creating a service/endpoint; e.g. -l env=prod,vers=2")
+	registerCmd.PersistentFlags().StringSliceVarP(&annotations, "annotations", "a",
+		nil, "List of string annotations to apply if creating a service/endpoint; e.g. -a foo=bar,test,x=y")
 }
 
 // samePorts returns true if the numerical part of the ports is the same.
@@ -109,7 +117,43 @@ func samePorts(ep []v1.EndpointPort, portsMap map[int32]bool) bool {
 	return true
 }
 
-func registerEndpoints(svcName string, ip string, portsList []namedPort) error {
+// splitEqual splits key=value string into key,value. if no = is found
+// the whole string is the key and value is empty.
+func splitEqual(str string) (string, string) {
+	idx := strings.Index(str, "=")
+	var k string
+	var v string
+	if idx >= 0 {
+		k = str[:idx]
+		v = str[idx+1:]
+	} else {
+		k = str
+	}
+	return k, v
+}
+
+// addLabelsAndAnnotations adds labels and annotations to an object.
+func addLabelsAndAnnotations(obj *meta_v1.ObjectMeta) {
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string, len(labels))
+	}
+	for _, l := range labels {
+		k, v := splitEqual(l)
+		obj.Labels[k] = v
+	}
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string, len(annotations))
+	}
+	for _, a := range annotations {
+		k, v := splitEqual(a)
+		obj.Annotations[k] = v
+	}
+}
+
+// registerEndpoints registers the endpoint (and the service if it doesn't
+// already exists). It creates or updates as needed. When creating it adds the
+// optional labels.
+func registerEndpoint(svcName string, ip string, portsList []namedPort) error {
 	client, err := kube.CreateInterface(kubeconfig)
 	if err != nil {
 		return err
@@ -123,6 +167,7 @@ func registerEndpoints(svcName string, ip string, portsList []namedPort) error {
 		for _, p := range portsList {
 			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Name: p.Name, Port: p.Port})
 		}
+		addLabelsAndAnnotations(&svc.ObjectMeta)
 		_, err = client.CoreV1().Services(namespace).Create(&svc)
 		if err != nil {
 			glog.Error("Unable to create service: ", err)
@@ -135,6 +180,7 @@ func registerEndpoints(svcName string, ip string, portsList []namedPort) error {
 			err, svcName, namespace)
 		endP := v1.Endpoints{}
 		endP.Name = svcName // same but does it need to be
+		addLabelsAndAnnotations(&endP.ObjectMeta)
 		eps, err = client.CoreV1().Endpoints(namespace).Create(&endP)
 		if err != nil {
 			glog.Error("Unable to create endpoint: ", err)
