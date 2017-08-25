@@ -198,6 +198,9 @@ func TestInitialize(t *testing.T) {
 		wantGroupVersionKind := schema.FromAPIVersionAndKind(typeMeta.APIVersion, typeMeta.Kind)
 
 		obj, err := injectScheme.New(wantGroupVersionKind)
+		if err != nil {
+			t.Fatalf("%: failed to create obj from GroupVersionKind: %v", c.name, err)
+		}
 		if err = yaml.Unmarshal(raw, obj); err != nil {
 			t.Fatalf("%v: Unmarshal(obj) failed: %v", c.name, err)
 		}
