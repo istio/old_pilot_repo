@@ -518,11 +518,11 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 		// services' kubeproxy to our specific endpoint IP.
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
-			defaultroute := buildDefaultRoute(cluster)
+			defaultRoute := buildDefaultRoute(cluster)
 
 			// set server-side mixer filter config for inbound HTTP routes
 			if mesh.MixerAddress != "" {
-				defaultroute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
+				defaultRoute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
 			}
 
 			host := &VirtualHost{
@@ -552,7 +552,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				}
 			}
 
-			host.Routes = append(host.Routes, defaultroute)
+			host.Routes = append(host.Routes, defaultRoute)
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, "", false))
