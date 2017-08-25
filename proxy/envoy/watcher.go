@@ -51,7 +51,7 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath string) (Watcher, error) {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath, customConfig string) (Watcher, error) {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
@@ -74,7 +74,7 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath s
 		return nil, errors.New("ingress proxy is disabled")
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath, customConfig), proxy.DefaultRetry)
 	out := &watcher{
 		agent: agent,
 		role:  role,
@@ -132,7 +132,6 @@ func (w *watcher) Reload() {
 		generateCertHash(h, proxy.IngressCertsPath, []string{"tls.crt", "tls.key"})
 	}
 	config.Hash = h.Sum(nil)
-
 	w.agent.ScheduleConfigUpdate(config)
 }
 
@@ -206,7 +205,7 @@ func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node 
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath, customConfig string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -214,10 +213,19 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 				return fmt.Errorf("Unexpected config type: %#v", config)
 			}
 
-			// attempt to write file
-			fname := configFile(configpath, epoch)
-			if err := envoyConfig.WriteFile(fname); err != nil {
-				return err
+			var fname string
+			// Note: the cert checking still works, the generated file is updated if certs are changed.
+			// We just don't save the generated file, but use a custom one instead. Pilot will keep
+			// monitoring the certs and restart if the content of the certs changes.
+			if len(customConfig) > 0 {
+				// user has a custom configuration. Don't write our own config - but keep watching the certs.
+				fname = customConfig
+			} else {
+				// attempt to write file
+				fname = configFile(configpath, epoch)
+				if err := envoyConfig.WriteFile(fname); err != nil {
+					return err
+				}
 			}
 
 			// spin up a new Envoy process

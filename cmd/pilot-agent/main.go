@@ -29,9 +29,10 @@ import (
 )
 
 var (
-	configpath string
-	meshconfig string
-	role       proxy.Node
+	configpath   string
+	meshconfig   string
+	role         proxy.Node
+	customConfig string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -68,13 +69,13 @@ var (
 			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
-			watcher, err := envoy.NewWatcher(mesh, role, configpath)
+			watcher, err := envoy.NewWatcher(mesh, role, configpath, customConfig)
 			if err != nil {
 				return err
 			}
+
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
-
 			stop := make(chan struct{})
 			cmd.WaitSignal(stop)
 			<-stop
@@ -95,6 +96,8 @@ func init() {
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
+	proxyCmd.PersistentFlags().StringVar(&customConfig, "envoyconfig", "",
+		"Custom envoy config. The meshconfig options and auto-generated envoy configs will not be used.")
 
 	cmd.AddFlags(rootCmd)
 
