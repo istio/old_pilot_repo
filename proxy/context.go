@@ -51,7 +51,7 @@ type ServiceRegistry string
 const (
 	// KubernetesRegistry environment flag
 	KubernetesRegistry ServiceRegistry = "Kubernetes"
-	// ConsulRegistry  environment flag
+	// ConsulRegistry environment flag
 	ConsulRegistry ServiceRegistry = "Consul"
 )
 

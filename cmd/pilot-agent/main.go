@@ -30,18 +30,11 @@ import (
 	"istio.io/pilot/tools/version"
 )
 
-// ConsulArgs store the args related to Consul configuration
-type ConsulArgs struct {
-	config    string
-	serverURL string
-}
-
 var (
 	configpath      string
 	meshconfig      string
 	role            proxy.Node
 	serviceregistry proxy.ServiceRegistry
-	consulargs      ConsulArgs
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -53,69 +46,56 @@ var (
 		Use:   "proxy",
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			// set values from environment variables
-			if serviceregistry == proxy.KubernetesRegistry {
-				if role.IPAddress == "" {
+			role.Type = proxy.Sidecar
+			if len(args) > 0 {
+				role.Type = proxy.NodeType(args[0])
+			}
+
+			// receive mesh configuration
+			mesh, err := cmd.ReadMeshConfig(meshconfig)
+			if err != nil {
+				return multierror.Prefix(err, "failed to read mesh configuration.")
+			}
+
+			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("mesh configuration %#v", mesh)
+
+			// set values from registry platform
+			if role.IPAddress == "" {
+				if serviceregistry == proxy.KubernetesRegistry {
 					role.IPAddress = os.Getenv("INSTANCE_IP")
+				} else if serviceregistry == proxy.ConsulRegistry {
+					ipAddr := "127.0.0.1"
+					if ok := consul.WaitForPrivateNetwork(); ok {
+						ipAddr = consul.GetPrivateIP().String()
+						glog.V(2).Infof("obtained private IP %v", ipAddr)
+					}
+
+					role.IPAddress = ipAddr
 				}
-				if role.ID == "" {
+			}
+			if role.ID == "" {
+				if serviceregistry == proxy.KubernetesRegistry {
 					role.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
 				}
-				if role.Domain == "" {
+			}
+			if role.Domain == "" {
+				if serviceregistry == proxy.KubernetesRegistry {
 					role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
 				}
-
-				role.Type = proxy.Sidecar
-				if len(args) > 0 {
-					role.Type = proxy.NodeType(args[0])
-				}
-
-				// receive mesh configuration
-				mesh, err := cmd.ReadMeshConfig(meshconfig)
-				if err != nil {
-					return multierror.Prefix(err, "failed to read mesh configuration.")
-				}
-
-				glog.V(2).Infof("version %s", version.Line())
-				glog.V(2).Infof("mesh configuration %#v", mesh)
-
-				watcher, err := envoy.NewWatcher(mesh, role, configpath)
-				if err != nil {
-					return err
-				}
-				ctx, cancel := context.WithCancel(context.Background())
-				go watcher.Run(ctx)
-
-				stop := make(chan struct{})
-				cmd.WaitSignal(stop)
-				<-stop
-				cancel()
-			} else if serviceregistry == proxy.ConsulRegistry {
-				mesh := proxy.DefaultMeshConfig()
-				ipAddr := "127.0.0.1"
-				available := consul.WaitForPrivateNetwork()
-				if available {
-					ipAddr = consul.GetPrivateIP().String()
-					glog.V(2).Infof("obtained private IP %v", ipAddr)
-				}
-
-				role.IPAddress = ipAddr
-				role.Type = proxy.Sidecar
-				if len(args) > 0 {
-					role.Type = proxy.NodeType(args[0])
-				}
-
-				watcher, err := envoy.NewWatcher(&mesh, role, configpath)
-				if err != nil {
-					return err
-				}
-				ctx, cancel := context.WithCancel(context.Background())
-				go watcher.Run(ctx)
-				stop := make(chan struct{})
-				cmd.WaitSignal(stop)
-				<-stop
-				cancel()
 			}
+
+			watcher, err := envoy.NewWatcher(mesh, role, configpath)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			go watcher.Run(ctx)
+
+			stop := make(chan struct{})
+			cmd.WaitSignal(stop)
+			<-stop
+			cancel()
 			return nil
 		},
 	}
@@ -135,11 +115,6 @@ func init() {
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
-	proxyCmd.PersistentFlags().StringVar(&consulargs.config, "consulconfig", "",
-		"Consul config file for sidecar")
-
-	proxyCmd.PersistentFlags().StringVar(&consulargs.serverURL, "consulserverURL", "",
-		"URL for the Consul registry server")
 
 	cmd.AddFlags(rootCmd)
 

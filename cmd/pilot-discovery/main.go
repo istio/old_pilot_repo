@@ -69,6 +69,22 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
+			// receive mesh configuration
+			mesh, fail := cmd.ReadMeshConfig(flags.meshconfig)
+			if fail != nil {
+				return multierror.Prefix(fail, "failed to read mesh configuration.")
+			}
+			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+
+			var serviceController model.Controller
+			var configController model.ConfigStoreCache
+			environment := proxy.Environment{
+				Mesh: mesh,
+			}
+
+			stop := make(chan struct{})
+
+			// Set up values for input to discovery service in different platforms
 			if flags.serviceregistry == proxy.KubernetesRegistry {
 
 				client, err := kube.CreateInterface(flags.kubeconfig)
@@ -83,14 +99,6 @@ var (
 				glog.V(2).Infof("version %s", version.Line())
 				glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
-				// receive mesh configuration
-				mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
-				if err != nil {
-					return multierror.Prefix(err, "failed to read mesh configuration.")
-				}
-
-				glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
-
 				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 					model.RouteRule,
 					model.DestinationPolicy,
@@ -103,8 +111,7 @@ var (
 					return multierror.Prefix(err, "failed to register custom resources.")
 				}
 
-				serviceController := kube.NewController(client, mesh, flags.controllerOptions)
-				var configController model.ConfigStoreCache
+				kubeController := kube.NewController(client, mesh, flags.controllerOptions)
 				if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
 					configController = crd.NewController(configClient, flags.controllerOptions)
 				} else {
@@ -117,68 +124,48 @@ var (
 					}
 				}
 
-				environment := proxy.Environment{
-					ServiceDiscovery: serviceController,
-					ServiceAccounts:  serviceController,
-					IstioConfigStore: model.MakeIstioStore(configController),
-					SecretRegistry:   kube.MakeSecretRegistry(client),
-					Mesh:             mesh,
-				}
-				discovery, err := envoy.NewDiscoveryService(
-					serviceController,
-					configController,
-					environment,
-					flags.discoveryOptions)
-				if err != nil {
-					return fmt.Errorf("failed to create discovery service: %v", err)
-				}
-
+				environment.ServiceDiscovery = kubeController
+				environment.ServiceAccounts = kubeController
+				environment.IstioConfigStore = model.MakeIstioStore(configController)
+				environment.SecretRegistry = kube.MakeSecretRegistry(client)
+				serviceController = kubeController
 				ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 
-				stop := make(chan struct{})
-				go serviceController.Run(stop)
-				go configController.Run(stop)
-				go discovery.Run()
 				go ingressSyncer.Run(stop)
-				cmd.WaitSignal(stop)
-
 			} else if flags.serviceregistry == proxy.ConsulRegistry {
-				mesh := proxy.DefaultMeshConfig()
-
 				glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
-				serviceController, err := consul.NewController(
+				consulController, err := consul.NewController(
 					flags.consulargs.serverURL, "dc1", 2*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to create Consul controller: %v", err)
 				}
 
-				configController := memory.NewController(memory.Make(model.ConfigDescriptor{
+				configController = memory.NewController(memory.Make(model.ConfigDescriptor{
 					model.RouteRule,
 					model.DestinationPolicy,
 				}))
 
-				environment := proxy.Environment{
-					ServiceDiscovery: serviceController,
-					ServiceAccounts:  serviceController,
-					IstioConfigStore: model.MakeIstioStore(configController),
-					Mesh:             &mesh,
-				}
-				discovery, err := envoy.NewDiscoveryService(
-					serviceController,
-					configController,
-					environment,
-					flags.discoveryOptions)
-				if err != nil {
-					return fmt.Errorf("failed to create discovery service: %v", err)
-				}
-
-				stop := make(chan struct{})
-				go serviceController.Run(stop)
-				go configController.Run(stop)
-				go discovery.Run()
-				cmd.WaitSignal(stop)
+				environment.ServiceDiscovery = consulController
+				environment.ServiceAccounts = consulController
+				environment.IstioConfigStore = model.MakeIstioStore(configController)
+				serviceController = consulController
 			}
+
+			// Set up discovery service
+			discovery, err := envoy.NewDiscoveryService(
+				serviceController,
+				configController,
+				environment,
+				flags.discoveryOptions)
+			if err != nil {
+				return fmt.Errorf("failed to create discovery service: %v", err)
+			}
+
+			go serviceController.Run(stop)
+			go configController.Run(stop)
+			go discovery.Run()
+			cmd.WaitSignal(stop)
 			return nil
 		},
 	}
