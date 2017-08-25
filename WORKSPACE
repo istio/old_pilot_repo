@@ -331,6 +331,12 @@ go_repository(
     importpath = "github.com/hashicorp/go-multierror",
 )
 
+go_repository(
+    name = "com_github_gorilla_websocket",
+    commit = "a69d9f6de432e2c6b296a947d8a5ee88f68522cf",
+    importpath = "github.com/gorilla/websocket",
+)
+
 # likely you need to update those next 2 at the same time:
 
 go_repository(
@@ -422,7 +428,8 @@ go_repository(
 ##
 
 # Change this and the docker/Dockerfile.proxy* files together
-ISTIO_PROXY_BUCKET = "2a8426631283669ef1a433c5d1bb84642f042e81"
+# This SHA is obtained from proxy/postsubmit job
+ISTIO_PROXY_BUCKET = "62755c63d9c80c043ece26504c4288845a929cc4"  # Aug 24 2017
 
 http_file(
     name = "envoy_binary",
