@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package kube
 
 import (
 	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"istio.io/pilot/platform/kube"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -38,15 +36,15 @@ var (
 	}
 )
 
-// namedPort defines the Port and Name tuple needed for services and endpoints.
-type namedPort struct {
+// NamedPort defines the Port and Name tuple needed for services and endpoints.
+type NamedPort struct {
 	Port int32
 	Name string
 }
 
-// str2NamedPort parses a proto:port string into a namePort struct.
-func str2NamedPort(str string) (namedPort, error) {
-	var r namedPort
+// Str2NamedPort parses a proto:port string into a namePort struct.
+func Str2NamedPort(str string) (NamedPort, error) {
+	var r NamedPort
 	idx := strings.Index(str, ":")
 	if idx >= 0 {
 		r.Name = str[:idx]
@@ -65,42 +63,6 @@ func str2NamedPort(str string) (namedPort, error) {
 		}
 	}
 	return r, nil
-}
-
-var (
-	registerCmd = &cobra.Command{
-		Use:   "register <svcname> <ip> [name1:]port1 [name2:]port2 ...",
-		Short: "Registers a service instance (VM)",
-		Args:  cobra.MinimumNArgs(3),
-		RunE: func(c *cobra.Command, args []string) error {
-			svcName := args[0]
-			ip := args[1]
-			portsListStr := args[2:]
-			portsList := make([]namedPort, len(portsListStr))
-			for i := range portsListStr {
-				p, err := str2NamedPort(portsListStr[i])
-				if err != nil {
-					return err
-				}
-				portsList[i] = p
-			}
-			glog.Infof("Registering for service '%s' ip '%s', ports list %v",
-				svcName, ip, portsList)
-			glog.Infof("%d labels (%v) and %d annotations (%v)",
-				len(labels), labels, len(annotations), annotations)
-			return registerEndpoint(svcName, ip, portsList)
-		},
-	}
-	labels      []string
-	annotations []string
-)
-
-func init() {
-	rootCmd.AddCommand(registerCmd)
-	registerCmd.PersistentFlags().StringSliceVarP(&labels, "labels", "l",
-		nil, "List of labels to apply if creating a service/endpoint; e.g. -l env=prod,vers=2")
-	registerCmd.PersistentFlags().StringSliceVarP(&annotations, "annotations", "a",
-		nil, "List of string annotations to apply if creating a service/endpoint; e.g. -a foo=bar,test,x=y")
 }
 
 // samePorts returns true if the numerical part of the ports is the same.
@@ -133,7 +95,7 @@ func splitEqual(str string) (string, string) {
 }
 
 // addLabelsAndAnnotations adds labels and annotations to an object.
-func addLabelsAndAnnotations(obj *meta_v1.ObjectMeta) {
+func addLabelsAndAnnotations(obj *meta_v1.ObjectMeta, labels []string, annotations []string) {
 	if obj.Labels == nil {
 		obj.Labels = make(map[string]string, len(labels))
 	}
@@ -150,16 +112,13 @@ func addLabelsAndAnnotations(obj *meta_v1.ObjectMeta) {
 	}
 }
 
-// registerEndpoints registers the endpoint (and the service if it doesn't
+// RegisterEndpoint registers the endpoint (and the service if it doesn't
 // already exists). It creates or updates as needed. When creating it adds the
 // optional labels.
-func registerEndpoint(svcName string, ip string, portsList []namedPort) error {
-	client, err := kube.CreateInterface(kubeconfig)
-	if err != nil {
-		return err
-	}
+func RegisterEndpoint(client kubernetes.Interface, namespace string, svcName string,
+	ip string, portsList []NamedPort, labels []string, annotations []string) error {
 	getOpt := meta_v1.GetOptions{IncludeUninitialized: true}
-	_, err = client.Core().Services(namespace).Get(svcName, getOpt)
+	_, err := client.Core().Services(namespace).Get(svcName, getOpt)
 	if err != nil {
 		glog.Warningf("Got '%v' looking up svc '%s' in namespace '%s', attempting to create it", err, svcName, namespace)
 		svc := v1.Service{}
@@ -167,7 +126,7 @@ func registerEndpoint(svcName string, ip string, portsList []namedPort) error {
 		for _, p := range portsList {
 			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{Name: p.Name, Port: p.Port})
 		}
-		addLabelsAndAnnotations(&svc.ObjectMeta)
+		addLabelsAndAnnotations(&svc.ObjectMeta, labels, annotations)
 		_, err = client.CoreV1().Services(namespace).Create(&svc)
 		if err != nil {
 			glog.Error("Unable to create service: ", err)
@@ -180,7 +139,7 @@ func registerEndpoint(svcName string, ip string, portsList []namedPort) error {
 			err, svcName, namespace)
 		endP := v1.Endpoints{}
 		endP.Name = svcName // same but does it need to be
-		addLabelsAndAnnotations(&endP.ObjectMeta)
+		addLabelsAndAnnotations(&endP.ObjectMeta, labels, annotations)
 		eps, err = client.CoreV1().Endpoints(namespace).Create(&endP)
 		if err != nil {
 			glog.Error("Unable to create endpoint: ", err)
