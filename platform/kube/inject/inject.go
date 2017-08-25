@@ -197,7 +197,6 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 	}
 
 	return &mesh, nil
-
 }
 
 // GetInitializerConfig fetches the initializer configuration from a Kubernetes ConfigMap.

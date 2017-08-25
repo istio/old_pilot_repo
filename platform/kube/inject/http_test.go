@@ -67,8 +67,8 @@ func TestHTTPServer(t *testing.T) {
 func TestHTTPServer_inject(t *testing.T) {
 	server := NewHTTPServer(0, httpTestConfig)
 
-	// Don't run the server. Use container.ServeHTTP() instead to
-	// verify inject method.
+	// Don't run the server. Use container.ServeHTTP() to verify
+	// inject method.
 
 	cases := []struct {
 		name         string
@@ -109,10 +109,10 @@ func TestHTTPServer_inject(t *testing.T) {
 		{
 			name:         "wrong Content-Type (JSON)",
 			method:       http.MethodPost,
-			url:          "/",
+			url:          "/inject",
 			contentType:  "application/json",
 			bodyFilename: "testdata/hello.yaml",
-			wantStatus:   http.StatusNotFound,
+			wantStatus:   http.StatusUnsupportedMediaType,
 		},
 	}
 

@@ -30,7 +30,7 @@ const (
 )
 
 // HTTPServer implements an HTTP endpoint equivalent of the k8s
-// initializer for injecting the sidecar into k8s resources.
+// sidecar initializer.
 type HTTPServer struct {
 	config    *Config
 	server    *http.Server
