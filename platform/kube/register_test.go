@@ -92,3 +92,23 @@ func TestSamePorts(t *testing.T) {
 		}
 	}
 }
+
+func TestAddLabelsAndAnnotations(t *testing.T) {
+	o := v1.Service{}
+	addLabelsAndAnnotations(&o.ObjectMeta, []string{"foo", "l1=l2"}, []string{"bar", "a1=av1"})
+	if o.Labels["l1"] != "l2" {
+		t.Errorf("Got unexpected %v for label l1=l2", o.Labels["l1"])
+	}
+	if _, found := o.Labels["foo"]; !found {
+		t.Error("Got unexpected not found for label foo")
+	}
+	if _, found := o.Annotations["foo"]; found {
+		t.Errorf("Got unexpected to find foo in annotations: %v", o.Annotations["foo"])
+	}
+	if _, found := o.Annotations["bar"]; !found {
+		t.Error("Got unexpected not found for annotation bar")
+	}
+	if o.Annotations["a1"] != "av1" {
+		t.Errorf("Got unexpected %v for annotation a1=av1", o.Annotations["a1"])
+	}
+}
