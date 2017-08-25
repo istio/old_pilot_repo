@@ -57,8 +57,8 @@ var (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-	// allow all connections by default
-	return true
+		// allow all connections by default
+		return true
 	},
 } //defaults
 
