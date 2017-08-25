@@ -26,7 +26,7 @@ import (
 var (
 	registerCmd = &cobra.Command{
 		Use:   "register <svcname> <ip> [name1:]port1 [name2:]port2 ...",
-		Short: "Registers a service instance (VM)",
+		Short: "Registers a service instance (e.g. VM) joining the mesh",
 		Args:  cobra.MinimumNArgs(3),
 		RunE: func(c *cobra.Command, args []string) error {
 			svcName := args[0]
@@ -65,6 +65,6 @@ func init() {
 		nil, "List of labels to apply if creating a service/endpoint; e.g. -l env=prod,vers=2")
 	registerCmd.PersistentFlags().StringSliceVarP(&annotations, "annotations", "a",
 		nil, "List of string annotations to apply if creating a service/endpoint; e.g. -a foo=bar,test,x=y")
-	registerCmd.PersistentFlags().StringVarP(&svcAcctAnn, "svcacct", "s",
+	registerCmd.PersistentFlags().StringVarP(&svcAcctAnn, "serviceaccount", "s",
 		"default", "Service account to link to the service")
 }
