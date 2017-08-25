@@ -59,7 +59,7 @@ func init() {
 	flag.StringVar(&headerKey, "key", "", "Header key (use Host for authority)")
 	flag.StringVar(&headerVal, "val", "", "Header value")
 	flag.StringVar(&caFile, "ca", "/cert.crt", "CA root cert file")
-	flag.StringVar(&msg, "msg", "hello world!", "message to send (for websockets)")
+	flag.StringVar(&msg, "msg", "HelloWorld", "message to send (for websockets)")
 }
 
 func makeHTTPRequest(client *http.Client) func(int) func() error {
@@ -121,6 +121,10 @@ func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
 				log.Printf("[%d] Header=%s:%s\n", i, headerKey, headerVal)
 			}
 
+			if msg != "" {
+				log.Printf("[%d] Body=%s\n", i, msg)
+			}
+
 			conn, _, err := client.Dial(url, req)
 			if err != nil {
 				// timeout or bad handshake
@@ -134,11 +138,16 @@ func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
 				return err
 			}
 
-			_, line, err := conn.ReadMessage()
+			_, resp, err := conn.ReadMessage()
 			if err != nil {
 				return err
 			}
-			log.Printf("[%d body] %s\n", i, line)
+
+			for _, line := range strings.Split(string(resp), "\n") {
+				if line != "" {
+					log.Printf("[%d body] %s\n", i, line)
+				}
+			}
 
 			return nil
 		}
