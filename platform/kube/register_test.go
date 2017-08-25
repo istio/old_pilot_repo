@@ -16,6 +16,8 @@ package kube
 
 import (
 	"testing"
+
+	"k8s.io/api/core/v1"
 )
 
 func TestStr2NamedPort(t *testing.T) {
@@ -29,7 +31,7 @@ func TestStr2NamedPort(t *testing.T) {
 		{"80", NamedPort{80, "http"}, false},
 		{"443", NamedPort{443, "https"}, false},
 		{"1234", NamedPort{1234, "1234"}, false},
-		// Error case:
+		// Error cases:
 		{"", NamedPort{0, ""}, true},
 		{"foo:bar", NamedPort{0, "foo"}, true},
 	}
@@ -71,19 +73,22 @@ func TestSplitEqual(t *testing.T) {
 	}
 }
 
-/*
 func TestSamePorts(t *testing.T) {
 	var tests = []struct {
-		input1 []v1.Endpoints,
-		input2 map[int32]bool,
-		expected  bool // result
+		input1   []v1.EndpointPort
+		input2   map[int32]bool
+		expected bool // result
 	}{
+		{[]v1.EndpointPort{}, map[int32]bool{}, true},
+		{[]v1.EndpointPort{{Port: 123, Name: "foo"}}, map[int32]bool{123: true}, true},
+		{[]v1.EndpointPort{{Port: 123}, {Port: 456}}, map[int32]bool{123: true}, false},
+		{[]v1.EndpointPort{{Port: 123}, {Port: 456}}, map[int32]bool{123: true, 777: true}, false},
+		{[]v1.EndpointPort{{Port: 123}, {Port: 456}}, map[int32]bool{123: true, 456: true}, true},
 	}
 	for _, tst := range tests {
 		actual := samePorts(tst.input1, tst.input2)
-		if tst.actual != expected {
+		if tst.expected != actual {
 			t.Errorf("Got unexpected samePorts(%+v, %+v) = %v", tst.input1, tst.input2, actual)
 		}
-		}
+	}
 }
-*/

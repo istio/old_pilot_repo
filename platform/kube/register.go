@@ -177,7 +177,7 @@ func RegisterEndpoint(client kubernetes.Interface, namespace string, svcName str
 			newSubSet.Ports = append(newSubSet.Ports, v1.EndpointPort{Name: p.Name, Port: p.Port})
 		}
 		eps.Subsets = append(eps.Subsets, newSubSet)
-		glog.Infof("No pre existing matching ports list found, created new subset %v", newSubSet)
+		glog.Infof("No pre existing exact matching ports list found, created new subset %v", newSubSet)
 	}
 	eps, err = client.CoreV1().Endpoints(namespace).Update(eps)
 	if err != nil {
