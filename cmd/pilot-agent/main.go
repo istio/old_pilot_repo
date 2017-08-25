@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"istio.io/pilot/cmd"
-	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
@@ -93,9 +92,9 @@ var (
 			} else if serviceregistry == proxy.ConsulRegistry {
 				mesh := proxy.DefaultMeshConfig()
 				ipAddr := "127.0.0.1"
-				available := consul.WaitForPrivateNetwork()
+				available := envoy.WaitForPrivateNetwork()
 				if available {
-					ipAddr = consul.GetPrivateIP().String()
+					ipAddr = envoy.GetPrivateIP().String()
 					glog.V(2).Infof("obtained private IP %v", ipAddr)
 				}
 
