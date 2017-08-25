@@ -15,6 +15,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
@@ -40,6 +42,9 @@ var (
 			}
 			glog.Infof("Registering for service '%s' ip '%s', ports list %v",
 				svcName, ip, portsList)
+			if svcAcctAnn != "" {
+				annotations = append(annotations, fmt.Sprintf("%s=%s", kube.KubeServiceAccountsOnVMAnnotation, svcAcctAnn))
+			}
 			glog.Infof("%d labels (%v) and %d annotations (%v)",
 				len(labels), labels, len(annotations), annotations)
 			client, err := kube.CreateInterface(kubeconfig)
@@ -51,6 +56,7 @@ var (
 	}
 	labels      []string
 	annotations []string
+	svcAcctAnn  string
 )
 
 func init() {
@@ -59,4 +65,6 @@ func init() {
 		nil, "List of labels to apply if creating a service/endpoint; e.g. -l env=prod,vers=2")
 	registerCmd.PersistentFlags().StringSliceVarP(&annotations, "annotations", "a",
 		nil, "List of string annotations to apply if creating a service/endpoint; e.g. -a foo=bar,test,x=y")
+	registerCmd.PersistentFlags().StringVarP(&svcAcctAnn, "svcacct", "s",
+		"default", "Service account to link to the service")
 }
