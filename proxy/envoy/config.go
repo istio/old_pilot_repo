@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -28,7 +29,6 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
-	"sort"
 )
 
 // Config generation main functions.
@@ -210,8 +210,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
-			buildHTTPListener(env.Mesh, sidecar, instances,nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
-			buildHTTPListener(env.Mesh, sidecar, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
+			buildHTTPListener(env.Mesh, sidecar, instances, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
 		// TODO: need inbound listeners in HTTP_PROXY case, with dedicated ingress listener.
 	}
 
@@ -263,7 +262,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, insta
 	})
 
 	service := ""
-	if (instances != nil) {
+	if instances != nil {
 		// join service names with a comma
 		serviceSet := make(map[string]bool, len(instances))
 		for _, instance := range instances {
