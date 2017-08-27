@@ -521,6 +521,6 @@ go_repository(
 
 git_repository(
     name = "com_github_istio_test_infra",
-    commit = "9a3ac467ba862432c75e42cecff7aa5c2980e3b8",  # Jun 18, 2017
+    commit = "67e73ad01f9d1074a7d787a91201d41938ad4310",  # Aug 25, 2017
     remote = "https://github.com/istio/test-infra.git",
 )
