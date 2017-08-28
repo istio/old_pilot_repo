@@ -41,13 +41,15 @@ type Watcher interface {
 }
 
 type watcher struct {
-	agent proxy.Agent
-	role  proxy.Node
-	mesh  *proxyconfig.ProxyMeshConfig
+	agent          proxy.Agent
+	role           proxy.Node
+	serviceCluster string
+	mesh           *proxyconfig.ProxyMeshConfig
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath string) (Watcher, error) {
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node,
+	serviceCluster, configpath string) (Watcher, error) {
 	glog.V(2).Infof("Proxy role: %#v", role)
 
 	if mesh.StatsdUdpAddress != "" {
@@ -70,11 +72,12 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, configpath s
 		return nil, errors.New("ingress proxy is disabled")
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), configpath), proxy.DefaultRetry)
+	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), serviceCluster, configpath), proxy.DefaultRetry)
 	out := &watcher{
-		agent: agent,
-		role:  role,
-		mesh:  mesh,
+		agent:          agent,
+		role:           role,
+		serviceCluster: serviceCluster,
+		mesh:           mesh,
 	}
 
 	return out, nil
@@ -127,17 +130,17 @@ func configFile(config string, epoch int) string {
 	return path.Join(config, fmt.Sprintf(EpochFileTemplate, epoch))
 }
 
-func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, node string) []string {
+func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, cluster, node string) []string {
 	return []string{"-c", fname,
 		"--restart-epoch", fmt.Sprint(epoch),
 		"--drain-time-s", fmt.Sprint(int(convertDuration(mesh.DrainDuration) / time.Second)),
 		"--parent-shutdown-time-s", fmt.Sprint(int(convertDuration(mesh.ParentShutdownDuration) / time.Second)),
-		"--service-cluster", mesh.IstioServiceCluster,
+		"--service-cluster", cluster,
 		"--service-node", node,
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.Proxy {
+func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, cluster, node, configpath string) proxy.Proxy {
 	return proxy.Proxy{
 		Run: func(config interface{}, epoch int, abort <-chan error) error {
 			envoyConfig, ok := config.(*Config)
@@ -152,7 +155,7 @@ func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, node, configpath string) proxy.
 			}
 
 			// spin up a new Envoy process
-			args := envoyArgs(fname, epoch, mesh, node)
+			args := envoyArgs(fname, epoch, mesh, cluster, node)
 
 			// inject tracing flag for higher levels
 			if glog.V(4) {

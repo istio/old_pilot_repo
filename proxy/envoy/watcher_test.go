@@ -23,14 +23,14 @@ import (
 
 func TestEnvoyArgs(t *testing.T) {
 	mesh := proxy.DefaultMeshConfig()
-	got := envoyArgs("test.json", 5, &mesh, "my-proxy")
+	got := envoyArgs("test.json", 5, &mesh, "my-cluster", "my-node")
 	want := []string{
 		"-c", "test.json",
 		"--restart-epoch", "5",
 		"--drain-time-s", "2",
 		"--parent-shutdown-time-s", "3",
-		"--service-cluster", mesh.IstioServiceCluster,
-		"--service-node", "my-proxy",
+		"--service-cluster", "my-cluster",
+		"--service-node", "my-node",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("envoyArgs() => got %v, want %v", got, want)
