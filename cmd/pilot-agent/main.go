@@ -32,6 +32,7 @@ import (
 var (
 	configpath      string
 	meshconfig      string
+	servicecluster  string
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
 
@@ -60,6 +61,10 @@ var (
 
 			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("mesh configuration %#v", mesh)
+
+			if servicecluster == "" {
+				servicecluster = mesh.IstioServiceCluster
+			}
 
 			// set values from registry platform
 			if role.IPAddress == "" {
@@ -91,7 +96,7 @@ var (
 
 			}
 
-			watcher, err := envoy.NewWatcher(mesh, role, configpath)
+			watcher, err := envoy.NewWatcher(mesh, role, servicecluster, configpath)
 			if err != nil {
 				return err
 			}
@@ -122,6 +127,8 @@ func init() {
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
+	proxyCmd.PersistentFlags().StringVar(&servicecluster, "servicecluster", "",
+		"Service cluster value to override mesh service cluster")
 
 	cmd.AddFlags(rootCmd)
 
