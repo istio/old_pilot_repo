@@ -96,12 +96,13 @@ func (r *HTTPServer) inject(request *restful.Request, response *restful.Response
 }
 
 // Run runs the HTTP server.
-func (r *HTTPServer) Run() error {
+func (r *HTTPServer) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting HTTP service at %v", r.server.Addr)
-	return r.server.ListenAndServe()
-}
-
-// Close immediately closes all active http connections.
-func (r *HTTPServer) Close() error {
-	return r.server.Close()
+	go func() {
+		<-stopCh
+		r.server.Close()
+	}()
+	if err := r.server.ListenAndServe(); err != nil {
+		glog.Error(err.Error())
+	}
 }

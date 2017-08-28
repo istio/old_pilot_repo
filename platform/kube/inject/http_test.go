@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	restful "github.com/emicklei/go-restful"
 	v1 "k8s.io/api/core/v1"
@@ -50,17 +51,11 @@ var (
 )
 
 func TestHTTPServer(t *testing.T) {
+	stop := make(chan struct{})
 	server := NewHTTPServer(0, httpTestConfig)
-
-	go func() {
-		if err := server.Run(); err != nil {
-			t.Errorf("Run() failed: %v", err)
-		}
-	}()
-
-	if err := server.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
-	}
+	go server.Run(stop)
+	time.Sleep(time.Second)
+	close(stop)
 }
 
 func TestHTTPServer_inject(t *testing.T) {
