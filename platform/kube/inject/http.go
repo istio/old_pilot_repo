@@ -100,7 +100,7 @@ func (r *HTTPServer) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting HTTP service at %v", r.server.Addr)
 	go func() {
 		<-stopCh
-		r.server.Close()
+		r.server.Close() // nolint: errcheck
 	}()
 	if err := r.server.ListenAndServe(); err != nil {
 		glog.Error(err.Error())
