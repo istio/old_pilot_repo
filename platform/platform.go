@@ -12,21 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+package platform
 
-package grpecho;
+// ServiceRegistry defines underlying platform supporting service regisgtry
+type ServiceRegistry string
 
-// DO NOT CHANGE THIS NAME. The test system will fail in unpredictable ways
-// because something (most probably Bazel) is caching the generated pb.go
-// files and refuses to flush the cache, making every PR to pilot fail.
-service EchoTestService {
-  rpc Echo(EchoRequest) returns (EchoResponse);
-}
-
-message EchoRequest {
-  string message = 1;
-}
-
-message EchoResponse {
-  string message = 1;
-}
+const (
+	// KubernetesRegistry environment flag
+	KubernetesRegistry ServiceRegistry = "Kubernetes"
+	// ConsulRegistry environment flag
+	ConsulRegistry ServiceRegistry = "Consul"
+)
