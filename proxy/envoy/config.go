@@ -251,8 +251,8 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName
 
 // buildHTTPListener constructs a listener for the network interface address and port.
 // Set RDS parameter to a non-empty value to enable RDS for the matching route name.
-func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, instances []*model.ServiceInstance, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds string, useRemoteAddress bool) *Listener {
+func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, instances []*model.ServiceInstance,
+	routeConfig *HTTPRouteConfig, ip string, port int, rds string, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -260,6 +260,9 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, insta
 		Name:   router,
 		Config: FilterRouterConfig{},
 	})
+
+	// This is the mixer 'target.service'
+	// TODO: use cannonical name, comma separated list is not actually supported by mixer.
 
 	service := ""
 	if instances != nil {

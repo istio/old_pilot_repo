@@ -19,7 +19,7 @@ gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
   --enable=gotype\
   --enable=ineffassign\
   --enable=interfacer\
-  --enable=lll --line-length=160\
+  --enable=lll --line-length=120\
   --enable=megacheck\
   --enable=misspell\
   --enable=structcheck\
