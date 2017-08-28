@@ -10,35 +10,10 @@ pkg_tar(
 )
 
 pkg_tar(
-    name = "discovery-bin",
-    files = [
-        "//cmd/pilot-discovery",
-    ],
-    mode = "0755",
-    package_dir = "/usr/local/bin",
-)
-
-pkg_tar(
     name = "debian-data-agent",
     extension = "tar.gz",
     deps = [
         ":agent-bin",
-    ],
-)
-
-pkg_tar(
-    name = "discovery-systemd",
-    files = ["istio-discovery.service"],
-    mode = "644",
-    package_dir = "/lib/systemd/system",
-)
-
-pkg_tar(
-    name = "debian-data-discovery",
-    extension = "tar.gz",
-    deps = [
-        ":discovery-bin",
-        ":discovery-systemd",
     ],
 )
 
@@ -54,14 +29,3 @@ pkg_deb(
     version = "0.2.1",
 )
 
-pkg_deb(
-    name = "istio-discovery",
-    architecture = "amd64",
-    built_using = "bazel",
-    data = ":debian-data-discovery",
-    description_file = "description-discovery",
-    homepage = "http://istio.io",
-    maintainer = "The Istio Authors <istio-dev@googlegroups.com>",
-    package = "istio-discovery",
-    version = "0.2.1",
-)
