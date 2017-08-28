@@ -262,7 +262,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, insta
 	})
 
 	// This is the mixer 'target.service'
-	// TODO: use cannonical name, comma separated list is not actually supported by mixer.
+	// TODO: use canonical name, comma separated list is not actually supported by mixer.
 
 	service := ""
 	if instances != nil {
