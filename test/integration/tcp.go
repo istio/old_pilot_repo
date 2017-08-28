@@ -54,9 +54,9 @@ func (t *tcp) run() error {
 							resp := t.clientRequest(src, url, 1, "")
 							if t.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS && src == "t" {
 								// t cannot talk to envoy (a or b) with mTLS enabled.
-  							if len(resp.code) == 0 || resp.code[0] != httpOk {
-	  							return nil
-		  					}
+								if len(resp.code) == 0 || resp.code[0] != httpOk {
+									return nil
+								}
 							} else if len(resp.code) > 0 && resp.code[0] == httpOk {
 								return nil
 							}
@@ -67,6 +67,5 @@ func (t *tcp) run() error {
 			}
 		}
 	}
-
 	return parallel(funcs)
 }

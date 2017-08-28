@@ -99,6 +99,5 @@ func (r *http) makeRequests() error {
 			}
 		}
 	}
-
 	return parallel(funcs)
 }
