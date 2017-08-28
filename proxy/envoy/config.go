@@ -471,6 +471,8 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
+//
+// TODO: use service load balancing address if available!
 func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment, services []*model.Service) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
@@ -493,21 +495,11 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 				for _, instance := range instances {
 					// TODO: could reduce number of TCPRoutes by grouping them together by port
 					route := buildTCPRoute(cluster,
-						[]string{instance.Endpoint.Address}, fmt.Sprint(instance.Endpoint.Port))
+						[]string{instance.Endpoint.Address}, fmt.Sprint(servicePort.Port))
 					routes[servicePort.Port] = append(routes[servicePort.Port], route)
 				}
 
 				tcpClusters = append(tcpClusters, cluster)
-
-				//addrs := make([]string, 0, len(instances))
-				//for _, instance := range instances {
-				//	addrs = append(addrs, instance.Endpoint.Address)
-				//}
-				//
-				//cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				//route := buildTCPRoute(cluster, addrs) // TODO: instance ports may differ from service port
-				//routes[servicePort.Port] = append(routes[servicePort.Port], route)
-				//tcpClusters = append(tcpClusters, cluster)
 			}
 		}
 	}
@@ -520,20 +512,6 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 		tcpListeners = append(tcpListeners, listener)
 	}
 
-	//for _, service := range services {
-	//	for _, servicePort := range service.Ports {
-	//		switch servicePort.Protocol {
-	//		case model.ProtocolTCP, model.ProtocolHTTPS:
-	//
-	//			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-	//			route := buildTCPRoute(cluster, service.Address)
-	//			config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-	//			listener := buildTCPListener(config, service.Address, servicePort.Port)
-	//			tcpClusters = append(tcpClusters, cluster)
-	//			tcpListeners = append(tcpListeners, listener)
-	//		}
-	//	}
-	//}
 	return tcpListeners, tcpClusters
 }
 
@@ -643,7 +621,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 // N.B. If a given management port is same as the service instance's endpoint port
 // the pod will fail to start in Kubernetes, because the mixer service tries to
 // lookup the service associated with the Pod. Since the pod is yet to be started
-// and hence not bound to the service), the service lookup fails causing the mixer
+// (and hence not bound to the service), the service lookup fails causing the mixer
 // to fail the health check call. This results in a vicious cycle, where kubernetes
 // restarts the unhealthy pod after successive failed health checks, and the mixer
 // continues to reject the health checks as there is no service associated with
