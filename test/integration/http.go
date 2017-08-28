@@ -51,14 +51,15 @@ func (r *http) run() error {
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
 func (r *http) makeRequests() error {
-	testPods := []string{"a", "b"}
+	srcPods := []string{"a", "b", "t"}
+	dstPods := []string{"a", "b"}
 	if r.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
-		testPods = append(testPods, "t")
+		dstPods = append(dstPods, "t")
 	}
 	funcs := make(map[string]func() status)
-	for _, src := range testPods {
-		for _, dst := range testPods {
+	for _, src := range srcPods {
+		for _, dst := range dstPods {
 			for _, port := range []string{"", ":80", ":8080"} {
 				for _, domain := range []string{"", "." + r.Namespace} {
 					name := fmt.Sprintf("HTTP request from %s to %s%s%s", src, dst, domain, port)
@@ -66,6 +67,13 @@ func (r *http) makeRequests() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := r.clientRequest(src, url, 1, "")
+							if r.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS && src == "t" {
+								if len(resp.id) == 0 {
+									// Expected no match for t->a
+									return nil
+								}
+								return errAgain
+							}
 							if len(resp.id) > 0 {
 								id := resp.id[0]
 								if src != "t" {
@@ -92,26 +100,5 @@ func (r *http) makeRequests() error {
 		}
 	}
 
-	if r.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		// An app without auth-enabled Envoy should not be able to talk to an auth-enabled app.
-		src := "t"
-		dst := "a"
-		for _, port := range []string{"", ":80", ":8080"} {
-			for _, domain := range []string{"", "." + r.Namespace} {
-				name := fmt.Sprintf("HTTP request from %s to %s%s%s", src, dst, domain, port)
-				funcs[name] = (func(src, dst, port, domain string) func() status {
-					url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-					return func() status {
-						resp := r.clientRequest(src, url, 1, "")
-						if len(resp.id) == 0 {
-							// Expected no match for t->a
-							return nil
-						}
-						return errAgain
-					}
-				})(src, dst, port, domain)
-			}
-		}
-	}
 	return parallel(funcs)
 }

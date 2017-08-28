@@ -36,14 +36,15 @@ func (t *tcp) teardown() {
 }
 
 func (t *tcp) run() error {
-	testPods := []string{"a", "b"}
+	srcPods := []string{"a", "b", "t"}
+	dstPods := []string{"a", "b"}
 	if t.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
-		testPods = append(testPods, "t")
+		dstPods = append(dstPods, "t")
 	}
 	funcs := make(map[string]func() status)
-	for _, src := range testPods {
-		for _, dst := range testPods {
+	for _, src := range srcPods {
+		for _, dst := range dstPods {
 			for _, port := range []string{":90", ":9090"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
 					name := fmt.Sprintf("TCP connection from %s to %s%s%s", src, dst, domain, port)
@@ -51,7 +52,12 @@ func (t *tcp) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if len(resp.code) > 0 && resp.code[0] == httpOk {
+							if t.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS && src == "t" {
+								// t cannot talk to envoy (a or b) with mTLS enabled.
+  							if len(resp.code) == 0 || resp.code[0] != httpOk {
+	  							return nil
+		  					}
+							} else if len(resp.code) > 0 && resp.code[0] == httpOk {
 								return nil
 							}
 							return errAgain
@@ -62,25 +68,5 @@ func (t *tcp) run() error {
 		}
 	}
 
-	if t.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		// An app without auth-enabled Envoy should not be able to talk to an auth-enabled app.
-		src := "t"
-		dst := "a"
-		for _, port := range []string{":90", ":9090"} {
-			for _, domain := range []string{"", "." + t.Namespace} {
-				name := fmt.Sprintf("TCP connection from %s to %s%s%s", src, dst, domain, port)
-				funcs[name] = (func(src, dst, port, domain string) func() status {
-					url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
-					return func() status {
-						resp := t.clientRequest(src, url, 1, "")
-						if len(resp.code) == 0 || resp.code[0] != httpOk {
-							return nil
-						}
-						return errAgain
-					}
-				})(src, dst, port, domain)
-			}
-		}
-	}
 	return parallel(funcs)
 }
