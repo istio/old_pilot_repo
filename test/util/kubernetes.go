@@ -29,7 +29,7 @@ import (
 
 const (
 	// PodCheckBudget is the maximum number of retries with 1s delays
-	PodCheckBudget = 90
+	PodCheckBudget = 180
 )
 
 // CreateNamespace creates a fresh namespace
@@ -81,7 +81,7 @@ func GetAppPods(cl kubernetes.Interface, ns string) (map[string][]string, error)
 			return pods, err
 		}
 		items = list.Items
-		ready := true
+		ready := len(items) > 0
 
 		for _, pod := range items {
 			if pod.Status.Phase != "Running" {

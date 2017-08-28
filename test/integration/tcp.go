@@ -44,6 +44,10 @@ func (t *tcp) run() error {
 	funcs := make(map[string]func() status)
 	for _, src := range testPods {
 		for _, dst := range testPods {
+			if src == dst {
+				continue // minikube bug prevents this scenario from working
+			}
+
 			for _, port := range []string{":90", ":9090"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
 					name := fmt.Sprintf("TCP connection from %s to %s%s%s", src, dst, domain, port)
