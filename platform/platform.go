@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+package platform
 
-package grpecho;
+// ServiceRegistry defines underlying platform supporting service regisgtry
+type ServiceRegistry string
 
-service GrpcEchoTestService {
-  rpc GrpcEcho(GrpcEchoRequest) returns (GrpcEchoResponse);
-}
-
-message GrpcEchoRequest {
-  string message = 1;
-}
-
-message GrpcEchoResponse {
-  string message = 1;
-}
+const (
+	// KubernetesRegistry environment flag
+	KubernetesRegistry ServiceRegistry = "Kubernetes"
+	// ConsulRegistry environment flag
+	ConsulRegistry ServiceRegistry = "Consul"
+)

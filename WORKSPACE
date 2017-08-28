@@ -195,12 +195,6 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_spf13_pflag",
-    commit = "9ff6c6923cfffbcd502984b8e0c80539a94968b7",
-    importpath = "github.com/spf13/pflag",
-)
-
-go_repository(
     name = "com_github_stretchr_testify",
     commit = "f6abca593680b2315d2075e0f5e2a9751e3f431a",
     importpath = "github.com/stretchr/testify",
@@ -338,8 +332,22 @@ go_repository(
 )
 
 go_repository(
+    name = "com_github_gorilla_websocket",
+    commit = "a69d9f6de432e2c6b296a947d8a5ee88f68522cf",
+    importpath = "github.com/gorilla/websocket",
+)
+
+# likely you need to update those next 2 at the same time:
+
+go_repository(
+    name = "com_github_spf13_pflag",
+    commit = "e57e3eeb33f795204c1ca35f56c44f83227c6e66",
+    importpath = "github.com/spf13/pflag",
+)
+
+go_repository(
     name = "com_github_spf13_cobra",
-    commit = "9c28e4bbd74e5c3ed7aacbc552b2cab7cfdfe744",
+    commit = "2df9a531813370438a4d79bfc33e21f58063ed87",
     importpath = "github.com/spf13/cobra",
 )
 
@@ -420,7 +428,8 @@ go_repository(
 ##
 
 # Change this and the docker/Dockerfile.proxy* files together
-ISTIO_PROXY_BUCKET = "2a8426631283669ef1a433c5d1bb84642f042e81"
+# This SHA is obtained from proxy/postsubmit job
+ISTIO_PROXY_BUCKET = "62755c63d9c80c043ece26504c4288845a929cc4"  # Aug 24 2017
 
 http_file(
     name = "envoy_binary",
@@ -469,7 +478,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "af5afdafc95826a5716facc2ea025f1e27bb8225",  # June 8, 2017
+    commit = "846cbe55455f0b3b2ed742b52edc520cc94326a9",  # Aug 18, 2017
     remote = "https://github.com/istio/api.git",
 )
 
@@ -518,6 +527,6 @@ go_repository(
 
 git_repository(
     name = "com_github_istio_test_infra",
-    commit = "9a3ac467ba862432c75e42cecff7aa5c2980e3b8",  # Jun 18, 2017
+    commit = "b0822890273f91d5aa8c40ea1a89ba01e0f0ee9d",  # Aug 22, 2017
     remote = "https://github.com/istio/test-infra.git",
 )
