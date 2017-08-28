@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
-	"istio.io/pilot/model"
 )
 
 type routing struct {
@@ -46,10 +45,10 @@ func (t *routing) run() error {
 	if err := t.applyConfig("rule-default-route.yaml.tmpl", map[string]string{
 		"Destination": "c",
 		"Namespace":   t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
-	if err := t.verifyRouting("a", "c", "", "",
+	if err := t.verifyRouting("http", "a", "c", "", "",
 		100, map[string]int{
 			"v1": 100,
 			"v2": 0,
@@ -62,10 +61,10 @@ func (t *routing) run() error {
 	if err := t.applyConfig("rule-weighted-route.yaml.tmpl", map[string]string{
 		"Destination": "c",
 		"Namespace":   t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
-	if err := t.verifyRouting("a", "c", "", "",
+	if err := t.verifyRouting("http", "a", "c", "", "",
 		100, map[string]int{
 			"v1": 75,
 			"v2": 25,
@@ -79,10 +78,10 @@ func (t *routing) run() error {
 		"Source":      "a",
 		"Destination": "c",
 		"Namespace":   t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
-	if err := t.verifyRouting("a", "c", "version", "v2",
+	if err := t.verifyRouting("http", "a", "c", "version", "v2",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
@@ -96,10 +95,10 @@ func (t *routing) run() error {
 		"Source":      "a",
 		"Destination": "c",
 		"Namespace":   t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
-	if err := t.verifyRouting("a", "c", "foo", "bar",
+	if err := t.verifyRouting("http", "a", "c", "foo", "bar",
 		100, map[string]int{
 			"v1": 0,
 			"v2": 100,
@@ -113,7 +112,7 @@ func (t *routing) run() error {
 		"Source":      "a",
 		"Destination": "c",
 		"Namespace":   t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
 	if err := t.verifyFaultInjection("a", "c", "version", "v2", time.Second*5, 503); err != nil {
@@ -130,10 +129,32 @@ func (t *routing) run() error {
 		"HostRedirect": redirectHost,
 		"Path":         redirectPath,
 		"Namespace":    t.Namespace,
-	}, model.RouteRule.Type); err != nil {
+	}); err != nil {
 		return err
 	}
 	if err := t.verifyRedirect("a", "c", redirectHost, redirectPath, "testredirect", "enabled", 200); err != nil {
+		return err
+	}
+	glog.Info("Success!")
+
+	// In case of websockets, the server does not return headers as part of response.
+	// After upgrading to websocket connection, it waits for a dummy message from the
+	// client over the websocket connection. It then returns all the headers as
+	// part of the response message which is then printed out by the client.
+	// So the verify checks here are really parsing the output of a websocket message
+	// i.e., we are effectively checking websockets beyond just the upgrade.
+	glog.Info("Routing 100 percent to c-v1 with websocket upgrades and verifying...")
+	if err := t.applyConfig("rule-websocket-route.yaml.tmpl", map[string]string{
+		"Destination": "c",
+		"Namespace":   t.Namespace,
+	}); err != nil {
+		return err
+	}
+	if err := t.verifyRouting("ws", "a", "c", "testwebsocket", "enabled",
+		100, map[string]int{
+			"v1": 100,
+			"v2": 0,
+		}); err != nil {
 		return err
 	}
 	glog.Info("Success!")
@@ -157,9 +178,9 @@ func counts(elts []string) map[string]int {
 }
 
 // verifyRouting verifies if the traffic is split as specified across different deployments in a service
-func (t *routing) verifyRouting(src, dst, headerKey, headerVal string,
+func (t *routing) verifyRouting(scheme, src, dst, headerKey, headerVal string,
 	samples int, expectedCount map[string]int) error {
-	url := fmt.Sprintf("http://%s/%s", dst, src)
+	url := fmt.Sprintf("%s://%s/%s", scheme, dst, src)
 	glog.Infof("Making %d requests (%s) from %s...\n", samples, url, src)
 
 	resp := t.clientRequest(src, url, samples, fmt.Sprintf("-key %s -val %s", headerKey, headerVal))

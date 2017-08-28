@@ -61,7 +61,7 @@ const (
 	caTag = "689b447"
 
 	// Mixer image tag is the short SHA *update manually*
-	mixerImage = "gcr.io/istio-testing/mixer:652be10fe0a6e001bf19993e4830365cf8018963"
+	mixerImage = "gcr.io/istio-testing/mixer:49e721e15d481cd5d92d9a2b30b5e8fcdcafdb63"
 
 	// retry budget
 	budget = 90
@@ -86,6 +86,10 @@ func init() {
 
 	// If specified, only run one test
 	flag.StringVar(&testType, "testtype", "", "Select test to run (default is all tests)")
+
+	// Keep disabled until default no-op initializer is distributed
+	// and running in test clusters.
+	flag.BoolVar(&params.UseInitializer, "use-initializer", false, "Use k8s sidecar initializer")
 }
 
 type test interface {
@@ -301,7 +305,7 @@ func parallel(fs map[string]func() status) error {
 
 // connect to K8S cluster and register TPRs
 func setupClient() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, "dummy")
+	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,6 @@ func TestConfigDescriptorValidate(t *testing.T) {
 		descriptor: ConfigDescriptor{ProtoSchema{
 			Type:        badLabel,
 			MessageName: RouteRule.MessageName,
-			Key:         func(config proto.Message) string { return "key" },
 		}},
 		wantErr: true,
 	}, {
@@ -52,7 +51,6 @@ func TestConfigDescriptorValidate(t *testing.T) {
 		descriptor: ConfigDescriptor{ProtoSchema{
 			Type:        goodLabel,
 			MessageName: "nonexistent",
-			Key:         func(config proto.Message) string { return "key" },
 		}},
 		wantErr: true,
 	}, {
@@ -559,6 +557,18 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 				{Destination: "host.default.svc.cluster.local", Weight: 75, Tags: map[string]string{"version": "v1"}},
 				{Destination: "host.default.svc.cluster.local", Weight: 25, Tags: map[string]string{"version": "v3"}},
 			},
+		},
+			valid: false},
+		{name: "websocket upgrade invalid redirect", in: &proxyconfig.RouteRule{
+			Destination: "host.default.svc.cluster.local",
+			Name:        "test",
+			Redirect: &proxyconfig.HTTPRedirect{
+				Uri: "/new/path",
+			},
+			Route: []*proxyconfig.DestinationWeight{
+				{Destination: "host.default.svc.cluster.local", Weight: 100},
+			},
+			WebsocketUpgrade: true,
 		},
 			valid: false},
 		{name: "route rule match invalid rewrite", in: &proxyconfig.RouteRule{
