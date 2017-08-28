@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang/sync/errgroup"
+	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -42,6 +43,7 @@ var (
 	url       string
 	headerKey string
 	headerVal string
+	msg       string
 
 	caFile string
 )
@@ -57,6 +59,7 @@ func init() {
 	flag.StringVar(&headerKey, "key", "", "Header key (use Host for authority)")
 	flag.StringVar(&headerVal, "val", "", "Header value")
 	flag.StringVar(&caFile, "ca", "/cert.crt", "CA root cert file")
+	flag.StringVar(&msg, "msg", "HelloWorld", "message to send (for websockets)")
 }
 
 func makeHTTPRequest(client *http.Client) func(int) func() error {
@@ -95,6 +98,53 @@ func makeHTTPRequest(client *http.Client) func(int) func() error {
 			}
 
 			for _, line := range strings.Split(string(data), "\n") {
+				if line != "" {
+					log.Printf("[%d body] %s\n", i, line)
+				}
+			}
+
+			return nil
+		}
+	}
+}
+
+func makeWebSocketRequest(client *websocket.Dialer) func(int) func() error {
+	return func(i int) func() error {
+		return func() error {
+			req := make(http.Header)
+
+			log.Printf("[%d] Url=%s\n", i, url)
+			if headerKey == hostKey {
+				req.Add("Host", headerVal)
+				log.Printf("[%d] Host=%s\n", i, headerVal)
+			} else if headerKey != "" {
+				req.Add(headerKey, headerVal)
+				log.Printf("[%d] Header=%s:%s\n", i, headerKey, headerVal)
+			}
+
+			if msg != "" {
+				log.Printf("[%d] Body=%s\n", i, msg)
+			}
+
+			conn, _, err := client.Dial(url, req)
+			if err != nil {
+				// timeout or bad handshake
+				return err
+			}
+			// nolint: errcheck
+			defer conn.Close()
+
+			err = conn.WriteMessage(websocket.TextMessage, []byte(msg))
+			if err != nil {
+				return err
+			}
+
+			_, resp, err := conn.ReadMessage()
+			if err != nil {
+				return err
+			}
+
+			for _, line := range strings.Split(string(resp), "\n") {
 				if line != "" {
 					log.Printf("[%d body] %s\n", i, line)
 				}
@@ -182,6 +232,15 @@ func main() {
 		}()
 		client := pb.NewEchoTestServiceClient(conn)
 		f = makeGRPCRequest(client)
+	} else if strings.HasPrefix(url, "ws://") || strings.HasPrefix(url, "wss://") {
+		/* #nosec */
+		client := &websocket.Dialer{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+			HandshakeTimeout: timeout,
+		}
+		f = makeWebSocketRequest(client)
 	} else {
 		log.Fatalf("Unrecognized protocol %q", url)
 	}
