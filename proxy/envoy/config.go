@@ -477,7 +477,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 
-	routes := make(map[int][]*TCPRoute)
+	routesByPort := make(map[int][]*TCPRoute)
 	for _, service := range services {
 		if service.External() {
 			continue // TODO TCP external services not currently supported
@@ -486,26 +486,30 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS:
-				instances := env.Instances(service.Hostname, []string{servicePort.Name}, nil)
-				if len(instances) == 0 {
-					continue
+				var addrs []string
+				if service.Address != "" {
+					addrs = []string{service.Address}
+				} else {
+					instances := env.Instances(service.Hostname, []string{servicePort.Name}, nil)
+					if len(instances) == 0 {
+						continue
+					}
+					addrs = make([]string, 0, len(instances))
+					for _, instance := range instances {
+						addrs = append(addrs, instance.Endpoint.Address)
+					}
 				}
-
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-				for _, instance := range instances {
-					// TODO: could reduce number of TCPRoutes by grouping them together by port
-					route := buildTCPRoute(cluster,
-						[]string{instance.Endpoint.Address}, fmt.Sprint(servicePort.Port))
-					routes[servicePort.Port] = append(routes[servicePort.Port], route)
-				}
-
+				routesByPort[servicePort.Port] = append(routesByPort[servicePort.Port],
+					buildTCPRoute(cluster, addrs, fmt.Sprint(servicePort.Port)))
 				tcpClusters = append(tcpClusters, cluster)
 			}
 		}
 	}
 
 	// create a listener per port
-	for port, routes := range routes {
+	// TODO: canonical ordering of ports
+	for port, routes := range routesByPort {
 		sort.Sort(TCPRouteByRoute(routes))
 		config := &TCPRouteConfig{Routes: routes}
 		listener := buildTCPListener(config, "0.0.0.0", port)
