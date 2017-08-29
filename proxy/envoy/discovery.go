@@ -481,7 +481,8 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 
 		routeConfigName := request.PathParameter(RouteConfigName)
 
-		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s, route-config-name %s",
+		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, "+
+			"role %s, route-config-name %s",
 			cluster, node, role.Type, routeConfigName)
 
 		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
