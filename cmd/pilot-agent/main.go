@@ -67,8 +67,8 @@ var (
 					role.IPAddress = os.Getenv("INSTANCE_IP")
 				} else if serviceregistry == platform.ConsulRegistry {
 					ipAddr := "127.0.0.1"
-					if ok := envoy.WaitForPrivateNetwork(); ok {
-						ipAddr = envoy.GetPrivateIP().String()
+					if ok := proxy.WaitForPrivateNetwork(); ok {
+						ipAddr = proxy.GetPrivateIP().String()
 						glog.V(2).Infof("obtained private IP %v", ipAddr)
 					}
 
