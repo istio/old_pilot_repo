@@ -45,6 +45,9 @@ const (
 	// CDSName is the name of cluster-discovery-service (CDS) cluster
 	CDSName = "cds"
 
+	// RDSAll is the special name for HTTP PROXY route
+	RDSAll = "http_proxy"
+
 	// VirtualListenerName is the name for traffic capture listener
 	VirtualListenerName = "virtual"
 
@@ -80,6 +83,9 @@ const (
 
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
+
+	// LocalhostAddress for local binding
+	LocalhostAddress = "127.0.0.1"
 
 	// IngressTraceOperation denotes the name of trace operation for Envoy
 	IngressTraceOperation = "ingress"
@@ -225,7 +231,8 @@ type HTTPRoute struct {
 	RetryPolicy  *RetryPolicy      `json:"retry_policy,omitempty"`
 	OpaqueConfig map[string]string `json:"opaque_config,omitempty"`
 
-	AutoHostRewrite bool `json:"auto_host_rewrite,omitempty"`
+	AutoHostRewrite  bool `json:"auto_host_rewrite,omitempty"`
+	WebsocketUpgrade bool `json:"use_websocket,omitempty"`
 
 	// clusters contains the set of referenced clusters in the route; the field is special
 	// and used only to aggregate cluster information after composing routes
@@ -333,11 +340,40 @@ func (routes HTTPRouteConfigs) clusters() Clusters {
 	return out
 }
 
-func (routes HTTPRouteConfigs) normalize() {
+func (routes HTTPRouteConfigs) normalize() HTTPRouteConfigs {
+	out := make(HTTPRouteConfigs)
+
 	// sort HTTP routes by virtual hosts, rest should be deterministic
-	for _, routeConfig := range routes {
-		routeConfig.normalize()
+	for port, routeConfig := range routes {
+		out[port] = routeConfig.normalize()
 	}
+
+	return out
+}
+
+// combine creates a new route config that is the union of all HTTP routes.
+// note that the virtual hosts without an explicit port suffix (IP:PORT) are stripped
+// for all routes except the route for port 80.
+func (routes HTTPRouteConfigs) combine() *HTTPRouteConfig {
+	out := &HTTPRouteConfig{}
+	for port, config := range routes {
+		for _, host := range config.VirtualHosts {
+			vhost := &VirtualHost{
+				Name:   host.Name,
+				Routes: host.Routes,
+			}
+			for _, domain := range host.Domains {
+				if port == 80 || strings.Contains(domain, ":") {
+					vhost.Domains = append(vhost.Domains, domain)
+				}
+			}
+
+			if len(vhost.Domains) > 0 {
+				out.VirtualHosts = append(out.VirtualHosts, vhost)
+			}
+		}
+	}
+	return out.normalize()
 }
 
 // faults aggregates fault filters across virtual hosts in single http_conn_man
@@ -359,9 +395,11 @@ func (rc *HTTPRouteConfig) clusters() Clusters {
 	return out
 }
 
-func (rc *HTTPRouteConfig) normalize() {
-	hosts := rc.VirtualHosts
+func (rc *HTTPRouteConfig) normalize() *HTTPRouteConfig {
+	hosts := make([]*VirtualHost, len(rc.VirtualHosts))
+	copy(hosts, rc.VirtualHosts)
 	sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
+	return &HTTPRouteConfig{VirtualHosts: hosts}
 }
 
 // AccessLog definition.

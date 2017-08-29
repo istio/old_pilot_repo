@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -241,13 +240,11 @@ func (infra *infra) teardown() {
 }
 
 func (infra *infra) kubeApply(yaml string) error {
-	fmt.Println(yaml)
 	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
 		kubeconfig, infra.Namespace), yaml)
 }
 
 func (infra *infra) kubeDelete(yaml string) error {
-	fmt.Println(yaml)
 	return util.RunInput(fmt.Sprintf("kubectl delete --kubeconfig %s -n %s -f -",
 		kubeconfig, infra.Namespace), yaml)
 }

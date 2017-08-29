@@ -21,10 +21,11 @@ import (
 	"strings"
 
 	multierror "github.com/hashicorp/go-multierror"
-	"istio.io/pilot/model"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"istio.io/pilot/model"
 )
 
 const (
@@ -34,11 +35,11 @@ const (
 
 	// KubeServiceAccountsOnVMAnnotation is to specify the K8s service accounts that are allowed to run
 	// this service on the VMs
-	KubeServiceAccountsOnVMAnnotation = "alpha.istio.io/serviceaccounts/kubernetes"
+	KubeServiceAccountsOnVMAnnotation = "alpha.istio.io/kubernetes-serviceaccounts"
 
 	// CanonicalServiceAccountsOnVMAnnotation is to specify the non-Kubernetes service accounts that
 	// are allowed to run this service on the VMs
-	CanonicalServiceAccountsOnVMAnnotation = "alpha.istio.io/serviceaccounts/canonical"
+	CanonicalServiceAccountsOnVMAnnotation = "alpha.istio.io/canonical-serviceaccounts"
 
 	// IstioURIPrefix is the URI prefix in the Istio service account scheme
 	IstioURIPrefix = "spiffe"
@@ -168,7 +169,7 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 
 	var protocol model.Protocol
 	var portVal intstr.IntOrString
-	port := 0
+	var port int
 
 	// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
 	if handler.HTTPGet != nil {
