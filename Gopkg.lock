@@ -119,7 +119,7 @@
   branch = "master"
   name = "github.com/googleapis/gnostic"
   packages = ["OpenAPIv2","compiler","extensions"]
-  revision = "2efd131d87c0eee9eff9232a9b1d8e454bf471f1"
+  revision = "0919c0e45c2684446b7cc76376ee79f4a95d1500"
 
 [[projects]]
   branch = "master"
@@ -204,7 +204,7 @@
   branch = "master"
   name = "github.com/mailru/easyjson"
   packages = ["buffer","jlexer","jwriter"]
-  revision = "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
+  revision = "3b3bbef4e2d9a6f24d7ee73a894afbc064f0e057"
 
 [[projects]]
   branch = "master"
@@ -258,19 +258,19 @@
   branch = "master"
   name = "github.com/ugorji/go"
   packages = ["codec"]
-  revision = "5efa3251c7f7d05e5d9704a69a984ec9f1386a40"
+  revision = "8c0409fcbb70099c748d71f714529204975f6c3f"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "eb71ad9bd329b5ac0fd0148dd99bd62e8be8e035"
+  revision = "81e90905daefcd6fd217b62423c0908922eadb30"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "1c05540f6879653db88113bc4a2b70aec4bd491f"
+  revision = "57efc9c3d9f91fb3277f8da1cff370539c4d3dc5"
 
 [[projects]]
   branch = "master"
@@ -282,13 +282,13 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "07c182904dbd53199946ba614a412c61d3c548f5"
+  revision = "2d6f6f883a06fc0d5f4b14a81e4c28705ea64c15"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "e56139fd9c5bc7244c76116c68e500765bb6db6b"
+  revision = "ac87088df8ef557f1e32cd00ed0b6fbc3f7ddafb"
 
 [[projects]]
   branch = "master"

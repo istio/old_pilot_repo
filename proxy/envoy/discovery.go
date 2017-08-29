@@ -478,10 +478,12 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 			errorResponse(response, http.StatusNotFound, "RDS "+err.Error())
 			return
 		}
-		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s",
-			cluster, node, role.Type)
 
 		routeConfigName := request.PathParameter(RouteConfigName)
+
+		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, role %s, route-config-name %s",
+			cluster, node, role.Type, routeConfigName)
+
 		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, "RDS "+err.Error())
