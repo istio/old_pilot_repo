@@ -32,14 +32,14 @@ func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig,
 	config model.IstioConfigStore,
 	ingress proxy.Node) Listeners {
 	listeners := Listeners{
-		buildHTTPListener(mesh, ingress, nil, WildcardAddress, 80, "80", true),
+		buildHTTPListener(mesh, ingress, nil, nil, WildcardAddress, 80, "80", true),
 	}
 
 	// lack of SNI in Envoy implies that TLS secrets are attached to listeners
 	// therefore, we should first check that TLS endpoint is needed before shipping TLS listener
 	_, secret := buildIngressRoutes(mesh, discovery, config)
 	if secret != "" {
-		listener := buildHTTPListener(mesh, ingress, nil, WildcardAddress, 443, "443", true)
+		listener := buildHTTPListener(mesh, ingress, nil, nil, WildcardAddress, 443, "443", true)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
@@ -54,6 +54,7 @@ func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) (HTTPRouteConfigs, string) {
 	ingressRules := config.IngressRules()
+	glog.V(5).Infof("buildIngressRoute from %d rules ", len(ingressRules))
 
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
@@ -64,7 +65,13 @@ func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 	rules := config.RouteRulesBySource(nil)
 
 	for _, rule := range ingressRules {
+		glog.V(5).Infof("Process rule %s , destination %s", rule.Name, rule.Destination)
 		routes, tls, err := buildIngressRoute(mesh, rule, discovery, rules)
+		if tls != "" {
+			glog.V(5).Infof("TLS is set for rule %s , destination %s", rule.Name, rule.Destination)
+		} else {
+			glog.V(5).Infof("TLS is empty for rule %s , destination %s", rule.Name, rule.Destination)
+		}
 		if err != nil {
 			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
 			continue
