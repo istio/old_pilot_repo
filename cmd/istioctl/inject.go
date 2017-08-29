@@ -120,8 +120,8 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 					namespace, namespace)
 			}
 			config := &inject.Config{
-				Policy:    inject.DefaultInjectionPolicy,
-				Namespace: v1.NamespaceAll,
+				Policy:     inject.DefaultInjectionPolicy,
+				Namespaces: []string{v1.NamespaceAll},
 				Params: inject.Params{
 					InitImage:         inject.InitImageName(hub, tag),
 					ProxyImage:        inject.ProxyImageName(hub, tag),

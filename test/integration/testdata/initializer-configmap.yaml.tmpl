@@ -5,7 +5,10 @@ metadata:
 data:
   config: |-
     policy: {{.Policy}}
-    namespace: {{.Namespace}}
+    namespaces:
+{{ range $namespace := .Namespaces}}
+    - {{$namespace}}
+{{ end }}
     params:
       initImage: {{.Params.InitImage}}
       proxyImage: {{.Params.ProxyImage}}

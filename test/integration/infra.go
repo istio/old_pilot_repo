@@ -118,8 +118,8 @@ func (infra *infra) setup() error {
 	}
 
 	infra.InjectConfig = &inject.Config{
-		Policy:    inject.InjectionPolicyOptOut,
-		Namespace: infra.Namespace,
+		Policy:     inject.InjectionPolicyOptOut,
+		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
 		Params: inject.Params{
 			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
 			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),

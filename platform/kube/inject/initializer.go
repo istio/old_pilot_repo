@@ -17,6 +17,7 @@ package inject
 import (
 	"encoding/json"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -114,49 +115,53 @@ func NewInitializer(restConfig *rest.Config, config *Config, cl kubernetes.Inter
 			return nil, err
 		}
 
-		watchlist := &cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.IncludeUninitialized = true
-				options.FieldSelector = fields.Everything().String()
-				return kindClient.Get().
-					Namespace(i.config.Namespace).
-					Resource(kind.resource).
-					VersionedParams(&options, metav1.ParameterCodec).
-					Do().
-					Get()
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.IncludeUninitialized = true
-				options.Watch = true
-				options.FieldSelector = fields.Everything().String()
-				return kindClient.Get().
-					Namespace(i.config.Namespace).
-					Resource(kind.resource).
-					VersionedParams(&options, metav1.ParameterCodec).
-					Watch()
-			},
-		}
+		for n := range i.config.Namespaces {
+			namespace := i.config.Namespaces[n]
 
-		patcher := func(namespace, name string, patchBytes []byte, obj runtime.Object) error {
-			return kindClient.Patch(types.StrategicMergePatchType).
-				Namespace(namespace).
-				Resource(kind.resource).
-				Name(name).
-				Body(patchBytes).
-				Do().
-				Into(obj)
-		}
-
-		_, controller := cache.NewInformer(watchlist, kind.obj, DefaultResyncPeriod,
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					if err := i.initialize(obj, patcher); err != nil {
-						glog.Error(err.Error())
-					}
+			watchlist := &cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					options.IncludeUninitialized = true
+					options.FieldSelector = fields.Everything().String()
+					return kindClient.Get().
+						Namespace(namespace).
+						Resource(kind.resource).
+						VersionedParams(&options, metav1.ParameterCodec).
+						Do().
+						Get()
 				},
-			},
-		)
-		i.controllers = append(i.controllers, controller)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					options.IncludeUninitialized = true
+					options.Watch = true
+					options.FieldSelector = fields.Everything().String()
+					return kindClient.Get().
+						Namespace(namespace).
+						Resource(kind.resource).
+						VersionedParams(&options, metav1.ParameterCodec).
+						Watch()
+				},
+			}
+
+			patcher := func(namespace, name string, patchBytes []byte, obj runtime.Object) error {
+				return kindClient.Patch(types.StrategicMergePatchType).
+					Namespace(namespace).
+					Resource(kind.resource).
+					Name(name).
+					Body(patchBytes).
+					Do().
+					Into(obj)
+			}
+
+			_, controller := cache.NewInformer(watchlist, kind.obj, DefaultResyncPeriod,
+				cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						if err := i.initialize(obj, patcher); err != nil {
+							glog.Error(err.Error())
+						}
+					},
+				},
+			)
+			i.controllers = append(i.controllers, controller)
+		}
 	}
 	return i, nil
 }
@@ -167,19 +172,31 @@ func (i *Initializer) initialize(in interface{}, patcher patcherFunc) error {
 		return err
 	}
 
-	switch i.config.Namespace {
-	case v1.NamespaceAll:
-		// skip special kubernetes system namespaces
-		for _, namespace := range ignoredNamespaces {
-			if obj.GetNamespace() == namespace {
-				return nil
+	var inject bool
+namespaceSearch:
+	for _, namespace := range i.config.Namespaces {
+		if namespace == v1.NamespaceAll {
+			// skip special kubernetes system namespaces
+			for _, namespace := range ignoredNamespaces {
+				if obj.GetNamespace() == namespace {
+					break namespaceSearch
+				}
 			}
+			inject = true
+			break namespaceSearch
+		} else if namespace == obj.GetNamespace() {
+			// Don't skip. The initializer should initialize this
+			// resource.
+			inject = true
+			break namespaceSearch
 		}
-	case obj.GetNamespace():
-		// Don't skip. The initializer should initialize this resource.
-	default:
-		// Skip namespace(s) that we're not responsible for
-		// initializing.
+		// else, keep searching
+	}
+	if !inject {
+		// Skip namespace(s) that we're not responsible for if
+		// len(pendingInitializers) == 0 { initializing.
+		glog.V(2).Infof("Skipping %s/%s: non-managed namespace",
+			obj.GetNamespace(), obj.GetName())
 		return nil
 	}
 
@@ -245,7 +262,7 @@ func (i *Initializer) initialize(in interface{}, patcher patcherFunc) error {
 func (i *Initializer) Run(stopCh <-chan struct{}) {
 	glog.Info("Starting Istio sidecar initializer...")
 	glog.Infof("Initializer name set to: %s", initializerName)
-	glog.Infof("Options: %v", i.config)
+	glog.Infof("Options: %v", spew.Sdump(i.config))
 
 	glog.Infof("Supported kinds:")
 	for _, kind := range kinds {

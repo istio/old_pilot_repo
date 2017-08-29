@@ -31,7 +31,7 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --port=8083
-            - --namespace={{.Namespace}}
+            - --namespace={{.IstioNamespace}}
             - -v=2
           volumeMounts:
           - name: config-volume

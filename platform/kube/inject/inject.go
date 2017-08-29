@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 
@@ -167,7 +168,7 @@ type Config struct {
 	Policy InjectionPolicy `json:"policy"`
 
 	// deprecate if InitializerConfiguration becomes namespace aware
-	Namespace string `json:"namespace"`
+	Namespaces []string `json:"namespaces"`
 
 	// Params specifies the parameters of the injected sidcar template
 	Params Params `json:"params"`
@@ -201,11 +202,16 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*proxycon
 
 // GetInitializerConfig fetches the initializer configuration from a Kubernetes ConfigMap.
 func GetInitializerConfig(kube kubernetes.Interface, namespace, name string) (*Config, error) {
-	configMap, err := kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
+	var configMap *v1.ConfigMap
+	var err error
+	if errPoll := wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
+		if configMap, err = kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		return true, nil
+	}); errPoll != nil {
+		return nil, errPoll
 	}
-
 	data, exists := configMap.Data[InitializerConfigMapKey]
 	if !exists {
 		return nil, fmt.Errorf("missing configuration map key %q", InitializerConfigMapKey)
@@ -456,7 +462,7 @@ func intoObject(c *Config, in interface{}) (interface{}, error) {
 	}
 
 	if !injectRequired(c.Policy, obj) {
-		glog.V(2).Infof("Skipping %s/%s", obj.GetNamespace(), obj.GetName())
+		glog.V(2).Infof("Skipping %s/%s due to policy check", obj.GetNamespace(), obj.GetName())
 		return out, nil
 	}
 

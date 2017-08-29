@@ -147,8 +147,8 @@ func TestInitialize(t *testing.T) {
 
 	for _, c := range cases {
 		config := &Config{
-			Policy:    c.policy,
-			Namespace: c.managedNamespace,
+			Policy:     c.policy,
+			Namespaces: []string{c.managedNamespace},
 			Params: Params{
 				InitImage:         InitImageName(unitTestHub, unitTestTag),
 				ProxyImage:        ProxyImageName(unitTestHub, unitTestTag),

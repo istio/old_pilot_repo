@@ -154,8 +154,8 @@ func TestIntoResourceFile(t *testing.T) {
 		}
 
 		config := &Config{
-			Policy:    InjectionPolicyOptOut,
-			Namespace: v1.NamespaceAll,
+			Policy:     InjectionPolicyOptOut,
+			Namespaces: []string{v1.NamespaceAll},
 			Params: Params{
 				InitImage:         InitImageName(unitTestHub, unitTestTag),
 				ProxyImage:        ProxyImageName(unitTestHub, unitTestTag),
