@@ -87,7 +87,7 @@ var (
 			stop := make(chan struct{})
 
 			// Set up values for input to discovery service in different platforms
-			if flags.serviceregistry == platform.KubernetesRegistry {
+			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
 
 				client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {

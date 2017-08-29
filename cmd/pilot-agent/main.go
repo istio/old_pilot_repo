@@ -63,7 +63,7 @@ var (
 
 			// set values from registry platform
 			if role.IPAddress == "" {
-				if serviceregistry == platform.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
 					role.IPAddress = os.Getenv("INSTANCE_IP")
 				} else if serviceregistry == platform.ConsulRegistry {
 					ipAddr := "127.0.0.1"
@@ -76,14 +76,19 @@ var (
 				}
 			}
 			if role.ID == "" {
-				if serviceregistry == platform.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
 					role.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
+				} else if serviceregistry == platform.ConsulRegistry {
+					role.ID = role.IPAddress + ".service.consul"
 				}
 			}
 			if role.Domain == "" {
-				if serviceregistry == platform.KubernetesRegistry {
+				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
 					role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
+				} else if serviceregistry == platform.ConsulRegistry {
+					role.Domain = "service.consul"
 				}
+
 			}
 
 			watcher, err := envoy.NewWatcher(mesh, role, configpath)
