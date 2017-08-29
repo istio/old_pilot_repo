@@ -43,8 +43,8 @@ const (
 )
 
 var ignoredNamespaces = []string{
-	"kube-system", // v1.NamespaceSystem
-	"kube-public", // v1.NamespacePublic
+	metav1.NamespaceSystem,
+	metav1.NamespacePublic,
 	"istio-system",
 }
 
