@@ -538,6 +538,17 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 	return listeners, clusters
 }
 
+func appendPortToDomains(domains []string, port int) []string {
+	domainsWithPorts := make([]string, 2*len(domains))
+	copy(domainsWithPorts, domains)
+
+	for _, domain := range domains {
+		domainsWithPorts = append(domainsWithPorts, domain+":"+string(port))
+	}
+
+	return domainsWithPorts
+}
+
 func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
@@ -558,7 +569,7 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 
 	return &VirtualHost{
 		Name:    rule.Domains[0], // use the first domain as the name
-		Domains: rule.Domains,
+		Domains: appendPortToDomains(rule.Domains, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
 }
