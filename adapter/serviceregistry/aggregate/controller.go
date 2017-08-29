@@ -15,6 +15,8 @@
 package aggregate
 
 import (
+	"github.com/golang/glog"
+
 	"istio.io/pilot/model"
 )
 
@@ -32,35 +34,61 @@ func NewController(registries []model.Controller) *Controller {
 
 // Services list declarations of all services in the system
 func (c *Controller) Services() []*model.Service {
-	return nil
+	services := make([]*model.Service, 0)
+	for _, r := range c.registries {
+		services = append(services, r.(model.ServiceDiscovery).Services()...)
+	}
+	return services
 }
 
 // GetService retrieves a service by host name if it exists
 func (c *Controller) GetService(hostname string) (*model.Service, bool) {
+	for _, r := range c.registries {
+		if service, exists := r.(model.ServiceDiscovery).GetService(hostname); exists {
+			return service, true
+		}
+	}
 	return nil, false
 }
 
 // ManagementPorts retries set of health check ports by instance IP.
-// This does not apply to Consul service registry, as Consul does not
-// manage the service instances. In future, when we integrate Nomad, we
-// might revisit this function.
+// Return on the first hit.
 func (c *Controller) ManagementPorts(addr string) model.PortList {
+	for _, r := range c.registries {
+		if portList := r.(model.ServiceDiscovery).ManagementPorts(addr); portList != nil {
+			return portList
+		}
+	}
 	return nil
 }
 
 // Instances retrieves instances for a service and its ports that match
 // any of the supplied tags. All instances match an empty tag list.
 func (c *Controller) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
-	return nil
+	instances := make([]*model.ServiceInstance, 0)
+	for _, r := range c.registries {
+		instances = append(instances, r.(model.ServiceDiscovery).Instances(hostname, ports, tags)...)
+	}
+	return instances
 }
 
 // HostInstances lists service instances for a given set of IPv4 addresses.
 func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
-	return nil
+	instances := make([]*model.ServiceInstance, 0)
+	for _, r := range c.registries {
+		instances = append(instances, r.(model.ServiceDiscovery).HostInstances(addrs)...)
+	}
+	return instances
 }
 
 // Run all controllers until a signal is received
 func (c *Controller) Run(stop <-chan struct{}) {
+	for _, r := range c.registries {
+		go r.Run(stop)
+	}
+
+	<-stop
+	glog.V(2).Info("Registry Aggregator terminated")
 }
 
 // AppendServiceHandler implements a service catalog operation
@@ -75,5 +103,10 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 
 // GetIstioServiceAccounts implements model.ServiceAccounts operation
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
+	for _, r := range c.registries {
+		if svcAccounts := r.(model.ServiceAccounts).GetIstioServiceAccounts(hostname, ports); svcAccounts != nil {
+			return svcAccounts
+		}
+	}
 	return nil
 }
