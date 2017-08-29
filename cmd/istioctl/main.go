@@ -41,8 +41,8 @@ const (
 var (
 	platform string
 
-	kubeconfig string
-	namespace  string
+	kubeconfig     string
+	namespace      string
 	istioNamespace string
 
 	// input file name
@@ -319,7 +319,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", defaultKubeconfig,
 		"Kubernetes configuration file")
 
-	rootCmd.PersistentFlags().StringVarP(&istioNamespace, "istioNamespace", "i", kube.IstioNamespace,
+	rootCmd.PersistentFlags().StringVarP(&istioNamespace, "istioNamespace", "ins", kube.IstioNamespace,
 		"Istio system namespace")
 
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", v1.NamespaceDefault,
