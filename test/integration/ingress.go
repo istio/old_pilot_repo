@@ -92,7 +92,7 @@ func (t *ingress) run() error {
 
 	funcs := make(map[string]func() status)
 	funcs["Ingress status IP"] = t.checkIngressStatus
-	//funcs["Route rule for /c"] = t.checkRouteRule
+	funcs["Route rule for /c"] = t.checkRouteRule
 
 	cases := []struct {
 		// empty destination to expect 404
@@ -151,7 +151,6 @@ func (t *ingress) run() error {
 }
 
 // checkRouteRule verifies that version splitting is applied to ingress paths
-/*
 func (t *ingress) checkRouteRule() status {
 	url := fmt.Sprintf("http://%s.%s/c", ingressServiceName, t.IstioNamespace)
 	resp := t.clientRequest("t", url, 100, "")
@@ -161,7 +160,7 @@ func (t *ingress) checkRouteRule() status {
 		return nil
 	}
 	return errAgain
-}*/
+}
 
 // ensure that IPs/hostnames are in the ingress statuses
 func (t *ingress) checkIngressStatus() status {

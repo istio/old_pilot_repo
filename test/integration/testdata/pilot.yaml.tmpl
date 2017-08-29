@@ -4,7 +4,7 @@
 kind: PersistentVolume
 apiVersion: v1
 metadata:
-  name: dlv
+  name: debug
   labels:
     type: local
 spec:
@@ -15,12 +15,12 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/data/delve"
+    path: "/data/debug"
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: dlv-claim
+  name: pilot-debug-claim
 spec:
   storageClassName: manual
   accessModes:
@@ -46,7 +46,7 @@ spec:
     name: http-discovery
 {{if .DebugPort}}
   - port: {{.DebugPort}}
-    name: tcp-dlv
+    name: tcp-debug
 {{end}}
   selector:
     infra: pilot
@@ -80,8 +80,8 @@ spec:
 {{if .DebugPort}}
         - containerPort: {{.DebugPort}}
         volumeMounts:
-          - mountPath: "/data/delve"
-            name: dlv
+          - mountPath: "/data/debug"
+            name: debug
 {{end}}
         env:
         - name: POD_NAME
@@ -98,16 +98,16 @@ spec:
         - name: config-volume
           mountPath: /etc/istio/config
 {{if .DebugPort}}
-        - mountPath: "/data/delve"
-          name: dlv
+        - mountPath: "/data/debug"
+          name: debug
 {{end}}
       volumes:
       - name: config-volume
         configMap:
           name: istio
 {{if .DebugPort}}
-      - name: dlv
+      - name: debug
         persistentVolumeClaim:
-          claimName: dlv-claim
+          claimName: pilot-debug-claim
 {{end}}
 ---
