@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"strconv"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -613,11 +614,11 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 }
 
 func appendPortToDomains(domains []string, port int) []string {
-	domainsWithPorts := make([]string, 2*len(domains))
+	domainsWithPorts := make([]string, len(domains), 2*len(domains))
 	copy(domainsWithPorts, domains)
 
 	for _, domain := range domains {
-		domainsWithPorts = append(domainsWithPorts, domain+":"+string(port))
+		domainsWithPorts = append(domainsWithPorts, domain +":" + strconv.Itoa(port))
 	}
 
 	return domainsWithPorts
