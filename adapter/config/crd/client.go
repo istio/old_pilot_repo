@@ -246,7 +246,7 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 		return nil, false
 	}
 
-	out, err := convertObject(schema, config)
+	out, err := ConvertObject(schema, config)
 	if err != nil {
 		glog.Warning(err)
 		return nil, false
@@ -265,7 +265,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 
-	out, err := convertConfig(schema, config)
+	out, err := ConvertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}
@@ -298,7 +298,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 		return "", fmt.Errorf("revision is required")
 	}
 
-	out, err := convertConfig(schema, config)
+	out, err := ConvertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}
@@ -346,7 +346,7 @@ func (cl *Client) List(typ, namespace string) ([]model.Config, error) {
 
 	out := make([]model.Config, 0)
 	for _, item := range list.GetItems() {
-		obj, err := convertObject(schema, item)
+		obj, err := ConvertObject(schema, item)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		} else {

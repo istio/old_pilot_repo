@@ -23,7 +23,9 @@ import (
 	"istio.io/pilot/model"
 )
 
-func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
+// ConvertObject converts an IstioObject k8s-style object to the
+// internal configuration model.
+func ConvertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
 	data, err := schema.FromJSONMap(object.GetSpec())
 	if err != nil {
 		return nil, err
@@ -42,8 +44,8 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 	}, nil
 }
 
-// convertConfig translates Istio config to k8s config JSON
-func convertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
+// ConvertConfig translates Istio config to k8s config JSON
+func ConvertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
 	spec, err := schema.ToJSONMap(config.Spec)
 	if err != nil {
 		return nil, err
@@ -71,9 +73,8 @@ func kabobCaseToCamelCase(s string) string {
 	return out
 }
 
-// camelCaseToKabobCase converts "MyName" to "my-name"
-// nolint: deadcode
-func camelCaseToKabobCase(s string) string {
+// CamelCaseToKabobCase converts "MyName" to "my-name"
+func CamelCaseToKabobCase(s string) string {
 	var out bytes.Buffer
 	for i := range s {
 		if 'A' <= s[i] && s[i] <= 'Z' {
