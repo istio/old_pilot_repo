@@ -72,6 +72,7 @@ var (
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
 			var err error
+
 			// receive mesh configuration
 			mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
 			if err != nil {
@@ -100,7 +101,6 @@ var (
 			}
 
 			serviceControllers := make(map[platform.ServiceRegistry]model.Controller)
-
 			for _, r := range strings.Split(flags.registries, ",") {
 				serviceRegistry := platform.ServiceRegistry(r)
 				if _, exists := serviceControllers[serviceRegistry]; exists {
