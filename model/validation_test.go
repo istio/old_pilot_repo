@@ -866,6 +866,8 @@ func TestValidateEgressRuleDomain(t *testing.T) {
 func TestValidateEgressRulePort(t *testing.T) {
 	ports := map[*proxyconfig.EgressRule_Port]bool{
 		{Port: 80, Protocol: "http"}:    true,
+		{Port: 80, Protocol: "http2"}:   true,
+		{Port: 80, Protocol: "grpc"}:    true,
 		{Port: 443, Protocol: "https"}:  true,
 		{Port: 80, Protocol: "https"}:   true,
 		{Port: 443, Protocol: "http"}:   true,

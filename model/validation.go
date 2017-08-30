@@ -840,8 +840,10 @@ func ValidateEgressRulePort(port *proxyconfig.EgressRule_Port) error {
 	}
 
 	protocol := Protocol(strings.ToUpper(port.Protocol))
-	if protocol != ProtocolHTTP && protocol != ProtocolHTTPS {
-		return fmt.Errorf("currently, only %s and %s protocols are supported", ProtocolHTTP, ProtocolHTTPS)
+	switch protocol {
+	case ProtocolHTTP, ProtocolHTTPS, ProtocolHTTP2, ProtocolGRPC:
+	default:
+		return fmt.Errorf("Support for non-HTTP protocols is not yet available")
 	}
 
 	return nil
