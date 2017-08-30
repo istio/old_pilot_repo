@@ -58,7 +58,7 @@ var (
 
 const (
 	// CA image tag is the short SHA *update manually*
-	caTag = "689b447"
+	caTag = "2baec6baacecbd516ea0880573b6fc3cd5736739"
 
 	// Mixer image tag is the short SHA *update manually*
 	mixerImage = "gcr.io/istio-testing/mixer:49e721e15d481cd5d92d9a2b30b5e8fcdcafdb63"

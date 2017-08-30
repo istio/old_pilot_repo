@@ -156,19 +156,21 @@ func (infra *infra) setup() error {
 	//
 	// See github.com/kubernetes/kubernetes/issues/49048 for k8s
 	// tracking issue.
-	if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
-		return err
-	} else if err = infra.kubeDelete(yaml, infra.IstioNamespace); err != nil {
-		glog.Infof("Sidecar initializer could not be deleted: %v", err)
-	}
+	if infra.UseInitializer {
+		if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
+			return err
+		} else if err = infra.kubeDelete(yaml, infra.IstioNamespace); err != nil {
+			glog.Infof("Sidecar initializer could not be deleted: %v", err)
+		}
 
-	if yaml, err := fill("initializer-configmap.yaml.tmpl", &infra.InjectConfig); err != nil {
-		return err
-	} else if err = infra.kubeApply(yaml, infra.IstioNamespace); err != nil {
-		return err
-	}
-	if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
-		return err
+		if yaml, err := fill("initializer-configmap.yaml.tmpl", &infra.InjectConfig); err != nil {
+			return err
+		} else if err = infra.kubeApply(yaml, infra.IstioNamespace); err != nil {
+			return err
+		}
+		if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
+			return err
+		}
 	}
 
 	if err := deploy("pilot.yaml.tmpl", infra.IstioNamespace); err != nil {
@@ -184,12 +186,12 @@ func (infra *infra) setup() error {
 		}
 	}
 	if infra.Ingress {
-		if err := deploy("ingress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
+		if err := deploy("ingress-proxy.yaml.tmpl", infra.Namespace); err != nil {
 			return err
 		}
 	}
 	if infra.Egress {
-		if err := deploy("egress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
+		if err := deploy("egress-proxy.yaml.tmpl", infra.Namespace); err != nil {
 			return err
 		}
 	}
