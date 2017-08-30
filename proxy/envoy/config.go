@@ -613,7 +613,7 @@ func appendPortToDomains(domains []string, port int) []string {
 	copy(domainsWithPorts, domains)
 
 	for _, domain := range domains {
-		domainsWithPorts = append(domainsWithPorts, domain +":" + strconv.Itoa(port))
+		domainsWithPorts = append(domainsWithPorts, domain + ":" + strconv.Itoa(port))
 	}
 
 	return domainsWithPorts
