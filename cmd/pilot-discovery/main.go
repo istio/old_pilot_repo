@@ -28,7 +28,6 @@ import (
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/adapter/config/ingress"
-	"istio.io/pilot/adapter/config/memory"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform"
@@ -70,10 +69,13 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
+
 			// receive mesh configuration
 			mesh, fail := cmd.ReadMeshConfig(flags.meshconfig)
 			if fail != nil {
-				return multierror.Prefix(fail, "failed to read mesh configuration.")
+				defaultMesh := proxy.DefaultMeshConfig()
+				mesh = &defaultMesh
+				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
 			}
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 
@@ -86,9 +88,9 @@ var (
 			stop := make(chan struct{})
 
 			// Set up values for input to discovery service in different platforms
-			if flags.serviceregistry == platform.KubernetesRegistry {
+			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
 
-				client, err := kube.CreateInterface(flags.kubeconfig)
+				_, client, err := kube.CreateInterface(flags.kubeconfig)
 				if err != nil {
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 				}
@@ -142,10 +144,19 @@ var (
 					return fmt.Errorf("failed to create Consul controller: %v", err)
 				}
 
-				configController = memory.NewController(memory.Make(model.ConfigDescriptor{
+				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 					model.RouteRule,
 					model.DestinationPolicy,
-				}))
+				})
+				if err != nil {
+					return multierror.Prefix(err, "failed to open a config client.")
+				}
+
+				if err = configClient.RegisterResources(); err != nil {
+					return multierror.Prefix(err, "failed to register custom resources.")
+				}
+
+				configController = crd.NewController(configClient, flags.controllerOptions)
 
 				environment.ServiceDiscovery = consulController
 				environment.ServiceAccounts = consulController
