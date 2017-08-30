@@ -619,7 +619,8 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
-func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
+func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
+	port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
 	protocolSuffix := string(port.Protocol)
