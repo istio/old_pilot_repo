@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	configAggregate "istio.io/pilot/adapter/config/aggregate"
@@ -71,8 +72,6 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
-			var err error
-
 			// receive mesh configuration
 			mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
 			if err != nil {
@@ -111,7 +110,8 @@ var (
 				case platform.KubernetesRegistry:
 					glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 
-					_, client, err := kube.CreateInterface(flags.kubeconfig)
+					var client kubernetes.Interface
+					_, client, err = kube.CreateInterface(flags.kubeconfig)
 					if err != nil {
 						return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 					}
@@ -176,10 +176,10 @@ var (
 )
 
 func init() {
-	discoveryCmd.PersistentFlags().StringVar((*string)(&flags.registries), "registries",
+	discoveryCmd.PersistentFlags().StringVar(&flags.registries, "registries",
 		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Comma separated list of service registries to read from (choose one or more from {%s, %s, %s})",
-			string(platform.KubernetesRegistry), string(platform.ConsulRegistry), string(platform.EurekaRegistry)))
+			platform.KubernetesRegistry, platform.ConsulRegistry, platform.EurekaRegistry))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
