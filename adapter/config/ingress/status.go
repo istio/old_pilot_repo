@@ -29,9 +29,10 @@ import (
 	"k8s.io/ingress/core/pkg/ingress/status"
 	"k8s.io/ingress/core/pkg/ingress/store"
 
+	"os"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"
-	"os"
 )
 
 const ingressElectionID = "istio-ingress-controller-leader"
