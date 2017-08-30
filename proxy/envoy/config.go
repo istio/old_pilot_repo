@@ -622,7 +622,7 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 	port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
-	protocolSuffix := string(port.Protocol)
+	protocolSuffix := "-" + strings.ToLower(string(port.Protocol))
 	if rule.UseEgressProxy {
 		externalTrafficCluster = buildOutboundCluster("istio-egress.default-"+protocolSuffix, port, nil)
 		externalTrafficCluster.ServiceName = ""
