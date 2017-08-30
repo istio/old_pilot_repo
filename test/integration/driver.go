@@ -60,7 +60,7 @@ const (
 	// caImage specifies the default istio-ca docker image used for e2e testing *update manually*
 	caImage = "gcr.io/istio-testing/istio-ca:2baec6baacecbd516ea0880573b6fc3cd5736739"
 
-	// miserImage specifies the default mixer docker image used for e2e testing *update manually*
+	// mixerImage specifies the default mixer docker image used for e2e testing *update manually*
 	mixerImage = "gcr.io/istio-testing/mixer:49e721e15d481cd5d92d9a2b30b5e8fcdcafdb63"
 
 	// retry budget
