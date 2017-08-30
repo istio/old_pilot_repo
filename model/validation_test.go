@@ -932,7 +932,7 @@ func TestValidateEgressRule(t *testing.T) {
 					{Port: 80, Protocol: "http"},
 					{Port: 443, Protocol: "https"},
 				},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: false},
 		{name: "empty domains",
 			in: &proxyconfig.EgressRule{
@@ -949,7 +949,7 @@ func TestValidateEgressRule(t *testing.T) {
 				Name:           "cnn",
 				Domains:        []string{"*cnn.com", "*.cnn.com"},
 				Ports:          []*proxyconfig.EgressRule_Port{},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: false},
 		{name: "duplicate domain",
 			in: &proxyconfig.EgressRule{
@@ -959,7 +959,7 @@ func TestValidateEgressRule(t *testing.T) {
 					{Port: 80, Protocol: "http"},
 					{Port: 443, Protocol: "https"},
 				},
-				UseEgressProxy: true},
+				UseEgressProxy: false},
 			valid: false},
 		{name: "duplicate port",
 			in: &proxyconfig.EgressRule{
