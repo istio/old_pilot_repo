@@ -111,7 +111,7 @@ var (
 				case platform.KubernetesRegistry:
 					glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 
-					client, err := kube.CreateInterface(flags.kubeconfig)
+					_, client, err := kube.CreateInterface(flags.kubeconfig)
 					if err != nil {
 						return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 					}
@@ -123,7 +123,7 @@ var (
 					glog.V(2).Infof("version %s", version.Line())
 					glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
-					kubeController := kube.NewController(client, mesh, flags.controllerOptions)
+					serviceControllers[serviceRegistry] = kube.NewController(client, mesh, flags.controllerOptions)
 					if mesh.IngressControllerMode != proxyconfig.ProxyMeshConfig_OFF {
 						configController, err = configAggregate.MakeCache([]model.ConfigStoreCache{
 							configController,
@@ -134,7 +134,6 @@ var (
 						}
 					}
 
-					serviceControllers[serviceRegistry] = kubeController
 					environment.SecretRegistry = kube.MakeSecretRegistry(client)
 					ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 
@@ -143,13 +142,11 @@ var (
 					glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 					glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
-					consulController, err := consul.NewController(
+					serviceControllers[serviceRegistry], err = consul.NewController(
 						flags.consulargs.serverURL, "dc1", 2*time.Second)
 					if err != nil {
 						return fmt.Errorf("failed to create Consul controller: %v", err)
 					}
-
-					serviceControllers[serviceRegistry] = consulController
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
