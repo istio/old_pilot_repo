@@ -865,16 +865,16 @@ func TestValidateEgressRuleDomain(t *testing.T) {
 
 func TestValidateEgressRulePort(t *testing.T) {
 	ports := map[*proxyconfig.EgressRule_Port]bool{
-		&proxyconfig.EgressRule_Port{Port: 80, Protocol: "http"}:    true,
-		&proxyconfig.EgressRule_Port{Port: 443, Protocol: "https"}:  true,
-		&proxyconfig.EgressRule_Port{Port: 80, Protocol: "https"}:   true,
-		&proxyconfig.EgressRule_Port{Port: 443, Protocol: "http"}:   true,
-		&proxyconfig.EgressRule_Port{Port: 1, Protocol: "http"}:     true,
-		&proxyconfig.EgressRule_Port{Port: 2, Protocol: "https"}:    true,
-		&proxyconfig.EgressRule_Port{Port: 80, Protocol: "tcp"}:     false,
-		&proxyconfig.EgressRule_Port{Port: 0, Protocol: "http"}:     false,
-		&proxyconfig.EgressRule_Port{Port: 65536, Protocol: "http"}: false,
-		&proxyconfig.EgressRule_Port{Port: 65535, Protocol: "http"}: true,
+		{Port: 80, Protocol: "http"}:    true,
+		{Port: 443, Protocol: "https"}:  true,
+		{Port: 80, Protocol: "https"}:   true,
+		{Port: 443, Protocol: "http"}:   true,
+		{Port: 1, Protocol: "http"}:     true,
+		{Port: 2, Protocol: "https"}:    true,
+		{Port: 80, Protocol: "tcp"}:     false,
+		{Port: 0, Protocol: "http"}:     false,
+		{Port: 65536, Protocol: "http"}: false,
+		{Port: 65535, Protocol: "http"}: true,
 	}
 
 	for port, valid := range ports {
