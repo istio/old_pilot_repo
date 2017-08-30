@@ -821,8 +821,9 @@ func ValidateEgressRuleDomain(domain string) error {
 		if len(domain) == 0 { // the domain was just * and it is OK
 			return nil
 		}
-		if domain[0] == '.' {
-			domain = domain[1:] // the domain started with '*.' - the rest of the domain should be validate FDQN
+		if domain[0] == '.' || domain[0] == '-' {
+			// the domain started with '*.' or '*-' - the rest of the domain should be validate FDQN
+			domain = domain[1:]
 		}
 	}
 	if err := ValidateFQDN(domain); err != nil {

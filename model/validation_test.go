@@ -843,6 +843,7 @@ func TestValidateEgressRuleDomain(t *testing.T) {
 		"cnn.com:80": false,
 		"*cnn.com":   true,
 		"*.cnn.com":  true,
+		"*-cnn.com":  true,
 		"*.0.0.100":  true,
 		"*0.0.100":   true,
 		"*cnn*.com":  false,
