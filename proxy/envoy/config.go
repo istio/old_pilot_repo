@@ -618,7 +618,7 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
-func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
+func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
 	port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
@@ -649,11 +649,11 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 }
 
 // buildExternalTrafficVirtualHosts builds virtual hosts from egress rule
-func buildExternalTrafficVirtualHostsOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
+func buildEgressFromSidecarVirtualHostsOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
 	port *model.Port) []*VirtualHost {
 	hosts := make([]*VirtualHost, 0)
 
-	host := buildExternalTrafficVirtualHostOnPort(rule, mesh, port)
+	host := buildEgressFromSidecarVirtualHostOnPort(rule, mesh, port)
 	hosts = append(hosts, host)
 
 	return hosts
@@ -674,7 +674,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			httpConfig := httpConfigs.EnsurePort(intPort)
 			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildExternalTrafficVirtualHostsOnPort(rule, mesh, modelPort)...)
+				buildEgressFromSidecarVirtualHostsOnPort(rule, mesh, modelPort)...)
 		}
 	}
 
