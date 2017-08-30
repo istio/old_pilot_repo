@@ -8,22 +8,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//model:go_default_library",
+        "//platform:go_default_library",
         "//platform/consul:go_default_library",
         "//platform/kube:go_default_library",
         "@com_github_golang_glog//:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    size = "small",
-    srcs = [
-        "controller_test.go",
-    ],
-    library = ":go_default_library",
-    deps = [
-        "//model:go_default_library",
-        "//platform/consul:go_default_library",
-        "//platform/kube:go_default_library",
     ],
 )

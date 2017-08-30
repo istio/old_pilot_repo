@@ -71,24 +71,17 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
+			var err error
 			// receive mesh configuration
-			mesh, fail := cmd.ReadMeshConfig(flags.meshconfig)
-			if fail != nil {
+			mesh, err := cmd.ReadMeshConfig(flags.meshconfig)
+			if err != nil {
 				defaultMesh := proxy.DefaultMeshConfig()
 				mesh = &defaultMesh
-				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
+				glog.Warningf("failed to read mesh configuration, using default: %v", err)
 			}
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 
-			serviceControllers := make([]model.Controller, 0)
-			registriesConfigured := make(map[platform.ServiceRegistry]bool)
-			var configController model.ConfigStoreCache
-			environment := proxy.Environment{
-				Mesh: mesh,
-			}
-
 			stop := make(chan struct{})
-			var err error
 			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 				model.RouteRule,
 				model.DestinationPolicy,
@@ -100,14 +93,18 @@ var (
 			if err = configClient.RegisterResources(); err != nil {
 				return multierror.Prefix(err, "failed to register custom resources.")
 			}
-			configController = crd.NewController(configClient, flags.controllerOptions)
+			configController := crd.NewController(configClient, flags.controllerOptions)
+			environment := proxy.Environment{
+				Mesh:             mesh,
+				IstioConfigStore: model.MakeIstioStore(configController),
+			}
+
+			serviceControllers := make(map[platform.ServiceRegistry]model.Controller)
 
 			for _, r := range strings.Split(flags.registries, ",") {
 				serviceRegistry := platform.ServiceRegistry(r)
-				if registriesConfigured[serviceRegistry] {
+				if _, exists := serviceControllers[serviceRegistry]; exists {
 					return multierror.Prefix(err, r+" registry specified multiple times.")
-				} else {
-					registriesConfigured[serviceRegistry] = true
 				}
 
 				switch serviceRegistry {
@@ -137,7 +134,7 @@ var (
 						}
 					}
 
-					serviceControllers = append(serviceControllers, kubeController)
+					serviceControllers[serviceRegistry] = kubeController
 					environment.SecretRegistry = kube.MakeSecretRegistry(client)
 					ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 
@@ -152,10 +149,7 @@ var (
 						return fmt.Errorf("failed to create Consul controller: %v", err)
 					}
 
-					serviceControllers = append(serviceControllers, consulController)
-
-				//case platform.EurekaRegistry:
-				//	glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
+					serviceControllers[serviceRegistry] = consulController
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
@@ -165,9 +159,7 @@ var (
 			regAggregate := registryAggregate.NewController(serviceControllers)
 			environment.ServiceDiscovery = regAggregate
 			environment.ServiceAccounts = regAggregate
-			environment.IstioConfigStore = model.MakeIstioStore(configController)
 
-			// Set up discovery service
 			discovery, err := envoy.NewDiscoveryService(
 				regAggregate,
 				configController,

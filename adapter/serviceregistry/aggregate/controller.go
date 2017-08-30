@@ -18,15 +18,16 @@ import (
 	"github.com/golang/glog"
 
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform"
 )
 
 // Controller aggregates data across different registries and monitors for changes
 type Controller struct {
-	registries []model.Controller
+	registries map[platform.ServiceRegistry]model.Controller
 }
 
 // NewController creates a new Aggregate controller
-func NewController(registries []model.Controller) *Controller {
+func NewController(registries map[platform.ServiceRegistry]model.Controller) *Controller {
 	return &Controller{
 		registries: registries,
 	}
@@ -93,11 +94,23 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 // AppendServiceHandler implements a service catalog operation
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
+	for adapter, r := range c.registries {
+		if err := r.AppendServiceHandler(f); err != nil {
+			glog.V(2).Infof("Fail to append service handler to adapter %s", adapter)
+			return err
+		}
+	}
 	return nil
 }
 
 // AppendInstanceHandler implements a service catalog operation
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
+	for adapter, r := range c.registries {
+		if err := r.AppendInstanceHandler(f); err != nil {
+			glog.V(2).Infof("Fail to append instance handler to adapter %s", adapter)
+			return err
+		}
+	}
 	return nil
 }
 
