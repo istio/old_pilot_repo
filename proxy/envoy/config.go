@@ -29,6 +29,10 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
+
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/duration"
+	"math"
 )
 
 // Config generation main functions.
@@ -619,6 +623,20 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
+// Figure out what the external timeout should be, given the internal timeout
+func getExternalTimeout(inMeshTimeout *duration.Duration) *duration.Duration {
+	inMeshTimeoutAsTimeDuration, err := ptypes.Duration(inMeshTimeout)
+	if err != nil { // the original timeout is too large already, return it
+		return inMeshTimeout
+	}
+
+	if int64(inMeshTimeoutAsTimeDuration) > math.MaxInt64/10 { // the original duration is too large already, return it
+		return inMeshTimeout
+	}
+
+	return ptypes.DurationProto(inMeshTimeoutAsTimeDuration * 10)
+}
+
 func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
@@ -631,7 +649,7 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 	} else {
 		// heuristically define external timeout to be x10 than the in-mesh timeout
 		//TODO consider to define external connect timeout separately in the mesh configuration
-		timeout := mesh.ConnectTimeout * 10
+		timeout := getExternalTimeout(mesh.ConnectTimeout)
 
 		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, timeout)
 		if port.Protocol == model.ProtocolHTTPS {
