@@ -629,11 +629,7 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
-		// heuristically define external timeout to be x10 than the in-mesh timeout
-		//TODO consider to define external connect timeout separately in the mesh configuration
-		timeout := mesh.ConnectTimeout * 10
-
-		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, timeout)
+		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
 		if port.Protocol == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
 		}
