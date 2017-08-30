@@ -100,7 +100,6 @@ var (
 			}
 
 			serviceControllers := make(map[platform.ServiceRegistry]model.Controller)
-
 			for _, r := range strings.Split(flags.registries, ",") {
 				serviceRegistry := platform.ServiceRegistry(r)
 				if _, exists := serviceControllers[serviceRegistry]; exists {
@@ -111,7 +110,7 @@ var (
 				case platform.KubernetesRegistry:
 					glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 
-					client, err := kube.CreateInterface(flags.kubeconfig)
+					_, client, err := kube.CreateInterface(flags.kubeconfig)
 					if err != nil {
 						return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 					}
