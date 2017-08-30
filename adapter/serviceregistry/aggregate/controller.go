@@ -21,13 +21,20 @@ import (
 	"istio.io/pilot/platform"
 )
 
+// Registry specifies the collection of service registry related interfaces
+type Registry interface {
+	model.Controller
+	model.ServiceDiscovery
+	model.ServiceAccounts
+}
+
 // Controller aggregates data across different registries and monitors for changes
 type Controller struct {
-	registries map[platform.ServiceRegistry]model.Controller
+	registries map[platform.ServiceRegistry]Registry
 }
 
 // NewController creates a new Aggregate controller
-func NewController(registries map[platform.ServiceRegistry]model.Controller) *Controller {
+func NewController(registries map[platform.ServiceRegistry]Registry) *Controller {
 	return &Controller{
 		registries: registries,
 	}
@@ -37,7 +44,7 @@ func NewController(registries map[platform.ServiceRegistry]model.Controller) *Co
 func (c *Controller) Services() []*model.Service {
 	services := make([]*model.Service, 0)
 	for _, r := range c.registries {
-		services = append(services, r.(model.ServiceDiscovery).Services()...)
+		services = append(services, r.Services()...)
 	}
 	return services
 }
@@ -45,7 +52,7 @@ func (c *Controller) Services() []*model.Service {
 // GetService retrieves a service by host name if it exists
 func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 	for _, r := range c.registries {
-		if service, exists := r.(model.ServiceDiscovery).GetService(hostname); exists {
+		if service, exists := r.GetService(hostname); exists {
 			return service, true
 		}
 	}
@@ -56,7 +63,7 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 // Return on the first hit.
 func (c *Controller) ManagementPorts(addr string) model.PortList {
 	for _, r := range c.registries {
-		if portList := r.(model.ServiceDiscovery).ManagementPorts(addr); portList != nil {
+		if portList := r.ManagementPorts(addr); portList != nil {
 			return portList
 		}
 	}
@@ -68,7 +75,7 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 func (c *Controller) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
 	instances := make([]*model.ServiceInstance, 0)
 	for _, r := range c.registries {
-		instances = append(instances, r.(model.ServiceDiscovery).Instances(hostname, ports, tags)...)
+		instances = append(instances, r.Instances(hostname, ports, tags)...)
 	}
 	return instances
 }
@@ -77,7 +84,7 @@ func (c *Controller) Instances(hostname string, ports []string, tags model.TagsL
 func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	instances := make([]*model.ServiceInstance, 0)
 	for _, r := range c.registries {
-		instances = append(instances, r.(model.ServiceDiscovery).HostInstances(addrs)...)
+		instances = append(instances, r.HostInstances(addrs)...)
 	}
 	return instances
 }
@@ -117,7 +124,7 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 // GetIstioServiceAccounts implements model.ServiceAccounts operation
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
 	for _, r := range c.registries {
-		if svcAccounts := r.(model.ServiceAccounts).GetIstioServiceAccounts(hostname, ports); svcAccounts != nil {
+		if svcAccounts := r.GetIstioServiceAccounts(hostname, ports); svcAccounts != nil {
 			return svcAccounts
 		}
 	}
