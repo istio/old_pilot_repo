@@ -233,6 +233,7 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName
 		instances := discovery.HostInstances(map[string]bool{role.IPAddress: true})
 		services := discovery.Services()
 		configs = buildOutboundHTTPRoutes(mesh, role, instances, services, config)
+		configs = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), configs)
 	default:
 		return nil
 	}
@@ -472,8 +473,6 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 		}
 	}
 
-	addExternalTrafficVirtualHosts(&httpConfigs, config.EgressRules(), mesh)
-
 	return httpConfigs.normalize()
 }
 
@@ -656,8 +655,8 @@ func buildExternalTrafficVirtualHostsOnPort(rule *proxyconfig.EgressRule, mesh *
 	return hosts
 }
 
-func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules map[string]*proxyconfig.EgressRule,
-	mesh *proxyconfig.ProxyMeshConfig) {
+func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressRules map[string]*proxyconfig.EgressRule,
+	httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
 	for _, rule := range egressRules {
 		if len(rule.Domains) < 1 {
 			continue
@@ -674,6 +673,8 @@ func addExternalTrafficVirtualHosts(httpConfigs *HTTPRouteConfigs, egressRules m
 				buildExternalTrafficVirtualHostsOnPort(rule, mesh, modelPort)...)
 		}
 	}
+
+	return httpConfigs.normalize()
 }
 
 // buildMgmtPortListeners creates inbound TCP only listeners for the management ports on
