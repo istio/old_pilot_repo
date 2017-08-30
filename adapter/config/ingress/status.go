@@ -32,6 +32,7 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"
+	"os"
 )
 
 const ingressElectionID = "istio-ingress-controller-leader"
@@ -59,10 +60,10 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).List(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).List(opts)
 			},
 			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).Watch(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).Watch(opts)
 			},
 		},
 		&v1beta1.Ingress{}, options.ResyncPeriod, cache.Indexers{},
@@ -70,7 +71,7 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 
 	var publishService string
 	if mesh.IngressService != "" {
-		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
+		publishService = fmt.Sprintf("%v/%v", os.Getenv("POD_NAMESPACE"), mesh.IngressService)
 	}
 	glog.V(2).Infof("INGRESS STATUS publishService %s", publishService)
 	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)

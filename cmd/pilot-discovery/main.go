@@ -93,10 +93,6 @@ var (
 					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
 				}
 
-				if flags.controllerOptions.Namespace == "" {
-					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-				}
-
 				glog.V(2).Infof("version %s", version.Line())
 				glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
@@ -181,10 +177,8 @@ func init() {
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
 		fmt.Sprintf("File name for Istio mesh configuration"))
-	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.Namespace, "namespace", "n", "",
-		"Select a namespace for the controller loop. If not set, uses ${POD_NAMESPACE} environment variable")
-	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.AppNamespace, "app namespace", "a", "",
-		"Restrict the applications namespace that controller manages, do n")
+	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.WatchedNamespace, "watched namespace", "a", "",
+		"Restrict the applications namespace that controller manages")
 	discoveryCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", time.Second,
 		"Controller resync interval")
 	discoveryCmd.PersistentFlags().StringVar(&flags.controllerOptions.DomainSuffix, "domain", "cluster.local",

@@ -37,17 +37,16 @@ const (
 	NodeRegionLabel = "failure-domain.beta.kubernetes.io/region"
 	// NodeZoneLabel is the well-known label for kubernetes node zone
 	NodeZoneLabel = "failure-domain.beta.kubernetes.io/zone"
-	// IstioNamespace used by default for Istio cluster-wide installation
-	IstioNamespace = "istio-system"
 )
 
 // ControllerOptions stores the configurable attributes of a Controller.
 type ControllerOptions struct {
-	// Namespace to restrict controller to (empty to disable restriction)
-	Namespace    string
-	AppNamespace string
-	ResyncPeriod time.Duration
-	DomainSuffix string
+	// Namespace to restrict controller to (empty to disable restriction),
+	// different from the namespace the controller runs in (which
+	// can be obtained via downward API from POD_NAMESPACE)
+	WatchedNamespace string
+	ResyncPeriod     time.Duration
+	DomainSuffix     string
 }
 
 // Controller is a collection of synchronized resource watchers
@@ -73,6 +72,8 @@ type cacheHandler struct {
 // NewController creates a new Kubernetes controller
 func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig,
 	options ControllerOptions) *Controller {
+
+	glog.V(2).Infof("New kube controller watching namespace %s", options.WatchedNamespace)
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
 		mesh:         mesh,
@@ -83,18 +84,18 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 
 	out.services = out.createInformer(&v1.Service{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Services(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Services(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Services(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Services(options.WatchedNamespace).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Endpoints(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Endpoints(options.WatchedNamespace).Watch(opts)
 		})
 
 	out.nodes = out.createInformer(&v1.Node{}, options.ResyncPeriod,
@@ -107,10 +108,10 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Pods(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Pods(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Pods(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Pods(options.WatchedNamespace).Watch(opts)
 		}))
 
 	return out
