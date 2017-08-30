@@ -805,13 +805,13 @@ func ValidateEgressRule(msg proto.Message) error {
 	return errs
 }
 
+// ValidateEgressRuleDomain validates domains in the egress rules
 // domains are according to the definion of Envoy's domain of virtual hosts.
 // See https://lyft.github.io/envoy/docs/configuration/http_conn_man/route_config/vhost.html#config-http-conn-man-route-table-vhost
 //
 // Wildcard hosts are supported in the form of “*.foo.com” or “*-bar.foo.com”.
 // Note that the wildcard will not match the empty string. e.g. “*-bar.foo.com” will match “baz-bar.foo.com”
 // but not “-bar.foo.com”.  Additionally, a special entry “*” is allowed which will match any host/authority header.
-
 func ValidateEgressRuleDomain(domain string) error {
 	if len(domain) < 1 {
 		return fmt.Errorf("domain must not be empty string")
@@ -833,6 +833,7 @@ func ValidateEgressRuleDomain(domain string) error {
 	return nil
 }
 
+// ValidateEgressRulePort checks the port of the egress rule (communication port and protocol)
 func ValidateEgressRulePort(port *proxyconfig.EgressRule_Port) error {
 
 	if err := ValidatePort(int(port.Port)); err != nil {
