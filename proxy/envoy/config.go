@@ -633,6 +633,10 @@ func buildExternalTrafficVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh *p
 		if port.Protocol == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
 		}
+
+		if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
+			externalTrafficCluster.Features = ClusterFeatureHTTP2
+		}
 	}
 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
