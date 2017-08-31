@@ -35,19 +35,21 @@ var (
 
 	// ExampleRouteRule is an example route rule
 	ExampleRouteRule = &proxyconfig.RouteRule{
-		Name:        "sample-rule",
-		Destination: WorldService.Hostname,
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
 		Route: []*proxyconfig.DestinationWeight{
-			{Weight: 80, Tags: map[string]string{"version": "v1"}},
-			{Weight: 20, Tags: map[string]string{"version": "v2"}},
+			{Weight: 80, Labels: map[string]string{"version": "v1"}},
+			{Weight: 20, Labels: map[string]string{"version": "v2"}},
 		},
 	}
 
 	// ExampleIngressRule is an example ingress rule
 	ExampleIngressRule = &proxyconfig.IngressRule{
-		Name:                   "sample-ingress",
-		Port:                   80,
-		Destination:            WorldService.Hostname,
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
+		Port: 80,
 		DestinationServicePort: &proxyconfig.IngressRule_DestinationPort{DestinationPort: 80},
 	}
 
@@ -61,7 +63,9 @@ var (
 
 	// ExampleDestinationPolicy is an example destination policy
 	ExampleDestinationPolicy = &proxyconfig.DestinationPolicy{
-		Destination: WorldService.Hostname,
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
 		Policy: []*proxyconfig.DestinationVersionPolicy{
 			{LoadBalancing: &proxyconfig.LoadBalancing{
 				LbPolicy: &proxyconfig.LoadBalancing_Name{Name: proxyconfig.LoadBalancing_RANDOM},

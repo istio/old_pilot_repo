@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	multierror "github.com/hashicorp/go-multierror"
@@ -73,6 +72,7 @@ func TestConfigDescriptorValidate(t *testing.T) {
 	}
 }
 
+/*
 func TestConfigDescriptorValidateConfig(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -675,6 +675,7 @@ func TestValidateDestinationPolicy(t *testing.T) {
 		}
 	}
 }
+*/
 
 func TestValidatePort(t *testing.T) {
 	ports := map[int]bool{

@@ -375,7 +375,8 @@ func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Nod
 // buildDestinationHTTPRoutes creates HTTP route for a service and a port from rules
 func buildDestinationHTTPRoutes(service *model.Service,
 	servicePort *model.Port,
-	rules []*proxyconfig.RouteRule) []*HTTPRoute {
+	instances []*model.ServiceInstance,
+	config model.IstioConfigStore) []*HTTPRoute {
 	protocol := servicePort.Protocol
 	switch protocol {
 	case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
@@ -383,22 +384,21 @@ func buildDestinationHTTPRoutes(service *model.Service,
 
 		// collect route rules
 		useDefaultRoute := true
+		rules := config.RouteRulesBySource(instances, service)
 		for _, rule := range rules {
-			if rule.Destination == service.Hostname {
-				httpRoute := buildHTTPRoute(rule, servicePort)
-				routes = append(routes, httpRoute)
+			httpRoute := buildHTTPRoute(rule, service, servicePort)
+			routes = append(routes, httpRoute)
 
-				// User can provide timeout/retry policies without any match condition,
-				// or specific route. User could also provide a single default route, in
-				// which case, we should not be generating another default route.
-				// For every HTTPRoute we build, the return value also provides a boolean
-				// "catchAll" flag indicating if the route that was built was a catch all route.
-				// When such a route is encountered, we stop building further routes for the
-				// destination and we will not add the default route after the for loop.
-				if httpRoute.CatchAll() {
-					useDefaultRoute = false
-					break
-				}
+			// User can provide timeout/retry policies without any match condition,
+			// or specific route. User could also provide a single default route, in
+			// which case, we should not be generating another default route.
+			// For every HTTPRoute we build, the return value also provides a boolean
+			// "catchAll" flag indicating if the route that was built was a catch all route.
+			// When such a route is encountered, we stop building further routes for the
+			// destination and we will not add the default route after the for loop.
+			if httpRoute.CatchAll() {
+				useDefaultRoute = false
+				break
 			}
 		}
 
@@ -434,10 +434,6 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 	httpConfigs := make(HTTPRouteConfigs)
 	suffix := strings.Split(sidecar.Domain, ".")
 
-	//TODO optimize route build to avoid linear search
-	// get all the route rules applicable to the instances
-	rules := config.RouteRulesBySource(instances)
-
 	// outbound connections/requests are directed to service ports; we create a
 	// map for each service port to define filters
 	for _, service := range services {
@@ -447,7 +443,7 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 				continue
 			}
 
-			routes := buildDestinationHTTPRoutes(service, servicePort, rules)
+			routes := buildDestinationHTTPRoutes(service, servicePort, instances, config)
 
 			if len(routes) > 0 {
 				// must use egress proxy to route external name services
