@@ -75,9 +75,6 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 	if addr != "" && external != "" {
 		return nil
 	}
-	//if (addr == "" && external == "") || (addr != "" && external != "") {
-	//	return nil
-	//}
 
 	ports := make([]*model.Port, 0, len(svc.Spec.Ports))
 	for _, port := range svc.Spec.Ports {

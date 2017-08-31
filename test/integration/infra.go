@@ -127,9 +127,9 @@ func (infra *infra) setup() error {
 		glog.Infof("Sidecar initializer could not be deleted: %v", err)
 	}
 
-	//if err := deploy("initializer.yaml.tmpl"); err != nil {
-	//	return err
-	//}
+	if err := deploy("initializer.yaml.tmpl"); err != nil {
+		return err
+	}
 
 	if err := deploy("pilot.yaml.tmpl"); err != nil {
 		return err

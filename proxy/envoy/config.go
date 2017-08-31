@@ -471,8 +471,6 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-//
-// TODO: use service load balancing address if available!
 func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment, services []*model.Service) (Listeners, Clusters) {
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
