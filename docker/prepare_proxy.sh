@@ -12,12 +12,14 @@ usage() {
   echo '  -u: Specify the UID of the user for which the redirection is not'
   echo '      applied. Typically, this is the UID of the proxy container'
   echo '  -i: Comma separated list of IP ranges in CIDR form to redirect to envoy (optional)'
+  echo '  -e: Comma separated list of IP ranges in CIDR form to exclude from outbound redirection to envoy (optional)'
   echo ''
 }
 
 IP_RANGES_INCLUDE=""
+IP_RANGES_EXCLUDE=""
 
-while getopts ":p:u:e:i:h" opt; do
+while getopts ":p:u:e:i:e:h" opt; do
   case ${opt} in
     p)
       ENVOY_PORT=${OPTARG}
@@ -27,6 +29,9 @@ while getopts ":p:u:e:i:h" opt; do
       ;;
     i)
       IP_RANGES_INCLUDE=${OPTARG}
+      ;;
+    e)
+      IP_RANGES_EXCLUDE=${OPTARG}
       ;;
     h)
       usage
@@ -45,6 +50,30 @@ if [[ -z "${ENVOY_PORT-}" ]] || [[ -z "${ENVOY_UID-}" ]]; then
   usage
   exit 1
 fi
+
+if [[ "${IP_RANGES_INCLUDE}" && "${IP_RANGES_EXCLUDE}" ]]; then
+  echo "Please don't set both -i and -e parameters"
+  usage
+  exit 1
+fi
+
+#Outbound iptables rule to redirect to sidecar or bypass traffic to sidecar and send directly out.
+function output_redir() {
+    local range=$1
+    shift
+    local inc=$1
+    shift
+    sifs=$IFS
+    IFS=,
+    for cidr in ${range}; do
+        if [ ${inc} = "include" ]; then
+            iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
+        else
+            iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j RETURN                  -m comment --comment "istio/exclude-ip-range-${cidr}"
+        fi
+    done
+    IFS=${sifs}
+}
 
 # Create a new chain for redirecting inbound and outbound traffic to
 # the common Envoy port.
@@ -79,12 +108,15 @@ iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m
 # All outbound traffic will be redirected to Envoy by default. If
 # IP_RANGES_INCLUDE is non-empty, only traffic bound for the
 # destinations specified in this list will be captured.
-IFS=,
+# IF IP_RANGES_EXCLUDE is non-empty, traffic specified by it will
+# NOT be redirected to the sidecar.
+# NOTE: IP_RANGES_INCLUDE and IP_RANGES_EXCLUDE cannot be specified.
 if [ "${IP_RANGES_INCLUDE}" != "" ]; then
-    for cidr in ${IP_RANGES_INCLUDE}; do
-        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
-    done
+    output_redir ${IP_RANGES_INCLUDE} "include"
     iptables -t nat -A ISTIO_OUTPUT -j RETURN                                 -m comment --comment "istio/bypass-default-outbound"
+elif [ "${IP_RANGES_EXCLUDE}" != "" ]; then
+    output_redir ${IP_RANGES_EXCLUDE} "exclude"
+    iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                         -m comment --comment "istio/bypass-exclude-default-outbound"
 else
     iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                         -m comment --comment "istio/redirect-default-outbound"
 fi
