@@ -512,7 +512,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Envi
 	for port, routes := range routesByPort {
 		sort.Sort(TCPRouteByRoute(routes))
 		config := &TCPRouteConfig{Routes: routes}
-		listener := buildTCPListener(config, "0.0.0.0", port)
+		listener := buildTCPListener(config, WildcardAddress, port)
 		tcpListeners = append(tcpListeners, listener)
 	}
 

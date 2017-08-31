@@ -71,7 +71,7 @@ func (r *http) makeRequests() error {
 								if src != "t" {
 									r.logs.add(src, id, name)
 								}
-								if dst != "t" {
+								if dst != "t" && dst != src { // TODO: only for headless
 									r.logs.add(dst, id, name)
 								}
 								// mixer filter is invoked on the server side, that is when dst is not "t"
