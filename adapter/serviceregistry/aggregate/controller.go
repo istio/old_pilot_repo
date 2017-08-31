@@ -73,9 +73,11 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 // Instances retrieves instances for a service and its ports that match
 // any of the supplied tags. All instances match an empty tag list.
 func (c *Controller) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
-	instances := make([]*model.ServiceInstance, 0)
+	var instances []*model.ServiceInstance
 	for _, r := range c.registries {
-		instances = append(instances, r.Instances(hostname, ports, tags)...)
+		if instances = r.Instances(hostname, ports, tags); len(instances) > 0 {
+			break
+		}
 	}
 	return instances
 }
