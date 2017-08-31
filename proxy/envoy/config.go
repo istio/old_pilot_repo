@@ -396,6 +396,8 @@ func buildDestinationHTTPRoutes(service *model.Service,
 		// collect route rules
 		useDefaultRoute := true
 		rules := config.RouteRules(instances, service.Hostname)
+		// sort for output uniqueness
+		model.SortRouteRules(rules)
 		for _, rule := range rules {
 			httpRoute := buildHTTPRoute(rule, service, servicePort)
 			routes = append(routes, httpRoute)
@@ -569,6 +571,8 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 			if protocol == model.ProtocolHTTP {
 				// get all the route rules applicable to the instances
 				rules := config.RouteRulesByDestination(instances)
+				// sort for the output uniqueness
+				model.SortRouteRules(rules)
 				for _, config := range rules {
 					rule := config.Spec.(*proxyconfig.RouteRule)
 					if rule.WebsocketUpgrade {

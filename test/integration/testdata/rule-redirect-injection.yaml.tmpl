@@ -2,13 +2,14 @@ type: route-rule
 name: redirect-route
 namespace: {{.Namespace}}
 spec:
-  destination: {{.Destination}}.{{.Namespace}}.svc.cluster.local
-  name: redirect-route
+  destination:
+    name: {{.Destination}}
   precedence: 5
   match:
-    httpHeaders:
-      testredirect:
-        exact: enabled
+    request:
+      headers:
+        testredirect:
+          exact: enabled
   redirect:
     uri: {{.Path}}
     authority: {{.HostRedirect}}

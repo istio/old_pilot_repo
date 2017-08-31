@@ -2,13 +2,15 @@ type: route-rule
 name: websocket-route
 namespace: {{.Namespace}}
 spec:
-  destination: {{.Destination}}.{{.Namespace}}.svc.cluster.local
+  destination:
+    name: {{.Destination}}
   precedence: 6
   match:
-    httpHeaders:
-      testwebsocket:
-        exact: enabled
+    request:
+      headers:
+        testwebsocket:
+          exact: enabled
   route:
-    - tags:
+    - labels:
          version: v1
-  websocket_upgrade: true
+  websocketUpgrade: true

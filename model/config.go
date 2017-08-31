@@ -17,6 +17,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -374,6 +375,24 @@ func MatchSource(meta ConfigMeta, source *proxyconfig.IstioService, instances []
 	return false
 }
 
+// SortRouteRules sorts a slice of rules by precedence in a stable manner
+func SortRouteRules(rules []Config) {
+	// sort by high precedence first, key string second (keys are unique)
+	sort.Slice(rules, func(i, j int) bool {
+		irule, ok := rules[i].Spec.(*proxyconfig.RouteRule)
+		if !ok {
+			return false
+		}
+		jrule, ok := rules[j].Spec.(*proxyconfig.RouteRule)
+		if !ok {
+			return false
+		}
+
+		return irule.Precedence > jrule.Precedence ||
+			(irule.Precedence == jrule.Precedence && rules[i].Key() < rules[j].Key())
+	})
+}
+
 func (i *istioConfigStore) RouteRules(instances []*ServiceInstance, destination string) []Config {
 	out := make([]Config, 0)
 	configs, err := i.List(RouteRule.Type, NamespaceAll)
@@ -397,20 +416,7 @@ func (i *istioConfigStore) RouteRules(instances []*ServiceInstance, destination 
 
 		out = append(out, config)
 	}
-	/*
-		// sort by high precedence first, key string second (keys are unique)
-		sort.Slice(rules, func(i, j int) bool {
-			return rules[i].Spec.Precedence > rules[j].Spec.Precedence ||
-				(rules[i].Spec.Precedence == rules[j].Spec.Precedence &&
-					rules[i].Key < rules[j].Key)
-		})
 
-		// project to rules
-		out := make([]*proxyconfig.RouteRule, len(rules))
-		for i, rule := range rules {
-			out[i] = rule.Spec
-		}
-	*/
 	return out
 }
 
@@ -500,9 +506,12 @@ func (i *istioConfigStore) Policy(instances []*ServiceInstance, destination stri
 		if !MatchSource(config.ConfigMeta, policy.Source, instances) {
 			continue
 		}
+
 		if destination != ResolveHostname(config.ConfigMeta, policy.Destination) {
 			continue
 		}
+
+		// note the exact label match
 		if !labels.Equals(policy.Destination.Labels) {
 			continue
 		}
