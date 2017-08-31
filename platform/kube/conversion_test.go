@@ -166,7 +166,7 @@ func TestServiceConversionWithEmptyServiceAccountsAnnotation(t *testing.T) {
 	}
 
 	sa := service.ServiceAccounts
-	if sa != nil && len(sa) != 0 {
+	if len(sa) != 0 {
 		t.Errorf("number of service accounts is incorrect: %d, expected 0", len(sa))
 	}
 }
