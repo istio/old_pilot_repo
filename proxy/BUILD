@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "agent.go",
         "context.go",
+        "net.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -25,6 +26,7 @@ go_test(
 
 go_test(
     name = "go_default_xtest",
+    size = "small",
     srcs = ["context_test.go"],
     deps = [
         ":go_default_library",

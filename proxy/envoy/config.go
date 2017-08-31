@@ -19,15 +19,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
-
-	"sort"
-
 	proxyconfig "istio.io/api/proxy/v1/config"
+
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 )
@@ -211,7 +210,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
-			buildHTTPListener(env.Mesh, sidecar, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
+			buildHTTPListener(env.Mesh, sidecar, instances, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
 		// TODO: need inbound listeners in HTTP_PROXY case, with dedicated ingress listener.
 	}
 
@@ -252,8 +251,8 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName
 
 // buildHTTPListener constructs a listener for the network interface address and port.
 // Set RDS parameter to a non-empty value to enable RDS for the matching route name.
-func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeConfig *HTTPRouteConfig,
-	ip string, port int, rds string, useRemoteAddress bool) *Listener {
+func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, instances []*model.ServiceInstance,
+	routeConfig *HTTPRouteConfig, ip string, port int, rds string, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
 	filters = append(filters, HTTPFilter{
@@ -262,8 +261,27 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, route
 		Config: FilterRouterConfig{},
 	})
 
+	// This is the mixer 'target.service'
+	// TODO: use canonical name, comma separated list is not actually supported by mixer.
+
+	service := ""
+	if instances != nil {
+		// join service names with a comma
+		serviceSet := make(map[string]bool, len(instances))
+		for _, instance := range instances {
+			serviceSet[instance.Service.Hostname] = true
+		}
+		services := make([]string, 0, len(serviceSet))
+		for service := range serviceSet {
+			services = append(services, service)
+		}
+
+		sort.Strings(services)
+		service = strings.Join(services, ",")
+	}
+
 	if mesh.MixerAddress != "" {
-		mixerConfig := mixerHTTPRouteConfig(role)
+		mixerConfig := mixerHTTPRouteConfig(role, service)
 		filter := HTTPFilter{
 			Type:   decoder,
 			Name:   MixerFilter,
@@ -346,7 +364,7 @@ func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Nod
 	httpOutbound := buildOutboundHTTPRoutes(mesh, sidecar, instances, services, config)
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners,
-			buildHTTPListener(mesh, sidecar, routeConfig, WildcardAddress, port, fmt.Sprintf("%d", port), false))
+			buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port, fmt.Sprintf("%d", port), false))
 		clusters = append(clusters, routeConfig.clusters()...)
 	}
 
@@ -415,6 +433,7 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 	httpConfigs := make(HTTPRouteConfigs)
 	suffix := strings.Split(sidecar.Domain, ".")
 
+	//TODO optimize route build to avoid linear search
 	// get all the route rules applicable to the instances
 	rules := config.RouteRulesBySource(instances)
 
@@ -583,7 +602,7 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 			host.Routes = append(host.Routes, defaultRoute)
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(mesh, sidecar, config, endpoint.Address, endpoint.Port, "", false))
+				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address, endpoint.Port, "", false))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS:
 			listener := buildTCPListener(&TCPRouteConfig{

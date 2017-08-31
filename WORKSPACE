@@ -305,7 +305,7 @@ go_repository(
 
 go_repository(
     name = "io_k8s_ingress",
-    commit = "3495bfb4aca9d34c97ad0cd3915965a79831fc9c",
+    commit = "0c6f15e372c831de52fcc393932540bb3a6d51b5",
     importpath = "k8s.io/ingress",
 )
 
@@ -527,6 +527,6 @@ go_repository(
 
 git_repository(
     name = "com_github_istio_test_infra",
-    commit = "b0822890273f91d5aa8c40ea1a89ba01e0f0ee9d",  # Aug 22, 2017
+    commit = "67e73ad01f9d1074a7d787a91201d41938ad4310",  # Aug 25, 2017
     remote = "https://github.com/istio/test-infra.git",
 )
