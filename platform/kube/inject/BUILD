@@ -6,6 +6,7 @@ go_library(
         "http.go",
         "initializer.go",
         "inject.go",
+        "configmap.go"
     ],
     visibility = ["//visibility:public"],
     deps = [
