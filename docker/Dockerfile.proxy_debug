@@ -1,4 +1,5 @@
 # Change this and ../WORKSPACE at the same time
 FROM gcr.io/istio-testing/envoy-debug:20170825-62755c6
+RUN apt-get update && apt-get install -y curl
 ADD pilot-agent /usr/local/bin/pilot-agent
 ENTRYPOINT ["/usr/local/bin/pilot-agent"]
