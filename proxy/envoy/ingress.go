@@ -125,7 +125,7 @@ func buildIngressRoute(mesh *proxyconfig.ProxyMeshConfig,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) ([]*HTTPRoute, string, error) {
 	ingress := rule.Spec.(*proxyconfig.IngressRule)
-	destination := model.ResolveService(rule.ConfigMeta, ingress.Destination)
+	destination := model.ResolveHostname(rule.ConfigMeta, ingress.Destination)
 	service, exists := discovery.GetService(destination)
 	if !exists {
 		return nil, "", fmt.Errorf("cannot find service %q", destination)

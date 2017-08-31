@@ -41,17 +41,17 @@ var (
 		},
 		versions: 2,
 	}
-	HostInstanceV0 = MakeIP(HelloService, 0)
-	HostInstanceV1 = MakeIP(HelloService, 1)
-	ProxyV0        = proxy.Node{
+	HelloInstanceV0 = MakeIP(HelloService, 0)
+	HelloInstanceV1 = MakeIP(HelloService, 1)
+	HelloProxyV0    = proxy.Node{
 		Type:      proxy.Sidecar,
-		IPAddress: HostInstanceV0,
+		IPAddress: HelloInstanceV0,
 		ID:        "v0.default",
 		Domain:    "default.svc.cluster.local",
 	}
-	ProxyV1 = proxy.Node{
+	HelloProxyV1 = proxy.Node{
 		Type:      proxy.Sidecar,
-		IPAddress: HostInstanceV1,
+		IPAddress: HelloInstanceV1,
 		ID:        "v1.default",
 		Domain:    "default.svc.cluster.local",
 	}

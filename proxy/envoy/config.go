@@ -113,34 +113,42 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyco
 }
 
 // buildListeners produces a list of listeners and referenced clusters for all proxies
-func buildListeners(env proxy.Environment, role proxy.Node) Listeners {
-	switch role.Type {
+func buildListeners(env proxy.Environment, node proxy.Node) Listeners {
+	switch node.Type {
 	case proxy.Sidecar:
-		listeners, _ := buildSidecar(env, role)
+		instances := env.HostInstances(map[string]bool{node.IPAddress: true})
+		listeners, _ := buildSidecarListenersClusters(env.Mesh, instances,
+			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
 		return listeners
 	case proxy.Ingress:
-		return buildIngressListeners(env.Mesh, env.ServiceDiscovery, env.IstioConfigStore, role)
+		return buildIngressListeners(env.Mesh, env.ServiceDiscovery, env.IstioConfigStore, node)
 	case proxy.Egress:
-		return buildEgressListeners(env.Mesh, role)
+		return buildEgressListeners(env.Mesh, node)
 	}
 	return nil
 }
 
-func buildClusters(env proxy.Environment, role proxy.Node) (clusters Clusters) {
-	switch role.Type {
+func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
+	var clusters Clusters
+	var instances []*model.ServiceInstance
+	switch node.Type {
 	case proxy.Sidecar:
-		_, clusters = buildSidecar(env, role)
+		instances = env.HostInstances(map[string]bool{node.IPAddress: true})
+		_, clusters = buildSidecarListenersClusters(env.Mesh, instances,
+			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
 	case proxy.Ingress:
+		// TODO: decide upon instances for ingress proxy
 		httpRouteConfigs, _ := buildIngressRoutes(env.Mesh, env.ServiceDiscovery, env.IstioConfigStore)
 		clusters = httpRouteConfigs.clusters().normalize()
 	case proxy.Egress:
+		// TODO: decide upon instances for egress proxy
 		httpRouteConfigs := buildEgressRoutes(env.Mesh, env.ServiceDiscovery)
 		clusters = httpRouteConfigs.clusters().normalize()
 	}
 
 	// apply custom policies for outbound clusters
 	for _, cluster := range clusters {
-		applyClusterPolicy(cluster, env.IstioConfigStore, env.Mesh, env.ServiceAccounts)
+		applyClusterPolicy(cluster, instances, env.IstioConfigStore, env.Mesh, env.ServiceAccounts)
 	}
 
 	// append Mixer service definition if necessary
@@ -151,21 +159,24 @@ func buildClusters(env proxy.Environment, role proxy.Node) (clusters Clusters) {
 	return clusters
 }
 
-// buildSidecar produces a list of listeners and referenced clusters for sidecar proxies
+// buildSidecarListenersClusters produces a list of listeners and referenced clusters for sidecar proxies
 // TODO: this implementation is inefficient as it is recomputing all the routes for all proxies
 // There is a lot of potential to cache and reuse cluster definitions across proxies and also
 // skip computing the actual HTTP routes
-func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Clusters) {
-	instances := env.HostInstances(map[string]bool{sidecar.IPAddress: true})
-	services := env.Services()
-	managementPorts := env.ManagementPorts(sidecar.IPAddress)
+func buildSidecarListenersClusters(
+	mesh *proxyconfig.ProxyMeshConfig,
+	instances []*model.ServiceInstance,
+	services []*model.Service,
+	managementPorts model.PortList,
+	node proxy.Node,
+	config model.IstioConfigStore) (Listeners, Clusters) {
 	listeners := make(Listeners, 0)
 	clusters := make(Clusters, 0)
 
-	if env.Mesh.ProxyListenPort > 0 {
-		inbound, inClusters := buildInboundListeners(env.Mesh, sidecar, instances, env.IstioConfigStore)
-		outbound, outClusters := buildOutboundListeners(env.Mesh, sidecar, instances, services, env.IstioConfigStore)
-		mgmtListeners, mgmtClusters := buildMgmtPortListeners(env.Mesh, managementPorts, sidecar.IPAddress)
+	if mesh.ProxyListenPort > 0 {
+		inbound, inClusters := buildInboundListeners(mesh, node, instances, config)
+		outbound, outClusters := buildOutboundListeners(mesh, node, instances, services, config)
+		mgmtListeners, mgmtClusters := buildMgmtPortListeners(mesh, managementPorts, node.IPAddress)
 
 		listeners = append(listeners, inbound...)
 		listeners = append(listeners, outbound...)
@@ -196,7 +207,7 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 		// add an extra listener that binds to the port that is the recipient of the iptables redirect
 		listeners = append(listeners, &Listener{
 			Name:           VirtualListenerName,
-			Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, env.Mesh.ProxyListenPort),
+			Address:        fmt.Sprintf("tcp://%s:%d", WildcardAddress, mesh.ProxyListenPort),
 			BindToPort:     true,
 			UseOriginalDst: true,
 			Filters:        make([]*NetworkFilter, 0),
@@ -204,13 +215,13 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 	}
 
 	// enable HTTP PROXY port if necessary; this will add an RDS route for this port
-	if env.Mesh.ProxyHttpPort > 0 {
+	if mesh.ProxyHttpPort > 0 {
 		// only HTTP outbound clusters are needed
-		httpOutbound := buildOutboundHTTPRoutes(env.Mesh, sidecar, instances, services, env.IstioConfigStore)
+		httpOutbound := buildOutboundHTTPRoutes(mesh, node, instances, services, config)
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
-			buildHTTPListener(env.Mesh, sidecar, instances, nil, LocalhostAddress, int(env.Mesh.ProxyHttpPort), RDSAll, false))
+			buildHTTPListener(mesh, node, instances, nil, LocalhostAddress, int(mesh.ProxyHttpPort), RDSAll, false))
 		// TODO: need inbound listeners in HTTP_PROXY case, with dedicated ingress listener.
 	}
 
@@ -221,16 +232,16 @@ func buildSidecar(env proxy.Environment, sidecar proxy.Node) (Listeners, Cluster
 // The route name is assumed to be the port number used by the route in the
 // listener, or the special value for _all routes_.
 // TODO: this can be optimized by querying for a specific HTTP port in the table
-func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName string,
+func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, routeName string,
 	discovery model.ServiceDiscovery, config model.IstioConfigStore) *HTTPRouteConfig {
 	var configs HTTPRouteConfigs
-	switch role.Type {
+	switch node.Type {
 	case proxy.Ingress:
 		configs, _ = buildIngressRoutes(mesh, discovery, config)
 	case proxy.Egress:
 		configs = buildEgressRoutes(mesh, discovery)
 	case proxy.Sidecar:
-		instances := discovery.HostInstances(map[string]bool{role.IPAddress: true})
+		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
 		configs = buildOutboundHTTPRoutes(mesh, role, instances, services, config)
 		configs = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), configs)
@@ -252,7 +263,7 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, routeName
 
 // buildHTTPListener constructs a listener for the network interface address and port.
 // Set RDS parameter to a non-empty value to enable RDS for the matching route name.
-func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, instances []*model.ServiceInstance,
+func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, instances []*model.ServiceInstance,
 	routeConfig *HTTPRouteConfig, ip string, port int, rds string, useRemoteAddress bool) *Listener {
 	filters := buildFaultFilters(routeConfig)
 
@@ -282,7 +293,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node, insta
 	}
 
 	if mesh.MixerAddress != "" {
-		mixerConfig := mixerHTTPRouteConfig(role, service)
+		mixerConfig := mixerHTTPRouteConfig(node, service)
 		filter := HTTPFilter{
 			Type:   decoder,
 			Name:   MixerFilter,
@@ -384,7 +395,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 
 		// collect route rules
 		useDefaultRoute := true
-		rules := config.RouteRules(instances, service)
+		rules := config.RouteRules(instances, service.Hostname)
 		for _, rule := range rules {
 			httpRoute := buildHTTPRoute(rule, service, servicePort)
 			routes = append(routes, httpRoute)

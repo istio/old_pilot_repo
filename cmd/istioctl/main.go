@@ -97,10 +97,6 @@ istioctl mixer command documentation.
 					config.Namespace = namespace
 				}
 
-				if config.IstioNamespace == "" {
-					config.IstioNamespace = istioNamespace
-				}
-
 				configClient, err := newClient()
 				if err != nil {
 					return err
@@ -137,11 +133,6 @@ istioctl mixer command documentation.
 			for _, config := range varr {
 				if config.Namespace == "" {
 					config.Namespace = namespace
-				}
-
-				if config.IstioNamespace == "" {
-					config.IstioNamespace = istioNamespace
-
 				}
 
 				configClient, err := newClient()
@@ -282,10 +273,6 @@ istioctl mixer command documentation.
 			for _, config := range varr {
 				if config.Namespace == "" {
 					config.Namespace = namespace
-				}
-
-				if config.IstioNamespace == "" {
-					config.IstioNamespace = istioNamespace
 				}
 
 				// compute key if necessary

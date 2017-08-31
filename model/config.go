@@ -42,10 +42,8 @@ type ConfigMeta struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Domain defines the suffix of the fully qualified name past the namespace.
+	// Domain is not a part of the unique key unlike name and namespace.
 	Domain string `json:"domain,omitempty"`
-
-	// Namespace where istio control plane is installed
-	IstioNamespace string `json:"istioNamespace,omitempty"`
 
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects.
@@ -141,8 +139,8 @@ func Key(typ, name, namespace string) string {
 }
 
 // Key is the unique identifier for a configuration object
-func (config *Config) Key() string {
-	return Key(config.Type, config.Name, config.Namespace)
+func (meta *ConfigMeta) Key() string {
+	return Key(meta.Type, meta.Name, meta.Namespace)
 }
 
 // ConfigStoreCache is a local fully-replicated cache of the config store.  The
@@ -235,19 +233,20 @@ type IstioConfigStore interface {
 	// DestinationPolicies lists all destination rules
 	DestinationPolicies() []*proxyconfig.DestinationPolicy
 
-	// RouteRules selects routing rules by source service instances and destination service.
-	// A rule must match at least one of the input service instances since the proxy
-	// does not distinguish between source instances in the request.
-	// The rules are sorted by precedence (high first) in a stable manner.
-	RouteRules(source []*ServiceInstance, destination *Service) []Config
+	// RouteRules selects routing rules by source service instances and
+	// destination service.  A rule must match at least one of the input service
+	// instances since the proxy does not distinguish between source instances in
+	// the request.
+	RouteRules(source []*ServiceInstance, destination string) []Config
 
-	// RouteRulesByDestination selects routing rules associated with destination service instances.
-	// A rule must match at least one of the input destination instances.
-	// The rules are sorted by precedence (high first) in a stable manner.
+	// RouteRulesByDestination selects routing rules associated with destination
+	// service instances.  A rule must match at least one of the input
+	// destination instances.
 	RouteRulesByDestination(destination []*ServiceInstance) []Config
 
-	// DestinationPolicy returns a policy for a service version.
-	DestinationPolicy(destination string, tags Labels) *proxyconfig.DestinationVersionPolicy
+	// Policy returns a policy for a service version that match at least one of
+	// the source instances.  The labels must match precisely in the policy.
+	Policy(source []*ServiceInstance, destination string, labels Labels) *Config
 }
 
 const (
@@ -263,7 +262,7 @@ const (
 	// HeaderAuthority is authority HTTP header
 	HeaderAuthority = "authority"
 
-	// NamespaceAll is a designated symbol for all namespaces
+	// NamespaceAll is a designated symbol for listing across all namespaces
 	NamespaceAll = ""
 )
 
@@ -322,9 +321,10 @@ var (
 	}
 )
 
-// ResolveService uses metadata information to resolve a service reference to a
-// fully qualified hostname
-func ResolveService(meta ConfigMeta, svc *proxyconfig.IstioService) string {
+// ResolveHostname uses metadata information to resolve a service reference to
+// a fully qualified hostname. The metadata namespace and domain are used as
+// fallback values to fill up the complete name.
+func ResolveHostname(meta ConfigMeta, svc *proxyconfig.IstioService) string {
 	out := svc.Name
 	if svc.Namespace != "" {
 		out = out + "." + svc.Namespace
@@ -352,7 +352,29 @@ func MakeIstioStore(store ConfigStore) IstioConfigStore {
 	return &istioConfigStore{store}
 }
 
-func (i *istioConfigStore) RouteRules(source []*ServiceInstance, destination *Service) []Config {
+// MatchSource checks that a rule applies for source service instances.
+// Empty source match condition applies for all cases.
+func MatchSource(meta ConfigMeta, source *proxyconfig.IstioService, instances []*ServiceInstance) bool {
+	if source == nil {
+		return true
+	}
+
+	sourceService := ResolveHostname(meta, source)
+	for _, instance := range instances {
+		// must match the source field if it is set
+		if sourceService != instance.Service.Hostname {
+			continue
+		}
+		// must match the tags field - the rule tags are a subset of the instance tags
+		if Labels(source.Labels).SubsetOf(instance.Labels) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (i *istioConfigStore) RouteRules(instances []*ServiceInstance, destination string) []Config {
 	out := make([]Config, 0)
 	configs, err := i.List(RouteRule.Type, NamespaceAll)
 	if err != nil {
@@ -363,29 +385,14 @@ func (i *istioConfigStore) RouteRules(source []*ServiceInstance, destination *Se
 		rule := config.Spec.(*proxyconfig.RouteRule)
 
 		// validate that rule match predicate applies to destination service
-		hostname := ResolveService(config.ConfigMeta, rule.Destination)
-		if hostname != destination.Hostname {
+		hostname := ResolveHostname(config.ConfigMeta, rule.Destination)
+		if hostname != destination {
 			continue
 		}
 
 		// validate that rule match predicate applies to source service instances
-		if rule.Match != nil && rule.Match.Source != nil {
-			found := false
-			sourceService := ResolveService(config.ConfigMeta, rule.Match.Source)
-			for _, instance := range source {
-				// must match the source field if it is set
-				if sourceService != instance.Service.Hostname {
-					continue
-				}
-				// must match the tags field - the rule tags are a subset of the instance tags
-				if Labels(rule.Match.Source.Labels).SubsetOf(instance.Labels) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				continue
-			}
+		if rule.Match != nil && !MatchSource(config.ConfigMeta, rule.Match.Source, instances) {
+			continue
 		}
 
 		out = append(out, config)
@@ -416,7 +423,7 @@ func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance)
 
 	for _, config := range configs {
 		rule := config.Spec.(*proxyconfig.RouteRule)
-		destination := ResolveService(config.ConfigMeta, rule.Destination)
+		destination := ResolveHostname(config.ConfigMeta, rule.Destination)
 		for _, instance := range instances {
 			if destination == instance.Service.Hostname {
 				out = append(out, config)
@@ -481,39 +488,30 @@ func (i *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
 	return out
 }
 
-func (i *istioConfigStore) DestinationPolicies() []*proxyconfig.DestinationPolicy {
-	out := make([]*proxyconfig.DestinationPolicy, 0)
-	rs, err := i.List(DestinationPolicy.Type, "")
+func (i *istioConfigStore) Policy(instances []*ServiceInstance, destination string, labels Labels) *Config {
+	configs, err := i.List(DestinationPolicy.Type, NamespaceAll)
 	if err != nil {
-		glog.V(2).Infof("DestinationPolicies => %v", err)
+		return nil
 	}
-	for _, r := range rs {
-		if rule, ok := r.Spec.(*proxyconfig.DestinationPolicy); ok {
-			out = append(out, rule)
+
+	var out *Config
+	for _, config := range configs {
+		policy := config.Spec.(*proxyconfig.DestinationPolicy)
+		if !MatchSource(config.ConfigMeta, policy.Source, instances) {
+			continue
+		}
+		if destination != ResolveHostname(config.ConfigMeta, policy.Destination) {
+			continue
+		}
+		if !labels.Equals(policy.Destination.Labels) {
+			continue
+		}
+
+		// pick a deterministic policy from the matching configs by picking the smallest key
+		if out == nil || out.Key() > config.Key() {
+			out = &config
 		}
 	}
+
 	return out
-}
-
-func (i *istioConfigStore) DestinationPolicy(destination string, tags Labels) *proxyconfig.DestinationVersionPolicy {
-	/*
-		names := strings.Split(destination, ".")
-		name, namespace := "", ""
-		if len(names) > 0 {
-			name = names[0]
-		}
-		if len(names) > 1 {
-			namespace = names[1]
-		}
-
-		config, exists := i.Get(DestinationPolicy.Type, name, namespace)
-		if exists {
-			for _, policy := range config.Spec.(*proxyconfig.DestinationPolicy).Policy {
-				if tags.Equals(policy.Tags) {
-					return policy
-				}
-			}
-		}
-	*/
-	return nil
 }
