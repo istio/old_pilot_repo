@@ -67,10 +67,5 @@ func CreateMeshConfigMap(kube kubernetes.Interface, namespace, name string, srcC
 		Data:       srcConfigMap.Data,
 	}
 
-	destConfigMap, err := kube.CoreV1().ConfigMaps(namespace).Create(destConfigMap)
-	if err != nil {
-		return nil, err
-	}
-
-	return destConfigMap, nil
+	return kube.CoreV1().ConfigMaps(namespace).Create(destConfigMap)
 }
