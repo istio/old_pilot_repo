@@ -112,7 +112,7 @@ func (infra *infra) setup() error {
 		return err
 	}
 
-	mesh, err := inject.GetMeshConfig(client, infra.IstioNamespace, "istio")
+	_, mesh, err := inject.GetMeshConfig(client, infra.IstioNamespace, "istio")
 	if err != nil {
 		return err
 	}

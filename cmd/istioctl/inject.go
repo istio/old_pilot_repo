@@ -113,12 +113,24 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 				return err
 			}
 
-			mesh, err := inject.GetMeshConfig(client, namespace, meshConfig)
+			istioMeshConfigMap, mesh, err := inject.GetMeshConfig(client, istioNamespace, meshConfig)
 			if err != nil {
 				return fmt.Errorf("Istio configuration not found. Verify istio configmap is "+
 					"installed in namespace %q with `kubectl get -n %s configmap istio`",
-					namespace, namespace)
+					istioNamespace, istioNamespace)
 			}
+
+			// Temporary hack (few days), until this is properly implemented
+			// https://github.com/istio/pilot/issues/1153
+			_, _, err = inject.GetMeshConfig(client, namespace, meshConfig)
+			if err != nil {
+				_, err = inject.CreateMeshConfigMap(client, namespace, meshConfig, istioMeshConfigMap)
+				if err != nil {
+					return fmt.Errorf("Cannot create Istio configuration map in namespace",
+						namespace)
+				}
+			}
+
 			config := &inject.Config{
 				Policy:     inject.DefaultInjectionPolicy,
 				Namespaces: []string{v1.NamespaceAll},

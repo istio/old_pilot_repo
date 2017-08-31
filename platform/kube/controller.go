@@ -37,13 +37,15 @@ const (
 	NodeRegionLabel = "failure-domain.beta.kubernetes.io/region"
 	// NodeZoneLabel is the well-known label for kubernetes node zone
 	NodeZoneLabel = "failure-domain.beta.kubernetes.io/zone"
+	// IstioNamespace used by default for Istio cluster-wide installation
+	IstioNamespace = "istio-system"
 )
 
 // ControllerOptions stores the configurable attributes of a Controller.
 type ControllerOptions struct {
-	// Namespace in which the controller runs. Can be empty if the controller does not run in a namespace
+	// Namespace in which the controller runs. Can be "" if the controller does not run in a namespace
 	Namespace string
-	// Namespace the controller watches. If set to options.WatchedNamespace (""), controller watches all namespaces
+	// Namespace the controller watches. If set to meta_v1.NamespaceAll (""), controller watches all namespaces
 	WatchedNamespace string
 	ResyncPeriod     time.Duration
 	DomainSuffix     string

@@ -30,6 +30,7 @@ import (
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/tools/version"
 )
 
@@ -40,8 +41,9 @@ const (
 var (
 	platform string
 
-	kubeconfig string
-	namespace  string
+	kubeconfig     string
+	namespace      string
+	istioNamespace string
 
 	// input file name
 	file string
@@ -95,6 +97,10 @@ istioctl mixer command documentation.
 					config.Namespace = namespace
 				}
 
+				if config.IstioNamespace == "" {
+					config.IstioNamespace = istioNamespace
+				}
+
 				configClient, err := newClient()
 				if err != nil {
 					return err
@@ -131,6 +137,11 @@ istioctl mixer command documentation.
 			for _, config := range varr {
 				if config.Namespace == "" {
 					config.Namespace = namespace
+				}
+
+				if config.IstioNamespace == "" {
+					config.IstioNamespace = istioNamespace
+
 				}
 
 				configClient, err := newClient()
@@ -273,6 +284,10 @@ istioctl mixer command documentation.
 					config.Namespace = namespace
 				}
 
+				if config.IstioNamespace == "" {
+					config.IstioNamespace = istioNamespace
+				}
+
 				// compute key if necessary
 				if err = configClient.Delete(config.Type, config.Name, config.Namespace); err != nil {
 					errs = multierror.Append(errs, fmt.Errorf("cannot delete %s: %v", config.Key(), err))
@@ -303,6 +318,9 @@ func init() {
 	}
 	rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubeconfig", "c", defaultKubeconfig,
 		"Kubernetes configuration file")
+
+	rootCmd.PersistentFlags().StringVarP(&istioNamespace, "istioNamespace", "i", kube.IstioNamespace,
+		"Istio system namespace")
 
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", v1.NamespaceDefault,
 		"Config namespace")
