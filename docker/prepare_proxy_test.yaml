@@ -37,6 +37,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: clientv2
+  labels:
+    app: clientv2
+    iter: TEMPLATE_ITER
+spec:
+  ports:
+  - port: CLIENT_PORT
+    targetPort: CLIENT_PORT
+    name: http
+  selector:
+    app: clientv2
+    iter: TEMPLATE_ITER
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: clientv2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: clientv2
+        iter: TEMPLATE_ITER
+    spec:
+      containers:
+      - image: TEMPLATE_HUB/app:TEMPLATE_TAG
+        imagePullPolicy: IfNotPresent
+        name: app
+        args: [ "--port", "CLIENT_PORT" ]
+        ports:
+          - containerPort: CLIENT_PORT
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: server
   labels:
     app: server
