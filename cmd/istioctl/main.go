@@ -30,7 +30,6 @@ import (
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
-	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/tools/version"
 )
 
