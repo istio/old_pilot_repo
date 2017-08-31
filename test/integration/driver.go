@@ -57,10 +57,10 @@ var (
 )
 
 const (
-	// CA image tag is the short SHA *update manually*
-	caTag = "689b447"
+	// caImage specifies the default istio-ca docker image used for e2e testing *update manually*
+	caImage = "gcr.io/istio-testing/istio-ca:2baec6baacecbd516ea0880573b6fc3cd5736739"
 
-	// Mixer image tag is the short SHA *update manually*
+	// mixerImage specifies the default mixer docker image used for e2e testing *update manually*
 	mixerImage = "gcr.io/istio-testing/mixer:49e721e15d481cd5d92d9a2b30b5e8fcdcafdb63"
 
 	// retry budget
@@ -70,12 +70,12 @@ const (
 func init() {
 	flag.StringVar(&params.Hub, "hub", "gcr.io/istio-testing", "Docker hub")
 	flag.StringVar(&params.Tag, "tag", "", "Docker tag")
-	flag.StringVar(&params.CaImage, "ca", "gcr.io/istio-testing/istio-ca:"+caTag,
-		"CA Docker image")
-	flag.StringVar(&params.MixerImage, "mixer", mixerImage,
-		"Mixer Docker image")
+	flag.StringVar(&params.CaImage, "ca", caImage, "CA Docker image")
+	flag.StringVar(&params.MixerImage, "mixer", mixerImage, "Mixer Docker image")
+	flag.StringVar(&params.IstioNamespace, "ns", "",
+		"Namespace in which to install Istio components (empty to create/delete temporary one)")
 	flag.StringVar(&params.Namespace, "n", "",
-		"Namespace to use for testing (empty to create/delete temporary one)")
+		"Namespace in which to install the applications (empty to create/delete temporary one)")
 	flag.BoolVar(&verbose, "verbose", false, "Debug level noise from proxies")
 	flag.BoolVar(&params.checkLogs, "logs", true, "Validate pod logs (expensive in long-running tests)")
 
@@ -90,6 +90,8 @@ func init() {
 	// Keep disabled until default no-op initializer is distributed
 	// and running in test clusters.
 	flag.BoolVar(&params.UseInitializer, "use-initializer", false, "Use k8s sidecar initializer")
+
+	flag.IntVar(&params.DebugPort, "debugport", 0, "Debugging port")
 }
 
 type test interface {
@@ -172,7 +174,8 @@ func runTests(envs ...infra) {
 			continue
 		}
 
-		istio.apps, errs = util.GetAppPods(client, istio.Namespace)
+		nslist := []string{istio.IstioNamespace, istio.Namespace}
+		istio.apps, errs = util.GetAppPods(client, nslist)
 
 		tests := []test{
 			&http{infra: &istio},
@@ -212,10 +215,16 @@ func runTests(envs ...infra) {
 			for _, pod := range util.GetPods(client, istio.Namespace) {
 				if strings.HasPrefix(pod, "istio-pilot") {
 					log("Discovery log", pod)
-					glog.Info(util.FetchLogs(client, pod, istio.Namespace, "discovery"))
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, "discovery"))
 				} else if strings.HasPrefix(pod, "istio-mixer") {
 					log("Mixer log", pod)
-					glog.Info(util.FetchLogs(client, pod, istio.Namespace, "mixer"))
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, "mixer"))
+				} else if strings.HasPrefix(pod, "istio-ingress") {
+					log("Ingress log", pod)
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
+				} else if strings.HasPrefix(pod, "istio-egress") {
+					log("Egress log", pod)
+					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
 				} else {
 					log("Proxy log", pod)
 					glog.Info(util.FetchLogs(client, pod, istio.Namespace, inject.ProxyContainerName))
@@ -309,7 +318,7 @@ func setupClient() error {
 	if err != nil {
 		return err
 	}
-	client, err = kube.CreateInterface(kubeconfig)
+	_, client, err = kube.CreateInterface(kubeconfig)
 	if err != nil {
 		return err
 	}

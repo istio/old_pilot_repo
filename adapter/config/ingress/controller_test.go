@@ -53,7 +53,7 @@ func makeTempClient(t *testing.T) (string, kubernetes.Interface, func()) {
 		kubeconfig = kubeconfig + "/../../../platform/kube/config"
 	}
 
-	client, err := kube.CreateInterface(kubeconfig)
+	_, client, err := kube.CreateInterface(kubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +75,7 @@ func TestIngressController(t *testing.T) {
 	mesh := proxy.DefaultMeshConfig()
 	ctl := ingress.NewController(cl, &mesh, kube.ControllerOptions{
 		Namespace:    ns,
+		AppNamespace: ns,
 		ResyncPeriod: resync,
 	})
 

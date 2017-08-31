@@ -41,8 +41,9 @@ type infra struct {
 	MixerImage string
 	CaImage    string
 
-	Namespace string
-	Verbosity int
+	Namespace      string
+	IstioNamespace string
+	Verbosity      int
 
 	// map from app to pods
 	apps map[string][]string
@@ -50,19 +51,21 @@ type infra struct {
 	Auth proxyconfig.ProxyMeshConfig_AuthPolicy
 
 	// switches for infrastructure components
-	Mixer   bool
-	Ingress bool
-	Egress  bool
-	Zipkin  bool
+	Mixer     bool
+	Ingress   bool
+	Egress    bool
+	Zipkin    bool
+	DebugPort int
 
 	// check proxy logs
 	checkLogs bool
 
-	namespaceCreated bool
+	namespaceCreated      bool
+	istioNamespaceCreated bool
 
 	// sidecar initializer
-	UseInitializer  bool
-	InjectionPolicy inject.InjectionPolicy
+	UseInitializer bool
+	InjectConfig   *inject.Config
 }
 
 func (infra *infra) setup() error {
@@ -78,31 +81,63 @@ func (infra *infra) setup() error {
 		}
 	}
 
-	deploy := func(name string) error {
+	if infra.IstioNamespace == "" {
+		var err error
+		if infra.IstioNamespace, err = util.CreateNamespace(client); err != nil {
+			return err
+		}
+		infra.istioNamespaceCreated = true
+	} else {
+		if _, err := client.Core().Namespaces().Get(infra.IstioNamespace, meta_v1.GetOptions{}); err != nil {
+			return err
+		}
+	}
+
+	deploy := func(name, namespace string) error {
 		if yaml, err := fill(name, infra); err != nil {
 			return err
-		} else if err = infra.kubeApply(yaml); err != nil {
+		} else if err = infra.kubeApply(yaml, namespace); err != nil {
 			return err
 		}
 		return nil
 	}
-	if err := deploy("rbac-beta.yaml.tmpl"); err != nil {
+	if err := deploy("rbac-beta.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("config.yaml.tmpl"); err != nil {
+	if err := deploy("config.yaml.tmpl", infra.Namespace); err != nil {
 		return err
 	}
-	if infra.UseInitializer {
-		infra.InjectionPolicy = inject.InjectionPolicyOptOut
 
-		// NOTE: InitializerConfiguration is cluster-scoped and may be
-		// created and used by other tests in the same test
-		// cluster.
-		if err := deploy("initializer-config.yaml.tmpl"); err != nil {
+	if err := deploy("config.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
+	}
+
+	mesh, err := inject.GetMeshConfig(client, infra.IstioNamespace, "istio")
+	if err != nil {
+		return err
+	}
+
+	infra.InjectConfig = &inject.Config{
+		Policy:     inject.InjectionPolicyOptOut,
+		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
+		Params: inject.Params{
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
+			Verbosity:         infra.Verbosity,
+			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
+			EnableCoreDump:    true,
+			Version:           "integration-test",
+			Mesh:              mesh,
+			MeshConfigMapName: "istio",
+		},
+	}
+
+	// NOTE: InitializerConfiguration is cluster-scoped and may be
+	// created and used by other tests in the same test cluster.
+	if infra.UseInitializer {
+		if err := deploy("initializer-config.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
-	} else {
-		infra.InjectionPolicy = inject.InjectionPolicyOff
 	}
 
 	// TODO - Initializer configs can block initializers from being
@@ -123,38 +158,43 @@ func (infra *infra) setup() error {
 	// tracking issue.
 	if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
 		return err
-	} else if err = infra.kubeDelete(yaml); err != nil {
+	} else if err = infra.kubeDelete(yaml, infra.IstioNamespace); err != nil {
 		glog.Infof("Sidecar initializer could not be deleted: %v", err)
 	}
 
-	if err := deploy("initializer.yaml.tmpl"); err != nil {
+	if yaml, err := fill("initializer-configmap.yaml.tmpl", &infra.InjectConfig); err != nil {
+		return err
+	} else if err = infra.kubeApply(yaml, infra.IstioNamespace); err != nil {
+		return err
+	}
+	if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
 
-	if err := deploy("pilot.yaml.tmpl"); err != nil {
+	if err := deploy("pilot.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("mixer.yaml.tmpl"); err != nil {
+	if err := deploy("mixer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
 
 	if infra.Auth != proxyconfig.ProxyMeshConfig_NONE {
-		if err := deploy("ca.yaml.tmpl"); err != nil {
+		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Ingress {
-		if err := deploy("ingress-proxy.yaml.tmpl"); err != nil {
+		if err := deploy("ingress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Egress {
-		if err := deploy("egress-proxy.yaml.tmpl"); err != nil {
+		if err := deploy("egress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
 	if infra.Zipkin {
-		if err := deploy("zipkin.yaml"); err != nil {
+		if err := deploy("zipkin.yaml", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
@@ -185,18 +225,19 @@ func (infra *infra) deployApps() error {
 func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, port4, port5, port6 int,
 	version string, injectProxy bool) error {
 	w, err := fill("app.yaml.tmpl", map[string]string{
-		"Hub":         infra.Hub,
-		"Tag":         infra.Tag,
-		"service":     svcName,
-		"deployment":  deployment,
-		"port1":       strconv.Itoa(port1),
-		"port2":       strconv.Itoa(port2),
-		"port3":       strconv.Itoa(port3),
-		"port4":       strconv.Itoa(port4),
-		"port5":       strconv.Itoa(port5),
-		"port6":       strconv.Itoa(port6),
-		"version":     version,
-		"injectProxy": strconv.FormatBool(injectProxy),
+		"Hub":            infra.Hub,
+		"Tag":            infra.Tag,
+		"service":        svcName,
+		"deployment":     deployment,
+		"port1":          strconv.Itoa(port1),
+		"port2":          strconv.Itoa(port2),
+		"port3":          strconv.Itoa(port3),
+		"port4":          strconv.Itoa(port4),
+		"port5":          strconv.Itoa(port5),
+		"port6":          strconv.Itoa(port6),
+		"version":        version,
+		"istioNamespace": infra.IstioNamespace,
+		"injectProxy":    strconv.FormatBool(injectProxy),
 	})
 	if err != nil {
 		return err
@@ -205,22 +246,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 	writer := new(bytes.Buffer)
 
 	if injectProxy && !infra.UseInitializer {
-		mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
-		if err != nil {
-			return err
-		}
-
-		p := &inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
-			Verbosity:         infra.Verbosity,
-			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
-			EnableCoreDump:    true,
-			Version:           "integration-test",
-			Mesh:              mesh,
-			MeshConfigMapName: "istio",
-		}
-		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
+		if err := inject.IntoResourceFile(infra.InjectConfig, strings.NewReader(w), writer); err != nil {
 			return err
 		}
 	} else {
@@ -229,7 +255,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		}
 	}
 
-	return infra.kubeApply(writer.String())
+	return infra.kubeApply(writer.String(), infra.Namespace)
 }
 
 func (infra *infra) teardown() {
@@ -237,16 +263,20 @@ func (infra *infra) teardown() {
 		util.DeleteNamespace(client, infra.Namespace)
 		infra.Namespace = ""
 	}
+	if infra.istioNamespaceCreated {
+		util.DeleteNamespace(client, infra.IstioNamespace)
+		infra.IstioNamespace = ""
+	}
 }
 
-func (infra *infra) kubeApply(yaml string) error {
+func (infra *infra) kubeApply(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl apply --kubeconfig %s -n %s -f -",
-		kubeconfig, infra.Namespace), yaml)
+		kubeconfig, namespace), yaml)
 }
 
-func (infra *infra) kubeDelete(yaml string) error {
+func (infra *infra) kubeDelete(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl delete --kubeconfig %s -n %s -f -",
-		kubeconfig, infra.Namespace), yaml)
+		kubeconfig, namespace), yaml)
 }
 
 type response struct {
@@ -274,8 +304,9 @@ func (infra *infra) clientRequest(app, url string, count int, extra string) resp
 	}
 
 	pod := infra.apps[app][0]
-	request, err := util.Shell(fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
-		pod, kubeconfig, infra.Namespace, url, count, extra))
+	cmd := fmt.Sprintf("kubectl exec %s --kubeconfig %s -n %s -c app -- client -url %s -count %d %s",
+		pod, kubeconfig, infra.Namespace, url, count, extra)
+	request, err := util.Shell(cmd)
 
 	if err != nil {
 		glog.Errorf("client request error %v for %s in %s", err, url, app)
