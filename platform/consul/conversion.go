@@ -29,8 +29,8 @@ const (
 	externalTagName = "external"
 )
 
-func convertTags(tags []string) model.Tags {
-	out := make(model.Tags, len(tags))
+func convertTags(tags []string) model.Labels {
+	out := make(model.Labels, len(tags))
 	for _, tag := range tags {
 		vals := strings.Split(tag, "|")
 		// Tags not of form "key|value" are ignored to avoid possible collisions
@@ -116,7 +116,7 @@ func convertInstance(instance *api.CatalogService) *model.ServiceInstance {
 			// TODO ExternalName come from metadata?
 			ExternalName: instance.NodeMeta[externalTagName],
 		},
-		Tags: tags,
+		Labels: tags,
 	}
 }
 

@@ -103,14 +103,14 @@ var (
 	serviceInstance1 = &ServiceInstance{
 		Endpoint: endpoint1,
 		Service:  service1,
-		Tags:     Tags{"a": "b", "c": "d"},
+		Labels:   Labels{"a": "b", "c": "d"},
 	}
 	serviceInstance2 = &ServiceInstance{
 		Endpoint: endpoint2,
 
 		Service: service2,
 
-		Tags: Tags{"e": "f", "g": "h"},
+		Labels: Labels{"e": "f", "g": "h"},
 	}
 
 	/*
@@ -487,7 +487,7 @@ func TestServiceKey(t *testing.T) {
 	{
 		want := "hostname|http|a=b,c=d"
 		port := &Port{Name: "http", Port: 80, Protocol: ProtocolHTTP}
-		tags := Tags{"a": "b", "c": "d"}
+		tags := Labels{"a": "b", "c": "d"}
 		got := svc.Key(port, tags)
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Service.Key() failed: got %v want %v", got, want)
@@ -496,7 +496,7 @@ func TestServiceKey(t *testing.T) {
 
 	cases := []struct {
 		port PortList
-		tags TagsList
+		tags LabelsCollection
 		want string
 	}{
 		{
@@ -504,37 +504,37 @@ func TestServiceKey(t *testing.T) {
 				{Name: "http", Port: 80, Protocol: ProtocolHTTP},
 				{Name: "http-alt", Port: 8080, Protocol: ProtocolHTTP},
 			},
-			tags: TagsList{{"a": "b", "c": "d"}},
+			tags: LabelsCollection{{"a": "b", "c": "d"}},
 			want: "hostname|http,http-alt|a=b,c=d",
 		},
 		{
 			port: PortList{{Name: "http", Port: 80, Protocol: ProtocolHTTP}},
-			tags: TagsList{{"a": "b", "c": "d"}},
+			tags: LabelsCollection{{"a": "b", "c": "d"}},
 			want: "hostname|http|a=b,c=d",
 		},
 		{
 			port: PortList{{Port: 80, Protocol: ProtocolHTTP}},
-			tags: TagsList{{"a": "b", "c": "d"}},
+			tags: LabelsCollection{{"a": "b", "c": "d"}},
 			want: "hostname||a=b,c=d",
 		},
 		{
 			port: PortList{},
-			tags: TagsList{{"a": "b", "c": "d"}},
+			tags: LabelsCollection{{"a": "b", "c": "d"}},
 			want: "hostname||a=b,c=d",
 		},
 		{
 			port: PortList{{Name: "http", Port: 80, Protocol: ProtocolHTTP}},
-			tags: TagsList{nil},
+			tags: LabelsCollection{nil},
 			want: "hostname|http",
 		},
 		{
 			port: PortList{{Name: "http", Port: 80, Protocol: ProtocolHTTP}},
-			tags: TagsList{},
+			tags: LabelsCollection{},
 			want: "hostname|http",
 		},
 		{
 			port: PortList{},
-			tags: TagsList{},
+			tags: LabelsCollection{},
 			want: "hostname",
 		},
 	}
@@ -549,20 +549,20 @@ func TestServiceKey(t *testing.T) {
 
 func TestTagsEquals(t *testing.T) {
 	cases := []struct {
-		a, b Tags
+		a, b Labels
 		want bool
 	}{
 		{
 			a: nil,
-			b: Tags{"a": "b"},
+			b: Labels{"a": "b"},
 		},
 		{
-			a: Tags{"a": "b"},
+			a: Labels{"a": "b"},
 			b: nil,
 		},
 		{
-			a:    Tags{"a": "b"},
-			b:    Tags{"a": "b"},
+			a:    Labels{"a": "b"},
+			b:    Labels{"a": "b"},
 			want: true,
 		},
 	}

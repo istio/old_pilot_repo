@@ -95,7 +95,7 @@ func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Du
 	return cluster
 }
 
-func buildOutboundCluster(hostname string, port *model.Port, tags model.Tags) *Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, tags model.Labels) *Cluster {
 	svc := model.Service{Hostname: hostname}
 	key := svc.Key(port, tags)
 

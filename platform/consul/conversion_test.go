@@ -111,12 +111,12 @@ func TestConvertInstance(t *testing.T) {
 		t.Errorf("convertInstance() => %v, want %v", out.Endpoint.Address, ip)
 	}
 
-	if len(out.Tags) != 2 {
-		t.Errorf("convertInstance() len(Tags) => %v, want %v", len(out.Tags), 2)
+	if len(out.Labels) != 2 {
+		t.Errorf("convertInstance() len(Tags) => %v, want %v", len(out.Labels), 2)
 	}
 
-	if out.Tags[tagKey1] != tagVal1 || out.Tags[tagKey2] != tagVal2 {
-		t.Errorf("convertInstance() => missing or incorrect tag in %q", out.Tags)
+	if out.Labels[tagKey1] != tagVal1 || out.Labels[tagKey2] != tagVal2 {
+		t.Errorf("convertInstance() => missing or incorrect tag in %q", out.Labels)
 	}
 
 	if out.Service.Hostname != serviceHostname(name) {

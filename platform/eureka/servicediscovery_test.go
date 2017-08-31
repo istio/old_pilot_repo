@@ -137,13 +137,13 @@ func TestServiceDiscoveryInstances(t *testing.T) {
 	sd := NewServiceDiscovery(cl)
 	serviceA := makeService("a.default.svc.local", []int{9090, 8080}, nil)
 	serviceB := makeService("b.default.svc.local", []int{7070}, nil)
-	spamCoolaidTags := model.Tags{"spam": "coolaid"}
-	kitKatTags := model.Tags{"kit": "kat"}
+	spamCoolaidTags := model.Labels{"spam": "coolaid"}
+	kitKatTags := model.Labels{"kit": "kat"}
 
 	serviceInstanceTests := []struct {
 		hostname  string
 		ports     []string
-		tags      model.TagsList
+		tags      model.LabelsCollection
 		instances []*model.ServiceInstance
 	}{
 		{
@@ -157,7 +157,7 @@ func TestServiceDiscoveryInstances(t *testing.T) {
 		{
 			// filter by hostname and tags
 			hostname: "a.default.svc.local",
-			tags:     model.TagsList{{"spam": "coolaid"}},
+			tags:     model.LabelsCollection{{"spam": "coolaid"}},
 			instances: []*model.ServiceInstance{
 				makeServiceInstance(serviceA, "10.0.0.1", 9090, spamCoolaidTags),
 			},
@@ -189,7 +189,7 @@ func sortServices(services []*model.Service) {
 }
 
 func sortServiceInstances(instances []*model.ServiceInstance) {
-	tagsToSlice := func(tags model.Tags) []string {
+	tagsToSlice := func(tags model.Labels) []string {
 		out := make([]string, 0, len(tags))
 		for k, v := range tags {
 			out = append(out, fmt.Sprintf("%s=%s", k, v))
@@ -202,16 +202,16 @@ func sortServiceInstances(instances []*model.ServiceInstance) {
 		if instances[i].Service.Hostname == instances[j].Service.Hostname {
 			if instances[i].Endpoint.Port == instances[j].Endpoint.Port {
 				if instances[i].Endpoint.Address == instances[j].Endpoint.Address {
-					if len(instances[i].Tags) == len(instances[j].Tags) {
-						iTags := tagsToSlice(instances[i].Tags)
-						jTags := tagsToSlice(instances[j].Tags)
+					if len(instances[i].Labels) == len(instances[j].Labels) {
+						iTags := tagsToSlice(instances[i].Labels)
+						jTags := tagsToSlice(instances[j].Labels)
 						for k := range iTags {
 							if iTags[k] < jTags[k] {
 								return true
 							}
 						}
 					}
-					return len(instances[i].Tags) < len(instances[j].Tags)
+					return len(instances[i].Labels) < len(instances[j].Labels)
 				}
 				return instances[i].Endpoint.Address < instances[j].Endpoint.Address
 			}

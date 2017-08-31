@@ -288,7 +288,7 @@ func makeService(hostname string, ports []int, protocols []model.Protocol) *mode
 	}
 }
 
-func makeServiceInstance(service *model.Service, ip string, port int, tags model.Tags) *model.ServiceInstance {
+func makeServiceInstance(service *model.Service, ip string, port int, tags model.Labels) *model.ServiceInstance {
 	servicePort, _ := service.Ports.GetByPort(port)
 	return &model.ServiceInstance{
 		Endpoint: model.NetworkEndpoint{
@@ -297,7 +297,7 @@ func makeServiceInstance(service *model.Service, ip string, port int, tags model
 			ServicePort: servicePort,
 		},
 		Service:          service,
-		Tags:             tags,
+		Labels:           tags,
 		AvailabilityZone: "",
 	}
 }

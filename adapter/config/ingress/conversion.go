@@ -114,7 +114,7 @@ func createIngressRule(name, host, path, domainSuffix string,
 			Type:            model.IngressRule.Type,
 			Name:            name,
 			Namespace:       ingress.Namespace,
-			Domain:          domainSuffix,
+			Domain:          "svc." + domainSuffix,
 			Labels:          ingress.Labels,
 			Annotations:     ingress.Annotations,
 			ResourceVersion: ingress.ResourceVersion,
@@ -157,11 +157,6 @@ func decodeIngressRuleName(name string) (ingressName string, ruleNum, pathNum in
 // TODO: warning that Envoy regex language is not 1-1 with golang's regex language!
 func isRegularExpression(s string) bool {
 	return len(s) < len(regexp.QuoteMeta(s))
-}
-
-// serviceHostname produces FQDN for a k8s service
-func serviceHostname(name, namespace, domainSuffix string) string {
-	return fmt.Sprintf("%s.%s.svc.%s", name, namespace, domainSuffix)
 }
 
 // shouldProcessIngress determines whether the given ingress resource should be processed

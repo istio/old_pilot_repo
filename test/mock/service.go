@@ -137,7 +137,7 @@ func MakeInstance(service *model.Service, port *model.Port, version int) *model.
 			ServicePort: port,
 		},
 		Service: service,
-		Tags:    map[string]string{"version": fmt.Sprintf("v%d", version)},
+		Labels:  map[string]string{"version": fmt.Sprintf("v%d", version)},
 	}
 }
 
@@ -175,7 +175,7 @@ func (sd *ServiceDiscovery) GetService(hostname string) (*model.Service, bool) {
 }
 
 // Instances implements discovery interface
-func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags model.TagsList) []*model.ServiceInstance {
+func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags model.LabelsCollection) []*model.ServiceInstance {
 	service, ok := sd.services[hostname]
 	if !ok {
 		return nil

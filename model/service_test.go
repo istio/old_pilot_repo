@@ -18,13 +18,13 @@ import "testing"
 
 var validServiceKeys = map[string]struct {
 	service Service
-	tags    TagsList
+	tags    LabelsCollection
 }{
 	"example-service1.default|grpc,http|a=b,c=d;e=f": {
 		service: Service{
 			Hostname: "example-service1.default",
 			Ports:    []*Port{{Name: "http", Port: 80}, {Name: "grpc", Port: 90}}},
-		tags: TagsList{{"e": "f"}, {"c": "d", "a": "b"}}},
+		tags: LabelsCollection{{"e": "f"}, {"c": "d", "a": "b"}}},
 	"my-service": {
 		service: Service{
 			Hostname: "my-service",
@@ -37,12 +37,12 @@ var validServiceKeys = map[string]struct {
 		service: Service{
 			Hostname: "svc",
 			Ports:    []*Port{{Name: "", Port: 80}}},
-		tags: TagsList{{"istio.io/my_tag-v1.test": "my_value-v2.value"}}},
+		tags: LabelsCollection{{"istio.io/my_tag-v1.test": "my_value-v2.value"}}},
 	"svc|test|prod": {
 		service: Service{
 			Hostname: "svc",
 			Ports:    []*Port{{Name: "test", Port: 80}}},
-		tags: TagsList{{"prod": ""}}},
+		tags: LabelsCollection{{"prod": ""}}},
 	"svc.default.svc.cluster.local|http-test": {
 		service: Service{
 			Hostname: "svc.default.svc.cluster.local",
@@ -96,7 +96,7 @@ func compare(a, b []string) bool {
 }
 
 // compareTags compares sets of tags
-func compareTags(a, b []Tags) bool {
+func compareTags(a, b []Labels) bool {
 	var as, bs []string
 	for _, i := range a {
 		as = append(as, i.String())
@@ -108,17 +108,17 @@ func compareTags(a, b []Tags) bool {
 }
 
 func TestTags(t *testing.T) {
-	a := Tags{"app": "a"}
-	b := Tags{"app": "b"}
-	a1 := Tags{"app": "a", "prod": "env"}
-	ab := TagsList{a, b}
-	a1b := TagsList{a1, b}
-	none := TagsList{}
+	a := Labels{"app": "a"}
+	b := Labels{"app": "b"}
+	a1 := Labels{"app": "a", "prod": "env"}
+	ab := LabelsCollection{a, b}
+	a1b := LabelsCollection{a1, b}
+	none := LabelsCollection{}
 
 	// equivalent to empty tag list
-	singleton := TagsList{nil}
+	singleton := LabelsCollection{nil}
 
-	var empty Tags
+	var empty Labels
 	if !empty.SubsetOf(a) {
 		t.Errorf("nil.SubsetOf({a}) => Got false")
 	}
@@ -128,8 +128,8 @@ func TestTags(t *testing.T) {
 	}
 
 	matching := []struct {
-		tag  Tags
-		list TagsList
+		tag  Labels
+		list LabelsCollection
 	}{
 		{a, ab},
 		{b, ab},
@@ -140,7 +140,7 @@ func TestTags(t *testing.T) {
 		{b, a1b},
 	}
 
-	if (TagsList{a}).HasSubsetOf(b) {
+	if (LabelsCollection{a}).HasSubsetOf(b) {
 		t.Errorf("{a}.HasSubsetOf(b) => Got true")
 	}
 

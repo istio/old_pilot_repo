@@ -171,7 +171,7 @@ func (instance *ServiceInstance) Validate() error {
 		errs = multierror.Append(errs, err)
 	}
 
-	if err := instance.Tags.Validate(); err != nil {
+	if err := instance.Labels.Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -202,7 +202,7 @@ func (instance *ServiceInstance) Validate() error {
 }
 
 // Validate ensures tag is well-formed
-func (t Tags) Validate() error {
+func (t Labels) Validate() error {
 	var errs error
 	for k, v := range t {
 		if !tagRegexp.MatchString(k) {
@@ -252,7 +252,7 @@ func ValidateIstioService(svc *proxyconfig.IstioService) (errs error) {
 
 	// TODO: handle service reference
 
-	if err := Tags(svc.Labels).Validate(); err != nil {
+	if err := Labels(svc.Labels).Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -370,7 +370,7 @@ func ValidateFloatPercent(val float32) error {
 func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) (errs error) {
 	// TODO: fix destination in destination weight to be an istio service
 
-	if err := Tags(dw.Labels).Validate(); err != nil {
+	if err := Labels(dw.Labels).Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 

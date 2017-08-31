@@ -95,7 +95,7 @@ func convertServiceInstances(services map[string]*model.Service, apps []*applica
 						ServicePort: port,
 					},
 					Service: services[instance.Hostname],
-					Tags:    convertTags(instance.Metadata),
+					Labels:  convertTags(instance.Metadata),
 				})
 			}
 		}
@@ -157,8 +157,8 @@ func convertProtocol(md metadata) model.Protocol {
 	return model.ProtocolTCP // default protocol
 }
 
-func convertTags(metadata metadata) model.Tags {
-	tags := make(model.Tags)
+func convertTags(metadata metadata) model.Labels {
+	tags := make(model.Labels)
 	for k, v := range metadata {
 		tags[k] = v
 	}

@@ -17,7 +17,6 @@ package model
 import (
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -227,9 +226,6 @@ func (descriptor ConfigDescriptor) GetByType(name string) (ProtoSchema, bool) {
 type IstioConfigStore interface {
 	ConfigStore
 
-	// RouteRules lists all routing rules
-	RouteRules() map[string]*proxyconfig.RouteRule
-
 	// IngressRules lists all ingress rules
 	IngressRules() map[string]*proxyconfig.IngressRule
 
@@ -239,18 +235,19 @@ type IstioConfigStore interface {
 	// DestinationPolicies lists all destination rules
 	DestinationPolicies() []*proxyconfig.DestinationPolicy
 
-	// RouteRulesBySource selects routing rules by source service instances.
+	// RouteRules selects routing rules by source service instances and destination service.
 	// A rule must match at least one of the input service instances since the proxy
 	// does not distinguish between source instances in the request.
 	// The rules are sorted by precedence (high first) in a stable manner.
-	RouteRulesBySource(source []*ServiceInstance, destination *Service) []Config
+	RouteRules(source []*ServiceInstance, destination *Service) []Config
 
 	// RouteRulesByDestination selects routing rules associated with destination service instances.
+	// A rule must match at least one of the input destination instances.
 	// The rules are sorted by precedence (high first) in a stable manner.
-	RouteRulesByDestination(instances []*ServiceInstance) []*proxyconfig.RouteRule
+	RouteRulesByDestination(destination []*ServiceInstance) []Config
 
 	// DestinationPolicy returns a policy for a service version.
-	DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy
+	DestinationPolicy(destination string, tags Labels) *proxyconfig.DestinationVersionPolicy
 }
 
 const (
@@ -355,45 +352,45 @@ func MakeIstioStore(store ConfigStore) IstioConfigStore {
 	return &istioConfigStore{store}
 }
 
-func (i istioConfigStore) RouteRules() map[string]*proxyconfig.RouteRule {
-	out := make(map[string]*proxyconfig.RouteRule)
-	rs, err := i.List(RouteRule.Type, "")
+func (i *istioConfigStore) RouteRules(source []*ServiceInstance, destination *Service) []Config {
+	out := make([]Config, 0)
+	configs, err := i.List(RouteRule.Type, NamespaceAll)
 	if err != nil {
-		glog.V(2).Infof("RouteRules => %v", err)
+		return nil
 	}
-	for _, r := range rs {
-		if rule, ok := r.Spec.(*proxyconfig.RouteRule); ok {
-			out[r.Key()] = rule
-		}
-	}
-	return out
-}
 
-func (i *istioConfigStore) RouteRulesBySource(source []*ServiceInstance, destination *Service) []Config {
-	rules := make([]Config, 0)
-	/*
-		for key, rule := range i.RouteRules() {
-			// validate that rule match predicate applies to source service instances
-					if rule.Match != nil && rule.Match.Source != "" {
-						found := false
-						for _, instance := range instances {
-							// must match the source field if it is set
-							if rule.Match.Source != instance.Service.Hostname {
-								continue
-							}
-							// must match the tags field - the rule tags are a subset of the instance tags
-							var tags Tags = rule.Match.SourceTags
-							if tags.SubsetOf(instance.Tags) {
-								found = true
-								break
-							}
-						}
-						if !found {
-							continue
-						}
-					}
-				rules = append(rules, config{Key: key, Spec: rule})
+	for _, config := range configs {
+		rule := config.Spec.(*proxyconfig.RouteRule)
+
+		// validate that rule match predicate applies to destination service
+		hostname := ResolveService(config.ConfigMeta, rule.Destination)
+		if hostname != destination.Hostname {
+			continue
 		}
+
+		// validate that rule match predicate applies to source service instances
+		if rule.Match != nil && rule.Match.Source != nil {
+			found := false
+			sourceService := ResolveService(config.ConfigMeta, rule.Match.Source)
+			for _, instance := range source {
+				// must match the source field if it is set
+				if sourceService != instance.Service.Hostname {
+					continue
+				}
+				// must match the tags field - the rule tags are a subset of the instance tags
+				if Labels(rule.Match.Source.Labels).SubsetOf(instance.Labels) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		out = append(out, config)
+	}
+	/*
 		// sort by high precedence first, key string second (keys are unique)
 		sort.Slice(rules, func(i, j int) bool {
 			return rules[i].Spec.Precedence > rules[j].Spec.Precedence ||
@@ -407,15 +404,26 @@ func (i *istioConfigStore) RouteRulesBySource(source []*ServiceInstance, destina
 			out[i] = rule.Spec
 		}
 	*/
-	return rules
+	return out
 }
 
-func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance) []*proxyconfig.RouteRule {
-	type config struct {
-		Key  string
-		Spec *proxyconfig.RouteRule
+func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance) []Config {
+	out := make([]Config, 0)
+	configs, err := i.List(RouteRule.Type, NamespaceAll)
+	if err != nil {
+		return nil
 	}
-	rules := make([]config, 0)
+
+	for _, config := range configs {
+		rule := config.Spec.(*proxyconfig.RouteRule)
+		destination := ResolveService(config.ConfigMeta, rule.Destination)
+		for _, instance := range instances {
+			if destination == instance.Service.Hostname {
+				out = append(out, config)
+				break
+			}
+		}
+	}
 
 	/*
 		for key, rule := range i.RouteRules() {
@@ -428,18 +436,20 @@ func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance)
 		}
 	*/
 
-	// sort by high precedence first, key string second (keys are unique)
-	sort.Slice(rules, func(i, j int) bool {
-		return rules[i].Spec.Precedence > rules[j].Spec.Precedence ||
-			(rules[i].Spec.Precedence == rules[j].Spec.Precedence &&
-				rules[i].Key < rules[j].Key)
-	})
+	/*
+		// sort by high precedence first, key string second (keys are unique)
+		sort.Slice(rules, func(i, j int) bool {
+			return rules[i].Spec.Precedence > rules[j].Spec.Precedence ||
+				(rules[i].Spec.Precedence == rules[j].Spec.Precedence &&
+					rules[i].Key < rules[j].Key)
+		})
 
-	// project to rules
-	out := make([]*proxyconfig.RouteRule, len(rules))
-	for i, rule := range rules {
-		out[i] = rule.Spec
-	}
+		// project to rules
+		out := make([]*proxyconfig.RouteRule, len(rules))
+		for i, rule := range rules {
+			out[i] = rule.Spec
+		}
+	*/
 	return out
 }
 
@@ -485,7 +495,7 @@ func (i *istioConfigStore) DestinationPolicies() []*proxyconfig.DestinationPolic
 	return out
 }
 
-func (i *istioConfigStore) DestinationPolicy(destination string, tags Tags) *proxyconfig.DestinationVersionPolicy {
+func (i *istioConfigStore) DestinationPolicy(destination string, tags Labels) *proxyconfig.DestinationVersionPolicy {
 	/*
 		names := strings.Split(destination, ".")
 		name, namespace := "", ""

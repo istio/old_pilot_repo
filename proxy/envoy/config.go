@@ -384,7 +384,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 
 		// collect route rules
 		useDefaultRoute := true
-		rules := config.RouteRulesBySource(instances, service)
+		rules := config.RouteRules(instances, service)
 		for _, rule := range rules {
 			httpRoute := buildHTTPRoute(rule, service, servicePort)
 			routes = append(routes, httpRoute)
@@ -551,12 +551,15 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				Routes:  []*HTTPRoute{},
 			}
 
+			host.Routes = append(host.Routes, defaultRoute)
+
 			// Websocket enabled routes need to have an explicit use_websocket : true
 			// This setting needs to be enabled on Envoys at both sender and receiver end
 			if protocol == model.ProtocolHTTP {
 				// get all the route rules applicable to the instances
 				rules := config.RouteRulesByDestination(instances)
-				for _, rule := range rules {
+				for _, config := range rules {
+					rule := config.Spec.(*proxyconfig.RouteRule)
 					if rule.WebsocketUpgrade {
 						websocketRoute := buildInboundWebsocketRoute(rule, cluster)
 
@@ -572,7 +575,6 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				}
 			}
 
-			host.Routes = append(host.Routes, defaultRoute)
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address, endpoint.Port, "", false))

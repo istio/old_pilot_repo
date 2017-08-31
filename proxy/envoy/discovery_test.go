@@ -291,10 +291,13 @@ func TestRouteDiscoveryWebsocket(t *testing.T) {
 	addConfig(registry, websocketRouteRule, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
 
-	// fault rule is source based: we check that the rule only affect v0 and not v1
 	url := fmt.Sprintf("/v1/routes/80/%s/%s", ds.Mesh.IstioServiceCluster, mock.ProxyV0.ServiceNode())
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-websocket.json", t)
+
+	url = fmt.Sprintf("/v1/listeners/%s/%s", ds.Mesh.IstioServiceCluster, mock.ProxyV0.ServiceNode())
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/lds-websocket.json", t)
 }
 
 func TestRouteDiscoveryIngress(t *testing.T) {

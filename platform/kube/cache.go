@@ -65,7 +65,7 @@ func (pc *PodCache) getPodByIP(addr string) (*v1.Pod, bool) {
 }
 
 // tagsByIP returns pod tags or nil if pod not found or an error occurred
-func (pc *PodCache) tagsByIP(addr string) (model.Tags, bool) {
+func (pc *PodCache) tagsByIP(addr string) (model.Labels, bool) {
 	pod, exists := pc.getPodByIP(addr)
 	if !exists {
 		return nil, false
