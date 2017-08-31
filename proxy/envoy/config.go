@@ -668,7 +668,8 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 		}
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
-			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS {
+			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS &&
+				protocol != model.ProtocolHTTP2 && protocol != model.ProtocolGRPC {
 				continue
 			}
 			intPort := int(port.Port)
