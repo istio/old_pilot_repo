@@ -632,7 +632,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 	protocolSuffix := "-" + strings.ToLower(string(protocolToHandle))
 
 	if rule.UseEgressProxy {
-		externalTrafficCluster = buildOutboundCluster("istio-egress.default-"+protocolSuffix, port, nil)
+		externalTrafficCluster = buildOutboundCluster("istio-egress", port, nil)
 		externalTrafficCluster.ServiceName = ""
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
