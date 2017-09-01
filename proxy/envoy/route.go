@@ -95,9 +95,9 @@ func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Du
 	return cluster
 }
 
-func buildOutboundCluster(hostname string, port *model.Port, tags model.Labels) *Cluster {
+func buildOutboundCluster(hostname string, port *model.Port, labels model.Labels) *Cluster {
 	svc := model.Service{Hostname: hostname}
-	key := svc.Key(port, tags)
+	key := svc.Key(port, labels)
 
 	// cluster name must be below 60 characters
 	cluster := &Cluster{
@@ -108,7 +108,7 @@ func buildOutboundCluster(hostname string, port *model.Port, tags model.Labels) 
 		outbound:    true,
 		hostname:    hostname,
 		port:        port,
-		tags:        tags,
+		tags:        labels,
 	}
 
 	if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {

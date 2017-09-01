@@ -379,16 +379,11 @@ func MatchSource(meta ConfigMeta, source *proxyconfig.IstioService, instances []
 func SortRouteRules(rules []Config) {
 	// sort by high precedence first, key string second (keys are unique)
 	sort.Slice(rules, func(i, j int) bool {
-		irule, ok := rules[i].Spec.(*proxyconfig.RouteRule)
-		if !ok {
-			return false
-		}
-		jrule, ok := rules[j].Spec.(*proxyconfig.RouteRule)
-		if !ok {
-			return false
-		}
-
-		return irule.Precedence > jrule.Precedence ||
+		// protect against incompatible types
+		irule, _ := rules[i].Spec.(*proxyconfig.RouteRule)
+		jrule, _ := rules[j].Spec.(*proxyconfig.RouteRule)
+		return irule == nil || jrule == nil ||
+			irule.Precedence > jrule.Precedence ||
 			(irule.Precedence == jrule.Precedence && rules[i].Key() < rules[j].Key())
 	})
 }
