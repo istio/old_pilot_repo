@@ -651,7 +651,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
 	return &VirtualHost{
-		Name:    rule.Domains[0], // use the first domain as the name
+		Name:    rule.Name + "-" + strconv.Itoa(port.Port),
 		Domains: appendPortToDomains(rule.Domains, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
