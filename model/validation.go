@@ -766,7 +766,7 @@ func ValidateEgressRule(msg proto.Message) error {
 		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a name"))
 	}
 
-	if rule.Domains == nil || len(rule.Domains) == 0 {
+	if len(rule.Domains) == 0 {
 		return fmt.Errorf("egress rule must have a domains list")
 	}
 
@@ -782,7 +782,7 @@ func ValidateEgressRule(msg proto.Message) error {
 		}
 	}
 
-	if rule.Ports == nil || len(rule.Ports) == 0 {
+	if len(rule.Ports) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a ports list"))
 	}
 
