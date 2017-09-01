@@ -33,7 +33,9 @@ import (
 )
 
 // GetMeshConfig fetches the ProxyMesh configuration from Kubernetes ConfigMap.
-func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*v1.ConfigMap, *proxyconfig.ProxyMeshConfig, error) {
+func GetMeshConfig(kube kubernetes.Interface, namespace,
+	name string) (*v1.ConfigMap, *proxyconfig.ProxyMeshConfig, error) {
+
 	config, err := kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
@@ -59,7 +61,8 @@ func GetMeshConfig(kube kubernetes.Interface, namespace, name string) (*v1.Confi
 }
 
 // CreateMeshConfigMap copies a configMap in another namespace
-func CreateMeshConfigMap(kube kubernetes.Interface, namespace, name string, srcConfigMap *v1.ConfigMap) (*v1.ConfigMap, error) {
+func CreateMeshConfigMap(kube kubernetes.Interface, namespace, name string,
+	srcConfigMap *v1.ConfigMap) (*v1.ConfigMap, error) {
 
 	destConfigMap := &v1.ConfigMap{
 		TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},

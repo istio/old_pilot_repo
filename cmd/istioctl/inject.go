@@ -126,7 +126,7 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 			if err != nil {
 				_, err = inject.CreateMeshConfigMap(client, namespace, meshConfig, istioMeshConfigMap)
 				if err != nil {
-					return fmt.Errorf("Cannot create Istio configuration map in namespace",
+					return fmt.Errorf("Cannot create Istio configuration map in namespace %s",
 						namespace)
 				}
 			}
