@@ -41,6 +41,7 @@ import (
 	"istio.io/pilot/model"
 	"istio.io/pilot/model/test"
 	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/platform/kube/admit/testcerts"
 	"istio.io/pilot/test/mock"
 )
 
@@ -87,7 +88,7 @@ func makeConfig(t *testing.T, namespace string, i int, valid bool) []byte {
 	return raw
 }
 
-func TestAdmit(t *testing.T) {
+func TestAdmissionController(t *testing.T) {
 	valid := makeConfig(t, watchedNamespace, 0, true)
 	invalid := makeConfig(t, watchedNamespace, 0, false)
 	nonWatchedInvalid := makeConfig(t, nonWatchedNamespace, 0, false)
@@ -212,10 +213,10 @@ func TestAdmit(t *testing.T) {
 		if c.useNamespaceAll {
 			namespaces = []string{metav1.NamespaceAll}
 		}
-		testAdmit := New(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-			DefaultAdmissionServiceName, "istio-system", namespaces, caCert)
+		testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
+			DefaultAdmissionServiceName, "istio-system", namespaces, testcerts.CACert)
 
-		got := testAdmit.admit(c.in)
+		got := testAdmissionController.admit(c.in)
 		if got.Allowed != c.want.Allowed {
 			t.Errorf("%v: AdmissionReviewStatus.Allowed is wrong : got %v want %v",
 				c.name, got.Allowed, c.want.Allowed)
@@ -241,12 +242,12 @@ func makeTestData(t *testing.T, valid bool) []byte {
 }
 
 func makeTestClient() (*http.Client, error) {
-	clientCert, err := tls.X509KeyPair(clientCert, clientKey)
+	clientCert, err := tls.X509KeyPair(testcerts.ClientCert, testcerts.ClientKey)
 	if err != nil {
 		return nil, fmt.Errorf("LoadX509KeyPair failed: %v", err)
 	}
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	caCertPool.AppendCertsFromPEM(testcerts.CACert)
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{clientCert},
 		RootCAs:      caCertPool,
@@ -313,15 +314,15 @@ func TestServe(t *testing.T) {
 		},
 	}
 
-	testAdmit := New(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, caCert)
+	testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
+		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, testcerts.CACert)
 
-	tlsConfig, err := MakeTLSConfig(serverCert, serverKey, caCert)
+	tlsConfig, err := MakeTLSConfig(testcerts.ServerCert, testcerts.ServerKey, testcerts.CACert)
 	if err != nil {
 		t.Fatalf("MakeTLSConfig failed: %v", err)
 	}
 
-	testServer, testListener, err := makeTestServer(testAdmit, tlsConfig)
+	testServer, testListener, err := makeTestServer(testAdmissionController, tlsConfig)
 	if err != nil {
 		t.Fatalf("Could not create test server: %v", err)
 	}
@@ -371,13 +372,13 @@ func TestServe(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-	testAdmit := New(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, caCert)
+	testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
+		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, testcerts.CACert)
 
 	fakeClient := fake.NewSimpleClientset(&admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{})
 
 	fakeAdmissionClient := fakeClient.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations()
-	if err := testAdmit.Register(fakeAdmissionClient); err != nil {
+	if err := testAdmissionController.Register(fakeAdmissionClient); err != nil {
 		t.Fatalf("Register() failed: %v", err)
 	}
 
@@ -397,7 +398,7 @@ func TestRegister(t *testing.T) {
 	}
 	fakeClient.ClearActions()
 
-	if err := testAdmit.Unregister(fakeAdmissionClient); err != nil {
+	if err := testAdmissionController.Unregister(fakeAdmissionClient); err != nil {
 		t.Fatalf("Register() failed: %v", err)
 	}
 

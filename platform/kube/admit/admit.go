@@ -50,27 +50,55 @@ const (
 
 	// DefaultAdmissionServiceName is the default service of the
 	// validation webhook.
-	DefaultAdmissionServiceName = "istio-pilot-config"
+	//
+	// This is a reference to the service for the webhook. If there is
+	// only one port open for the service, that port will be used. If
+	// there are multiple ports open, port 443 will be used if it is
+	// open, otherwise it is an error.
+	//
+	// ref - k8s.io/pkg/apis/admissionregistration/types.go#L197
+	//
+	// This needs to point to an external service when running on
+	// Kubernetes 1.7 to work around some cloud provider bug (see
+	// https://github.com/kubernetes/kubernetes/issues/49987#issuecomment-319739227)
+	DefaultAdmissionServiceName = "istio-pilot"
 )
 
-// Admit implements the external admission webhook for validation
+// AdmissionController implements the external admission webhook for validation of
 // pilot configuration.
-type Admit struct {
-	descriptor       model.ConfigDescriptor
-	hookConfigName   string
-	hookName         string
-	serviceName      string
+type AdmissionController struct {
+	descriptor model.ConfigDescriptor
+
+	// externalAdmissionHookConfigurationName is the name of the
+	// ExternalAdmissionHookConfiguration which configures the
+	// initializer.
+	externalAdmissionHookConfigurationName string
+
+	// Name of the ExternalAdmissionHook which describes he external
+	// admission webhook and resources and operations it applies to.
+	externalAdmissionHookName string
+
+	// serviceName is the service name of the webhook.
+	serviceName string
+
+	// serviceNamespace is the namespace of the webhook service.
 	serviceNamespace string
-	caBundle         []byte
+
+	// cabundle is the PEM encoded CA bundle which will be used to
+	// validate webhook's service certificate.
+	caBundle []byte
 
 	// unconditionally validate all config that is not in this list of
 	// configuration.
 	validateNamespaces []string
 }
 
-// GetAPIServerExtensionCACert gets the CA cert that will signed the
-// cert used by the "GenericAdmissionWebhook" plugin admission
-// controller.
+// GetAPIServerExtensionCACert gets the Kubernetes aggregate apiserver
+// client CA cert used by the "GenericAdmissionWebhook" plugin
+// admission controller.
+//
+// NOTE: this certificate is provided kubernetes. We do not control
+// its name or location.
 func GetAPIServerExtensionCACert(cl kubernetes.Interface) ([]byte, error) {
 	const name = "extension-apiserver-authentication"
 	c, err := cl.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(name, metav1.GetOptions{})
@@ -100,39 +128,40 @@ func MakeTLSConfig(serverCert, serverKey, caCert []byte) (*tls.Config, error) {
 	}, nil
 }
 
-// New creates a new instance of the admission webhook controller.
-func New(descriptor model.ConfigDescriptor, hookConfigName, hookName, serviceName, serviceNamespace string, validateNamespaces []string, caBundle []byte) *Admit { // nolint: lll
-	return &Admit{
-		descriptor:         descriptor,
-		hookConfigName:     hookConfigName,
-		hookName:           hookName,
-		serviceName:        serviceName,
-		serviceNamespace:   serviceNamespace,
-		caBundle:           caBundle,
-		validateNamespaces: validateNamespaces,
+// NewController creates a new instance of the admission webhook controller.
+func NewController(descriptor model.ConfigDescriptor, externalAdmissionHookConfigurationName, externalAdmissionHookName,
+	serviceName, serviceNamespace string, validateNamespaces []string, caBundle []byte) *AdmissionController {
+	return &AdmissionController{
+		descriptor:                             descriptor,
+		externalAdmissionHookConfigurationName: externalAdmissionHookConfigurationName,
+		externalAdmissionHookName:              externalAdmissionHookName,
+		serviceName:                            serviceName,
+		serviceNamespace:                       serviceNamespace,
+		caBundle:                               caBundle,
+		validateNamespaces:                     validateNamespaces,
 	}
 }
 
-// Unregister registers the external admission webhook
-func (a *Admit) Unregister(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
-	return client.Delete(a.hookConfigName, nil)
+// Unregister unregisters the external admission webhook
+func (ac *AdmissionController) Unregister(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
+	return client.Delete(ac.externalAdmissionHookConfigurationName, nil)
 }
 
 // Register registers the external admission webhook for pilot
 // configuration types.
-func (a *Admit) Register(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
+func (ac *AdmissionController) Register(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
 	var resources []string
-	for _, schema := range a.descriptor {
+	for _, schema := range ac.descriptor {
 		resources = append(resources, schema.Plural)
 	}
 
 	webhook := &admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: a.hookConfigName,
+			Name: ac.externalAdmissionHookConfigurationName,
 		},
 		ExternalAdmissionHooks: []admissionregistrationv1alpha1.ExternalAdmissionHook{
 			{
-				Name: a.hookName,
+				Name: ac.externalAdmissionHookName,
 				Rules: []admissionregistrationv1alpha1.RuleWithOperations{{
 					Operations: []admissionregistrationv1alpha1.OperationType{
 						admissionregistrationv1alpha1.Create,
@@ -146,22 +175,25 @@ func (a *Admit) Register(client admissionClient.ExternalAdmissionHookConfigurati
 				}},
 				ClientConfig: admissionregistrationv1alpha1.AdmissionHookClientConfig{
 					Service: admissionregistrationv1alpha1.ServiceReference{
-						Namespace: a.serviceNamespace,
-						Name:      a.serviceName,
+						Namespace: ac.serviceNamespace,
+						Name:      ac.serviceName,
 					},
-					CABundle: a.caBundle,
+					CABundle: ac.caBundle,
 				},
 			},
 		},
 	}
-	client.Delete(webhook.Name, nil) // nolint: errcheck
+	if err := client.Delete(webhook.Name, nil); err != nil {
+		glog.V(2).Info("Delete %v failed before trying to (re)register (innocuous):%v",
+			webhook.Name, err)
+	}
 	_, err := client.Create(webhook) // Update?
 	return err
 }
 
 // ServeHTTP implements the external admission webhook for validating
 // pilot configuration.
-func (a *Admit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (ac *AdmissionController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -181,7 +213,7 @@ func (a *Admit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("could not decode body: %v", err), http.StatusBadRequest)
 		return
 	}
-	status := a.admit(&review)
+	status := ac.admit(&review)
 
 	resp, err := json.Marshal(status)
 	if err != nil {
@@ -206,7 +238,7 @@ func watched(watchedNamespaces []string, namespace string) bool {
 	return false
 }
 
-func (a *Admit) admit(review *v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func (ac *AdmissionController) admit(review *v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
 	makeErrorStatus := func(reason string, args ...interface{}) *v1alpha1.AdmissionReviewStatus {
 		result := apierrors.NewBadRequest(fmt.Sprintf(reason, args...)).Status()
 		return &v1alpha1.AdmissionReviewStatus{
@@ -226,11 +258,11 @@ func (a *Admit) admit(review *v1alpha1.AdmissionReview) *v1alpha1.AdmissionRevie
 		return makeErrorStatus("cannot decode configuration: %v", err)
 	}
 
-	if !watched(a.validateNamespaces, obj.Namespace) {
+	if !watched(ac.validateNamespaces, obj.Namespace) {
 		return &v1alpha1.AdmissionReviewStatus{Allowed: true}
 	}
 
-	schema, exists := a.descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
+	schema, exists := ac.descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
 	if !exists {
 		return makeErrorStatus("unrecognized type %v", obj.Kind)
 	}

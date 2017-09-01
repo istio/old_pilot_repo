@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "admit.go",
-        "testcerts.go",
-    ],
+    srcs = ["admit.go"],
     visibility = ["//visibility:public"],
     deps = [
         "//adapter/config/crd:go_default_library",
@@ -33,6 +30,7 @@ go_test(
         "//model:go_default_library",
         "//model/test:go_default_library",
         "//platform/kube:go_default_library",
+        "//platform/kube/admit/testcerts:go_default_library",
         "//test/mock:go_default_library",
         "@io_k8s_api//admission/v1alpha1:go_default_library",
         "@io_k8s_api//admissionregistration/v1alpha1:go_default_library",
