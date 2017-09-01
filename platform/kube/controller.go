@@ -271,7 +271,8 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 }
 
 // Instances implements a service catalog operation
-func (c *Controller) Instances(hostname string, ports []string, tagsList model.LabelsCollection) []*model.ServiceInstance {
+func (c *Controller) Instances(hostname string, ports []string,
+	tagsList model.LabelsCollection) []*model.ServiceInstance {
 	// Get actual service by name
 	name, namespace, err := parseHostname(hostname)
 	if err != nil {

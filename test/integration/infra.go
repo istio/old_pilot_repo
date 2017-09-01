@@ -77,14 +77,16 @@ type infra struct {
 }
 
 func (infra *infra) setup() error {
-	if client, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, ""); err != nil {
-		return err
-	} else {
-		if err := client.RegisterResources(); err != nil {
-			return err
-		}
-		infra.config = model.MakeIstioStore(client)
+	crdclient, crderr := crd.NewClient(kubeconfig, model.IstioConfigTypes, "")
+	if crderr != nil {
+		return crderr
 	}
+	if err := crdclient.RegisterResources(); err != nil {
+		return err
+	}
+
+	infra.config = model.MakeIstioStore(crdclient)
+
 	if infra.Namespace == "" {
 		var err error
 		if infra.Namespace, err = util.CreateNamespace(client); err != nil {

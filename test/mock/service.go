@@ -175,7 +175,8 @@ func (sd *ServiceDiscovery) GetService(hostname string) (*model.Service, bool) {
 }
 
 // Instances implements discovery interface
-func (sd *ServiceDiscovery) Instances(hostname string, ports []string, tags model.LabelsCollection) []*model.ServiceInstance {
+func (sd *ServiceDiscovery) Instances(hostname string, ports []string,
+	tags model.LabelsCollection) []*model.ServiceInstance {
 	service, ok := sd.services[hostname]
 	if !ok {
 		return nil

@@ -125,7 +125,7 @@ func main() {
 	}
 
 	var err error
-	client, err = kube.CreateInterface(kubeconfig)
+	_, client, err = kube.CreateInterface(kubeconfig)
 	if err != nil {
 		glog.Fatal(err)
 	}

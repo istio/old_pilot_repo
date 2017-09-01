@@ -103,10 +103,9 @@ var (
 
 			// Set up values for input to discovery service in different platforms
 			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
-
-				_, client, err := kube.CreateInterface(flags.kubeconfig)
-				if err != nil {
-					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
+				_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
+				if kuberr != nil {
+					return multierror.Prefix(kuberr, "failed to connect to Kubernetes API.")
 				}
 
 				if flags.controllerOptions.Namespace == "" {
@@ -152,10 +151,10 @@ var (
 			} else if flags.serviceregistry == platform.ConsulRegistry {
 				glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
-				consulController, err := consul.NewController(
+				consulController, conerr := consul.NewController(
 					flags.consulargs.serverURL, "dc1", 2*time.Second)
-				if err != nil {
-					return fmt.Errorf("failed to create Consul controller: %v", err)
+				if conerr != nil {
+					return fmt.Errorf("failed to create Consul controller: %v", conerr)
 				}
 
 				configController = crd.NewController(configClient, flags.controllerOptions)
