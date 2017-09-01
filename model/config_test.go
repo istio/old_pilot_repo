@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/mock/gomock"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
@@ -52,6 +51,7 @@ func TestConfigDescriptor(t *testing.T) {
 	}
 }
 
+/*
 type testRegistry struct {
 	ctrl     gomock.Controller
 	mock     *MockConfigStore
@@ -100,85 +100,82 @@ var (
 		},
 	}
 
-	serviceInstance1 = &ServiceInstance{
-		Endpoint: endpoint1,
-		Service:  service1,
-		Labels:   Labels{"a": "b", "c": "d"},
-	}
-	serviceInstance2 = &ServiceInstance{
-		Endpoint: endpoint2,
+		serviceInstance1 = &ServiceInstance{
+			Endpoint: endpoint1,
+			Service:  service1,
+			Labels:   Labels{"a": "b", "c": "d"},
+		}
+		serviceInstance2 = &ServiceInstance{
+			Endpoint: endpoint2,
 
-		Service: service2,
+			Service: service2,
 
-		Labels: Labels{"e": "f", "g": "h"},
-	}
-
-	/*
-		routeRule1MatchNil = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Name:        "foo",
-			Precedence:  1,
+			Labels: Labels{"e": "f", "g": "h"},
 		}
 
-		routeRule2SourceEmpty = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Precedence:  1,
-			Match:       &proxyconfig.MatchCondition{},
-		}
-		routeRule3SourceMismatch = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Precedence:  3,
-			Match: &proxyconfig.MatchCondition{
-				Source: "three.service.com",
-			},
-		}
-		routeRule4SourceMatch = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Precedence:  4,
-			Match: &proxyconfig.MatchCondition{
-				Source: "one.service.com",
-			},
-		}
-		routeRule5TagSubsetOfMismatch = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Precedence:  5,
-			Match: &proxyconfig.MatchCondition{
-				Source:     "two.service.com",
-				SourceTags: map[string]string{"z": "y"},
-			},
-		}
-		routeRule6TagSubsetOfMatch = &proxyconfig.RouteRule{
-			Destination: "foo",
-			Precedence:  5,
-			Match: &proxyconfig.MatchCondition{
-				Source:     "one.service.com",
-				SourceTags: map[string]string{"a": "b"},
-			},
-		}
-		routeRule7DestinationMatch = &proxyconfig.RouteRule{
-			Destination: "two.service.com",
-			Precedence:  1,
-			Match:       &proxyconfig.MatchCondition{},
-		}
+			routeRule1MatchNil = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Name:        "foo",
+				Precedence:  1,
+			}
 
-		dstTags0 = map[string]string{"a": "b"}
-		dstTags1 = map[string]string{"c": "d"}
+			routeRule2SourceEmpty = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Precedence:  1,
+				Match:       &proxyconfig.MatchCondition{},
+			}
+			routeRule3SourceMismatch = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Precedence:  3,
+				Match: &proxyconfig.MatchCondition{
+					Source: "three.service.com",
+				},
+			}
+			routeRule4SourceMatch = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Precedence:  4,
+				Match: &proxyconfig.MatchCondition{
+					Source: "one.service.com",
+				},
+			}
+			routeRule5TagSubsetOfMismatch = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Precedence:  5,
+				Match: &proxyconfig.MatchCondition{
+					Source:     "two.service.com",
+					SourceTags: map[string]string{"z": "y"},
+				},
+			}
+			routeRule6TagSubsetOfMatch = &proxyconfig.RouteRule{
+				Destination: "foo",
+				Precedence:  5,
+				Match: &proxyconfig.MatchCondition{
+					Source:     "one.service.com",
+					SourceTags: map[string]string{"a": "b"},
+				},
+			}
+			routeRule7DestinationMatch = &proxyconfig.RouteRule{
+				Destination: "two.service.com",
+				Precedence:  1,
+				Match:       &proxyconfig.MatchCondition{},
+			}
 
-		dstPolicy1 = &proxyconfig.DestinationPolicy{
-			Destination: "foo",
-			Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags0}},
-		}
-		dstPolicy2 = &proxyconfig.DestinationPolicy{
-			Destination: "bar",
-		}
-		dstPolicy3 = &proxyconfig.DestinationPolicy{
-			Destination: "baz",
-			Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags1}},
-		}
-	*/
+			dstTags0 = map[string]string{"a": "b"}
+			dstTags1 = map[string]string{"c": "d"}
+
+			dstPolicy1 = &proxyconfig.DestinationPolicy{
+				Destination: "foo",
+				Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags0}},
+			}
+			dstPolicy2 = &proxyconfig.DestinationPolicy{
+				Destination: "bar",
+			}
+			dstPolicy3 = &proxyconfig.DestinationPolicy{
+				Destination: "baz",
+				Policy:      []*proxyconfig.DestinationVersionPolicy{{Tags: dstTags1}},
+			}
 )
 
-/*
 func TestIstioRegistryRouteRules(t *testing.T) {
 	r := initTestRegistry(t)
 	defer r.shutdown()

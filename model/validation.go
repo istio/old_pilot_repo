@@ -233,6 +233,7 @@ func ValidateFQDN(fqdn string) error {
 	return nil
 }
 
+// ValidateIstioService checks for validity of a service reference
 func ValidateIstioService(svc *proxyconfig.IstioService) (errs error) {
 	if svc.Name == "" {
 		errs = multierror.Append(errs, errors.New("name is mandatory for a service reference"))
