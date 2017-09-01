@@ -91,7 +91,7 @@ echo "package testcerts" >> $outfile
 for file in CACert ServerKey ServerCert ClientKey ClientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
-        echo "// nolint: deadcode" >> $outfile
+        echo "// ${file} is a test cert for dynamic admission controller." >> $outfile
 	echo "var $file = []byte(\`$data\`)" >> $outfile
 done
 
