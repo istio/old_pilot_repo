@@ -176,6 +176,10 @@ func runTests(envs ...infra) {
 
 		nslist := []string{istio.IstioNamespace, istio.Namespace}
 		istio.apps, errs = util.GetAppPods(client, nslist)
+		if errs != nil {
+			result = multierror.Append(result, errs)
+			break
+		}
 
 		tests := []test{
 			&http{infra: &istio},

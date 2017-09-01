@@ -75,7 +75,7 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
-  version = "1.5.1"
+  revision = "8050b9cbc271307e5a716a9d782803d09b0d6f2d"
 
 [[constraint]]
   name = "istio.io/api"
