@@ -393,9 +393,9 @@ func SortRouteRules(rules []Config) {
 	})
 }
 
-func (i *istioConfigStore) RouteRules(instances []*ServiceInstance, destination string) []Config {
+func (store *istioConfigStore) RouteRules(instances []*ServiceInstance, destination string) []Config {
 	out := make([]Config, 0)
-	configs, err := i.List(RouteRule.Type, NamespaceAll)
+	configs, err := store.List(RouteRule.Type, NamespaceAll)
 	if err != nil {
 		return nil
 	}
@@ -420,9 +420,9 @@ func (i *istioConfigStore) RouteRules(instances []*ServiceInstance, destination 
 	return out
 }
 
-func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance) []Config {
+func (store *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance) []Config {
 	out := make([]Config, 0)
-	configs, err := i.List(RouteRule.Type, NamespaceAll)
+	configs, err := store.List(RouteRule.Type, NamespaceAll)
 	if err != nil {
 		return nil
 	}
@@ -438,31 +438,6 @@ func (i *istioConfigStore) RouteRulesByDestination(instances []*ServiceInstance)
 		}
 	}
 
-	/*
-		for key, rule := range i.RouteRules() {
-			for _, instance := range instances {
-					if rule.Destination == instance.Service.Hostname {
-						rules = append(rules, config{Key: key, Spec: rule})
-						break
-					}
-			}
-		}
-	*/
-
-	/*
-		// sort by high precedence first, key string second (keys are unique)
-		sort.Slice(rules, func(i, j int) bool {
-			return rules[i].Spec.Precedence > rules[j].Spec.Precedence ||
-				(rules[i].Spec.Precedence == rules[j].Spec.Precedence &&
-					rules[i].Key < rules[j].Key)
-		})
-
-		// project to rules
-		out := make([]*proxyconfig.RouteRule, len(rules))
-		for i, rule := range rules {
-			out[i] = rule.Spec
-		}
-	*/
 	return out
 }
 
@@ -494,8 +469,8 @@ func (i *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
 	return out
 }
 
-func (i *istioConfigStore) Policy(instances []*ServiceInstance, destination string, labels Labels) *Config {
-	configs, err := i.List(DestinationPolicy.Type, NamespaceAll)
+func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination string, labels Labels) *Config {
+	configs, err := store.List(DestinationPolicy.Type, NamespaceAll)
 	if err != nil {
 		return nil
 	}

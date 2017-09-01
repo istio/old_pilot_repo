@@ -24,8 +24,13 @@ import (
 
 // Mock values
 var (
-	HelloService   = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
-	WorldService   = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	HelloService = MakeService("hello.default.svc.cluster.local", "10.1.0.0")
+	WorldService = MakeService("world.default.svc.cluster.local", "10.2.0.0")
+	PortHTTP     = &model.Port{
+		Name:     "http",
+		Port:     80, // target port 80
+		Protocol: model.ProtocolHTTP,
+	}
 	ExtHTTPService = MakeExternalHTTPService("httpbin.default.svc.cluster.local",
 		"httpbin.org", "")
 	ExtHTTPSService = MakeExternalHTTPSService("httpsbin.default.svc.cluster.local",
@@ -74,19 +79,17 @@ func MakeService(hostname, address string) *model.Service {
 	return &model.Service{
 		Hostname: hostname,
 		Address:  address,
-		Ports: []*model.Port{{
-			Name:     "http",
-			Port:     80, // target port 80
-			Protocol: model.ProtocolHTTP,
-		}, {
-			Name:     "http-status",
-			Port:     81, // target port 1081
-			Protocol: model.ProtocolHTTP,
-		}, {
-			Name:     "custom",
-			Port:     90, // target port 1090
-			Protocol: model.ProtocolTCP,
-		}},
+		Ports: []*model.Port{
+			PortHTTP,
+			{
+				Name:     "http-status",
+				Port:     81, // target port 1081
+				Protocol: model.ProtocolHTTP,
+			}, {
+				Name:     "custom",
+				Port:     90, // target port 1090
+				Protocol: model.ProtocolTCP,
+			}},
 	}
 }
 
