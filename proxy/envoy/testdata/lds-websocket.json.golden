@@ -210,14 +210,6 @@
           ],
           "routes": [
            {
-            "prefix": "/",
-            "cluster": "in.1081",
-            "opaque_config": {
-             "mixer_control": "on",
-             "mixer_forward": "off"
-            }
-           },
-           {
             "prefix": "/websocket",
             "cluster": "in.1081",
             "opaque_config": {
@@ -225,6 +217,14 @@
              "mixer_forward": "off"
             },
             "use_websocket": true
+           },
+           {
+            "prefix": "/",
+            "cluster": "in.1081",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
            }
           ]
          }
@@ -344,14 +344,6 @@
           ],
           "routes": [
            {
-            "prefix": "/",
-            "cluster": "in.80",
-            "opaque_config": {
-             "mixer_control": "on",
-             "mixer_forward": "off"
-            }
-           },
-           {
             "prefix": "/websocket",
             "cluster": "in.80",
             "opaque_config": {
@@ -359,6 +351,14 @@
              "mixer_forward": "off"
             },
             "use_websocket": true
+           },
+           {
+            "prefix": "/",
+            "cluster": "in.80",
+            "opaque_config": {
+             "mixer_control": "on",
+             "mixer_forward": "off"
+            }
            }
           ]
          }
