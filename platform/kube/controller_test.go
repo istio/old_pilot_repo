@@ -88,9 +88,9 @@ func TestServices(t *testing.T) {
 
 	mesh := proxy.DefaultMeshConfig()
 	ctl := NewController(cl, &mesh, ControllerOptions{
-		Namespace:    ns,
-		ResyncPeriod: resync,
-		DomainSuffix: domainSuffix,
+		WatchedNamespace: ns,
+		ResyncPeriod:     resync,
+		DomainSuffix:     domainSuffix,
 	})
 	go ctl.Run(stop)
 
@@ -305,9 +305,9 @@ func makeFakeKubeAPIController() *Controller {
 	clientSet := fake.NewSimpleClientset()
 	mesh := proxy.DefaultMeshConfig()
 	return NewController(clientSet, &mesh, ControllerOptions{
-		Namespace:    "default",
-		ResyncPeriod: resync,
-		DomainSuffix: domainSuffix,
+		WatchedNamespace: "default",
+		ResyncPeriod:     resync,
+		DomainSuffix:     domainSuffix,
 	})
 }
 

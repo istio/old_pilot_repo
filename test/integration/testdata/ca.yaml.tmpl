@@ -22,3 +22,6 @@ spec:
       - name: istio-ca-container
         image: {{.CaImage}}
         imagePullPolicy: IfNotPresent
+        env:
+        - name: NAMESPACE
+          value: {{.Namespace}}

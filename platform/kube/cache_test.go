@@ -69,9 +69,9 @@ func TestPodCache(t *testing.T) {
 			clientSet := fake.NewSimpleClientset()
 			mesh := proxy.DefaultMeshConfig()
 			controller := NewController(clientSet, &mesh, ControllerOptions{
-				Namespace:    "default",
-				ResyncPeriod: resync,
-				DomainSuffix: domainSuffix,
+				WatchedNamespace: "default",
+				ResyncPeriod:     resync,
+				DomainSuffix:     domainSuffix,
 			})
 
 			// Populate podCache
