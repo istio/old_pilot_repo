@@ -355,7 +355,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener 
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
 func buildOutboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node, env proxy.Environment,
-	instances []*model.ServiceInstance,  services []*model.Service,
+	instances []*model.ServiceInstance, services []*model.Service,
 	config model.IstioConfigStore) (Listeners, Clusters) {
 
 	listeners, clusters := buildOutboundTCPListeners(mesh, env, services)
@@ -490,7 +490,9 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.No
 //
 // Temporary workaround is to add a listener for each service IP that requires
 // TCP routing
-func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment, services []*model.Service) (Listeners, Clusters) {
+func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, env proxy.Environment,
+	services []*model.Service) (Listeners, Clusters) {
+
 	tcpListeners := make(Listeners, 0)
 	tcpClusters := make(Clusters, 0)
 

@@ -238,7 +238,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		"version":        version,
 		"istioNamespace": infra.IstioNamespace,
 		"injectProxy":    strconv.FormatBool(injectProxy),
-		"headless":   strconv.FormatBool(headless),
+		"headless":       strconv.FormatBool(headless),
 	})
 	if err != nil {
 		return err
