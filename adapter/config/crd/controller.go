@@ -72,7 +72,7 @@ func (c *controller) addInformer(schema model.ProtoSchema, namespace string, res
 			result = knownTypes[schema.Type].collection.DeepCopyObject()
 			err = c.client.dynamic.Get().
 				Namespace(namespace).
-				Resource(schema.Plural).
+				Resource(resourceName(schema.Plural)).
 				VersionedParams(&opts, meta_v1.ParameterCodec).
 				Do().
 				Into(result)
@@ -82,7 +82,7 @@ func (c *controller) addInformer(schema model.ProtoSchema, namespace string, res
 			return c.client.dynamic.Get().
 				Prefix("watch").
 				Namespace(namespace).
-				Resource(schema.Plural).
+				Resource(resourceName(schema.Plural)).
 				VersionedParams(&opts, meta_v1.ParameterCodec).
 				Watch()
 		})

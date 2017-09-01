@@ -145,7 +145,7 @@ func (cl *Client) RegisterResources() error {
 	}
 
 	for _, schema := range cl.descriptor {
-		name := schema.Plural + "." + model.IstioAPIGroup
+		name := resourceName(schema.Plural) + "." + model.IstioAPIGroup
 		crd := &apiextensionsv1beta1.CustomResourceDefinition{
 			ObjectMeta: meta_v1.ObjectMeta{
 				Name: name,
@@ -155,7 +155,7 @@ func (cl *Client) RegisterResources() error {
 				Version: model.IstioAPIVersion,
 				Scope:   apiextensionsv1beta1.NamespaceScoped,
 				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-					Plural: schema.Plural,
+					Plural: resourceName(schema.Plural),
 					Kind:   kabobCaseToCamelCase(schema.Type),
 				},
 			},
@@ -171,7 +171,7 @@ func (cl *Client) RegisterResources() error {
 	errPoll := wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
 	descriptor:
 		for _, schema := range cl.descriptor {
-			name := schema.Plural + "." + model.IstioAPIGroup
+			name := resourceName(schema.Plural) + "." + model.IstioAPIGroup
 			crd, errGet := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
 			if errGet != nil {
 				return false, errGet
@@ -215,7 +215,7 @@ func (cl *Client) DeregisterResources() error {
 
 	var errs error
 	for _, schema := range cl.descriptor {
-		name := schema.Plural + "." + model.IstioAPIGroup
+		name := resourceName(schema.Plural) + "." + model.IstioAPIGroup
 		err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
 		errs = multierror.Append(errs, err)
 	}
@@ -237,7 +237,7 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 	config := knownTypes[typ].object.DeepCopyObject().(IstioObject)
 	err := cl.dynamic.Get().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(resourceName(schema.Plural)).
 		Name(name).
 		Do().Into(config)
 
@@ -273,7 +273,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 	obj := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Post().
 		Namespace(out.GetObjectMeta().Namespace).
-		Resource(schema.Plural).
+		Resource(resourceName(schema.Plural)).
 		Body(out).
 		Do().Into(obj)
 	if err != nil {
@@ -306,7 +306,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 	obj := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Put().
 		Namespace(out.GetObjectMeta().Namespace).
-		Resource(schema.Plural).
+		Resource(resourceName(schema.Plural)).
 		Name(out.GetObjectMeta().Name).
 		Body(out).
 		Do().Into(obj)
@@ -326,7 +326,7 @@ func (cl *Client) Delete(typ, name, namespace string) error {
 
 	return cl.dynamic.Delete().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(resourceName(schema.Plural)).
 		Name(name).
 		Do().Error()
 }
@@ -341,7 +341,7 @@ func (cl *Client) List(typ, namespace string) ([]model.Config, error) {
 	list := knownTypes[schema.Type].collection.DeepCopyObject().(IstioObjectList)
 	errs := cl.dynamic.Get().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(resourceName(schema.Plural)).
 		Do().Into(list)
 
 	out := make([]model.Config, 0)
