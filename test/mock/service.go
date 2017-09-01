@@ -179,7 +179,7 @@ func (sd *ServiceDiscovery) GetService(hostname string) (*model.Service, bool) {
 
 // Instances implements discovery interface
 func (sd *ServiceDiscovery) Instances(hostname string, ports []string,
-	tags model.LabelsCollection) []*model.ServiceInstance {
+	labels model.LabelsCollection) []*model.ServiceInstance {
 	service, ok := sd.services[hostname]
 	if !ok {
 		return nil
@@ -191,7 +191,7 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string,
 	for _, name := range ports {
 		if port, ok := service.Ports.Get(name); ok {
 			for v := 0; v < sd.versions; v++ {
-				if tags.HasSubsetOf(map[string]string{"version": fmt.Sprintf("v%d", v)}) {
+				if labels.HasSubsetOf(map[string]string{"version": fmt.Sprintf("v%d", v)}) {
 					out = append(out, MakeInstance(service, port, v))
 				}
 			}

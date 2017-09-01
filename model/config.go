@@ -366,7 +366,7 @@ func MatchSource(meta ConfigMeta, source *proxyconfig.IstioService, instances []
 		if sourceService != instance.Service.Hostname {
 			continue
 		}
-		// must match the tags field - the rule tags are a subset of the instance tags
+		// must match the labels field - the rule labels are a subset of the instance labels
 		if Labels(source.Labels).SubsetOf(instance.Labels) {
 			return true
 		}

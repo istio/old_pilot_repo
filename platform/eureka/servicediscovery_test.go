@@ -137,29 +137,29 @@ func TestServiceDiscoveryInstances(t *testing.T) {
 	sd := NewServiceDiscovery(cl)
 	serviceA := makeService("a.default.svc.local", []int{9090, 8080}, nil)
 	serviceB := makeService("b.default.svc.local", []int{7070}, nil)
-	spamCoolaidTags := model.Labels{"spam": "coolaid"}
-	kitKatTags := model.Labels{"kit": "kat"}
+	spamCoolaidLabels := model.Labels{"spam": "coolaid"}
+	kitKatLabels := model.Labels{"kit": "kat"}
 
 	serviceInstanceTests := []struct {
 		hostname  string
 		ports     []string
-		tags      model.LabelsCollection
+		labels    model.LabelsCollection
 		instances []*model.ServiceInstance
 	}{
 		{
 			// filter by hostname
 			hostname: "a.default.svc.local",
 			instances: []*model.ServiceInstance{
-				makeServiceInstance(serviceA, "10.0.0.2", 8080, kitKatTags),
-				makeServiceInstance(serviceA, "10.0.0.1", 9090, spamCoolaidTags),
+				makeServiceInstance(serviceA, "10.0.0.2", 8080, kitKatLabels),
+				makeServiceInstance(serviceA, "10.0.0.1", 9090, spamCoolaidLabels),
 			},
 		},
 		{
-			// filter by hostname and tags
+			// filter by hostname and labels
 			hostname: "a.default.svc.local",
-			tags:     model.LabelsCollection{{"spam": "coolaid"}},
+			labels:   model.LabelsCollection{{"spam": "coolaid"}},
 			instances: []*model.ServiceInstance{
-				makeServiceInstance(serviceA, "10.0.0.1", 9090, spamCoolaidTags),
+				makeServiceInstance(serviceA, "10.0.0.1", 9090, spamCoolaidLabels),
 			},
 		},
 		{
@@ -173,7 +173,7 @@ func TestServiceDiscoveryInstances(t *testing.T) {
 	}
 
 	for _, c := range serviceInstanceTests {
-		instances := sd.Instances(c.hostname, c.ports, c.tags)
+		instances := sd.Instances(c.hostname, c.ports, c.labels)
 		sortServiceInstances(instances)
 		if err := compare(t, instances, c.instances); err != nil {
 			t.Error(err)
@@ -189,9 +189,9 @@ func sortServices(services []*model.Service) {
 }
 
 func sortServiceInstances(instances []*model.ServiceInstance) {
-	tagsToSlice := func(tags model.Labels) []string {
-		out := make([]string, 0, len(tags))
-		for k, v := range tags {
+	labelsToSlice := func(labels model.Labels) []string {
+		out := make([]string, 0, len(labels))
+		for k, v := range labels {
 			out = append(out, fmt.Sprintf("%s=%s", k, v))
 		}
 		sort.Strings(out)
@@ -203,10 +203,10 @@ func sortServiceInstances(instances []*model.ServiceInstance) {
 			if instances[i].Endpoint.Port == instances[j].Endpoint.Port {
 				if instances[i].Endpoint.Address == instances[j].Endpoint.Address {
 					if len(instances[i].Labels) == len(instances[j].Labels) {
-						iTags := tagsToSlice(instances[i].Labels)
-						jTags := tagsToSlice(instances[j].Labels)
-						for k := range iTags {
-							if iTags[k] < jTags[k] {
+						iLabels := labelsToSlice(instances[i].Labels)
+						jLabels := labelsToSlice(instances[j].Labels)
+						for k := range iLabels {
+							if iLabels[k] < jLabels[k] {
 								return true
 							}
 						}

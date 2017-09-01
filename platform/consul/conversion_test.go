@@ -38,12 +38,12 @@ var (
 		{"", 86, model.ProtocolHTTP},
 	}
 
-	goodTags = []string{
+	goodLabels = []string{
 		"key1|val1",
 		"version|v1",
 	}
 
-	badTags = []string{
+	badLabels = []string{
 		"badtag",
 		"goodtag|goodvalue",
 	}
@@ -58,15 +58,15 @@ func TestConvertProtocol(t *testing.T) {
 	}
 }
 
-func TestConvertTags(t *testing.T) {
-	out := convertTags(goodTags)
-	if len(out) != len(goodTags) {
-		t.Errorf("convertTags(%q) => length %v, want %v", goodTags, len(out), len(goodTags))
+func TestConvertLabels(t *testing.T) {
+	out := convertLabels(goodLabels)
+	if len(out) != len(goodLabels) {
+		t.Errorf("convertLabels(%q) => length %v, want %v", goodLabels, len(out), len(goodLabels))
 	}
 
-	out = convertTags(badTags)
-	if len(out) == len(badTags) {
-		t.Errorf("convertTags(%q) => length %v, want %v", badTags, len(out), len(badTags)-1)
+	out = convertLabels(badLabels)
+	if len(out) == len(badLabels) {
+		t.Errorf("convertLabels(%q) => length %v, want %v", badLabels, len(out), len(badLabels)-1)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestConvertInstance(t *testing.T) {
 	}
 
 	if len(out.Labels) != 2 {
-		t.Errorf("convertInstance() len(Tags) => %v, want %v", len(out.Labels), 2)
+		t.Errorf("convertInstance() len(Labels) => %v, want %v", len(out.Labels), 2)
 	}
 
 	if out.Labels[tagKey1] != tagVal1 || out.Labels[tagKey2] != tagVal2 {

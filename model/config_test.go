@@ -186,67 +186,67 @@ func TestServiceKey(t *testing.T) {
 	{
 		want := "hostname|http|a=b,c=d"
 		port := &model.Port{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}
-		tags := model.Labels{"a": "b", "c": "d"}
-		got := svc.Key(port, tags)
+		labels := model.Labels{"a": "b", "c": "d"}
+		got := svc.Key(port, labels)
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Service.Key() failed: got %v want %v", got, want)
 		}
 	}
 
 	cases := []struct {
-		port model.PortList
-		tags model.LabelsCollection
-		want string
+		port   model.PortList
+		labels model.LabelsCollection
+		want   string
 	}{
 		{
 			port: model.PortList{
 				{Name: "http", Port: 80, Protocol: model.ProtocolHTTP},
 				{Name: "http-alt", Port: 8080, Protocol: model.ProtocolHTTP},
 			},
-			tags: model.LabelsCollection{{"a": "b", "c": "d"}},
-			want: "hostname|http,http-alt|a=b,c=d",
+			labels: model.LabelsCollection{{"a": "b", "c": "d"}},
+			want:   "hostname|http,http-alt|a=b,c=d",
 		},
 		{
-			port: model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
-			tags: model.LabelsCollection{{"a": "b", "c": "d"}},
-			want: "hostname|http|a=b,c=d",
+			port:   model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
+			labels: model.LabelsCollection{{"a": "b", "c": "d"}},
+			want:   "hostname|http|a=b,c=d",
 		},
 		{
-			port: model.PortList{{Port: 80, Protocol: model.ProtocolHTTP}},
-			tags: model.LabelsCollection{{"a": "b", "c": "d"}},
-			want: "hostname||a=b,c=d",
+			port:   model.PortList{{Port: 80, Protocol: model.ProtocolHTTP}},
+			labels: model.LabelsCollection{{"a": "b", "c": "d"}},
+			want:   "hostname||a=b,c=d",
 		},
 		{
-			port: model.PortList{},
-			tags: model.LabelsCollection{{"a": "b", "c": "d"}},
-			want: "hostname||a=b,c=d",
+			port:   model.PortList{},
+			labels: model.LabelsCollection{{"a": "b", "c": "d"}},
+			want:   "hostname||a=b,c=d",
 		},
 		{
-			port: model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
-			tags: model.LabelsCollection{nil},
-			want: "hostname|http",
+			port:   model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
+			labels: model.LabelsCollection{nil},
+			want:   "hostname|http",
 		},
 		{
-			port: model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
-			tags: model.LabelsCollection{},
-			want: "hostname|http",
+			port:   model.PortList{{Name: "http", Port: 80, Protocol: model.ProtocolHTTP}},
+			labels: model.LabelsCollection{},
+			want:   "hostname|http",
 		},
 		{
-			port: model.PortList{},
-			tags: model.LabelsCollection{},
-			want: "hostname",
+			port:   model.PortList{},
+			labels: model.LabelsCollection{},
+			want:   "hostname",
 		},
 	}
 
 	for _, c := range cases {
-		got := model.ServiceKey(svc.Hostname, c.port, c.tags)
+		got := model.ServiceKey(svc.Hostname, c.port, c.labels)
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("Failed: got %q want %q", got, c.want)
 		}
 	}
 }
 
-func TestTagsEquals(t *testing.T) {
+func TestLabelsEquals(t *testing.T) {
 	cases := []struct {
 		a, b model.Labels
 		want bool

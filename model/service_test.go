@@ -18,13 +18,13 @@ import "testing"
 
 var validServiceKeys = map[string]struct {
 	service Service
-	tags    LabelsCollection
+	labels  LabelsCollection
 }{
 	"example-service1.default|grpc,http|a=b,c=d;e=f": {
 		service: Service{
 			Hostname: "example-service1.default",
 			Ports:    []*Port{{Name: "http", Port: 80}, {Name: "grpc", Port: 90}}},
-		tags: LabelsCollection{{"e": "f"}, {"c": "d", "a": "b"}}},
+		labels: LabelsCollection{{"e": "f"}, {"c": "d", "a": "b"}}},
 	"my-service": {
 		service: Service{
 			Hostname: "my-service",
@@ -37,12 +37,12 @@ var validServiceKeys = map[string]struct {
 		service: Service{
 			Hostname: "svc",
 			Ports:    []*Port{{Name: "", Port: 80}}},
-		tags: LabelsCollection{{"istio.io/my_tag-v1.test": "my_value-v2.value"}}},
+		labels: LabelsCollection{{"istio.io/my_tag-v1.test": "my_value-v2.value"}}},
 	"svc|test|prod": {
 		service: Service{
 			Hostname: "svc",
 			Ports:    []*Port{{Name: "test", Port: 80}}},
-		tags: LabelsCollection{{"prod": ""}}},
+		labels: LabelsCollection{{"prod": ""}}},
 	"svc.default.svc.cluster.local|http-test": {
 		service: Service{
 			Hostname: "svc.default.svc.cluster.local",
@@ -54,16 +54,16 @@ func TestServiceString(t *testing.T) {
 		if err := svc.service.Validate(); err != nil {
 			t.Errorf("Valid service failed validation: %v,  %#v", err, svc.service)
 		}
-		s1 := ServiceKey(svc.service.Hostname, svc.service.Ports, svc.tags)
+		s1 := ServiceKey(svc.service.Hostname, svc.service.Ports, svc.labels)
 		if s1 != s {
 			t.Errorf("ServiceKey => Got %s, expected %s", s1, s)
 		}
-		hostname, ports, tags := ParseServiceKey(s)
+		hostname, ports, labels := ParseServiceKey(s)
 		if hostname != svc.service.Hostname {
 			t.Errorf("ParseServiceKey => Got %s, expected %s for %s", hostname, svc.service.Hostname, s)
 		}
-		if !compareTags(tags, svc.tags) {
-			t.Errorf("ParseServiceKey => Got %#v, expected %#v for %s", tags, svc.tags, s)
+		if !compareLabels(labels, svc.labels) {
+			t.Errorf("ParseServiceKey => Got %#v, expected %#v for %s", labels, svc.labels, s)
 		}
 		if len(ports) != len(svc.service.Ports) {
 			t.Errorf("ParseServiceKey => Got %#v, expected %#v for %s", ports, svc.service.Ports, s)
@@ -95,8 +95,8 @@ func compare(a, b []string) bool {
 	return true
 }
 
-// compareTags compares sets of tags
-func compareTags(a, b []Labels) bool {
+// compareLabels compares sets of labels
+func compareLabels(a, b []Labels) bool {
 	var as, bs []string
 	for _, i := range a {
 		as = append(as, i.String())
@@ -107,7 +107,7 @@ func compareTags(a, b []Labels) bool {
 	return compare(as, bs)
 }
 
-func TestTags(t *testing.T) {
+func TestLabels(t *testing.T) {
 	a := Labels{"app": "a"}
 	b := Labels{"app": "b"}
 	a1 := Labels{"app": "a", "prod": "env"}
