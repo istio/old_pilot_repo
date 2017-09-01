@@ -1,7 +1,7 @@
 type: route-rule
 name: fault-route
 namespace: default
-domain: svc.cluster.local
+domain: cluster.local
 spec:
   destination:
     name: world

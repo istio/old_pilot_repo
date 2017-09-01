@@ -72,9 +72,19 @@ type infra struct {
 	// sidecar initializer
 	UseInitializer bool
 	InjectConfig   *inject.Config
+
+	config model.IstioConfigStore
 }
 
 func (infra *infra) setup() error {
+	if client, err := crd.NewClient(kubeconfig, model.IstioConfigTypes, ""); err != nil {
+		return err
+	} else {
+		if err := client.RegisterResources(); err != nil {
+			return err
+		}
+		infra.config = model.MakeIstioStore(client)
+	}
 	if infra.Namespace == "" {
 		var err error
 		if infra.Namespace, err = util.CreateNamespace(client); err != nil {
@@ -374,17 +384,15 @@ func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 		return err
 	}
 
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
-	if err != nil {
-		return err
-	}
+	// fill up namespace for the config
+	v.Namespace = infra.Namespace
 
-	old, exists := istioClient.Get(v.Type, v.Name, v.Namespace)
+	old, exists := infra.config.Get(v.Type, v.Name, v.Namespace)
 	if exists {
 		v.ResourceVersion = old.ResourceVersion
-		_, err = istioClient.Update(*v)
+		_, err = infra.config.Update(*v)
 	} else {
-		_, err = istioClient.Create(*v)
+		_, err = infra.config.Create(*v)
 	}
 	if err != nil {
 		return err
@@ -396,18 +404,14 @@ func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 }
 
 func (infra *infra) deleteAllConfigs() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
-	if err != nil {
-		return err
-	}
-	for _, desc := range istioClient.ConfigDescriptor() {
-		configs, err := istioClient.List(desc.Type, infra.Namespace)
+	for _, desc := range infra.config.ConfigDescriptor() {
+		configs, err := infra.config.List(desc.Type, infra.Namespace)
 		if err != nil {
 			return err
 		}
 		for _, config := range configs {
 			glog.Infof("Delete config %s", config.Key())
-			if err = istioClient.Delete(desc.Type, config.Name, config.Namespace); err != nil {
+			if err = infra.config.Delete(desc.Type, config.Name, config.Namespace); err != nil {
 				return err
 			}
 		}

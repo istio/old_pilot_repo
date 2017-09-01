@@ -564,8 +564,6 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 				Routes:  []*HTTPRoute{},
 			}
 
-			host.Routes = append(host.Routes, defaultRoute)
-
 			// Websocket enabled routes need to have an explicit use_websocket : true
 			// This setting needs to be enabled on Envoys at both sender and receiver end
 			if protocol == model.ProtocolHTTP {
@@ -589,6 +587,8 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 					}
 				}
 			}
+
+			host.Routes = append(host.Routes, defaultRoute)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,

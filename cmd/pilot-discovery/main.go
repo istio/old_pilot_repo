@@ -78,6 +78,8 @@ var (
 				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
 			}
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			var serviceController model.Controller
 			var configController model.ConfigStoreCache
@@ -86,6 +88,18 @@ var (
 			}
 
 			stop := make(chan struct{})
+
+			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+				model.RouteRule,
+				model.DestinationPolicy,
+			}, flags.controllerOptions.DomainSuffix)
+			if err != nil {
+				return multierror.Prefix(err, "failed to open a config client.")
+			}
+
+			if err = configClient.RegisterResources(); err != nil {
+				return multierror.Prefix(err, "failed to register custom resources.")
+			}
 
 			// Set up values for input to discovery service in different platforms
 			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
@@ -142,18 +156,6 @@ var (
 					flags.consulargs.serverURL, "dc1", 2*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to create Consul controller: %v", err)
-				}
-
-				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-					model.RouteRule,
-					model.DestinationPolicy,
-				})
-				if err != nil {
-					return multierror.Prefix(err, "failed to open a config client.")
-				}
-
-				if err = configClient.RegisterResources(); err != nil {
-					return multierror.Prefix(err, "failed to register custom resources.")
 				}
 
 				configController = crd.NewController(configClient, flags.controllerOptions)

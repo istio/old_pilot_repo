@@ -336,7 +336,7 @@ func ResolveHostname(meta ConfigMeta, svc *proxyconfig.IstioService) string {
 	if svc.Domain != "" {
 		out = out + "." + svc.Domain
 	} else if meta.Domain != "" {
-		out = out + "." + meta.Domain
+		out = out + ".svc." + meta.Domain
 	}
 
 	return out

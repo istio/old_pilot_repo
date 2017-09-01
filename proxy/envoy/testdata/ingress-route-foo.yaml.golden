@@ -1,7 +1,7 @@
 type: ingress-rule
 name: foo
 namespace: default
-domain: svc.cluster.local
+domain: cluster.local
 spec:
   destination:
     name: hello

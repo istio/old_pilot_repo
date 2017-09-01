@@ -1,13 +1,12 @@
 type: route-rule
 name: content-route
-namespace: {{.Namespace}}
 spec:
   destination:
-    name: {{.Destination}}
+    name: c
   precedence: 4
   match:
     source:
-      name: {{.Source}}
+      name: a
       labels:
         version: v1
     request:

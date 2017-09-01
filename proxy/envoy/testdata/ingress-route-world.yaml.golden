@@ -1,7 +1,7 @@
 type: ingress-rule
 name: bar
 namespace: default
-domain: svc.cluster.local
+domain: cluster.local
 spec:
   destination:
     name: world

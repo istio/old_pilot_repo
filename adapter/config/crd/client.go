@@ -65,6 +65,9 @@ type Client struct {
 
 	// dynamic REST client for accessing config CRDs
 	dynamic *rest.RESTClient
+
+	// domainSuffix for the config metadata
+	domainSuffix string
 }
 
 // CreateRESTConfig for cluster API server, pass empty config file for in-cluster
@@ -106,7 +109,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // NewClient creates a client to Kubernetes API using a kubeconfig file.
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
-func NewClient(config string, descriptor model.ConfigDescriptor) (*Client, error) {
+func NewClient(config string, descriptor model.ConfigDescriptor, domainSuffix string) (*Client, error) {
 	for _, typ := range descriptor {
 		if _, exists := knownTypes[typ.Type]; !exists {
 			return nil, fmt.Errorf("missing known type for %q", typ.Type)
@@ -129,9 +132,10 @@ func NewClient(config string, descriptor model.ConfigDescriptor) (*Client, error
 	}
 
 	out := &Client{
-		descriptor: descriptor,
-		restconfig: restconfig,
-		dynamic:    dynamic,
+		descriptor:   descriptor,
+		restconfig:   restconfig,
+		dynamic:      dynamic,
+		domainSuffix: domainSuffix,
 	}
 
 	return out, nil
@@ -246,7 +250,7 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 		return nil, false
 	}
 
-	out, err := convertObject(schema, config)
+	out, err := convertObject(schema, config, cl.domainSuffix)
 	if err != nil {
 		glog.Warning(err)
 		return nil, false
@@ -346,7 +350,7 @@ func (cl *Client) List(typ, namespace string) ([]model.Config, error) {
 
 	out := make([]model.Config, 0)
 	for _, item := range list.GetItems() {
-		obj, err := convertObject(schema, item)
+		obj, err := convertObject(schema, item, cl.domainSuffix)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		} else {

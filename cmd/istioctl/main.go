@@ -412,5 +412,5 @@ func newClient() (*crd.Client, error) {
 		model.RouteRule,
 		model.EgressRule,
 		model.DestinationPolicy,
-	})
+	}, "")
 }

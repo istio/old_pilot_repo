@@ -23,7 +23,7 @@ import (
 	"istio.io/pilot/model"
 )
 
-func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
+func convertObject(schema model.ProtoSchema, object IstioObject, domain string) (*model.Config, error) {
 	data, err := schema.FromJSONMap(object.GetSpec())
 	if err != nil {
 		return nil, err
@@ -34,6 +34,7 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 			Type:            schema.Type,
 			Name:            meta.Name,
 			Namespace:       meta.Namespace,
+			Domain:          domain,
 			Labels:          meta.Labels,
 			Annotations:     meta.Annotations,
 			ResourceVersion: meta.ResourceVersion,
