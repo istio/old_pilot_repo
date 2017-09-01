@@ -657,17 +657,6 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 	}
 }
 
-// buildExternalTrafficVirtualHosts builds virtual hosts from egress rule
-func buildEgressFromSidecarVirtualHostsOnPort(rule *proxyconfig.EgressRule, mesh *proxyconfig.ProxyMeshConfig,
-	port *model.Port) []*VirtualHost {
-	hosts := make([]*VirtualHost, 0)
-
-	host := buildEgressFromSidecarVirtualHostOnPort(rule, mesh, port)
-	hosts = append(hosts, host)
-
-	return hosts
-}
-
 func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressRules map[string]*proxyconfig.EgressRule,
 	httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
 	for _, rule := range egressRules {
@@ -684,7 +673,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			httpConfig := httpConfigs.EnsurePort(intPort)
 			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildEgressFromSidecarVirtualHostsOnPort(rule, mesh, modelPort)...)
+				buildEgressFromSidecarVirtualHostOnPort(rule, mesh, modelPort))
 		}
 	}
 
