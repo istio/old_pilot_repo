@@ -625,7 +625,12 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 	port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
-	protocolSuffix := "-" + strings.ToLower(string(port.Protocol))
+	protocolToHandle := port.Protocol
+	if protocolToHandle == model.ProtocolGRPC {
+		protocolToHandle = model.ProtocolHTTP2
+	}
+	protocolSuffix := "-" + strings.ToLower(string(protocolToHandle))
+
 	if rule.UseEgressProxy {
 		externalTrafficCluster = buildOutboundCluster("istio-egress.default-"+protocolSuffix, port, nil)
 		externalTrafficCluster.ServiceName = ""
@@ -633,11 +638,12 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
 		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
-		if port.Protocol == model.ProtocolHTTPS {
+
+		if protocolToHandle == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
 		}
 
-		if port.Protocol == model.ProtocolGRPC || port.Protocol == model.ProtocolHTTP2 {
+		if protocolToHandle == model.ProtocolHTTP2 {
 			externalTrafficCluster.Features = ClusterFeatureHTTP2
 		}
 	}
