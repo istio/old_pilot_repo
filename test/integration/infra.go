@@ -202,7 +202,7 @@ func (infra *infra) setup() error {
 		if err != nil {
 			return err
 		}
-		_, err = client.CoreV1().Secrets(infra.IstioNamespace).Update(&v1.Secret{
+		_, err = client.CoreV1().Secrets(infra.Namespace).Update(&v1.Secret{
 			ObjectMeta: meta_v1.ObjectMeta{Name: ingressSecretName},
 			Data: map[string][]byte{
 				"tls.key": key,
