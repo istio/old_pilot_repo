@@ -914,16 +914,6 @@ func TestValidateEgressRule(t *testing.T) {
 				},
 				UseEgressProxy: true},
 			valid: false},
-		{name: "valid egress rule",
-			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
-				Domains: []string{"*cnn.com", "*.cnn.com"},
-				Ports: []*proxyconfig.EgressRule_Port{
-					{Port: 80, Protocol: "http"},
-					{Port: 443, Protocol: "https"},
-				},
-				UseEgressProxy: false},
-			valid: true},
 		{name: "empty name",
 			in: &proxyconfig.EgressRule{
 				Name:    "",
