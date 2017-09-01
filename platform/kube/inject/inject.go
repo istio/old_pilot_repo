@@ -456,14 +456,14 @@ func intoObject(c *Config, in interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	out, err := injectScheme.DeepCopy(in)
-	if err != nil {
-		return nil, err
-	}
-
 	if !injectRequired(c.Policy, obj) {
 		glog.V(2).Infof("Skipping %s/%s due to policy check", obj.GetNamespace(), obj.GetName())
 		return out, nil
+	}
+
+	out, err := injectScheme.DeepCopy(in)
+	if err != nil {
+		return nil, err
 	}
 
 	// `in` is a pointer to an Object. Dereference it.
