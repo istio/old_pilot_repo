@@ -672,6 +672,12 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 
 func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressRules map[string]*proxyconfig.EgressRule,
 	httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
+	egressRules, errs := model.RejectConflictingEgressRules(egressRules)
+
+	if errs != nil {
+		glog.Warningf("Rejected rules: %", errs)
+	}
+
 	for _, rule := range egressRules {
 		if len(rule.Domains) < 1 {
 			continue
