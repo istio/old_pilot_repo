@@ -541,7 +541,7 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 				},
 			},
 			valid: false},
-		{name: "two conflicts, removed one rule",
+		{name: "two conflicts, one rule rejected",
 			in: map[string]*proxyconfig.EgressRule{"cnn2": &proxyconfig.EgressRule{
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
@@ -581,7 +581,7 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 				},
 			},
 			valid: false},
-		{name: "two conflicts, removed two rules",
+		{name: "two conflicts, two rules rejected",
 			in: map[string]*proxyconfig.EgressRule{"cnn2": &proxyconfig.EgressRule{
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
