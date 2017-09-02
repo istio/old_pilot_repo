@@ -18,72 +18,46 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"k8s.io/api/admission/v1alpha1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/kubernetes"
 	admissionClient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
+	"k8s.io/client-go/tools/cache"
 
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/model"
 )
 
-// A cluster-unique (i.e. random) suffix should be added to each
-// default below when testing in a shared cluster to avoid collisions.
-
 const (
-	// DefaultAdmissionHookConfigName is the default name for the
-	// ExternalAdmissionHookConfiguration.
-	DefaultAdmissionHookConfigName = "pilot-config"
-
-	// DefaultAdmissionHookName is the default name for the
-	// ExternalAdmissionHooks.
-	DefaultAdmissionHookName = "pilot.config.istio.io"
-
-	// DefaultAdmissionServiceName is the default service of the
-	// validation webhook.
-	//
-	// This is a reference to the service for the webhook. If there is
-	// only one port open for the service, that port will be used. If
-	// there are multiple ports open, port 443 will be used if it is
-	// open, otherwise it is an error.
-	//
-	// ref - k8s.io/pkg/apis/admissionregistration/types.go#L197
-	//
-	// This needs to point to an external service when running on
-	// Kubernetes 1.7 to work around some cloud provider bug (see
-	// https://github.com/kubernetes/kubernetes/issues/49987#issuecomment-319739227)
-	DefaultAdmissionServiceName = "istio-pilot"
-
-	// DefaultDomainSuffix is the default DNS domain suffix for Istio
-	// CRD resources.
-	DefaultDomainSuffix = "local.cluster"
+	secretServerKey  = "server-key.pem"
+	secretServerCert = "server-cert.pem"
+	secretCACert     = "ca-cert.pem"
 )
 
-// Config specifies the configuration for the Istio Pilot validation
+// ControllerOptions contains the configuration for the Istio Pilot validation
 // admission controller.
-type Config struct {
+type ControllerOptions struct {
 	// Descriptor defines the list of supported configuration model
 	// types for Pilot.
 	Descriptor model.ConfigDescriptor
 
-	// ExternalAdmissionHookConfigurationName is the name of the
-	// ExternalAdmissionHookConfiguration which configures the
-	// initializer.
-	ExternalAdmissionHookConfigurationName string
-
-	// ExternalAdmissionHookName is the name of the
+	// ExternalAdmissionWebhookName is the name of the
 	// ExternalAdmissionHook which describes he external admission
 	// webhook and resources and operations it applies to.
-	ExternalAdmissionHookName string
+	ExternalAdmissionWebhookName string
 
 	// ServiceName is the service name of the webhook.
 	ServiceName string
@@ -98,18 +72,37 @@ type Config struct {
 	// (e.g. shared test clusters).
 	ValidateNamespaces []string
 
-	// CAbundle is the PEM encoded CA bundle which will be used to
-	// validate webhook's service certificate.
-	CABundle []byte
+	// // CAbundle is the PEM encoded CA bundle which will be used to
+	// // validate webhook's service certificate.
+	// CABundle []byte
 
 	// DomainSuffix is the DNS domain suffix for Istio CRD resources, e.g. local.cluster.
 	DomainSuffix string
+
+	// SecretName is the name of k8s secret that contains the webhook
+	// server key/cert and corresponding CA cert that signed them. The
+	// server key/cert are used to serve the webhook and the CA cert
+	// is provided to k8s apiserver during admission controller
+	// registration.
+	SecretName string
+
+	// Port where the webhook is served. Per k8s admission
+	// registration requirements this should be 443 unless there is
+	// only a single port for the service.
+	Port int
+
+	// RegistrationDelay controls how long admission registration
+	// occurs after the webhook is started. This is used to avoid
+	// potential races where registration completes and k8s apiserver
+	// invokes the webhook before the HTTP server is started.
+	RegistrationDelay time.Duration
 }
 
 // AdmissionController implements the external admission webhook for validation of
 // pilot configuration.
 type AdmissionController struct {
-	config Config
+	client  kubernetes.Interface
+	options ControllerOptions
 }
 
 // GetAPIServerExtensionCACert gets the Kubernetes aggregate apiserver
@@ -118,7 +111,7 @@ type AdmissionController struct {
 //
 // NOTE: this certificate is provided kubernetes. We do not control
 // its name or location.
-func GetAPIServerExtensionCACert(cl kubernetes.Interface) ([]byte, error) {
+func getAPIServerExtensionCACert(cl kubernetes.Interface) ([]byte, error) {
 	const name = "extension-apiserver-authentication"
 	c, err := cl.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -133,7 +126,7 @@ func GetAPIServerExtensionCACert(cl kubernetes.Interface) ([]byte, error) {
 
 // MakeTLSConfig makes a TLS configuration suitable for use with the
 // GenericAdmissionWebhook.
-func MakeTLSConfig(serverCert, serverKey, caCert []byte) (*tls.Config, error) {
+func makeTLSConfig(serverCert, serverKey, caCert []byte) (*tls.Config, error) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	cert, err := tls.X509KeyPair(serverCert, serverKey)
@@ -147,33 +140,132 @@ func MakeTLSConfig(serverCert, serverKey, caCert []byte) (*tls.Config, error) {
 	}, nil
 }
 
-// NewController creates a new instance of the admission webhook controller.
-func NewController(config Config) *AdmissionController {
-	return &AdmissionController{
-		config: config,
+func getKeyCertsFromSecret(client kubernetes.Interface, name, namespace string) (serverKey, serverCert, caCert []byte, err error) { // nolint: lll
+	listWatch := cache.NewListWatchFromClient(client.CoreV1().RESTClient(),
+		"secrets", namespace, fields.OneTermEqualSelector("metadata.name", name))
+	var secret *v1.Secret
+	stop := make(chan struct{})
+	_, controller := cache.NewInformer(listWatch, &v1.Secret{}, 30*time.Second,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if secret == nil {
+					secret = obj.(*v1.Secret)
+					close(stop)
+				}
+			},
+		},
+	)
+	controller.Run(stop)
+
+	var ok bool
+	if serverKey, ok = secret.Data[secretServerKey]; !ok {
+		return nil, nil, nil, errors.New("server key missing")
 	}
+	if serverCert, ok = secret.Data[secretServerCert]; !ok {
+		return nil, nil, nil, errors.New("server cert missing")
+	}
+	if caCert, ok = secret.Data[secretCACert]; !ok {
+		return nil, nil, nil, errors.New("ca cert missing")
+	}
+	return serverKey, serverCert, caCert, nil
+}
+
+// NewController creates a new instance of the admission webhook controller.
+func NewController(client kubernetes.Interface, options ControllerOptions) (*AdmissionController, error) {
+	return &AdmissionController{
+		client:  client,
+		options: options,
+	}, nil
+}
+
+func setup(client kubernetes.Interface, options *ControllerOptions) (*tls.Config, []byte, error) {
+	apiServerCACert, err := getAPIServerExtensionCACert(client)
+	if err != nil {
+		return nil, nil, err
+	}
+	serverKey, serverCert, caCert, err := getKeyCertsFromSecret(
+		client, options.SecretName, options.ServiceNamespace)
+	if err != nil {
+		return nil, nil, err
+	}
+	tlsConfig, err := makeTLSConfig(serverCert, serverKey, apiServerCACert)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tlsConfig, caCert, nil
+}
+
+// Run implements the admission controller run loop.
+func (ac *AdmissionController) Run(stop <-chan struct{}) {
+	// TODO(github.com/kubernetes/kubernetes/issues/49987) -
+	// Temporarily defer cert generation and registration to the run
+	// loop where it won't block other controllers. Ideally this
+	// should be performed synchronously as part of NewController()
+	// but cert generation (GetKeyCertsFromSecret) and webhooks in
+	// general may be optional (default off) until
+	// https://github.com/kubernetes/kubernetes/issues/49987 is fixed
+	// in GKE 1.8.
+	tlsConfig, caCert, err := setup(ac.client, &ac.options)
+	if err != nil {
+		glog.Errorf(err.Error())
+		return
+	}
+
+	server := &http.Server{
+		Handler:   ac,
+		Addr:      fmt.Sprintf(":%v", ac.options.Port),
+		TLSConfig: tlsConfig,
+	}
+
+	glog.Info("Found certificates for validation admission webhook. Delaying registration for %v",
+		ac.options.RegistrationDelay)
+
+	select {
+	case <-time.After(ac.options.RegistrationDelay):
+		cl := ac.client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations()
+		if err := ac.register(cl, caCert); err != nil {
+			glog.Errorf("Failed to register admission webhook: %v", err)
+			return
+		}
+		defer func() {
+			if err := ac.unregister(cl); err != nil {
+				glog.Errorf("Failed to unregister admission webhook: %v", err)
+			}
+		}()
+		glog.Info("Finished validation admission webhook registration")
+	case <-stop:
+		return
+	}
+
+	go func() {
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			glog.Errorf("ListenAndServeTLS for admission webhook returned error: %v", err)
+		}
+	}()
+	<-stop
+	server.Close() // nolint: errcheck
 }
 
 // Unregister unregisters the external admission webhook
-func (ac *AdmissionController) Unregister(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
-	return client.Delete(ac.config.ExternalAdmissionHookConfigurationName, nil)
+func (ac *AdmissionController) unregister(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
+	return client.Delete(ac.options.ExternalAdmissionWebhookName, nil)
 }
 
 // Register registers the external admission webhook for pilot
 // configuration types.
-func (ac *AdmissionController) Register(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
+func (ac *AdmissionController) register(client admissionClient.ExternalAdmissionHookConfigurationInterface, caCert []byte) error { // nolint: lll
 	var resources []string
-	for _, schema := range ac.config.Descriptor {
-		resources = append(resources, schema.Plural)
+	for _, schema := range ac.options.Descriptor {
+		resources = append(resources, crd.ResourceName(schema.Plural))
 	}
 
 	webhook := &admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ac.config.ExternalAdmissionHookConfigurationName,
+			Name: ac.options.ExternalAdmissionWebhookName,
 		},
 		ExternalAdmissionHooks: []admissionregistrationv1alpha1.ExternalAdmissionHook{
 			{
-				Name: ac.config.ExternalAdmissionHookName,
+				Name: ac.options.ExternalAdmissionWebhookName,
 				Rules: []admissionregistrationv1alpha1.RuleWithOperations{{
 					Operations: []admissionregistrationv1alpha1.OperationType{
 						admissionregistrationv1alpha1.Create,
@@ -187,17 +279,19 @@ func (ac *AdmissionController) Register(client admissionClient.ExternalAdmission
 				}},
 				ClientConfig: admissionregistrationv1alpha1.AdmissionHookClientConfig{
 					Service: admissionregistrationv1alpha1.ServiceReference{
-						Namespace: ac.config.ServiceNamespace,
-						Name:      ac.config.ServiceName,
+						Namespace: ac.options.ServiceNamespace,
+						Name:      ac.options.ServiceName,
 					},
-					CABundle: ac.config.CABundle,
+					CABundle: caCert,
 				},
 			},
 		},
 	}
 	if err := client.Delete(webhook.Name, nil); err != nil {
-		glog.V(2).Info("Delete %v failed before trying to (re)register (innocuous):%v",
-			webhook.Name, err)
+		serr, ok := err.(*apierrors.StatusError)
+		if !ok || serr.ErrStatus.Code != http.StatusNotFound {
+			glog.Warningf("Could not delete previously created AdmissionRegistration: %v", err)
+		}
 	}
 	_, err := client.Create(webhook) // Update?
 	return err
@@ -206,6 +300,8 @@ func (ac *AdmissionController) Register(client admissionClient.ExternalAdmission
 // ServeHTTP implements the external admission webhook for validating
 // pilot configuration.
 func (ac *AdmissionController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	glog.V(4).Infof("AdmissionController ServeHTTP request=%#v", r)
+
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -225,9 +321,15 @@ func (ac *AdmissionController) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		http.Error(w, fmt.Sprintf("could not decode body: %v", err), http.StatusBadRequest)
 		return
 	}
-	status := ac.admit(&review)
 
-	resp, err := json.Marshal(status)
+	status := ac.admit(&review)
+	ar := v1alpha1.AdmissionReview{
+		Status: *status,
+	}
+
+	glog.V(2).Info("AdmissionReview for %v: status=%v", review.Spec.Name, status)
+
+	resp, err := json.Marshal(ar)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could encode response: %v", err), http.StatusInternalServerError)
 		return
@@ -270,16 +372,16 @@ func (ac *AdmissionController) admit(review *v1alpha1.AdmissionReview) *v1alpha1
 		return makeErrorStatus("cannot decode configuration: %v", err)
 	}
 
-	if !watched(ac.config.ValidateNamespaces, obj.Namespace) {
+	if !watched(ac.options.ValidateNamespaces, obj.Namespace) {
 		return &v1alpha1.AdmissionReviewStatus{Allowed: true}
 	}
 
-	schema, exists := ac.config.Descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
+	schema, exists := ac.options.Descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
 	if !exists {
 		return makeErrorStatus("unrecognized type %v", obj.Kind)
 	}
 
-	out, err := crd.ConvertObject(schema, &obj, ac.config.DomainSuffix)
+	out, err := crd.ConvertObject(schema, &obj, ac.options.DomainSuffix)
 	if err != nil {
 		return makeErrorStatus("error decoding configuration: %v", err)
 	}

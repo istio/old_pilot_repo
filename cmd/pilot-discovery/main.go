@@ -34,6 +34,7 @@ import (
 	"istio.io/pilot/platform"
 	"istio.io/pilot/platform/consul"
 	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/platform/kube/admit"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
@@ -55,6 +56,8 @@ type args struct {
 
 	serviceregistry platform.ServiceRegistry
 	consulargs      ConsulArgs
+
+	admissionArgs admit.ControllerOptions
 }
 
 var (
@@ -90,6 +93,15 @@ var (
 
 			stop := make(chan struct{})
 
+			if flags.controllerOptions.Namespace == "" {
+				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
+			}
+
+			_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
+			if kuberr != nil {
+				return multierror.Prefix(kuberr, "failed to connect to Kubernetes API.")
+			}
+
 			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 				model.RouteRule,
 				model.EgressRule,
@@ -105,14 +117,6 @@ var (
 
 			// Set up values for input to discovery service in different platforms
 			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
-				_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
-				if kuberr != nil {
-					return multierror.Prefix(kuberr, "failed to connect to Kubernetes API.")
-				}
-
-				if flags.controllerOptions.Namespace == "" {
-					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-				}
 
 				kubeController := kube.NewController(client, mesh, flags.controllerOptions)
 				if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
@@ -161,6 +165,22 @@ var (
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
 
+			// Set up configuration validation admission
+			// controller. Fill in remaining admission controller
+			// options
+			flags.admissionArgs.Descriptor = configClient.ConfigDescriptor()
+			flags.admissionArgs.ServiceNamespace = flags.controllerOptions.Namespace
+			flags.admissionArgs.DomainSuffix = flags.controllerOptions.DomainSuffix
+			flags.admissionArgs.ValidateNamespaces = []string{
+				flags.controllerOptions.Namespace,
+				flags.controllerOptions.WatchedNamespace,
+			}
+			admissionController, err := admit.NewController(client, flags.admissionArgs)
+			if err != nil {
+				return fmt.Errorf("failed to create validation admission controller: %v", err)
+			}
+
+			go admissionController.Run(stop)
 			go serviceController.Run(stop)
 			go configController.Run(stop)
 			go discovery.Run()
@@ -184,7 +204,7 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.WatchedNamespace, "app namespace",
 		"a", metav1.NamespaceAll,
 		"Restrict the applications namespace the controller manages; if not set, controller watches all namespaces")
-	discoveryCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", time.Second,
+	discoveryCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", 60*time.Second,
 		"Controller resync interval")
 	discoveryCmd.PersistentFlags().StringVar(&flags.controllerOptions.DomainSuffix, "domain", "cluster.local",
 		"DNS domain suffix")
@@ -199,6 +219,19 @@ func init() {
 		"Consul Config file for discovery")
 	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.serverURL, "consulserverURL", "",
 		"URL for the consul server")
+
+	discoveryCmd.PersistentFlags().StringVar(&flags.admissionArgs.ExternalAdmissionWebhookName,
+		"admission-webhook-name", "pilot-webhook.istio.io", "Webhook name for Pilot admission controller")
+	discoveryCmd.PersistentFlags().StringVar(&flags.admissionArgs.ServiceName,
+		"admission-service", "istio-pilot-external",
+		"Service name the admission controller uses during registration")
+	discoveryCmd.PersistentFlags().IntVar(&flags.admissionArgs.Port, "admission-service-port", 443,
+		"HTTPS port of the admission service. Must be 443 if service has more than one port ")
+	discoveryCmd.PersistentFlags().StringVar(&flags.admissionArgs.SecretName, "admission-secret", "pilot-webhook",
+		"Name of k8s secret for pilot webhook certs")
+	discoveryCmd.PersistentFlags().DurationVar(&flags.admissionArgs.RegistrationDelay,
+		"admission-registration-delay", 5*time.Second,
+		"Time to delay webhook registration after starting webhook server")
 
 	cmd.AddFlags(rootCmd)
 

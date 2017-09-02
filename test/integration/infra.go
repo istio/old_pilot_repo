@@ -73,6 +73,10 @@ type infra struct {
 	UseInitializer bool
 	InjectConfig   *inject.Config
 
+	// External Admission Webhook for validation
+	UseAdmissionWebhook  bool
+	AdmissionServiceName string
+
 	config model.IstioConfigStore
 }
 

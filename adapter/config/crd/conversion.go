@@ -64,9 +64,9 @@ func ConvertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, 
 	return out, nil
 }
 
-// resourceName converts "my-name" to "myname".
+// ResourceName converts "my-name" to "myname".
 // This is needed by k8s API server as dashes prevent kubectl from accessing CRDs
-func resourceName(s string) string {
+func ResourceName(s string) string {
 	return strings.Replace(s, "-", "", -1)
 }
 

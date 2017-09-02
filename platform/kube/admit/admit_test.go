@@ -50,6 +50,20 @@ const (
 	nonWatchedNamespace = "not-watched"
 )
 
+const (
+	// testAdmissionHookName is the default name for the
+	// ExternalAdmissionHooks.
+	testAdmissionHookName = "pilot.config.istio.io"
+
+	// testAdmissionServiceName is the default service of the
+	// validation webhook.
+	testAdmissionServiceName = "istio-pilot"
+
+	// testDomainSuffix is the default DNS domain suffix for Istio
+	// CRD resources.
+	testDomainSuffix = "local.cluster"
+)
+
 // TODO use https://golang.org/pkg/testing/#T.Helper when default is golang1.9
 func makeConfig(t *testing.T, namespace string, i int, valid bool) []byte {
 	var key string
@@ -213,16 +227,17 @@ func TestAdmissionController(t *testing.T) {
 		if c.useNamespaceAll {
 			namespaces = []string{metav1.NamespaceAll}
 		}
-		testAdmissionController := NewController(Config{
-			Descriptor:                             mock.Types,
-			ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
-			ExternalAdmissionHookName:              DefaultAdmissionHookName,
-			ServiceName:                            DefaultAdmissionServiceName,
-			ServiceNamespace:                       "istio-system",
-			ValidateNamespaces:                     namespaces,
-			CABundle:                               testcerts.CACert,
-			DomainSuffix:                           DefaultDomainSuffix,
+		testAdmissionController, err := NewController(nil, ControllerOptions{
+			Descriptor:                   mock.Types,
+			ExternalAdmissionWebhookName: testAdmissionHookName,
+			ServiceName:                  testAdmissionServiceName,
+			ServiceNamespace:             "istio-system",
+			ValidateNamespaces:           namespaces,
+			DomainSuffix:                 testDomainSuffix,
 		})
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 
 		got := testAdmissionController.admit(c.in)
 		if got.Allowed != c.want.Allowed {
@@ -275,9 +290,9 @@ func makeTestServer(handler http.Handler, tlsConfig *tls.Config) (*http.Server, 
 		return nil, nil, fmt.Errorf("net.Listen failed: %v", err)
 	}
 	server := &http.Server{
+		Handler:   handler,
 		TLSConfig: tlsConfig,
 	}
-	http.Handle("/", handler)
 	return server, tls.NewListener(ln, tlsConfig), nil
 }
 
@@ -322,18 +337,19 @@ func TestServe(t *testing.T) {
 		},
 	}
 
-	testAdmissionController := NewController(Config{
-		Descriptor:                             mock.Types,
-		ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
-		ExternalAdmissionHookName:              DefaultAdmissionHookName,
-		ServiceName:                            DefaultAdmissionServiceName,
-		ServiceNamespace:                       "istio-system",
-		ValidateNamespaces:                     []string{watchedNamespace},
-		CABundle:                               testcerts.CACert,
-		DomainSuffix:                           DefaultDomainSuffix,
+	testAdmissionController, err := NewController(nil, ControllerOptions{
+		Descriptor:                   mock.Types,
+		ExternalAdmissionWebhookName: testAdmissionHookName,
+		ServiceName:                  testAdmissionServiceName,
+		ServiceNamespace:             "istio-system",
+		ValidateNamespaces:           []string{watchedNamespace},
+		DomainSuffix:                 testDomainSuffix,
 	})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
-	tlsConfig, err := MakeTLSConfig(testcerts.ServerCert, testcerts.ServerKey, testcerts.CACert)
+	tlsConfig, err := makeTLSConfig(testcerts.ServerCert, testcerts.ServerKey, testcerts.CACert)
 	if err != nil {
 		t.Fatalf("MakeTLSConfig failed: %v", err)
 	}
@@ -376,33 +392,34 @@ func TestServe(t *testing.T) {
 			t.Errorf("%v: could not read body: %v", c.name, err)
 			continue
 		}
-		var gotStatus v1alpha1.AdmissionReviewStatus
-		if err := json.Unmarshal(gotBody, &gotStatus); err != nil {
+		var gotReview v1alpha1.AdmissionReview
+		if err := json.Unmarshal(gotBody, &gotReview); err != nil {
 			t.Errorf("%v: could not decode response body: %v", c.name, err)
 		}
-		if gotStatus.Allowed != c.wantAllowed {
-			t.Errorf("%v: AdmissionReviewStatus.Allowed is wrong : got %v want %v",
-				c.name, gotStatus.Allowed, c.wantAllowed)
+		if gotReview.Status.Allowed != c.wantAllowed {
+			t.Errorf("%v: AdmissionReview.Status.Allowed is wrong : got %v want %v",
+				c.name, gotReview.Status.Allowed, c.wantAllowed)
 		}
 	}
 }
 
 func TestRegister(t *testing.T) {
-	testAdmissionController := NewController(Config{
-		Descriptor:                             mock.Types,
-		ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
-		ExternalAdmissionHookName:              DefaultAdmissionHookName,
-		ServiceName:                            DefaultAdmissionServiceName,
-		ServiceNamespace:                       "istio-system",
-		ValidateNamespaces:                     []string{watchedNamespace},
-		CABundle:                               testcerts.CACert,
-		DomainSuffix:                           DefaultDomainSuffix,
+	testAdmissionController, err := NewController(nil, ControllerOptions{
+		Descriptor:                   mock.Types,
+		ExternalAdmissionWebhookName: testAdmissionHookName,
+		ServiceName:                  testAdmissionServiceName,
+		ServiceNamespace:             "istio-system",
+		ValidateNamespaces:           []string{watchedNamespace},
+		DomainSuffix:                 testDomainSuffix,
 	})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
 	fakeClient := fake.NewSimpleClientset(&admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{})
 
 	fakeAdmissionClient := fakeClient.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations()
-	if err := testAdmissionController.Register(fakeAdmissionClient); err != nil {
+	if err := testAdmissionController.register(fakeAdmissionClient, testcerts.CACert); err != nil {
 		t.Fatalf("Register() failed: %v", err)
 	}
 
@@ -422,7 +439,7 @@ func TestRegister(t *testing.T) {
 	}
 	fakeClient.ClearActions()
 
-	if err := testAdmissionController.Unregister(fakeAdmissionClient); err != nil {
+	if err := testAdmissionController.unregister(fakeAdmissionClient); err != nil {
 		t.Fatalf("Register() failed: %v", err)
 	}
 
@@ -442,6 +459,7 @@ func TestRegister(t *testing.T) {
 	}
 	fakeClient.ClearActions()
 }
+
 func makeClient(t *testing.T) kubernetes.Interface {
 	usr, err := user.Current()
 	if err != nil {
@@ -465,7 +483,7 @@ func makeClient(t *testing.T) kubernetes.Interface {
 
 func TestGetAPIServerExtensionCACert(t *testing.T) {
 	cl := makeClient(t)
-	if _, err := GetAPIServerExtensionCACert(cl); err != nil {
+	if _, err := getAPIServerExtensionCACert(cl); err != nil {
 		t.Errorf("GetAPIServerExtensionCACert() failed: %v", err)
 	}
 }

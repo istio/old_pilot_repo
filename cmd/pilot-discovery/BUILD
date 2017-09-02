@@ -14,6 +14,7 @@ go_library(
         "//platform:go_default_library",
         "//platform/consul:go_default_library",
         "//platform/kube:go_default_library",
+        "//platform/kube/admit:go_default_library",
         "//proxy:go_default_library",
         "//proxy/envoy:go_default_library",
         "//tools/version:go_default_library",
