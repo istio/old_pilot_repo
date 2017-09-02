@@ -252,7 +252,7 @@ type IstioConfigStore interface {
 
 const (
 	// IstioAPIGroup defines API group name for Istio configuration resources
-	IstioAPIGroup = "pilot.config.istio.io"
+	IstioAPIGroup = "config.istio.io"
 
 	// IstioAPIVersion defines API group version
 	IstioAPIVersion = "v1alpha2"
