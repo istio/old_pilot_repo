@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model/test"
@@ -472,4 +473,45 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 	}
 
 	return out
+}
+
+// this function rejects rules that have a domain which same to domains of some other rule.
+// According to Envoy's virtual host specification, no virtual hosts can share the same domain.
+// The following code rejects conflicting rules determenistically, by a lexicographical order - a rule with
+// a smaller name lexicographically wins.
+func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule) (map[string]*proxyconfig.EgressRule, error) {
+	filteredEgressRules := make(map[string]*proxyconfig.EgressRule)
+	var errs error
+
+	var keys []string
+	for key, _ := range egressRules {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	domains := make(map[string]string)
+	for _, key := range keys {
+		egressRule := egressRules[key]
+		conflictingRule := false
+		for _, domain := range egressRule.Domains {
+			keyOfAnEgressRuleWithTheSameDomain, conflictFound := domains[domain]
+			if conflictFound {
+				errs = multierror.Append(errs, fmt.Errorf("rule %q conflicts with rule %q on domain %s, is rejected",
+					key, keyOfAnEgressRuleWithTheSameDomain, domain))
+				conflictingRule = true
+				break
+			}
+		}
+
+		if conflictingRule {
+			continue
+		}
+
+		for _, domain := range egressRule.Domains {
+			domains[domain] = key
+		}
+		filteredEgressRules[key] = egressRule
+	}
+
+	return filteredEgressRules, errs
 }
