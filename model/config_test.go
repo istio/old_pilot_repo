@@ -461,7 +461,8 @@ func TestPolicy(t *testing.T) {
 	if _, err := store.Create(config1); err != nil {
 		t.Error(err)
 	}
-	if out := store.Policy(instances, mock.WorldService.Hostname, labels); out == nil || !reflect.DeepEqual(policy1, out.Spec) {
+	if out := store.Policy(instances, mock.WorldService.Hostname, labels); out == nil ||
+		!reflect.DeepEqual(policy1, out.Spec) {
 		t.Errorf("Policy() => expected %#v but got %#v", policy1, out)
 	}
 	if out := store.Policy(instances, mock.HelloService.Hostname, labels); out != nil {

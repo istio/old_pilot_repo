@@ -103,7 +103,8 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 
 // Instances retrieves instances for a service and its ports that match
 // any of the supplied labels. All instances match an empty tag list.
-func (c *Controller) Instances(hostname string, ports []string, labels model.LabelsCollection) []*model.ServiceInstance {
+func (c *Controller) Instances(hostname string, ports []string,
+	labels model.LabelsCollection) []*model.ServiceInstance {
 	// Get actual service by name
 	name, err := parseHostname(hostname)
 	if err != nil {

@@ -134,11 +134,6 @@ var (
 		Port:        10001,
 		ServicePort: &Port{Name: "http", Port: 81, Protocol: ProtocolHTTP},
 	}
-	endpoint2 = NetworkEndpoint{
-		Address:     "192.168.1.2",
-		Port:        10002,
-		ServicePort: &Port{Name: "http", Port: 82, Protocol: ProtocolHTTP},
-	}
 
 	service1 = &Service{
 		Hostname: "one.service.com",
@@ -147,25 +142,6 @@ var (
 			&Port{Name: "http", Port: 81, Protocol: ProtocolHTTP},
 			&Port{Name: "http-alt", Port: 8081, Protocol: ProtocolHTTP},
 		},
-	}
-	service2 = &Service{
-		Hostname: "two.service.com",
-		Address:  "192.168.3.2", // VIP
-		Ports: PortList{
-			&Port{Name: "http", Port: 82, Protocol: ProtocolHTTP},
-			&Port{Name: "http-alt", Port: 8282, Protocol: ProtocolHTTP},
-		},
-	}
-
-	serviceInstance1 = &ServiceInstance{
-		Endpoint: endpoint1,
-		Service:  service1,
-		Labels:   Labels{"a": "b", "c": "d"},
-	}
-	serviceInstance2 = &ServiceInstance{
-		Endpoint: endpoint2,
-		Service:  service2,
-		Labels:   Labels{"e": "f", "g": "h"},
 	}
 )
 

@@ -24,18 +24,6 @@ go_library(
     ],
 )
 
-# Auto-generate mock interfaces for unit testing model package.
-#
-# Add `_test` suffix to the output file so mock interfaces, functions,
-# etc. are excluded from test coverage, gometalinter, etc.
-genrule(
-    name = "genmocks",
-    srcs = ["config.go"],
-    outs = ["mock_config_gen_test.go"],
-    cmd = "$(location @com_github_golang_mock//mockgen) -source $< -destination $@ -package model",
-    tools = ["@com_github_golang_mock//mockgen"],
-)
-
 go_test(
     name = "go_default_test",
     size = "small",
@@ -46,7 +34,9 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
+        "//model/test:go_default_library",
         "@com_github_golang_mock//gomock:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_golang_protobuf//ptypes:go_default_library",
         "@com_github_golang_protobuf//ptypes/duration:go_default_library",
         "@com_github_hashicorp_go_multierror//:go_default_library",
