@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -225,14 +224,8 @@ func (descriptor ConfigDescriptor) GetByType(name string) (ProtoSchema, bool) {
 type IstioConfigStore interface {
 	ConfigStore
 
-	// IngressRules lists all ingress rules
-	IngressRules() map[string]*proxyconfig.IngressRule
-
 	// EgressRules lists all egress rules
 	EgressRules() map[string]*proxyconfig.EgressRule
-
-	// DestinationPolicies lists all destination rules
-	DestinationPolicies() []*proxyconfig.DestinationPolicy
 
 	// RouteRules selects routing rules by source service instances and
 	// destination service.  A rule must match at least one of the input service
@@ -436,25 +429,11 @@ func (store *istioConfigStore) RouteRulesByDestination(instances []*ServiceInsta
 	return out
 }
 
-func (i *istioConfigStore) IngressRules() map[string]*proxyconfig.IngressRule {
-	out := make(map[string]*proxyconfig.IngressRule)
-	rs, err := i.List(IngressRule.Type, "")
-	if err != nil {
-		glog.V(2).Infof("IngressRules => %v", err)
-	}
-	for _, r := range rs {
-		if rule, ok := r.Spec.(*proxyconfig.IngressRule); ok {
-			out[r.Key()] = rule
-		}
-	}
-	return out
-}
-
-func (i *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
+func (store *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
 	out := make(map[string]*proxyconfig.EgressRule)
-	rs, err := i.List(EgressRule.Type, "")
+	rs, err := store.List(EgressRule.Type, "")
 	if err != nil {
-		glog.V(2).Infof("EgressRules => %v", err)
+		return nil
 	}
 	for _, r := range rs {
 		if rule, ok := r.Spec.(*proxyconfig.EgressRule); ok {

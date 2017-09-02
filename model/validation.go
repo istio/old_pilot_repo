@@ -785,10 +785,6 @@ func ValidateEgressRule(msg proto.Message) error {
 	}
 
 	var errs error
-	if rule.Name == "" {
-		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a name"))
-	}
-
 	if len(rule.Domains) == 0 {
 		return fmt.Errorf("egress rule must have a domains list")
 	}

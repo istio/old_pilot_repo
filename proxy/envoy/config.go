@@ -243,7 +243,7 @@ func buildRDSRoute(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, routeName
 	case proxy.Sidecar:
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
-		configs = buildOutboundHTTPRoutes(mesh, role, instances, services, config)
+		configs = buildOutboundHTTPRoutes(mesh, node, instances, services, config)
 		configs = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), configs)
 	default:
 		return nil
@@ -664,7 +664,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, mesh 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
 	return &VirtualHost{
-		Name:    rule.Name + "-" + strconv.Itoa(port.Port),
+		Name:    rule.Domains[0] + "-" + strconv.Itoa(port.Port),
 		Domains: appendPortToDomains(rule.Domains, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}

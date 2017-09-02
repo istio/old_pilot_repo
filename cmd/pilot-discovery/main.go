@@ -91,6 +91,7 @@ var (
 
 			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
 				model.RouteRule,
+				model.EgressRule,
 				model.DestinationPolicy,
 			}, flags.controllerOptions.DomainSuffix)
 			if err != nil {
@@ -110,22 +111,6 @@ var (
 
 				if flags.controllerOptions.Namespace == "" {
 					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-				}
-
-				glog.V(2).Infof("version %s", version.Line())
-				glog.V(2).Infof("flags %s", spew.Sdump(flags))
-
-				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-					model.RouteRule,
-					model.EgressRule,
-					model.DestinationPolicy,
-				})
-				if err != nil {
-					return multierror.Prefix(err, "failed to open a config client.")
-				}
-
-				if err = configClient.RegisterResources(); err != nil {
-					return multierror.Prefix(err, "failed to register custom resources.")
 				}
 
 				kubeController := kube.NewController(client, mesh, flags.controllerOptions)

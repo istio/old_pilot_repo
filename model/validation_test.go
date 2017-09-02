@@ -847,7 +847,6 @@ func TestValidateEgressRule(t *testing.T) {
 		{name: "empty egress rule", in: &proxyconfig.EgressRule{}, valid: false},
 		{name: "valid egress rule",
 			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
@@ -857,7 +856,6 @@ func TestValidateEgressRule(t *testing.T) {
 			valid: true},
 		{name: "egress rule with use_egress_proxy = true, not yet implemented",
 			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
 				Domains: []string{"*cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
@@ -867,7 +865,6 @@ func TestValidateEgressRule(t *testing.T) {
 			valid: false},
 		{name: "empty name",
 			in: &proxyconfig.EgressRule{
-				Name:    "",
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
@@ -877,7 +874,6 @@ func TestValidateEgressRule(t *testing.T) {
 			valid: false},
 		{name: "empty domains",
 			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
 				Domains: []string{},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
@@ -887,14 +883,12 @@ func TestValidateEgressRule(t *testing.T) {
 			valid: false},
 		{name: "empty ports",
 			in: &proxyconfig.EgressRule{
-				Name:           "cnn",
 				Domains:        []string{"*cnn.com", "*.cnn.com"},
 				Ports:          []*proxyconfig.EgressRule_Port{},
 				UseEgressProxy: false},
 			valid: false},
 		{name: "duplicate domain",
 			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
 				Domains: []string{"*cnn.com", "*.cnn.com", "*cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
@@ -904,7 +898,6 @@ func TestValidateEgressRule(t *testing.T) {
 			valid: false},
 		{name: "duplicate port",
 			in: &proxyconfig.EgressRule{
-				Name:    "cnn",
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},

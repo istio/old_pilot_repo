@@ -55,7 +55,6 @@ var (
 
 	// ExampleEgressRule is an example egress rule
 	ExampleEgressRule = &proxyconfig.EgressRule{
-		Name:           "sample-egress",
 		Domains:        []string{"*.cnn.com", "*.cnn.de"},
 		Ports:          []*proxyconfig.EgressRule_Port{{Port: 80, Protocol: "http"}},
 		UseEgressProxy: false,
