@@ -23,7 +23,12 @@ import (
 
 func TestEnvoyArgs(t *testing.T) {
 	mesh := proxy.DefaultMeshConfig()
-	got := envoyArgs("test.json", 5, &mesh, "my-cluster", "my-node")
+	test := envoy{
+		mesh:           &mesh,
+		serviceCluster: "my-cluster",
+		serviceNode:    "my-node",
+	}
+	got := test.args("test.json", 5)
 	want := []string{
 		"-c", "test.json",
 		"--restart-epoch", "5",
