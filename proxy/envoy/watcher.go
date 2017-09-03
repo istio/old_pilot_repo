@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/proxy"
@@ -47,20 +46,13 @@ type watcher struct {
 }
 
 // NewWatcher creates a new watcher instance with an agent
-func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node,
-	serviceCluster, configpath string) (Watcher, error) {
-	glog.V(2).Infof("Proxy role: %#v", role)
-
+func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, agent proxy.Agent, role proxy.Node) (Watcher, error) {
 	if mesh.StatsdUdpAddress != "" {
 		if addr, err := resolveStatsdAddr(mesh.StatsdUdpAddress); err == nil {
 			mesh.StatsdUdpAddress = addr
 		} else {
 			return nil, err
 		}
-	}
-
-	if err := os.MkdirAll(configpath, 0700); err != nil {
-		return nil, multierror.Prefix(err, "failed to create directory for proxy configuration")
 	}
 
 	if role.Type == proxy.Egress && mesh.EgressProxyAddress == "" {
@@ -71,14 +63,6 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node,
 		return nil, errors.New("ingress proxy is disabled")
 	}
 
-	envoyProxy := envoy{
-		mesh:           mesh,
-		serviceCluster: serviceCluster,
-		serviceNode:    role.ServiceNode(),
-		configpath:     configpath,
-	}
-
-	agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
 	out := &watcher{
 		agent: agent,
 		role:  role,
@@ -109,6 +93,7 @@ func (w *watcher) Run(ctx context.Context) {
 }
 
 func (w *watcher) Reload() {
+	// use LDS instead of static listeners and clusters
 	config := buildConfig(Listeners{}, Clusters{}, true, w.mesh)
 
 	h := sha256.New()
@@ -126,9 +111,6 @@ func (w *watcher) Reload() {
 const (
 	// EpochFileTemplate is a template for the root config JSON
 	EpochFileTemplate = "envoy-rev%d.json"
-
-	// BinaryPath is the path to envoy binary
-	BinaryPath = "/usr/local/bin/envoy"
 )
 
 func configFile(config string, epoch int) string {
@@ -140,6 +122,19 @@ type envoy struct {
 	serviceCluster string
 	serviceNode    string
 	configpath     string
+	binarypath     string
+}
+
+// MakeProxy creates an instance of the proxy control commands
+func MakeProxy(mesh *proxyconfig.ProxyMeshConfig,
+	serviceCluster, serviceNode, configPath, binaryPath string) proxy.Proxy {
+	return envoy{
+		mesh:           mesh,
+		serviceCluster: serviceCluster,
+		serviceNode:    serviceNode,
+		configpath:     configPath,
+		binarypath:     binaryPath,
+	}
 }
 
 func (proxy envoy) args(fname string, epoch int) []string {
@@ -177,7 +172,7 @@ func (proxy envoy) Run(config interface{}, epoch int, abort <-chan error) error 
 	glog.V(2).Infof("Envoy command: %v", args)
 
 	/* #nosec */
-	cmd := exec.Command(BinaryPath, args...)
+	cmd := exec.Command(proxy.binarypath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
