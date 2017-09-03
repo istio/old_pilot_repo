@@ -64,7 +64,7 @@ var (
 			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
-			if err := os.MkdirAll(configpath, 0700); err != nil {
+			if err = os.MkdirAll(configpath, 0700); err != nil {
 				return multierror.Prefix(err, "failed to create directory for proxy configuration")
 			}
 
