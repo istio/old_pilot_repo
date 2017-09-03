@@ -41,10 +41,9 @@ type Watcher interface {
 }
 
 type watcher struct {
-	agent          proxy.Agent
-	role           proxy.Node
-	serviceCluster string
-	mesh           *proxyconfig.ProxyMeshConfig
+	agent proxy.Agent
+	role  proxy.Node
+	mesh  *proxyconfig.ProxyMeshConfig
 }
 
 // NewWatcher creates a new watcher instance with an agent
@@ -72,12 +71,18 @@ func NewWatcher(mesh *proxyconfig.ProxyMeshConfig, role proxy.Node,
 		return nil, errors.New("ingress proxy is disabled")
 	}
 
-	agent := proxy.NewAgent(runEnvoy(mesh, role.ServiceNode(), serviceCluster, configpath), proxy.DefaultRetry)
-	out := &watcher{
-		agent:          agent,
-		role:           role,
-		serviceCluster: serviceCluster,
+	envoyProxy := envoy{
 		mesh:           mesh,
+		serviceCluster: serviceCluster,
+		serviceNode:    role.ServiceNode(),
+		configpath:     configpath,
+	}
+
+	agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
+	out := &watcher{
+		agent: agent,
+		role:  role,
+		mesh:  mesh,
 	}
 
 	return out, nil
@@ -130,74 +135,79 @@ func configFile(config string, epoch int) string {
 	return path.Join(config, fmt.Sprintf(EpochFileTemplate, epoch))
 }
 
-func envoyArgs(fname string, epoch int, mesh *proxyconfig.ProxyMeshConfig, cluster, node string) []string {
+type envoy struct {
+	mesh           *proxyconfig.ProxyMeshConfig
+	serviceCluster string
+	serviceNode    string
+	configpath     string
+}
+
+func (proxy envoy) args(fname string, epoch int) []string {
 	return []string{"-c", fname,
 		"--restart-epoch", fmt.Sprint(epoch),
-		"--drain-time-s", fmt.Sprint(int(convertDuration(mesh.DrainDuration) / time.Second)),
-		"--parent-shutdown-time-s", fmt.Sprint(int(convertDuration(mesh.ParentShutdownDuration) / time.Second)),
-		"--service-cluster", cluster,
-		"--service-node", node,
+		"--drain-time-s", fmt.Sprint(int(convertDuration(proxy.mesh.DrainDuration) / time.Second)),
+		"--parent-shutdown-time-s", fmt.Sprint(int(convertDuration(proxy.mesh.ParentShutdownDuration) / time.Second)),
+		"--service-cluster", proxy.serviceCluster,
+		"--service-node", proxy.serviceNode,
 	}
 }
 
-func runEnvoy(mesh *proxyconfig.ProxyMeshConfig, cluster, node, configpath string) proxy.Proxy {
-	return proxy.Proxy{
-		Run: func(config interface{}, epoch int, abort <-chan error) error {
-			envoyConfig, ok := config.(*Config)
-			if !ok {
-				return fmt.Errorf("Unexpected config type: %#v", config)
-			}
-
-			// attempt to write file
-			fname := configFile(configpath, epoch)
-			if err := envoyConfig.WriteFile(fname); err != nil {
-				return err
-			}
-
-			// spin up a new Envoy process
-			args := envoyArgs(fname, epoch, mesh, cluster, node)
-
-			// inject tracing flag for higher levels
-			if glog.V(4) {
-				args = append(args, "-l", "trace")
-			} else if glog.V(3) {
-				args = append(args, "-l", "debug")
-			}
-
-			glog.V(2).Infof("Envoy command: %v", args)
-
-			/* #nosec */
-			cmd := exec.Command(BinaryPath, args...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Start(); err != nil {
-				return err
-			}
-
-			done := make(chan error, 1)
-			go func() {
-				done <- cmd.Wait()
-			}()
-
-			select {
-			case err := <-abort:
-				glog.Warningf("Aborting epoch %d", epoch)
-				if errKill := cmd.Process.Kill(); errKill != nil {
-					glog.Warningf("killing epoch %d caused an error %v", epoch, errKill)
-				}
-				return err
-			case err := <-done:
-				return err
-			}
-		},
-		Cleanup: func(epoch int) {
-			path := configFile(configpath, epoch)
-			if err := os.Remove(path); err != nil {
-				glog.Warningf("Failed to delete config file %s for %d, %v", path, epoch, err)
-			}
-		},
-		Panic: func(_ interface{}) {
-			glog.Fatal("cannot start the proxy with the desired configuration")
-		},
+func (proxy envoy) Run(config interface{}, epoch int, abort <-chan error) error {
+	envoyConfig, ok := config.(*Config)
+	if !ok {
+		return fmt.Errorf("Unexpected config type: %#v", config)
 	}
+
+	// attempt to write file
+	fname := configFile(proxy.configpath, epoch)
+	if err := envoyConfig.WriteFile(fname); err != nil {
+		return err
+	}
+
+	// spin up a new Envoy process
+	args := proxy.args(fname, epoch)
+
+	// inject tracing flag for higher levels
+	if glog.V(4) {
+		args = append(args, "-l", "trace")
+	} else if glog.V(3) {
+		args = append(args, "-l", "debug")
+	}
+
+	glog.V(2).Infof("Envoy command: %v", args)
+
+	/* #nosec */
+	cmd := exec.Command(BinaryPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-abort:
+		glog.Warningf("Aborting epoch %d", epoch)
+		if errKill := cmd.Process.Kill(); errKill != nil {
+			glog.Warningf("killing epoch %d caused an error %v", epoch, errKill)
+		}
+		return err
+	case err := <-done:
+		return err
+	}
+}
+
+func (proxy envoy) Cleanup(epoch int) {
+	path := configFile(proxy.configpath, epoch)
+	if err := os.Remove(path); err != nil {
+		glog.Warningf("Failed to delete config file %s for %d, %v", path, epoch, err)
+	}
+}
+
+func (proxy envoy) Panic(_ interface{}) {
+	glog.Fatal("cannot start the proxy with the desired configuration")
 }
