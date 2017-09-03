@@ -62,7 +62,7 @@ if [ "${CI:-}" == 'bootstrap' ]; then
 else
     echo 'Not in bootstrap environment, skipping code coverage publishing'
 fi
-./bin/toolbox/pkg_coverage.sh
+#./bin/toolbox/pkg_coverage.sh
 
 echo '=== Build istioctl ==='
 ./bin/upload-istioctl -r -p "gs://istio-artifacts/pilot/${GIT_SHA}/artifacts/istioctl"
