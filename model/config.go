@@ -494,11 +494,11 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 		egressRule := egressRules[key]
 		conflictingRule := false
 		for _, domain := range egressRule.Domains {
-			keyOfAnEgressRuleWithTheSameDomain, conflictFound := domains[domain]
-			if conflictFound {
+			var keyOfAnEgressRuleWithTheSameDomain string
+			keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domain]
+			if conflictingRule {
 				errs = multierror.Append(errs, fmt.Errorf("rule %q conflicts with rule %q on domain %s, is rejected",
 					key, keyOfAnEgressRuleWithTheSameDomain, domain))
-				conflictingRule = true
 				break
 			}
 		}
