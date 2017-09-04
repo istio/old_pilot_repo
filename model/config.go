@@ -484,7 +484,7 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 	var errs error
 
 	var keys []string
-	for key, _ := range egressRules {
+	for key := range egressRules {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
