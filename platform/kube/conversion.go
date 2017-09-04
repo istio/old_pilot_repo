@@ -45,8 +45,8 @@ const (
 	IstioURIPrefix = "spiffe"
 )
 
-func convertTags(obj meta_v1.ObjectMeta) model.Tags {
-	out := make(model.Tags, len(obj.Labels))
+func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
+	out := make(model.Labels, len(obj.Labels))
 	for k, v := range obj.Labels {
 		out[k] = v
 	}
@@ -83,11 +83,15 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 
 	serviceaccounts := make([]string, 0)
 	if svc.Annotations != nil {
-		for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
-			serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+		if svc.Annotations[CanonicalServiceAccountsOnVMAnnotation] != "" {
+			for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
+				serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+			}
 		}
-		for _, ksa := range strings.Split(svc.Annotations[KubeServiceAccountsOnVMAnnotation], ",") {
-			serviceaccounts = append(serviceaccounts, kubeToIstioServiceAccount(ksa, svc.Namespace, domainSuffix))
+		if svc.Annotations[KubeServiceAccountsOnVMAnnotation] != "" {
+			for _, ksa := range strings.Split(svc.Annotations[KubeServiceAccountsOnVMAnnotation], ",") {
+				serviceaccounts = append(serviceaccounts, kubeToIstioServiceAccount(ksa, svc.Namespace, domainSuffix))
+			}
 		}
 	}
 	sort.Sort(sort.StringSlice(serviceaccounts))
