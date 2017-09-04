@@ -20,3 +20,4 @@ Istio Pilot [design](doc/design.md) gives an architectural overview of its compo
 proxy controllers.
 
 If you are interested in contributing to the project, please take a look at the [build instructions](doc/build.md) and the [testing infrastructure](doc/testing.md).
+
