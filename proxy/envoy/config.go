@@ -676,7 +676,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 	egressRules, errs := model.RejectConflictingEgressRules(egressRules)
 
 	if errs != nil {
-		glog.Warningf("Rejected rules: %", errs)
+		glog.Warningf("Rejected rules: %v", errs)
 	}
 
 	for key, rule := range egressRules {
