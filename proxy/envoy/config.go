@@ -350,7 +350,30 @@ func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) {
 }
 
 // buildTCPListener constructs a listener for the TCP proxy
-func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener {
+// in addition, it enables mongo proxy filter based on the protocol
+func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol model.Protocol) *Listener {
+	if protocol == model.ProtocolMONGO {
+		return &Listener{
+			Name:    fmt.Sprintf("mongo_%s_%d", ip, port),
+			Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+			Filters: []*NetworkFilter{{
+				Type: both,
+				Name: MONGOProxyFilter,
+				Config: &MONGOProxyFilterConfig{
+					StatPrefix: "mongo",
+				},
+			},
+				{
+					Type: read,
+					Name: TCPProxyFilter,
+					Config: &TCPProxyFilterConfig{
+						StatPrefix:  "tcp",
+						RouteConfig: tcpConfig,
+					},
+				}},
+		}
+	}
+
 	return &Listener{
 		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
 		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
@@ -430,7 +453,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 			return []*HTTPRoute{buildDefaultRoute(cluster)}
 		}
 
-	case model.ProtocolTCP:
+	case model.ProtocolTCP, model.ProtocolMONGO:
 		// handled by buildOutboundTCPListeners
 
 	default:
@@ -509,11 +532,11 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
-			case model.ProtocolTCP, model.ProtocolHTTPS:
+			case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 				route := buildTCPRoute(cluster, []string{service.Address})
 				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-				listener := buildTCPListener(config, service.Address, servicePort.Port)
+				listener := buildTCPListener(config, service.Address, servicePort.Port, servicePort.Protocol)
 				tcpClusters = append(tcpClusters, cluster)
 				tcpListeners = append(tcpListeners, listener)
 			}
@@ -594,10 +617,10 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address, endpoint.Port, "", false))
 
-		case model.ProtocolTCP, model.ProtocolHTTPS:
+		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
-			}, endpoint.Address, endpoint.Port)
+			}, endpoint.Address, endpoint.Port, protocol)
 
 			// set server-side mixer filter config
 			if mesh.MixerAddress != "" {
@@ -717,11 +740,12 @@ func buildMgmtPortListeners(mesh *proxyconfig.ProxyMeshConfig, managementPorts m
 	// assumes that inbound connections/requests are sent to the endpoint address
 	for _, mPort := range managementPorts {
 		switch mPort.Protocol {
-		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP, model.ProtocolHTTPS:
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP,
+			model.ProtocolHTTPS, model.ProtocolMONGO:
 			cluster := buildInboundCluster(mPort.Port, model.ProtocolTCP, mesh.ConnectTimeout)
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP})},
-			}, managementIP, mPort.Port)
+			}, managementIP, mPort.Port, model.ProtocolTCP)
 
 			clusters = append(clusters, cluster)
 			listeners = append(listeners, listener)
