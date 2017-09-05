@@ -49,7 +49,7 @@ type cacheHandler struct {
 func NewController(client *Client, options kube.ControllerOptions) model.ConfigStoreCache {
 
 	glog.V(2).Infof("CRD controller running in namespace %s, watching app namespaces %s",
-		options.Namespace, options.AppNamespace)
+		options.Namespace, options.WatchedNamespace)
 
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &controller{
@@ -60,7 +60,7 @@ func NewController(client *Client, options kube.ControllerOptions) model.ConfigS
 
 	// add stores for CRD kinds
 	for _, schema := range client.ConfigDescriptor() {
-		out.addInformer(schema, options.AppNamespace, options.ResyncPeriod)
+		out.addInformer(schema, options.WatchedNamespace, options.ResyncPeriod)
 	}
 
 	return out
@@ -72,7 +72,7 @@ func (c *controller) addInformer(schema model.ProtoSchema, namespace string, res
 			result = knownTypes[schema.Type].collection.DeepCopyObject()
 			err = c.client.dynamic.Get().
 				Namespace(namespace).
-				Resource(schema.Plural).
+				Resource(resourceName(schema.Plural)).
 				VersionedParams(&opts, meta_v1.ParameterCodec).
 				Do().
 				Into(result)
@@ -82,7 +82,7 @@ func (c *controller) addInformer(schema model.ProtoSchema, namespace string, res
 			return c.client.dynamic.Get().
 				Prefix("watch").
 				Namespace(namespace).
-				Resource(schema.Plural).
+				Resource(resourceName(schema.Plural)).
 				VersionedParams(&opts, meta_v1.ParameterCodec).
 				Watch()
 		})
@@ -141,7 +141,7 @@ func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model
 	c.kinds[typ].handler.Append(func(object interface{}, ev model.Event) error {
 		item, ok := object.(IstioObject)
 		if ok {
-			config, err := ConvertObject(schema, item)
+			config, err := ConvertObject(schema, item, c.client.domainSuffix)
 			if err != nil {
 				glog.Warningf("error translating object %#v", object)
 			} else {
@@ -199,7 +199,7 @@ func (c *controller) Get(typ, name, namespace string) (*model.Config, bool) {
 		return nil, false
 	}
 
-	config, err := ConvertObject(schema, obj)
+	config, err := ConvertObject(schema, obj, c.client.domainSuffix)
 	if err != nil {
 		return nil, false
 	}
@@ -237,7 +237,7 @@ func (c *controller) List(typ, namespace string) ([]model.Config, error) {
 			continue
 		}
 
-		config, err := ConvertObject(schema, item)
+		config, err := ConvertObject(schema, item, c.client.domainSuffix)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		} else {

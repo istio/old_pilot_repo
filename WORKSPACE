@@ -365,7 +365,7 @@ go_repository(
 
 go_repository(
     name = "com_github_russross_blackfriday",
-    commit = "35eb537633d9950afc8ae7bdf0edb6134584e9fc",  # Mar 19, 2017 (no releases)
+    commit = "4048872b16cc0fc2c5fd9eacf0ed2c2fedaa0c8c",
     importpath = "github.com/russross/blackfriday",
 )
 
@@ -478,7 +478,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "846cbe55455f0b3b2ed742b52edc520cc94326a9",  # Aug 18, 2017
+    commit = "311e590ce33153e953200c8573028ec37f32ddfd",  # Aug 29, 2017
     remote = "https://github.com/istio/api.git",
 )
 
