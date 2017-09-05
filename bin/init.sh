@@ -22,7 +22,7 @@ rm -rf vendor/k8s.io/*/vendor
 
 # Link proto gen files
 mkdir -p vendor/istio.io/api/proxy/v1/config
-for f in dest_policy.pb.go  http_fault.pb.go  l4_fault.pb.go  proxy_mesh.pb.go  route_rule.pb.go ingress_rule.pb.go; do
+for f in dest_policy.pb.go  http_fault.pb.go  l4_fault.pb.go  proxy_mesh.pb.go  route_rule.pb.go ingress_rule.pb.go egress_rule.pb.go; do
   ln -sf $(pwd)/bazel-genfiles/external/io_istio_api/proxy/v1/config/$f \
     vendor/istio.io/api/proxy/v1/config/
 done
@@ -36,10 +36,6 @@ mkdir -p vendor/github.com/googleapis/googleapis/google/rpc
 for f in $(pwd)/bazel-genfiles/external/com_github_googleapis_googleapis/google/rpc/*.pb.go; do
   ln -sf $f vendor/github.com/googleapis/googleapis/google/rpc/
 done
-
-# Link mock gen files
-ln -sf "$(pwd)/bazel-genfiles/model/mock_config_gen_test.go" \
-  model/
 
 ln -sf "$(pwd)/bazel-genfiles/adapter/config/crd/types.go" \
   adapter/config/crd/
