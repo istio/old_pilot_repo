@@ -26,7 +26,7 @@ import (
 type serviceHandler func(*model.Service, model.Event)
 type instanceHandler func(*model.ServiceInstance, model.Event)
 
-type controller struct {
+type Controller struct {
 	interval         time.Duration
 	serviceHandlers  []serviceHandler
 	instanceHandlers []instanceHandler
@@ -34,8 +34,8 @@ type controller struct {
 }
 
 // NewController instantiates a new Eureka controller
-func NewController(client Client, interval time.Duration) model.Controller {
-	return &controller{
+func NewController(client Client, interval time.Duration) *Controller {
+	return &Controller{
 		interval:         interval,
 		serviceHandlers:  make([]serviceHandler, 0),
 		instanceHandlers: make([]instanceHandler, 0),
@@ -43,17 +43,20 @@ func NewController(client Client, interval time.Duration) model.Controller {
 	}
 }
 
-func (c *controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
+// AppendServiceHandler implements controller operation
+func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
 	c.serviceHandlers = append(c.serviceHandlers, f)
 	return nil
 }
 
-func (c *controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
+// AppendInstanceHandler implements controller operation
+func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
 	c.instanceHandlers = append(c.instanceHandlers, f)
 	return nil
 }
 
-func (c *controller) Run(stop <-chan struct{}) {
+// Run implements controller operation
+func (c *Controller) Run(stop <-chan struct{}) {
 	cachedApps := make([]*application, 0)
 	ticker := time.NewTicker(c.interval)
 	for {
@@ -84,4 +87,9 @@ func (c *controller) Run(stop <-chan struct{}) {
 			return
 		}
 	}
+}
+
+// GetIstioServiceAccounts implements model.ServiceAccounts operation TODO
+func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
+	return nil
 }

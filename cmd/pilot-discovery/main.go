@@ -32,6 +32,7 @@ import (
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform"
 	"istio.io/pilot/platform/consul"
+	"istio.io/pilot/platform/eureka"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
@@ -39,9 +40,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ConsulArgs store the args related to Consul configuration
-type ConsulArgs struct {
+type consulArgs struct {
 	config    string
+	serverURL string
+}
+
+type eurekaArgs struct {
 	serverURL string
 }
 
@@ -54,7 +58,8 @@ type args struct {
 	discoveryOptions  envoy.DiscoveryServiceOptions
 
 	registries []string
-	consulargs ConsulArgs
+	consul     consulArgs
+	eureka     eurekaArgs
 }
 
 var (
@@ -144,15 +149,31 @@ var (
 					go ingressSyncer.Run(stop)
 
 				case platform.ConsulRegistry:
-					glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
+					glog.V(2).Infof("Consul url: %v", flags.consul.serverURL)
 					var conerr error
 					serviceControllers[serviceRegistry], conerr = consul.NewController(
 						// TODO: Remove this hardcoding!
-						flags.consulargs.serverURL, "dc1", 2*time.Second)
+						flags.consul.serverURL, "dc1", 2*time.Second)
 					if conerr != nil {
 						return fmt.Errorf("failed to create Consul controller: %v", conerr)
 					}
 					configController = crd.NewController(configClient, flags.controllerOptions)
+
+				case platform.EurekaRegistry:
+
+					client := eureka.NewClient(flags.eureka.serverURL)
+					serviceDiscovery := eureka.NewServiceDiscovery(client)
+					controller := eureka.NewController(client, 2*time.Second) // TODO: hardcoded
+
+					serviceControllers[serviceRegistry] = struct {
+						model.ServiceDiscovery
+						model.Controller
+						model.ServiceAccounts
+					}{
+						ServiceDiscovery: serviceDiscovery,
+						Controller:       controller,
+						ServiceAccounts:  controller,
+					}
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
@@ -208,10 +229,13 @@ func init() {
 		"Enable profiling via web interface host:port/debug/pprof")
 	discoveryCmd.PersistentFlags().BoolVar(&flags.discoveryOptions.EnableCaching, "discovery_cache", true,
 		"Enable caching discovery service responses")
-	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.config, "consulconfig", "",
+
+	discoveryCmd.PersistentFlags().StringVar(&flags.consul.config, "consulconfig", "",
 		"Consul Config file for discovery")
-	discoveryCmd.PersistentFlags().StringVar(&flags.consulargs.serverURL, "consulserverURL", "",
-		"URL for the consul server")
+	discoveryCmd.PersistentFlags().StringVar(&flags.consul.serverURL, "consulserverURL", "",
+		"URL for the Consul server")
+	discoveryCmd.PersistentFlags().StringVar(&flags.eureka.serverURL, "eurekaserverURL", "",
+		"URL for the Eureka server")
 
 	_ = discoveryCmd.PersistentFlags().MarkHidden("namespace")
 	_ = discoveryCmd.PersistentFlags().MarkHidden("profile")
