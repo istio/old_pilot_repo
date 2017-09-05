@@ -78,13 +78,13 @@ var (
 				mesh = &defaultMesh
 				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
 			}
-			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
-			glog.V(2).Infof("version %s", version.Line())
-			glog.V(2).Infof("flags %s", spew.Sdump(flags))
-
 			environment := proxy.Environment{
 				Mesh: mesh,
 			}
+
+			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			stop := make(chan struct{})
 
@@ -103,7 +103,6 @@ var (
 
 			configController := crd.NewController(configClient, flags.controllerOptions)
 			serviceControllers := make(map[platform.ServiceRegistry]registryaggregate.Registry)
-			environment.IstioConfigStore = model.MakeIstioStore(configController)
 
 			var regOrder []platform.ServiceRegistry
 
@@ -157,6 +156,7 @@ var (
 				}
 			}
 
+			environment.IstioConfigStore = model.MakeIstioStore(configController)
 			regAggregate := registryaggregate.NewController(serviceControllers, regOrder)
 			environment.ServiceDiscovery = regAggregate
 			environment.ServiceAccounts = regAggregate
