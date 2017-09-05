@@ -480,12 +480,17 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 // According to Envoy's virtual host specification, no virtual hosts can share the same domain.
 // The following code rejects conflicting rules deterministically, by a lexicographical order -
 // a rule with a smaller key lexicographically wins.
+// Here the key of the rule is the key of the Istio configuration objects - see
+// `func (meta *ConfigMeta) Key() string`
 func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule) ( // long line split
 	map[string]*proxyconfig.EgressRule, error) {
 	filteredEgressRules := make(map[string]*proxyconfig.EgressRule)
 	var errs error
 
 	var keys []string
+
+	// the key here is the key of the Istio configuration objects - see
+	// `func (meta *ConfigMeta) Key() string`
 	for key := range egressRules {
 		keys = append(keys, key)
 	}
