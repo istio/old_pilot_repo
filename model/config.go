@@ -475,10 +475,11 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 	return out
 }
 
-// RejectConflictingEgressRules rejects rules that have a domain which same to domains of some other rule.
+// RejectConflictingEgressRules rejects rules that have a domain which is equal to
+// a domain of some other rule.
 // According to Envoy's virtual host specification, no virtual hosts can share the same domain.
-// The following code rejects conflicting rules determenistically, by a lexicographical order - a rule with
-// a smaller name lexicographically wins.
+// The following code rejects conflicting rules deterministically, by a lexicographical order -
+// a rule with a smaller key lexicographically wins.
 func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule) ( // long line split
 	map[string]*proxyconfig.EgressRule, error) {
 	filteredEgressRules := make(map[string]*proxyconfig.EgressRule)
