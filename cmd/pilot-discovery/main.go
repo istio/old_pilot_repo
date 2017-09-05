@@ -101,7 +101,7 @@ var (
 				return multierror.Prefix(err, "failed to register custom resources.")
 			}
 
-			configController := crd.NewController(configClient, flags.controllerOptions)
+			var configController model.ConfigStoreCache
 			serviceControllers := make(map[platform.ServiceRegistry]registryaggregate.Registry)
 
 			var regOrder []platform.ServiceRegistry
@@ -127,9 +127,11 @@ var (
 					}
 
 					serviceControllers[serviceRegistry] = kube.NewController(client, mesh, flags.controllerOptions)
-					if mesh.IngressControllerMode != proxyconfig.ProxyMeshConfig_OFF {
+					if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
+						configController = crd.NewController(configClient, flags.controllerOptions)
+					} else {
 						configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
-							configController,
+							crd.NewController(configClient, flags.controllerOptions),
 							ingress.NewController(client, mesh, flags.controllerOptions),
 						})
 						if err != nil {
@@ -150,6 +152,7 @@ var (
 					if conerr != nil {
 						return fmt.Errorf("failed to create Consul controller: %v", conerr)
 					}
+					configController = crd.NewController(configClient, flags.controllerOptions)
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
