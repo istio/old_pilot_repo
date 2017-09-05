@@ -26,6 +26,7 @@ import (
 type serviceHandler func(*model.Service, model.Event)
 type instanceHandler func(*model.ServiceInstance, model.Event)
 
+// Controller represents state of Eureka registry
 type Controller struct {
 	interval         time.Duration
 	serviceHandlers  []serviceHandler
