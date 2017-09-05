@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
@@ -496,17 +497,29 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 	}
 	sort.Strings(keys)
 
+	// domains - a map where keys are of the form domain:port and values are the keys of
+	// egress-rule configuration objects
 	domains := make(map[string]string)
-	for _, key := range keys {
-		egressRule := egressRules[key]
+	for _, egressRuleKey := range keys {
+		egressRule := egressRules[egressRuleKey]
 		conflictingRule := false
+
+	DomainsAndPortsLoop:
 		for _, domain := range egressRule.Domains {
-			var keyOfAnEgressRuleWithTheSameDomain string
-			keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domain]
-			if conflictingRule {
-				errs = multierror.Append(errs, fmt.Errorf("rule %q conflicts with rule %q on domain %s, is rejected",
-					key, keyOfAnEgressRuleWithTheSameDomain, domain))
-				break
+			for _, port := range egressRule.Ports {
+				portNumber := int(port.Port)
+				domainsKey := domain + ":" + strconv.Itoa(portNumber)
+
+				var keyOfAnEgressRuleWithTheSameDomain string
+				keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domainsKey]
+				if conflictingRule {
+					errs = multierror.Append(errs,
+						fmt.Errorf("rule %q conflicts with rule %q on domain "+
+							"%s and port %d, is rejected", egressRuleKey,
+							keyOfAnEgressRuleWithTheSameDomain, domain,
+							portNumber))
+					break DomainsAndPortsLoop
+				}
 			}
 		}
 
@@ -515,9 +528,13 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 		}
 
 		for _, domain := range egressRule.Domains {
-			domains[domain] = key
+			for _, port := range egressRule.Ports {
+				portNumber := int(port.Port)
+				domainsKey := domain + ":" + strconv.Itoa(portNumber)
+				domains[domainsKey] = egressRuleKey
+			}
 		}
-		filteredEgressRules[key] = egressRule
+		filteredEgressRules[egressRuleKey] = egressRule
 	}
 
 	return filteredEgressRules, errs

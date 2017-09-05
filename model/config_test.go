@@ -541,7 +541,7 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 				},
 			},
 			valid: false},
-		{name: "a conflict in a domain, different ports and protocols",
+		{name: "a conflict in a domain, different ports",
 			in: map[string]*proxyconfig.EgressRule{"cnn2": {
 				Domains: []string{"*cnn.com", "*.cnn.com"},
 				Ports: []*proxyconfig.EgressRule_Port{
@@ -552,21 +552,27 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 				"cnn1": {
 					Domains: []string{"*cnn.com", "*.cnn.de"},
 					Ports: []*proxyconfig.EgressRule_Port{
-						{Port: 8080, Protocol: "http2"},
-						{Port: 8081, Protocol: "grpc"},
+						{Port: 8080, Protocol: "http"},
+						{Port: 8081, Protocol: "https"},
 					},
 				},
 			},
-			out: map[string]*proxyconfig.EgressRule{
+			out: map[string]*proxyconfig.EgressRule{"cnn2": {
+				Domains: []string{"*cnn.com", "*.cnn.com"},
+				Ports: []*proxyconfig.EgressRule_Port{
+					{Port: 80, Protocol: "http"},
+					{Port: 443, Protocol: "https"},
+				},
+			},
 				"cnn1": {
 					Domains: []string{"*cnn.com", "*.cnn.de"},
 					Ports: []*proxyconfig.EgressRule_Port{
-						{Port: 8080, Protocol: "http2"},
-						{Port: 8081, Protocol: "grpc"},
+						{Port: 8080, Protocol: "http"},
+						{Port: 8081, Protocol: "https"},
 					},
 				},
 			},
-			valid: false},
+			valid: true},
 		{name: "two conflicts, one rule rejected",
 			in: map[string]*proxyconfig.EgressRule{"cnn2": {
 				Domains: []string{"*cnn.com", "*.cnn.com"},
