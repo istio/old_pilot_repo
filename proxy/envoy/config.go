@@ -352,6 +352,9 @@ func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) {
 // buildTCPListener constructs a listener for the TCP proxy
 // in addition, it enables mongo proxy filter based on the protocol
 func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol model.Protocol) *Listener {
+	// TODO: add a watcher for /var/lib/istio/mongo/certs
+	// if certs are found use, TLS or mTLS clusters for talking to MongoDB.
+	// User is responsible for mounting those certs in the pod.
 	if protocol == model.ProtocolMONGO {
 		return &Listener{
 			Name:    fmt.Sprintf("mongo_%s_%d", ip, port),
