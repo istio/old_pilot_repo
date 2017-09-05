@@ -213,8 +213,16 @@ func TestAdmissionController(t *testing.T) {
 		if c.useNamespaceAll {
 			namespaces = []string{metav1.NamespaceAll}
 		}
-		testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-			DefaultAdmissionServiceName, "istio-system", namespaces, testcerts.CACert)
+		testAdmissionController := NewController(Config{
+			Descriptor:                             mock.Types,
+			ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
+			ExternalAdmissionHookName:              DefaultAdmissionHookName,
+			ServiceName:                            DefaultAdmissionServiceName,
+			ServiceNamespace:                       "istio-system",
+			ValidateNamespaces:                     namespaces,
+			CABundle:                               testcerts.CACert,
+			DomainSuffix:                           DefaultDomainSuffix,
+		})
 
 		got := testAdmissionController.admit(c.in)
 		if got.Allowed != c.want.Allowed {
@@ -314,8 +322,16 @@ func TestServe(t *testing.T) {
 		},
 	}
 
-	testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, testcerts.CACert)
+	testAdmissionController := NewController(Config{
+		Descriptor:                             mock.Types,
+		ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
+		ExternalAdmissionHookName:              DefaultAdmissionHookName,
+		ServiceName:                            DefaultAdmissionServiceName,
+		ServiceNamespace:                       "istio-system",
+		ValidateNamespaces:                     []string{watchedNamespace},
+		CABundle:                               testcerts.CACert,
+		DomainSuffix:                           DefaultDomainSuffix,
+	})
 
 	tlsConfig, err := MakeTLSConfig(testcerts.ServerCert, testcerts.ServerKey, testcerts.CACert)
 	if err != nil {
@@ -372,8 +388,16 @@ func TestServe(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-	testAdmissionController := NewController(mock.Types, DefaultAdmissionHookConfigName, DefaultAdmissionHookName,
-		DefaultAdmissionServiceName, "istio-system", []string{watchedNamespace}, testcerts.CACert)
+	testAdmissionController := NewController(Config{
+		Descriptor:                             mock.Types,
+		ExternalAdmissionHookConfigurationName: DefaultAdmissionHookConfigName,
+		ExternalAdmissionHookName:              DefaultAdmissionHookName,
+		ServiceName:                            DefaultAdmissionServiceName,
+		ServiceNamespace:                       "istio-system",
+		ValidateNamespaces:                     []string{watchedNamespace},
+		CABundle:                               testcerts.CACert,
+		DomainSuffix:                           DefaultDomainSuffix,
+	})
 
 	fakeClient := fake.NewSimpleClientset(&admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{})
 

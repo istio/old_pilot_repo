@@ -62,35 +62,54 @@ const (
 	// Kubernetes 1.7 to work around some cloud provider bug (see
 	// https://github.com/kubernetes/kubernetes/issues/49987#issuecomment-319739227)
 	DefaultAdmissionServiceName = "istio-pilot"
+
+	// DefaultDomainSuffix is the default DNS domain suffix for Istio
+	// CRD resources.
+	DefaultDomainSuffix = "local.cluster"
 )
+
+// Config specifies the configuration for the Istio Pilot validation
+// admission controller.
+type Config struct {
+	// Descriptor defines the list of supported configuration model
+	// types for Pilot.
+	Descriptor model.ConfigDescriptor
+
+	// ExternalAdmissionHookConfigurationName is the name of the
+	// ExternalAdmissionHookConfiguration which configures the
+	// initializer.
+	ExternalAdmissionHookConfigurationName string
+
+	// ExternalAdmissionHookName is the name of the
+	// ExternalAdmissionHook which describes he external admission
+	// webhook and resources and operations it applies to.
+	ExternalAdmissionHookName string
+
+	// ServiceName is the service name of the webhook.
+	ServiceName string
+
+	// ServiceNamespace is the namespace of the webhook service.
+	ServiceNamespace string
+
+	// ValidateNamespaces is a list of names to validate. Any
+	// namespace not in this list is unconditionally validated as
+	// good. This is useful when multiple validators are running in
+	// the same cluster managing different sets of namespaces
+	// (e.g. shared test clusters).
+	ValidateNamespaces []string
+
+	// CAbundle is the PEM encoded CA bundle which will be used to
+	// validate webhook's service certificate.
+	CABundle []byte
+
+	// DomainSuffix is the DNS domain suffix for Istio CRD resources, e.g. local.cluster.
+	DomainSuffix string
+}
 
 // AdmissionController implements the external admission webhook for validation of
 // pilot configuration.
 type AdmissionController struct {
-	descriptor model.ConfigDescriptor
-
-	// externalAdmissionHookConfigurationName is the name of the
-	// ExternalAdmissionHookConfiguration which configures the
-	// initializer.
-	externalAdmissionHookConfigurationName string
-
-	// Name of the ExternalAdmissionHook which describes he external
-	// admission webhook and resources and operations it applies to.
-	externalAdmissionHookName string
-
-	// serviceName is the service name of the webhook.
-	serviceName string
-
-	// serviceNamespace is the namespace of the webhook service.
-	serviceNamespace string
-
-	// cabundle is the PEM encoded CA bundle which will be used to
-	// validate webhook's service certificate.
-	caBundle []byte
-
-	// unconditionally validate all config that is not in this list of
-	// configuration.
-	validateNamespaces []string
+	config Config
 }
 
 // GetAPIServerExtensionCACert gets the Kubernetes aggregate apiserver
@@ -129,39 +148,32 @@ func MakeTLSConfig(serverCert, serverKey, caCert []byte) (*tls.Config, error) {
 }
 
 // NewController creates a new instance of the admission webhook controller.
-func NewController(descriptor model.ConfigDescriptor, externalAdmissionHookConfigurationName, externalAdmissionHookName,
-	serviceName, serviceNamespace string, validateNamespaces []string, caBundle []byte) *AdmissionController {
+func NewController(config Config) *AdmissionController {
 	return &AdmissionController{
-		descriptor:                             descriptor,
-		externalAdmissionHookConfigurationName: externalAdmissionHookConfigurationName,
-		externalAdmissionHookName:              externalAdmissionHookName,
-		serviceName:                            serviceName,
-		serviceNamespace:                       serviceNamespace,
-		caBundle:                               caBundle,
-		validateNamespaces:                     validateNamespaces,
+		config: config,
 	}
 }
 
 // Unregister unregisters the external admission webhook
 func (ac *AdmissionController) Unregister(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
-	return client.Delete(ac.externalAdmissionHookConfigurationName, nil)
+	return client.Delete(ac.config.ExternalAdmissionHookConfigurationName, nil)
 }
 
 // Register registers the external admission webhook for pilot
 // configuration types.
 func (ac *AdmissionController) Register(client admissionClient.ExternalAdmissionHookConfigurationInterface) error {
 	var resources []string
-	for _, schema := range ac.descriptor {
+	for _, schema := range ac.config.Descriptor {
 		resources = append(resources, schema.Plural)
 	}
 
 	webhook := &admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ac.externalAdmissionHookConfigurationName,
+			Name: ac.config.ExternalAdmissionHookConfigurationName,
 		},
 		ExternalAdmissionHooks: []admissionregistrationv1alpha1.ExternalAdmissionHook{
 			{
-				Name: ac.externalAdmissionHookName,
+				Name: ac.config.ExternalAdmissionHookName,
 				Rules: []admissionregistrationv1alpha1.RuleWithOperations{{
 					Operations: []admissionregistrationv1alpha1.OperationType{
 						admissionregistrationv1alpha1.Create,
@@ -175,10 +187,10 @@ func (ac *AdmissionController) Register(client admissionClient.ExternalAdmission
 				}},
 				ClientConfig: admissionregistrationv1alpha1.AdmissionHookClientConfig{
 					Service: admissionregistrationv1alpha1.ServiceReference{
-						Namespace: ac.serviceNamespace,
-						Name:      ac.serviceName,
+						Namespace: ac.config.ServiceNamespace,
+						Name:      ac.config.ServiceName,
 					},
-					CABundle: ac.caBundle,
+					CABundle: ac.config.CABundle,
 				},
 			},
 		},
@@ -258,16 +270,16 @@ func (ac *AdmissionController) admit(review *v1alpha1.AdmissionReview) *v1alpha1
 		return makeErrorStatus("cannot decode configuration: %v", err)
 	}
 
-	if !watched(ac.validateNamespaces, obj.Namespace) {
+	if !watched(ac.config.ValidateNamespaces, obj.Namespace) {
 		return &v1alpha1.AdmissionReviewStatus{Allowed: true}
 	}
 
-	schema, exists := ac.descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
+	schema, exists := ac.config.Descriptor.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
 	if !exists {
 		return makeErrorStatus("unrecognized type %v", obj.Kind)
 	}
 
-	out, err := crd.ConvertObject(schema, &obj)
+	out, err := crd.ConvertObject(schema, &obj, ac.config.DomainSuffix)
 	if err != nil {
 		return makeErrorStatus("error decoding configuration: %v", err)
 	}
