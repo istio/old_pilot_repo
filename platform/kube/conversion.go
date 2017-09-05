@@ -173,7 +173,6 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 
 	var protocol model.Protocol
 	var portVal intstr.IntOrString
-	var port int
 
 	// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
 	if handler.HTTPGet != nil {
@@ -188,7 +187,7 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 
 	switch portVal.Type {
 	case intstr.Int:
-		port = portVal.IntValue()
+		port := portVal.IntValue()
 		return &model.Port{
 			Name:     "mgmt-" + strconv.Itoa(port),
 			Port:     port,
@@ -197,7 +196,7 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 	case intstr.String:
 		for _, named := range c.Ports {
 			if named.Name == portVal.String() {
-				port = int(named.ContainerPort)
+				port := int(named.ContainerPort)
 				return &model.Port{
 					Name:     "mgmt-" + strconv.Itoa(port),
 					Port:     port,
