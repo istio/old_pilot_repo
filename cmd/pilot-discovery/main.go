@@ -23,6 +23,8 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	configaggregate "istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
@@ -37,7 +39,6 @@ import (
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type consulArgs struct {
@@ -106,7 +107,7 @@ var (
 				return multierror.Prefix(err, "failed to register custom resources.")
 			}
 
-			var configController model.ConfigStoreCache
+			configController := crd.NewController(configClient, flags.controllerOptions)
 			serviceControllers := make(map[platform.ServiceRegistry]registryaggregate.Registry)
 
 			var regOrder []platform.ServiceRegistry
@@ -132,11 +133,9 @@ var (
 					}
 
 					serviceControllers[serviceRegistry] = kube.NewController(client, mesh, flags.controllerOptions)
-					if mesh.IngressControllerMode == proxyconfig.ProxyMeshConfig_OFF {
-						configController = crd.NewController(configClient, flags.controllerOptions)
-					} else {
+					if mesh.IngressControllerMode != proxyconfig.ProxyMeshConfig_OFF {
 						configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
-							crd.NewController(configClient, flags.controllerOptions),
+							configController,
 							ingress.NewController(client, mesh, flags.controllerOptions),
 						})
 						if err != nil {
@@ -157,10 +156,9 @@ var (
 					if conerr != nil {
 						return fmt.Errorf("failed to create Consul controller: %v", conerr)
 					}
-					configController = crd.NewController(configClient, flags.controllerOptions)
 
 				case platform.EurekaRegistry:
-
+					glog.V(2).Infof("Eureka url: %v", flags.eureka.serverURL)
 					client := eureka.NewClient(flags.eureka.serverURL)
 					serviceDiscovery := eureka.NewServiceDiscovery(client)
 					controller := eureka.NewController(client, 2*time.Second) // TODO: hardcoded
