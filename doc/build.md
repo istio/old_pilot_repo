@@ -8,7 +8,7 @@ We build on Linux. For Windows and Mac, we recommend using a Linux virtual machi
 ## Prerequisites
 
 * [Setting up Go](https://github.com/istio/istio/blob/master/devel/README.md#setting-up-go)
-* [Setting up Bazel](https://github.com/istio/istio/blob/master/devel/README.md#setting-up-bazel)
+* [Setting up Bazel](https://github.com/istio/istio/blob/master/devel/README.md#setting-up-bazel) - the main build system of Istio. The minimal version for Istio Pilot is [0.5.2](https://github.com/bazelbuild/bazel/releases/tag/0.5.2).
 
 ## Initial Setup
 
