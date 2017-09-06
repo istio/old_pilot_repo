@@ -235,11 +235,7 @@ func init() {
 	discoveryCmd.PersistentFlags().StringVar(&flags.eureka.serverURL, "eurekaserverURL", "",
 		"URL for the Eureka server")
 
-	_ = discoveryCmd.PersistentFlags().MarkHidden("namespace")
-	_ = discoveryCmd.PersistentFlags().MarkHidden("profile")
-	_ = discoveryCmd.PersistentFlags().MarkHidden("discovery_cache")
 	cmd.AddFlags(rootCmd)
-
 	rootCmd.AddCommand(discoveryCmd)
 	rootCmd.AddCommand(cmd.VersionCmd)
 }
