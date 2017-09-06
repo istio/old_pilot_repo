@@ -39,6 +39,8 @@ done
 export GOOS=linux
 export GOARCH=amd64
 
+echo "Make sure to run 'dep ensure' to pull vendor dependencies."
+
 go build ./cmd/pilot-agent
 go build ./cmd/pilot-discovery
 go build ./test/server
