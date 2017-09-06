@@ -68,7 +68,7 @@ func (t *grpc) makeRequests() error {
 								if src != "t" {
 									t.logs.add(src, id, name)
 								}
-								if dst != "t" {
+								if dst != "t" && dst != src { // TODO: only for headless
 									t.logs.add(dst, id, name)
 								}
 								// mixer filter is invoked on the server side, that is when dst is not "t"

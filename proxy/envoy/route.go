@@ -311,14 +311,16 @@ func sharedHost(parts ...[]string) []string {
 	}
 }
 
-func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
+func buildTCPRoute(cluster *Cluster, addresses []string, ports string) *TCPRoute {
 	// destination port is unnecessary with use_original_dst since
 	// the listener address already contains the port
 	route := &TCPRoute{
-		Cluster:    cluster.Name,
-		clusterRef: cluster,
+		Cluster:           cluster.Name,
+		DestinationIPList: make([]string, 0, len(addresses)),
+		DestinationPorts:  ports,
+		clusterRef:        cluster,
 	}
-	sort.Sort(sort.StringSlice(addresses))
+	sort.Strings(addresses)
 	for _, addr := range addresses {
 		route.DestinationIPList = append(route.DestinationIPList, addr+"/32")
 	}
