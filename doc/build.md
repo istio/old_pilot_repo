@@ -3,7 +3,7 @@
 
 
 ## Environment
-We build on Linux. For Windows and Mac, we recommend using a Linux virtual machine and/or [Vagrant-specific build instructions](build-vagrant.md) or [minikube build pod](minikube.md). Go code compiles on Mac but docker and proxy tests will fail.
+We build on Linux. For Windows and Mac, we recommend using a Linux virtual machine and [minikube build pod](minikube.md). Go code compiles on Mac but docker and proxy tests will fail.
 
 ## Prerequisites
 
