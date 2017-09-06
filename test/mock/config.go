@@ -35,29 +35,38 @@ var (
 
 	// ExampleRouteRule is an example route rule
 	ExampleRouteRule = &proxyconfig.RouteRule{
-		Name:        "sample-rule",
-		Destination: WorldService.Hostname,
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
 		Route: []*proxyconfig.DestinationWeight{
-			{Weight: 80, Tags: map[string]string{"version": "v1"}},
-			{Weight: 20, Tags: map[string]string{"version": "v2"}},
+			{Weight: 80, Labels: map[string]string{"version": "v1"}},
+			{Weight: 20, Labels: map[string]string{"version": "v2"}},
 		},
 	}
 
 	// ExampleIngressRule is an example ingress rule
 	ExampleIngressRule = &proxyconfig.IngressRule{
-		Name:                   "sample-ingress",
-		Port:                   80,
-		Destination:            WorldService.Hostname,
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
+		Port: 80,
 		DestinationServicePort: &proxyconfig.IngressRule_DestinationPort{DestinationPort: 80},
+	}
+
+	// ExampleEgressRule is an example egress rule
+	ExampleEgressRule = &proxyconfig.EgressRule{
+		Domains:        []string{"*.cnn.com", "*.cnn.de"},
+		Ports:          []*proxyconfig.EgressRule_Port{{Port: 80, Protocol: "http"}},
+		UseEgressProxy: false,
 	}
 
 	// ExampleDestinationPolicy is an example destination policy
 	ExampleDestinationPolicy = &proxyconfig.DestinationPolicy{
-		Destination: WorldService.Hostname,
-		Policy: []*proxyconfig.DestinationVersionPolicy{
-			{LoadBalancing: &proxyconfig.LoadBalancing{
-				LbPolicy: &proxyconfig.LoadBalancing_Name{Name: proxyconfig.LoadBalancing_RANDOM},
-			}},
+		Destination: &proxyconfig.IstioService{
+			Name: "world",
+		},
+		LoadBalancing: &proxyconfig.LoadBalancing{
+			LbPolicy: &proxyconfig.LoadBalancing_Name{Name: proxyconfig.LoadBalancing_RANDOM},
 		},
 	}
 )
@@ -262,6 +271,16 @@ func CheckIstioConfigTypes(store model.ConfigStore, namespace string, t *testing
 		Spec: ExampleIngressRule,
 	}); err != nil {
 		t.Errorf("Post(IngressRule) => got %v", err)
+	}
+	if _, err := store.Create(model.Config{
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.EgressRule.Type,
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: ExampleEgressRule,
+	}); err != nil {
+		t.Errorf("Post(EgressRule) => got %v", err)
 	}
 	if _, err := store.Create(model.Config{
 		ConfigMeta: model.ConfigMeta{

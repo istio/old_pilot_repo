@@ -23,7 +23,6 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
@@ -36,6 +35,7 @@ import (
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
 	"istio.io/pilot/tools/version"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ConsulArgs store the args related to Consul configuration
@@ -78,6 +78,8 @@ var (
 				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
 			}
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
+			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			var serviceController model.Controller
 			var configController model.ConfigStoreCache
@@ -87,31 +89,28 @@ var (
 
 			stop := make(chan struct{})
 
+			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+				model.RouteRule,
+				model.EgressRule,
+				model.DestinationPolicy,
+			}, flags.controllerOptions.DomainSuffix)
+			if err != nil {
+				return multierror.Prefix(err, "failed to open a config client.")
+			}
+
+			if err = configClient.RegisterResources(); err != nil {
+				return multierror.Prefix(err, "failed to register custom resources.")
+			}
+
 			// Set up values for input to discovery service in different platforms
 			if flags.serviceregistry == platform.KubernetesRegistry || flags.serviceregistry == "" {
-
-				_, client, err := kube.CreateInterface(flags.kubeconfig)
-				if err != nil {
-					return multierror.Prefix(err, "failed to connect to Kubernetes API.")
+				_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
+				if kuberr != nil {
+					return multierror.Prefix(kuberr, "failed to connect to Kubernetes API.")
 				}
 
 				if flags.controllerOptions.Namespace == "" {
 					flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-				}
-
-				glog.V(2).Infof("version %s", version.Line())
-				glog.V(2).Infof("flags %s", spew.Sdump(flags))
-
-				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-					model.RouteRule,
-					model.DestinationPolicy,
-				})
-				if err != nil {
-					return multierror.Prefix(err, "failed to open a config client.")
-				}
-
-				if err = configClient.RegisterResources(); err != nil {
-					return multierror.Prefix(err, "failed to register custom resources.")
 				}
 
 				kubeController := kube.NewController(client, mesh, flags.controllerOptions)
@@ -130,7 +129,6 @@ var (
 				environment.ServiceDiscovery = kubeController
 				environment.ServiceAccounts = kubeController
 				environment.IstioConfigStore = model.MakeIstioStore(configController)
-				environment.SecretRegistry = kube.MakeSecretRegistry(client)
 				serviceController = kubeController
 				ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
 
@@ -138,22 +136,10 @@ var (
 			} else if flags.serviceregistry == platform.ConsulRegistry {
 				glog.V(2).Infof("Consul url: %v", flags.consulargs.serverURL)
 
-				consulController, err := consul.NewController(
+				consulController, conerr := consul.NewController(
 					flags.consulargs.serverURL, "dc1", 2*time.Second)
-				if err != nil {
-					return fmt.Errorf("failed to create Consul controller: %v", err)
-				}
-
-				configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
-					model.RouteRule,
-					model.DestinationPolicy,
-				})
-				if err != nil {
-					return multierror.Prefix(err, "failed to open a config client.")
-				}
-
-				if err = configClient.RegisterResources(); err != nil {
-					return multierror.Prefix(err, "failed to register custom resources.")
+				if conerr != nil {
+					return fmt.Errorf("failed to create Consul controller: %v", conerr)
 				}
 
 				configController = crd.NewController(configClient, flags.controllerOptions)
@@ -194,8 +180,9 @@ func init() {
 		fmt.Sprintf("File name for Istio mesh configuration"))
 	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.Namespace, "namespace", "n", "",
 		"Select a namespace for the controller loop. If not set, uses ${POD_NAMESPACE} environment variable")
-	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.AppNamespace, "app namespace", "a", "",
-		"Restrict the applications namespace that controller manages, do n")
+	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.WatchedNamespace, "app namespace",
+		"a", metav1.NamespaceAll,
+		"Restrict the applications namespace the controller manages; if not set, controller watches all namespaces")
 	discoveryCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", time.Second,
 		"Controller resync interval")
 	discoveryCmd.PersistentFlags().StringVar(&flags.controllerOptions.DomainSuffix, "domain", "cluster.local",
