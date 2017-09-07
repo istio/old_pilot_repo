@@ -29,7 +29,7 @@ import (
 	configaggregate "istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/adapter/config/ingress"
-	registryaggregate "istio.io/pilot/adapter/serviceregistry/aggregate"
+	"istio.io/pilot/adapter/serviceregistry/aggregate"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform"
@@ -84,9 +84,6 @@ var (
 				mesh = &defaultMesh
 				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
 			}
-			environment := proxy.Environment{
-				Mesh: mesh,
-			}
 
 			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			glog.V(2).Infof("version %s", version.Line())
@@ -108,19 +105,15 @@ var (
 			}
 
 			configController := crd.NewController(configClient, flags.controllerOptions)
-			serviceControllers := make(map[platform.ServiceRegistry]registryaggregate.Registry)
-
-			var regOrder []platform.ServiceRegistry
-
+			serviceControllers := aggregate.NewController()
+			registered := make(map[platform.ServiceREgistry]bool)
 			for _, r := range flags.registries {
 				serviceRegistry := platform.ServiceRegistry(r)
-				if _, exists := serviceControllers[serviceRegistry]; exists {
+				if _, exists := registered[serviceRegistry]; exists {
 					return multierror.Prefix(err, r+" registry specified multiple times.")
 				}
-
+				registered[serviceRegistry] = true
 				glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
-				regOrder = append(regOrder, serviceRegistry)
-
 				switch serviceRegistry {
 				case platform.KubernetesRegistry:
 					_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
@@ -132,7 +125,7 @@ var (
 						flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 					}
 
-					serviceControllers[serviceRegistry] = kube.NewController(client, mesh, flags.controllerOptions)
+					serviceControllers.AddAdapter(serviceRegistry, kube.NewController(client, mesh, flags.controllerOptions))
 					if mesh.IngressControllerMode != proxyconfig.ProxyMeshConfig_OFF {
 						configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
 							configController,
@@ -149,21 +142,21 @@ var (
 
 				case platform.ConsulRegistry:
 					glog.V(2).Infof("Consul url: %v", flags.consul.serverURL)
-					var conerr error
-					serviceControllers[serviceRegistry], conerr = consul.NewController(
+					conctl, conerr := consul.NewController(
 						// TODO: Remove this hardcoding!
 						flags.consul.serverURL, "dc1", 2*time.Second)
 					if conerr != nil {
 						return fmt.Errorf("failed to create Consul controller: %v", conerr)
 					}
 
+					serviceControllers.AddAdapter(serviceRegistry, conctl)
 				case platform.EurekaRegistry:
 					glog.V(2).Infof("Eureka url: %v", flags.eureka.serverURL)
 					client := eureka.NewClient(flags.eureka.serverURL)
 					serviceDiscovery := eureka.NewServiceDiscovery(client)
 					controller := eureka.NewController(client, 2*time.Second) // TODO: hardcoded
 
-					serviceControllers[serviceRegistry] = struct {
+					serviceControllers.AddAdapter(serviceRegistry, struct {
 						model.ServiceDiscovery
 						model.Controller
 						model.ServiceAccounts
@@ -171,21 +164,23 @@ var (
 						ServiceDiscovery: serviceDiscovery,
 						Controller:       controller,
 						ServiceAccounts:  controller,
-					}
+					})
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
 				}
 			}
 
-			environment.IstioConfigStore = model.MakeIstioStore(configController)
-			regAggregate := registryaggregate.NewController(serviceControllers, regOrder)
-			environment.ServiceDiscovery = regAggregate
-			environment.ServiceAccounts = regAggregate
+			environment := proxy.Environment{
+				Mesh:             mesh,
+				IstioConfigStore: model.MakeIstioStore(configController),
+				ServiceDiscovery: serviceControllers,
+				ServiceAccounts:  serviceCOntrollers,
+			}
 
 			// Set up discovery service
 			discovery, err := envoy.NewDiscoveryService(
-				regAggregate,
+				serviceControllers,
 				configController,
 				environment,
 				flags.discoveryOptions)
@@ -193,7 +188,7 @@ var (
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
 
-			go regAggregate.Run(stop)
+			go serviceControllers.Run(stop)
 			go configController.Run(stop)
 			go discovery.Run()
 			cmd.WaitSignal(stop)
