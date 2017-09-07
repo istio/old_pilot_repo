@@ -76,7 +76,8 @@ type ControllerOptions struct {
 	// // validate webhook's service certificate.
 	// CABundle []byte
 
-	// DomainSuffix is the DNS domain suffix for Istio CRD resources, e.g. local.cluster.
+	// DomainSuffix is the DNS domain suffix for Istio CRD resources,
+	// e.g. cluster.local.
 	DomainSuffix string
 
 	// SecretName is the name of k8s secret that contains the webhook
