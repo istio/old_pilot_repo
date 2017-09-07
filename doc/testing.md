@@ -20,8 +20,8 @@ gcloud container clusters create NAME \
                
     --cluster-version=1.7.3 \
     --enable-kubernetes-alpha \ 
-    --machine-type "n1-standard-2" \
-    --num-nodes "4" \
+    --machine-type=n1-standard-2 \
+    --num-nodes=4 \
     --zone=ZONE
 ```
 
