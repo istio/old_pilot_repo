@@ -95,7 +95,7 @@ func convertServiceInstances(services map[string]*model.Service, apps []*applica
 						ServicePort: port,
 					},
 					Service: services[instance.Hostname],
-					Tags:    convertTags(instance.Metadata),
+					Labels:  convertLabels(instance.Metadata),
 				})
 			}
 		}
@@ -130,6 +130,7 @@ const (
 	metadataHTTP2 = "http2"
 	metadataHTTPS = "https"
 	metadataGRPC  = "grpc"
+	metadataMONGO = "mongo"
 )
 
 func convertProtocol(md metadata) model.Protocol {
@@ -148,6 +149,8 @@ func convertProtocol(md metadata) model.Protocol {
 			return model.ProtocolHTTPS
 		case metadataGRPC:
 			return model.ProtocolGRPC
+		case metadataMONGO:
+			return model.ProtocolMONGO
 		case "":
 			// fallthrough to default protocol
 		default:
@@ -157,15 +160,15 @@ func convertProtocol(md metadata) model.Protocol {
 	return model.ProtocolTCP // default protocol
 }
 
-func convertTags(metadata metadata) model.Tags {
-	tags := make(model.Tags)
+func convertLabels(metadata metadata) model.Labels {
+	labels := make(model.Labels)
 	for k, v := range metadata {
-		tags[k] = v
+		labels[k] = v
 	}
 
-	// filter out special tags
-	delete(tags, protocolMetadata)
-	delete(tags, "@class")
+	// filter out special labels
+	delete(labels, protocolMetadata)
+	delete(labels, "@class")
 
-	return tags
+	return labels
 }

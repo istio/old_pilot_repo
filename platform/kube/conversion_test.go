@@ -44,6 +44,8 @@ var (
 		{"http2-test", v1.ProtocolTCP, model.ProtocolHTTP2},
 		{"grpc", v1.ProtocolTCP, model.ProtocolGRPC},
 		{"grpc-test", v1.ProtocolTCP, model.ProtocolGRPC},
+		{"mongo", v1.ProtocolTCP, model.ProtocolMONGO},
+		{"mongo-test", v1.ProtocolTCP, model.ProtocolMONGO},
 	}
 )
 
@@ -128,6 +130,46 @@ func TestServiceConversion(t *testing.T) {
 	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
+	}
+}
+
+func TestServiceConversionWithEmptyServiceAccountsAnnotation(t *testing.T) {
+	serviceName := "service1"
+	namespace := "default"
+
+	ip := "10.0.0.1"
+
+	localSvc := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        serviceName,
+			Namespace:   namespace,
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP: ip,
+			Ports: []v1.ServicePort{
+				{
+					Name:     "http",
+					Port:     8080,
+					Protocol: v1.ProtocolTCP,
+				},
+				{
+					Name:     "https",
+					Protocol: v1.ProtocolTCP,
+					Port:     443,
+				},
+			},
+		},
+	}
+
+	service := convertService(localSvc, domainSuffix)
+	if service == nil {
+		t.Errorf("could not convert service")
+	}
+
+	sa := service.ServiceAccounts
+	if len(sa) != 0 {
+		t.Errorf("number of service accounts is incorrect: %d, expected 0", len(sa))
 	}
 }
 

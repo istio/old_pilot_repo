@@ -29,11 +29,11 @@ const (
 	externalTagName = "external"
 )
 
-func convertTags(tags []string) model.Tags {
-	out := make(model.Tags, len(tags))
-	for _, tag := range tags {
+func convertLabels(labels []string) model.Labels {
+	out := make(model.Labels, len(labels))
+	for _, tag := range labels {
 		vals := strings.Split(tag, "|")
-		// Tags not of form "key|value" are ignored to avoid possible collisions
+		// Labels not of form "key|value" are ignored to avoid possible collisions
 		if len(vals) > 1 {
 			out[vals[0]] = vals[1]
 		} else {
@@ -94,7 +94,7 @@ func convertService(endpoints []*api.CatalogService) *model.Service {
 }
 
 func convertInstance(instance *api.CatalogService) *model.ServiceInstance {
-	tags := convertTags(instance.ServiceTags)
+	labels := convertLabels(instance.ServiceTags)
 	port := convertPort(instance.ServicePort, instance.NodeMeta[protocolTagName])
 
 	addr := instance.ServiceAddress
@@ -116,7 +116,7 @@ func convertInstance(instance *api.CatalogService) *model.ServiceInstance {
 			// TODO ExternalName come from metadata?
 			ExternalName: instance.NodeMeta[externalTagName],
 		},
-		Tags: tags,
+		Labels: labels,
 	}
 }
 
@@ -152,8 +152,12 @@ func convertProtocol(name string) model.Protocol {
 		return model.ProtocolHTTP2
 	case "https":
 		return model.ProtocolHTTPS
+	case "mongo":
+		return model.ProtocolMONGO
+	case "":
+		// fallthrough to default protocol
 	default:
-		return model.ProtocolHTTP
+		glog.Warningf("unsupported protocol value: %s", name)
 	}
-
+	return model.ProtocolTCP
 }
