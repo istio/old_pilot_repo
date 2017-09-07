@@ -391,7 +391,8 @@ func TestGetInitializerConfig(t *testing.T) {
 	defer util.DeleteNamespace(cl, ns)
 
 	goodConfig := Config{
-		Policy: InjectionPolicyOptIn,
+		Policy:          InjectionPolicyOptIn,
+		InitializerName: DefaultInitializerName,
 		Params: Params{
 			InitImage:         InitImageName(unitTestHub, unitTestTag),
 			ProxyImage:        ProxyImageName(unitTestHub, unitTestTag),
@@ -444,7 +445,8 @@ func TestGetInitializerConfig(t *testing.T) {
 				},
 			},
 			want: Config{
-				Policy: DefaultInjectionPolicy,
+				Policy:          DefaultInjectionPolicy,
+				InitializerName: DefaultInitializerName,
 				Params: Params{
 					InitImage:         InitImageName(DefaultHub, version.Info.Version),
 					ProxyImage:        ProxyImageName(DefaultHub, version.Info.Version),
