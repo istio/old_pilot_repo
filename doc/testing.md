@@ -16,8 +16,7 @@ Kubernetes [DynamicAdmissionControl](https://kubernetes.io/docs/admin/extensible
 * GKE
 
 ```bash
-gcloud container clusters create NAME \
-               
+gcloud container clusters create NAME \               
     --cluster-version=1.7.3 \
     --enable-kubernetes-alpha \ 
     --machine-type=n1-standard-2 \
