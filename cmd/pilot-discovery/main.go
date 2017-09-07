@@ -166,17 +166,14 @@ var (
 				case platform.EurekaRegistry:
 					glog.V(2).Infof("Eureka url: %v", flags.eureka.serverURL)
 					client := eureka.NewClient(flags.eureka.serverURL)
-					serviceDiscovery := eureka.NewServiceDiscovery(client)
-					controller := eureka.NewController(client, 2*time.Second) // TODO: hardcoded
-
 					serviceControllers.AddRegistry(
 						aggregate.Registry{
-							Name:             serviceRegistry,
-							ServiceDiscovery: serviceDiscovery,
-							ServiceAccounts:  controller,
-							Controller:       controller,
+							Name: serviceRegistry,
+							// TODO: Remove sync time hardcoding!
+							Controller:       eureka.NewController(client, 2*time.Second),
+							ServiceDiscovery: eureka.NewServiceDiscovery(client),
+							ServiceAccounts:  eureka.NewServiceAccounts(),
 						})
-
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
 				}
