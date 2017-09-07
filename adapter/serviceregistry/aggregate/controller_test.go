@@ -23,9 +23,7 @@ import (
 )
 
 // MockController specifies a mock Controller for testing
-type MockController struct {
-	discovery *mock.ServiceDiscovery
-}
+type MockController struct{}
 
 func (c *MockController) AppendServiceHandler(f func(*model.Service, model.Event)) error {
 	return nil
@@ -35,49 +33,38 @@ func (c *MockController) AppendInstanceHandler(f func(*model.ServiceInstance, mo
 	return nil
 }
 
-func (c *MockController) Services() []*model.Service {
-	return c.discovery.Services()
-}
-
-func (c *MockController) GetService(hostname string) (*model.Service, bool) {
-	return c.discovery.GetService(hostname)
-}
-
-func (c *MockController) Instances(hostname string, ports []string,
-	labels model.LabelsCollection) []*model.ServiceInstance {
-	return c.discovery.Instances(hostname, ports, labels)
-}
-
-func (c *MockController) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
-	return c.discovery.HostInstances(addrs)
-}
-
-func (c *MockController) ManagementPorts(addr string) model.PortList {
-	return c.discovery.ManagementPorts(addr)
-}
-
-func (c *MockController) GetIstioServiceAccounts(hostname string, ports []string) []string {
-	return c.discovery.GetIstioServiceAccounts(hostname, ports)
-}
 func (c *MockController) Run(<-chan struct{}) {}
 
 func buildMockController() *Controller {
-	ctls := NewController()
-	ctls.AddAdapter(platform.KubernetesRegistry, &MockController{
-		discovery: mock.NewDiscovery(
-			map[string]*model.Service{
-				mock.HelloService.Hostname:   mock.HelloService,
-				mock.ExtHTTPService.Hostname: mock.ExtHTTPService,
-			}, 2),
-	})
+	discovery1 := mock.NewDiscovery(
+		map[string]*model.Service{
+			mock.HelloService.Hostname:   mock.HelloService,
+			mock.ExtHTTPService.Hostname: mock.ExtHTTPService,
+		}, 2)
 
-	ctls.AddAdapter(platform.ConsulRegistry, &MockController{
-		discovery: mock.NewDiscovery(
-			map[string]*model.Service{
-				mock.WorldService.Hostname:    mock.WorldService,
-				mock.ExtHTTPSService.Hostname: mock.ExtHTTPSService,
-			}, 2),
-	})
+	discovery2 := mock.NewDiscovery(
+		map[string]*model.Service{
+			mock.WorldService.Hostname:    mock.WorldService,
+			mock.ExtHTTPSService.Hostname: mock.ExtHTTPSService,
+		}, 2)
+
+	registry1 := Registry{
+		Name:             platform.ServiceRegistry("mockAdapter1"),
+		ServiceDiscovery: discovery1,
+		ServiceAccounts:  discovery1,
+		Controller:       &MockController{},
+	}
+
+	registry2 := Registry{
+		Name:             platform.ServiceRegistry("mockAdapter2"),
+		ServiceDiscovery: discovery2,
+		ServiceAccounts:  discovery2,
+		Controller:       &MockController{},
+	}
+
+	ctls := NewController()
+	ctls.AddRegistry(registry1)
+	ctls.AddRegistry(registry2)
 
 	return ctls
 }
@@ -112,7 +99,7 @@ func TestServices(t *testing.T) {
 func TestGetService(t *testing.T) {
 	aggregateCtl := buildMockController()
 
-	// Get service from mock consul registry
+	// Get service from mockAdapter1
 	svc, exists := aggregateCtl.GetService(mock.HelloService.Hostname)
 	if !exists {
 		t.Fatal("Fail to get service")
@@ -121,7 +108,7 @@ func TestGetService(t *testing.T) {
 		t.Fatal("Returned service is incorrect")
 	}
 
-	// Get service from mock k8s registry
+	// Get service from mockAdapter2
 	svc, exists = aggregateCtl.GetService(mock.WorldService.Hostname)
 	if !exists {
 		t.Fatal("Fail to get service")
@@ -134,7 +121,7 @@ func TestGetService(t *testing.T) {
 func TestHostInstances(t *testing.T) {
 	aggregateCtl := buildMockController()
 
-	// Get Instances from mock k8s registry
+	// Get Instances from mockAdapter1
 	instances := aggregateCtl.HostInstances(map[string]bool{mock.HelloInstanceV0: true})
 	if len(instances) != 4 {
 		t.Fatalf("Returned HostInstances' amount %d is not correct", len(instances))
@@ -145,7 +132,7 @@ func TestHostInstances(t *testing.T) {
 		}
 	}
 
-	// Get Instances from mock consul registry
+	// Get Instances from mockAdapter2
 	instances = aggregateCtl.HostInstances(map[string]bool{mock.MakeIP(mock.WorldService, 1): true})
 	if len(instances) != 4 {
 		t.Fatalf("Returned HostInstances' amount %d is not correct", len(instances))
@@ -160,7 +147,7 @@ func TestHostInstances(t *testing.T) {
 func TestInstances(t *testing.T) {
 	aggregateCtl := buildMockController()
 
-	// Get Instances from mock k8s registry
+	// Get Instances from mockAdapter1
 	instances := aggregateCtl.Instances(mock.HelloService.Hostname, []string{mock.PortHTTP.Name}, model.LabelsCollection{})
 	if len(instances) != 2 {
 		t.Fatal("Returned wrong number of instances from controller")
@@ -174,7 +161,7 @@ func TestInstances(t *testing.T) {
 		}
 	}
 
-	// Get Instances from mock consul registry
+	// Get Instances from mockAdapter2
 	instances = aggregateCtl.Instances(mock.WorldService.Hostname, []string{mock.PortHTTP.Name}, model.LabelsCollection{})
 	if len(instances) != 2 {
 		t.Fatal("Returned wrong number of instances from controller")
@@ -192,7 +179,7 @@ func TestInstances(t *testing.T) {
 func TestGetIstioServiceAccounts(t *testing.T) {
 	aggregateCtl := buildMockController()
 
-	// Get accounts from mock k8s registry
+	// Get accounts from mockAdapter1
 	accounts := aggregateCtl.GetIstioServiceAccounts(mock.HelloService.Hostname, []string{})
 	expected := []string{}
 
@@ -206,7 +193,7 @@ func TestGetIstioServiceAccounts(t *testing.T) {
 		}
 	}
 
-	// Get accounts from mock consul registry
+	// Get accounts from mockAdapter2
 	accounts = aggregateCtl.GetIstioServiceAccounts(mock.WorldService.Hostname, []string{})
 	expected = []string{
 		"spiffe://cluster.local/ns/default/sa/serviceaccount1",
@@ -236,7 +223,7 @@ func TestManagementPorts(t *testing.T) {
 		Protocol: model.ProtocolTCP,
 	}}
 
-	// Get management ports from mock k8s registry
+	// Get management ports from mockAdapter1
 	ports := aggregateCtl.ManagementPorts(mock.HelloInstanceV0)
 	if len(ports) != 2 {
 		t.Fatal("Returned wrong number of ports from controller")
@@ -248,7 +235,7 @@ func TestManagementPorts(t *testing.T) {
 		}
 	}
 
-	// Get Instances from mock consul registry
+	// Get management ports from mockAdapter2
 	ports = aggregateCtl.ManagementPorts(mock.MakeIP(mock.WorldService, 0))
 	if len(ports) != len(expected) {
 		t.Fatal("Returned wrong number of ports from controller")

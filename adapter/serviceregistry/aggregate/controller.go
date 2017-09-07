@@ -22,50 +22,43 @@ import (
 )
 
 // Registry specifies the collection of service registry related interfaces
-type Registry interface {
+type Registry struct {
+	Name platform.ServiceRegistry
 	model.Controller
 	model.ServiceDiscovery
 	model.ServiceAccounts
 }
 
-type adapter struct {
-	name     platform.ServiceRegistry
-	registry Registry
-}
-
 // Controller aggregates data across different registries and monitors for changes
 type Controller struct {
-	adapters []adapter
+	registries []Registry
 }
 
 // NewController creates a new Aggregate controller
 func NewController() *Controller {
 	return &Controller{
-		adapters: make([]adapter, 0),
+		registries: make([]Registry, 0),
 	}
 }
 
-// AddAdapter adds registries into the aggregated controller
-func (c *Controller) AddAdapter(name platform.ServiceRegistry, registry Registry) {
-	c.adapters = append(c.adapters, adapter{
-		name:     name,
-		registry: registry,
-	})
+// AddRegistry adds registries into the aggregated controller
+func (c *Controller) AddRegistry(registry Registry) {
+	c.registries = append(c.registries, registry)
 }
 
 // Services lists services from all platforms
 func (c *Controller) Services() []*model.Service {
 	services := make([]*model.Service, 0)
-	for _, a := range c.adapters {
-		services = append(services, a.registry.Services()...)
+	for _, r := range c.registries {
+		services = append(services, r.Services()...)
 	}
 	return services
 }
 
 // GetService retrieves a service by hostname if exists
 func (c *Controller) GetService(hostname string) (*model.Service, bool) {
-	for _, a := range c.adapters {
-		if service, exists := a.registry.GetService(hostname); exists {
+	for _, r := range c.registries {
+		if service, exists := r.GetService(hostname); exists {
 			return service, true
 		}
 	}
@@ -75,8 +68,8 @@ func (c *Controller) GetService(hostname string) (*model.Service, bool) {
 // ManagementPorts retrieves set of health check ports by instance IP
 // Return on the first hit.
 func (c *Controller) ManagementPorts(addr string) model.PortList {
-	for _, a := range c.adapters {
-		if portList := a.registry.ManagementPorts(addr); portList != nil {
+	for _, r := range c.registries {
+		if portList := r.ManagementPorts(addr); portList != nil {
 			return portList
 		}
 	}
@@ -88,8 +81,8 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 func (c *Controller) Instances(hostname string, ports []string,
 	labels model.LabelsCollection) []*model.ServiceInstance {
 	var instances []*model.ServiceInstance
-	for _, a := range c.adapters {
-		if instances = a.registry.Instances(hostname, ports, labels); len(instances) > 0 {
+	for _, r := range c.registries {
+		if instances = r.Instances(hostname, ports, labels); len(instances) > 0 {
 			break
 		}
 	}
@@ -99,8 +92,8 @@ func (c *Controller) Instances(hostname string, ports []string,
 // HostInstances lists service instances for a given set of IPv4 addresses.
 func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstance {
 	instances := make([]*model.ServiceInstance, 0)
-	for _, a := range c.adapters {
-		instances = append(instances, a.registry.HostInstances(addrs)...)
+	for _, r := range c.registries {
+		instances = append(instances, r.HostInstances(addrs)...)
 	}
 	return instances
 }
@@ -108,8 +101,8 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 // Run starts all the controllers
 func (c *Controller) Run(stop <-chan struct{}) {
 
-	for _, a := range c.adapters {
-		go a.registry.Run(stop)
+	for _, r := range c.registries {
+		go r.Run(stop)
 	}
 
 	<-stop
@@ -118,9 +111,9 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 // AppendServiceHandler implements a service catalog operation
 func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) error {
-	for _, a := range c.adapters {
-		if err := a.registry.AppendServiceHandler(f); err != nil {
-			glog.V(2).Infof("Fail to append service handler to adapter %s", a.name)
+	for _, r := range c.registries {
+		if err := r.AppendServiceHandler(f); err != nil {
+			glog.V(2).Infof("Fail to append service handler to adapter %s", r.Name)
 			return err
 		}
 	}
@@ -129,9 +122,9 @@ func (c *Controller) AppendServiceHandler(f func(*model.Service, model.Event)) e
 
 // AppendInstanceHandler implements a service instance catalog operation
 func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.Event)) error {
-	for _, a := range c.adapters {
-		if err := a.registry.AppendInstanceHandler(f); err != nil {
-			glog.V(2).Infof("Fail to append instance handler to adapter %s", a.name)
+	for _, r := range c.registries {
+		if err := r.AppendInstanceHandler(f); err != nil {
+			glog.V(2).Infof("Fail to append instance handler to adapter %s", r.Name)
 			return err
 		}
 	}
@@ -140,8 +133,8 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 
 // GetIstioServiceAccounts implements model.ServiceAccounts operation
 func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []string {
-	for _, a := range c.adapters {
-		if svcAccounts := a.registry.GetIstioServiceAccounts(hostname, ports); svcAccounts != nil {
+	for _, r := range c.registries {
+		if svcAccounts := r.GetIstioServiceAccounts(hostname, ports); svcAccounts != nil {
 			return svcAccounts
 		}
 	}

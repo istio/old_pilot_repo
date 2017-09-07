@@ -125,7 +125,14 @@ var (
 						flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
 					}
 
-					serviceControllers.AddAdapter(serviceRegistry, kube.NewController(client, mesh, flags.controllerOptions))
+					kubectl := kube.NewController(client, mesh, flags.controllerOptions)
+					serviceControllers.AddRegistry(
+						aggregate.Registry{
+							Name:             serviceRegistry,
+							ServiceDiscovery: kubectl,
+							ServiceAccounts:  kubectl,
+							Controller:       kubectl,
+						})
 					if mesh.IngressControllerMode != proxyconfig.ProxyMeshConfig_OFF {
 						configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
 							configController,
@@ -149,22 +156,26 @@ var (
 						return fmt.Errorf("failed to create Consul controller: %v", conerr)
 					}
 
-					serviceControllers.AddAdapter(serviceRegistry, conctl)
+					serviceControllers.AddRegistry(
+						aggregate.Registry{
+							Name:             serviceRegistry,
+							ServiceDiscovery: conctl,
+							ServiceAccounts:  conctl,
+							Controller:       conctl,
+						})
 				case platform.EurekaRegistry:
 					glog.V(2).Infof("Eureka url: %v", flags.eureka.serverURL)
 					client := eureka.NewClient(flags.eureka.serverURL)
 					serviceDiscovery := eureka.NewServiceDiscovery(client)
 					controller := eureka.NewController(client, 2*time.Second) // TODO: hardcoded
 
-					serviceControllers.AddAdapter(serviceRegistry, struct {
-						model.ServiceDiscovery
-						model.Controller
-						model.ServiceAccounts
-					}{
-						ServiceDiscovery: serviceDiscovery,
-						Controller:       controller,
-						ServiceAccounts:  controller,
-					})
+					serviceControllers.AddRegistry(
+						aggregate.Registry{
+							Name:             serviceRegistry,
+							ServiceDiscovery: serviceDiscovery,
+							ServiceAccounts:  controller,
+							Controller:       controller,
+						})
 
 				default:
 					return multierror.Prefix(err, "Service registry "+r+" is not supported.")
