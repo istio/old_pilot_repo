@@ -71,8 +71,7 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		external = svc.Spec.ExternalName
 	}
 
-	// must have address or be external (but not both)
-	if (addr == "" && external == "") || (addr != "" && external != "") {
+	if addr != "" && external != "" {
 		return nil
 	}
 

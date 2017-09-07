@@ -555,7 +555,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 						tcpClusters = append(tcpClusters, originalDstCluster)
 					}
 
-					route := buildTCPRoute(originalDstCluster, []string{WildcardAddress})
+					route := buildTCPRoute(originalDstCluster, nil)
 					config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
 					listener := buildTCPListener(
 						config, WildcardAddress, servicePort.Port, servicePort.Protocol)
