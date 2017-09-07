@@ -18,8 +18,6 @@ go_test(
     deps = [
         "//model:go_default_library",
         "//platform:go_default_library",
-        "//platform/consul:go_default_library",
-        "//platform/kube:go_default_library",
         "//test/mock:go_default_library",
     ],
 )

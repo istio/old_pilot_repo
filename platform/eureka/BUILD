@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "controller.go",
         "conversion.go",
+        "serviceaccounts.go",
         "servicediscovery.go",
     ],
     visibility = ["//visibility:public"],
