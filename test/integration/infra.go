@@ -39,7 +39,7 @@ const (
 	ingressSecretName = "istio-ingress-certs"
 )
 
-type infra struct {
+type infra struct { // nolint: aligncheck
 	Name string
 
 	// docker tags
