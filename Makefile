@@ -20,6 +20,16 @@ ifeq ($(detected_OS),Darwin)  # Mac OS X
     BUILD_FLAGS = --cpu=k8
 endif
 
+hub = ""
+tag = ""
+ifneq ("x${HUB}", "x")
+	hub = -hub ${HUB}
+endif
+
+ifneq ("x${TAG}", "x")
+	tag = -tag ${TAG}
+endif
+
 .PHONY: setup
 setup: platform/kube/config
 	@bin/install-prereqs.sh
@@ -32,6 +42,10 @@ fmt:
 .PHONY: build
 build:	
 	@bazel build ${BUILD_FLAGS} //...
+
+.PHONY: docker
+docker:
+	@bin/push-docker ${hub} ${tag}
 
 .PHONY: clean
 clean:
