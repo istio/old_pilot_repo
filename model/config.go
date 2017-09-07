@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 
 	"github.com/golang/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
@@ -502,36 +501,17 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 	domains := make(map[string]string)
 	for _, egressRuleKey := range keys {
 		egressRule := egressRules[egressRuleKey]
-		conflictingRule := false
 		domain := egressRule.Destination.Service
-
-		for _, port := range egressRule.Ports {
-			portNumber := int(port.Port)
-
-			domainsKey := domain + ":" + strconv.Itoa(portNumber)
-
-			var keyOfAnEgressRuleWithTheSameDomain string
-			keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domainsKey]
-			if conflictingRule {
-				errs = multierror.Append(errs,
-					fmt.Errorf("rule %q conflicts with rule %q on domain "+
-						"%s and port %d, is rejected", egressRuleKey,
-						keyOfAnEgressRuleWithTheSameDomain, domain,
-						portNumber))
-				break
-			}
-		}
-
+		keyOfAnEgressRuleWithTheSameDomain, conflictingRule := domains[domain]
 		if conflictingRule {
+			errs = multierror.Append(errs,
+				fmt.Errorf("rule %q conflicts with rule %q on domain "+
+					"%s, is rejected", egressRuleKey,
+					keyOfAnEgressRuleWithTheSameDomain, domain))
 			continue
 		}
 
-		for _, port := range egressRule.Ports {
-			portNumber := int(port.Port)
-			domainsKey := domain + ":" + strconv.Itoa(portNumber)
-			domains[domainsKey] = egressRuleKey
-		}
-
+		domains[domain] = egressRuleKey
 		filteredEgressRules[egressRuleKey] = egressRule
 	}
 
