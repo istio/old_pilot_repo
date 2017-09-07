@@ -127,15 +127,6 @@ var (
 				glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 				switch serviceRegistry {
 				case platform.KubernetesRegistry:
-					_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
-					if kuberr != nil {
-						return multierror.Prefix(kuberr, "failed to connect to Kubernetes API.")
-					}
-
-					if flags.controllerOptions.Namespace == "" {
-						flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
-					}
-
 					kubectl := kube.NewController(client, mesh, flags.controllerOptions)
 					serviceControllers.AddRegistry(
 						aggregate.Registry{
@@ -223,7 +214,7 @@ var (
 			}
 
 			go admissionController.Run(stop)
-			go serviceController.Run(stop)
+			go serviceControllers.Run(stop)
 			go configController.Run(stop)
 			go discovery.Run()
 			cmd.WaitSignal(stop)
