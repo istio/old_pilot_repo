@@ -76,7 +76,7 @@ pushd docker
       for hub in ${hubs[@]}; do
         tagged_image="${hub}/${image}:${tag}"
         docker tag "${local_image}" "${tagged_image}"
-        #docker_push "${tagged_image}"
+        docker_push "${tagged_image}"
       done
     done
   done
