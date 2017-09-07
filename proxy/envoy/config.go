@@ -666,11 +666,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 	if protocolToHandle == model.ProtocolGRPC {
 		protocolToHandle = model.ProtocolHTTP2
 	}
-
-	domain := rule.Destination.Service
-
-	// the name of the virtual host and of the original dst cluster
-	name := domain + ":" + strconv.Itoa(port.Port)
+	protocolSuffix := "-" + strings.ToLower(string(protocolToHandle))
 
 	if rule.UseEgressProxy {
 		externalTrafficCluster = buildOutboundCluster("istio-egress", port, nil)
@@ -678,7 +674,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
-		externalTrafficCluster = buildOriginalDSTCluster(name, mesh.ConnectTimeout)
+		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
 
 		if protocolToHandle == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
@@ -691,8 +687,10 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
+	domain := rule.Destination.Service
+	virtualHostName := domain + ":" + strconv.Itoa(port.Port)
 	return &VirtualHost{
-		Name:    name,
+		Name:    virtualHostName,
 		Domains: appendPortToDomains([]string{domain}, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
