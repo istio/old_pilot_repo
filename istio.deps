@@ -1,5 +1,6 @@
 [
 	{
+		"_comment": "The script to update dependency is at https://github.com/istio/test-infra/blob/master/toolbox/deps_update/main.go",
 		"name": "ISTIO_PROXY_BUCKET",
 		"repoName": "proxy",
 		"prodBranch": "stable",
