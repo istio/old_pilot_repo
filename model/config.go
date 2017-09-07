@@ -476,8 +476,8 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 	return out
 }
 
-// RejectConflictingEgressRules rejects rules that have a domain which is equal to
-// a domain of some other rule.
+// RejectConflictingEgressRules rejects rules that have the destination which is equal to
+// the destionation of some other rule.
 // According to Envoy's virtual host specification, no virtual hosts can share the same domain.
 // The following code rejects conflicting rules deterministically, by a lexicographical order -
 // a rule with a smaller key lexicographically wins.
@@ -503,23 +503,22 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 	for _, egressRuleKey := range keys {
 		egressRule := egressRules[egressRuleKey]
 		conflictingRule := false
+		domain := egressRule.Destination.Service
 
-	DomainsAndPortsLoop:
-		for _, domain := range egressRule.Domains {
-			for _, port := range egressRule.Ports {
-				portNumber := int(port.Port)
-				domainsKey := domain + ":" + strconv.Itoa(portNumber)
+		for _, port := range egressRule.Ports {
+			portNumber := int(port.Port)
 
-				var keyOfAnEgressRuleWithTheSameDomain string
-				keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domainsKey]
-				if conflictingRule {
-					errs = multierror.Append(errs,
-						fmt.Errorf("rule %q conflicts with rule %q on domain "+
-							"%s and port %d, is rejected", egressRuleKey,
-							keyOfAnEgressRuleWithTheSameDomain, domain,
-							portNumber))
-					break DomainsAndPortsLoop
-				}
+			domainsKey := domain + ":" + strconv.Itoa(portNumber)
+
+			var keyOfAnEgressRuleWithTheSameDomain string
+			keyOfAnEgressRuleWithTheSameDomain, conflictingRule = domains[domainsKey]
+			if conflictingRule {
+				errs = multierror.Append(errs,
+					fmt.Errorf("rule %q conflicts with rule %q on domain "+
+						"%s and port %d, is rejected", egressRuleKey,
+						keyOfAnEgressRuleWithTheSameDomain, domain,
+						portNumber))
+				break
 			}
 		}
 
@@ -527,13 +526,12 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 			continue
 		}
 
-		for _, domain := range egressRule.Domains {
-			for _, port := range egressRule.Ports {
-				portNumber := int(port.Port)
-				domainsKey := domain + ":" + strconv.Itoa(portNumber)
-				domains[domainsKey] = egressRuleKey
-			}
+		for _, port := range egressRule.Ports {
+			portNumber := int(port.Port)
+			domainsKey := domain + ":" + strconv.Itoa(portNumber)
+			domains[domainsKey] = egressRuleKey
 		}
+
 		filteredEgressRules[egressRuleKey] = egressRule
 	}
 

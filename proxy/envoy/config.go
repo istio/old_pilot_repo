@@ -658,7 +658,7 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
-func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleKey string,
+func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 	mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
@@ -666,7 +666,11 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleK
 	if protocolToHandle == model.ProtocolGRPC {
 		protocolToHandle = model.ProtocolHTTP2
 	}
-	protocolSuffix := "-" + strings.ToLower(string(protocolToHandle))
+
+	domain := rule.Destination.Service
+
+	// the name of the virtual host and of the original dst cluster
+	name := domain + ":" + strconv.Itoa(port.Port)
 
 	if rule.UseEgressProxy {
 		externalTrafficCluster = buildOutboundCluster("istio-egress", port, nil)
@@ -674,7 +678,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleK
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
-		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
+		externalTrafficCluster = buildOriginalDSTCluster(name, mesh.ConnectTimeout)
 
 		if protocolToHandle == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
@@ -688,8 +692,8 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleK
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
 	return &VirtualHost{
-		Name:    ruleKey + ":" + strconv.Itoa(port.Port),
-		Domains: appendPortToDomains(rule.Domains, port.Port),
+		Name:    name,
+		Domains: appendPortToDomains([]string{domain}, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
 }
@@ -703,10 +707,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 		glog.Warningf("Rejected rules: %v", errs)
 	}
 
-	for key, rule := range egressRules {
-		if len(rule.Domains) < 1 {
-			continue
-		}
+	for _, rule := range egressRules {
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
 			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS &&
@@ -717,7 +718,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			httpConfig := httpConfigs.EnsurePort(intPort)
 			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildEgressFromSidecarVirtualHostOnPort(rule, key, mesh, modelPort))
+				buildEgressFromSidecarVirtualHostOnPort(rule, mesh, modelPort))
 		}
 	}
 
