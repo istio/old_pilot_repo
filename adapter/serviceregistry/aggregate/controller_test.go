@@ -43,7 +43,8 @@ func (c *MockController) GetService(hostname string) (*model.Service, bool) {
 	return c.discovery.GetService(hostname)
 }
 
-func (c *MockController) Instances(hostname string, ports []string, labels model.LabelsCollection) []*model.ServiceInstance {
+func (c *MockController) Instances(hostname string, ports []string,
+	labels model.LabelsCollection) []*model.ServiceInstance {
 	return c.discovery.Instances(hostname, ports, labels)
 }
 
@@ -61,28 +62,24 @@ func (c *MockController) GetIstioServiceAccounts(hostname string, ports []string
 func (c *MockController) Run(<-chan struct{}) {}
 
 func buildMockController() *Controller {
-	registries := make(map[platform.ServiceRegistry]Registry)
-	regOrder := make([]platform.ServiceRegistry, 0)
-
-	registries[platform.KubernetesRegistry] = &MockController{
+	ctls := NewController()
+	ctls.AddAdapter(platform.KubernetesRegistry, &MockController{
 		discovery: mock.NewDiscovery(
 			map[string]*model.Service{
 				mock.HelloService.Hostname:   mock.HelloService,
 				mock.ExtHTTPService.Hostname: mock.ExtHTTPService,
 			}, 2),
-	}
-	regOrder = append(regOrder, platform.KubernetesRegistry)
+	})
 
-	registries[platform.ConsulRegistry] = &MockController{
+	ctls.AddAdapter(platform.ConsulRegistry, &MockController{
 		discovery: mock.NewDiscovery(
 			map[string]*model.Service{
 				mock.WorldService.Hostname:    mock.WorldService,
 				mock.ExtHTTPSService.Hostname: mock.ExtHTTPSService,
 			}, 2),
-	}
-	regOrder = append(regOrder, platform.ConsulRegistry)
+	})
 
-	return NewController(registries, regOrder)
+	return ctls
 }
 
 func TestServices(t *testing.T) {
@@ -139,7 +136,7 @@ func TestHostInstances(t *testing.T) {
 
 	// Get Instances from mock k8s registry
 	instances := aggregateCtl.HostInstances(map[string]bool{mock.HelloInstanceV0: true})
-	if len(instances) != 3 {
+	if len(instances) != 4 {
 		t.Fatalf("Returned HostInstances' amount %d is not correct", len(instances))
 	}
 	for _, inst := range instances {
@@ -150,7 +147,7 @@ func TestHostInstances(t *testing.T) {
 
 	// Get Instances from mock consul registry
 	instances = aggregateCtl.HostInstances(map[string]bool{mock.MakeIP(mock.WorldService, 1): true})
-	if len(instances) != 3 {
+	if len(instances) != 4 {
 		t.Fatalf("Returned HostInstances' amount %d is not correct", len(instances))
 	}
 	for _, inst := range instances {

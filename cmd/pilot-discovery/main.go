@@ -106,7 +106,7 @@ var (
 
 			configController := crd.NewController(configClient, flags.controllerOptions)
 			serviceControllers := aggregate.NewController()
-			registered := make(map[platform.ServiceREgistry]bool)
+			registered := make(map[platform.ServiceRegistry]bool)
 			for _, r := range flags.registries {
 				serviceRegistry := platform.ServiceRegistry(r)
 				if _, exists := registered[serviceRegistry]; exists {
@@ -175,7 +175,7 @@ var (
 				Mesh:             mesh,
 				IstioConfigStore: model.MakeIstioStore(configController),
 				ServiceDiscovery: serviceControllers,
-				ServiceAccounts:  serviceCOntrollers,
+				ServiceAccounts:  serviceControllers,
 			}
 
 			// Set up discovery service

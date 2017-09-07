@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"istio.io/pilot/cmd"
@@ -31,7 +32,9 @@ import (
 
 var (
 	configpath      string
+	binarypath      string
 	meshconfig      string
+	servicecluster  string
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
 
@@ -61,9 +64,13 @@ var (
 			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("mesh configuration %#v", mesh)
 
+			if err = os.MkdirAll(configpath, 0700); err != nil {
+				return multierror.Prefix(err, "failed to create directory for proxy configuration")
+			}
+
 			// set values from registry platform
 			if role.IPAddress == "" {
-				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.IPAddress = os.Getenv("INSTANCE_IP")
 				} else if serviceregistry == platform.ConsulRegistry {
 					ipAddr := "127.0.0.1"
@@ -76,22 +83,25 @@ var (
 				}
 			}
 			if role.ID == "" {
-				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.ID = os.Getenv("POD_NAME") + "." + os.Getenv("POD_NAMESPACE")
 				} else if serviceregistry == platform.ConsulRegistry {
 					role.ID = role.IPAddress + ".service.consul"
 				}
 			}
 			if role.Domain == "" {
-				if serviceregistry == platform.KubernetesRegistry || serviceregistry == "" {
+				if serviceregistry == platform.KubernetesRegistry {
 					role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
 				} else if serviceregistry == platform.ConsulRegistry {
 					role.Domain = "service.consul"
 				}
-
 			}
 
-			watcher, err := envoy.NewWatcher(mesh, role, configpath)
+			glog.V(2).Infof("proxy role: %#v", role)
+
+			envoyProxy := envoy.MakeProxy(mesh, servicecluster, role.ServiceNode(), configpath, binarypath)
+			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
+			watcher, err := envoy.NewWatcher(mesh, agent, role)
 			if err != nil {
 				return err
 			}
@@ -116,12 +126,16 @@ func init() {
 		"File name for Istio mesh configuration")
 	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
 		"Path to generated proxy configuration directory")
+	proxyCmd.PersistentFlags().StringVar(&binarypath, "binarypath", "/usr/local/bin/envoy",
+		"Path to Envoy binary")
 	proxyCmd.PersistentFlags().StringVar(&role.IPAddress, "ip", "",
 		"Proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&role.ID, "id", "",
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
+	proxyCmd.PersistentFlags().StringVar(&servicecluster, "servicecluster", "istio-proxy",
+		"Service cluster value")
 
 	cmd.AddFlags(rootCmd)
 
