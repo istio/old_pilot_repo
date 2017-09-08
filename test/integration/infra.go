@@ -68,14 +68,13 @@ type infra struct {
 
 	namespaceCreated      bool
 	istioNamespaceCreated bool
+	debugImagesAndMode    bool
 
 	// sidecar initializer
 	UseInitializer bool
 	InjectConfig   *inject.Config
 
 	config model.IstioConfigStore
-
-	debugImagesAndMode bool
 }
 
 func (infra *infra) setup() error {
