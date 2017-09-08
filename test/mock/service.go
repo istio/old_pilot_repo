@@ -74,6 +74,14 @@ var (
 	}
 )
 
+// NewDiscovery builds a mock ServiceDiscovery
+func NewDiscovery(services map[string]*model.Service, versions int) *ServiceDiscovery {
+	return &ServiceDiscovery{
+		services: services,
+		versions: versions,
+	}
+}
+
 // MakeService creates a mock service
 func MakeService(hostname, address string) *model.Service {
 	return &model.Service{
@@ -89,6 +97,10 @@ func MakeService(hostname, address string) *model.Service {
 				Name:     "custom",
 				Port:     90, // target port 1090
 				Protocol: model.ProtocolTCP,
+			}, {
+				Name:     "mongo",
+				Port:     100, // target port 1100
+				Protocol: model.ProtocolMONGO,
 			}},
 	}
 }

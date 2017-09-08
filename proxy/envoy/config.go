@@ -303,10 +303,9 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, insta
 	}
 
 	config := &HTTPFilterConfig{
-		CodecType:         auto,
-		GenerateRequestID: true,
-		UseRemoteAddress:  useRemoteAddress,
-		StatPrefix:        "http",
+		CodecType:        auto,
+		UseRemoteAddress: useRemoteAddress,
+		StatPrefix:       "http",
 		AccessLog: []AccessLog{{
 			Path: DefaultAccessLog,
 		}},
@@ -314,6 +313,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, insta
 	}
 
 	if mesh.ZipkinAddress != "" {
+		config.GenerateRequestID = true
 		config.Tracing = &HTTPFilterTraceConfig{
 			OperationName: IngressTraceOperation,
 		}
@@ -350,18 +350,42 @@ func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) {
 }
 
 // buildTCPListener constructs a listener for the TCP proxy
-func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int) *Listener {
-	return &Listener{
-		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
-		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
-		Filters: []*NetworkFilter{{
-			Type: read,
-			Name: TCPProxyFilter,
-			Config: &TCPProxyFilterConfig{
-				StatPrefix:  "tcp",
-				RouteConfig: tcpConfig,
+// in addition, it enables mongo proxy filter based on the protocol
+func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol model.Protocol) *Listener {
+
+	baseTCPProxy := &NetworkFilter{
+		Type: read,
+		Name: TCPProxyFilter,
+		Config: &TCPProxyFilterConfig{
+			StatPrefix:  "tcp",
+			RouteConfig: tcpConfig,
+		},
+	}
+
+	switch protocol {
+	case model.ProtocolMONGO:
+		// TODO: add a watcher for /var/lib/istio/mongo/certs
+		// if certs are found use, TLS or mTLS clusters for talking to MongoDB.
+		// User is responsible for mounting those certs in the pod.
+		return &Listener{
+			Name:    fmt.Sprintf("mongo_%s_%d", ip, port),
+			Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+			Filters: []*NetworkFilter{{
+				Type: both,
+				Name: MONGOProxyFilter,
+				Config: &MONGOProxyFilterConfig{
+					StatPrefix: "mongo",
+				},
 			},
-		}},
+				baseTCPProxy,
+			},
+		}
+	default:
+		return &Listener{
+			Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
+			Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+			Filters: []*NetworkFilter{baseTCPProxy},
+		}
 	}
 }
 
@@ -430,7 +454,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 			return []*HTTPRoute{buildDefaultRoute(cluster)}
 		}
 
-	case model.ProtocolTCP:
+	case model.ProtocolTCP, model.ProtocolMONGO:
 		// handled by buildOutboundTCPListeners
 
 	default:
@@ -509,11 +533,11 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
-			case model.ProtocolTCP, model.ProtocolHTTPS:
+			case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
 				cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 				route := buildTCPRoute(cluster, []string{service.Address})
 				config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-				listener := buildTCPListener(config, service.Address, servicePort.Port)
+				listener := buildTCPListener(config, service.Address, servicePort.Port, servicePort.Protocol)
 				tcpClusters = append(tcpClusters, cluster)
 				tcpListeners = append(tcpListeners, listener)
 			}
@@ -594,10 +618,10 @@ func buildInboundListeners(mesh *proxyconfig.ProxyMeshConfig, sidecar proxy.Node
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address, endpoint.Port, "", false))
 
-		case model.ProtocolTCP, model.ProtocolHTTPS:
+		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
-			}, endpoint.Address, endpoint.Port)
+			}, endpoint.Address, endpoint.Port, protocol)
 
 			// set server-side mixer filter config
 			if mesh.MixerAddress != "" {
@@ -634,7 +658,7 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
-func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleKey string,
+func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 	mesh *proxyconfig.ProxyMeshConfig, port *model.Port) *VirtualHost {
 	var externalTrafficCluster *Cluster
 
@@ -663,9 +687,11 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule, ruleK
 
 	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
 
+	domain := rule.Destination.Service
+	virtualHostName := domain + ":" + strconv.Itoa(port.Port)
 	return &VirtualHost{
-		Name:    ruleKey + ":" + strconv.Itoa(port.Port),
-		Domains: appendPortToDomains(rule.Domains, port.Port),
+		Name:    virtualHostName,
+		Domains: appendPortToDomains([]string{domain}, port.Port),
 		Routes:  []*HTTPRoute{externalTrafficRoute},
 	}
 }
@@ -679,10 +705,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 		glog.Warningf("Rejected rules: %v", errs)
 	}
 
-	for key, rule := range egressRules {
-		if len(rule.Domains) < 1 {
-			continue
-		}
+	for _, rule := range egressRules {
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
 			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS &&
@@ -693,7 +716,7 @@ func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, egressR
 			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			httpConfig := httpConfigs.EnsurePort(intPort)
 			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildEgressFromSidecarVirtualHostOnPort(rule, key, mesh, modelPort))
+				buildEgressFromSidecarVirtualHostOnPort(rule, mesh, modelPort))
 		}
 	}
 
@@ -724,11 +747,12 @@ func buildMgmtPortListeners(mesh *proxyconfig.ProxyMeshConfig, managementPorts m
 	// assumes that inbound connections/requests are sent to the endpoint address
 	for _, mPort := range managementPorts {
 		switch mPort.Protocol {
-		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP, model.ProtocolHTTPS:
+		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP,
+			model.ProtocolHTTPS, model.ProtocolMONGO:
 			cluster := buildInboundCluster(mPort.Port, model.ProtocolTCP, mesh.ConnectTimeout)
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP})},
-			}, managementIP, mPort.Port)
+			}, managementIP, mPort.Port, model.ProtocolTCP)
 
 			clusters = append(clusters, cluster)
 			listeners = append(listeners, listener)
