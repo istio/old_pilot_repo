@@ -32,9 +32,8 @@ import (
 )
 
 var (
-	mesh              = proxy.DefaultMeshConfig()
-	unitTestDebugMode = true
-	httpTestConfig    = &Config{
+	mesh           = proxy.DefaultMeshConfig()
+	httpTestConfig = &Config{
 		Policy:     InjectionPolicyOptOut,
 		Namespaces: []string{v1.NamespaceAll},
 		Params: Params{
