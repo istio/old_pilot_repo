@@ -12,27 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package crd
+package eureka
 
-import "testing"
+import "istio.io/pilot/model"
 
-var (
-	camelKabobs = []struct{ in, out string }{
-		{"ExampleNameX", "example-name-x"},
-		{"Example1", "example1"},
-		{"ExampleXY", "example-x-y"},
-	}
-)
+type serviceAccounts struct {
+}
 
-func TestCamelKabob(t *testing.T) {
-	for _, tt := range camelKabobs {
-		s := CamelCaseToKabobCase(tt.in)
-		if s != tt.out {
-			t.Errorf("CamelCaseToKabobCase(%q) => %q, want %q", tt.in, s, tt.out)
-		}
-		u := kabobCaseToCamelCase(tt.out)
-		if u != tt.in {
-			t.Errorf("kabobToCamel(%q) => %q, want %q", tt.out, u, tt.in)
-		}
-	}
+// NewServiceAccounts instantiates the Eureka service account interface
+func NewServiceAccounts() model.ServiceAccounts {
+	return &serviceAccounts{}
+}
+
+func (sa *serviceAccounts) GetIstioServiceAccounts(hostname string, ports []string) []string {
+	return nil
 }
