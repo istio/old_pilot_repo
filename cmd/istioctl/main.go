@@ -374,7 +374,13 @@ func readInputs() ([]model.Config, error) {
 	return readInputsKubectl(bytes.NewReader(input))
 }
 
-// readInputs reads multiple documents from the input and checks with the schema
+// readInputsKubectl reads multiple documents from the input and checks with
+// the schema.
+//
+// NOTE: This function only decodes a subset of the complete k8s
+// ObjectMeta as identified by the fields in model.ConfigMeta. This
+// would typically only be a problem if a user dumps an configuration
+// object with kubectl and then re-ingests it through istioctl.
 func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 	var varr []model.Config
 
@@ -411,7 +417,8 @@ func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 	return varr, nil
 }
 
-// readInputs reads multiple documents from the input and checks with the schema
+// readInputsLegacy reads multiple documents from the input and checks
+// with the schema.
 func readInputsLegacy(reader io.Reader) ([]model.Config, error) {
 	var varr []model.Config
 
