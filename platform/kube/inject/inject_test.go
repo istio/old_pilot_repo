@@ -160,7 +160,6 @@ func TestIntoResourceFile(t *testing.T) {
 		mesh := proxy.DefaultMeshConfig()
 		if c.enableAuth {
 			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-			mesh.AuthCertsPath = c.authConfigPath
 		}
 
 		config := &Config{
