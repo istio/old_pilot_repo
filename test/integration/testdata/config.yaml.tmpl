@@ -14,6 +14,3 @@ data:
     mixerAddress: istio-mixer.{{.IstioNamespace}}:9091
 {{end}}
     authPolicy: {{ .Auth }}
-{{if .Zipkin}}
-    zipkinAddress: zipkin.{{.IstioNamespace}}:9411
-{{end}}
