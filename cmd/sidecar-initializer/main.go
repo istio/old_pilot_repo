@@ -30,11 +30,11 @@ import (
 
 func getRootCmd() *cobra.Command {
 	flags := struct {
-		kubeconfig      string
-		meshconfig      string
-		injectConfig    string
-		namespace       string
-		port            int
+		kubeconfig   string
+		meshconfig   string
+		injectConfig string
+		namespace    string
+		port         int
 	}{}
 
 	rootCmd := &cobra.Command{
