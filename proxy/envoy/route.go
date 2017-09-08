@@ -27,6 +27,7 @@ import (
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 const (
@@ -40,9 +41,9 @@ const (
 // buildListenerSSLContext returns an SSLContext struct.
 func buildListenerSSLContext(certsDir string) *SSLContext {
 	return &SSLContext{
-		CertChainFile:            certsDir + certChainFilename,
-		PrivateKeyFile:           certsDir + keyFilename,
-		CaCertFile:               certsDir + rootCertFilename,
+		CertChainFile:            certsDir + proxy.CertChainFilename,
+		PrivateKeyFile:           certsDir + proxy.KeyFilename,
+		CaCertFile:               certsDir + proxy.RootCertFilename,
 		RequireClientCertificate: true,
 	}
 }
@@ -51,9 +52,9 @@ func buildListenerSSLContext(certsDir string) *SSLContext {
 // The list of service accounts may be empty but not nil.
 func buildClusterSSLContext(certsDir string, serviceAccounts []string) *SSLContextWithSAN {
 	return &SSLContextWithSAN{
-		CertChainFile:        certsDir + certChainFilename,
-		PrivateKeyFile:       certsDir + keyFilename,
-		CaCertFile:           certsDir + rootCertFilename,
+		CertChainFile:        certsDir + proxy.CertChainFilename,
+		PrivateKeyFile:       certsDir + proxy.KeyFilename,
+		CaCertFile:           certsDir + proxy.RootCertFilename,
 		VerifySubjectAltName: serviceAccounts,
 	}
 }

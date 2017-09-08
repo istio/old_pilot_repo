@@ -105,6 +105,15 @@ const (
 
 	// AuthCertsPath is the path location for mTLS certificates
 	AuthCertsPath = "/etc/certs/"
+
+	// CertChainFilename is mTLS chain file
+	CertChainFilename = "cert-chain.pem"
+
+	// KeyFilename is mTLS private key
+	KeyFilename = "key.pem"
+
+	// RootCertFilename is mTLS root cert
+	RootCertFilename = "root-cert.pem"
 )
 
 // DefaultProxyConfig for individual proxies

@@ -20,9 +20,11 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"istio.io/pilot/cmd"
+	"istio.io/pilot/model"
 	"istio.io/pilot/platform"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/proxy/envoy"
@@ -32,6 +34,7 @@ import (
 var (
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
+	config          string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -80,21 +83,36 @@ var (
 
 			glog.V(2).Infof("proxy role: %#v", role)
 
-			config := proxy.DefaultProxyConfig()
+			proxyConfig := proxy.DefaultProxyConfig()
+			if config != "" {
+				if err := model.ApplyYAML(config, &proxyConfig); err != nil {
+					return multierror.Prefix(err, "failed to apply config YAML: ")
+				}
+			}
 
-			if config.StatsdUdpAddress != "" {
-				if addr, err := proxy.ResolveStatsdAddr(config.StatsdUdpAddress); err == nil {
-					config.StatsdUdpAddress = addr
+			if proxyConfig.StatsdUdpAddress != "" {
+				if addr, err := proxy.ResolveStatsdAddr(proxyConfig.StatsdUdpAddress); err == nil {
+					proxyConfig.StatsdUdpAddress = addr
 				} else {
 					return err
 				}
 			}
 
-			glog.V(2).Infof("effective config: %#v", config)
+			glog.V(2).Infof("effective config: %#v", proxyConfig)
 
-			envoyProxy := envoy.NewProxy(config, role.ServiceNode())
+			certs := []envoy.CertSource{
+				{
+					Directory: proxy.AuthCertsPath,
+					Files:     []string{proxy.CertChainFilename, proxy.KeyFilename, proxy.RootCertFilename},
+				},
+				{
+					Directory: proxy.IngressCertsPath,
+					Files:     []string{"tls.crt", "tls.key"},
+				},
+			}
+			envoyProxy := envoy.NewProxy(proxyConfig, role.ServiceNode())
 			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
-			watcher := envoy.NewWatcher(config, agent, role)
+			watcher := envoy.NewWatcher(proxyConfig, agent, role, certs)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
 
@@ -108,6 +126,8 @@ var (
 )
 
 func init() {
+	proxyCmd.PersistentFlags().StringVar(&config, "config", "",
+		"Configuration overrides for the proxy as YAML/JSON")
 	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry",
 		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",

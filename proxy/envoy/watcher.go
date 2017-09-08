@@ -16,6 +16,7 @@ package envoy
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,18 +39,29 @@ type Watcher interface {
 	Reload()
 }
 
+// CertSource is file source for certificates
+type CertSource struct {
+	// Directory containing certificates
+	Directory string
+	// Files for certificates
+	Files []string
+}
+
 type watcher struct {
 	agent  proxy.Agent
 	role   proxy.Node
 	config proxyconfig.ProxyConfig
+	certs  []CertSource
 }
 
-// NewWatcher creates a new watcher instance with an agent
-func NewWatcher(config proxyconfig.ProxyConfig, agent proxy.Agent, role proxy.Node) Watcher {
+// NewWatcher creates a new watcher instance from a proxy agent and a set of monitored certificate paths
+// (directories with files in them)
+func NewWatcher(config proxyconfig.ProxyConfig, agent proxy.Agent, role proxy.Node, certs []CertSource) Watcher {
 	return &watcher{
 		agent:  agent,
 		role:   role,
 		config: config,
+		certs:  certs,
 	}
 }
 
@@ -60,17 +72,10 @@ func (w *watcher) Run(ctx context.Context) {
 	// kickstart the proxy with partial state (in case there are no notifications coming)
 	w.Reload()
 
-	/*
-		// monitor auth certificates
-		if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-			go watchCerts(ctx, proxy.AuthCertsPath, w.Reload)
-		}
-
-		// monitor ingress certificates
-		if w.role.Type == proxy.Ingress {
-			go watchCerts(ctx, proxy.IngressCertsPath, w.Reload)
-		}
-	*/
+	// monitor certificates
+	for _, cert := range w.certs {
+		go watchCerts(ctx, cert.Directory, w.Reload)
+	}
 
 	<-ctx.Done()
 }
@@ -79,16 +84,12 @@ func (w *watcher) Reload() {
 	// use LDS instead of static listeners and clusters
 	config := buildConfig(Listeners{}, Clusters{}, true, w.config)
 
-	/*
-		h := sha256.New()
-		if w.mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-			generateCertHash(h, proxy.AuthCertsPath, authFiles)
-		}
-		if w.role.Type == proxy.Ingress {
-			generateCertHash(h, proxy.IngressCertsPath, []string{"tls.crt", "tls.key"})
-		}
-		config.Hash = h.Sum(nil)
-	*/
+	// compute hash of dependent certificates
+	h := sha256.New()
+	for _, cert := range w.certs {
+		generateCertHash(h, cert.Directory, cert.Files)
+	}
+	config.Hash = h.Sum(nil)
 
 	w.agent.ScheduleConfigUpdate(config)
 }
