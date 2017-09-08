@@ -40,7 +40,7 @@ spec:
         - ingress
         - -v
         - "{{.Verbosity}}"
-        - --config
+        - --configInline
         - |
           discoveryAddress: istio-pilot.{{.IstioNamespace}}:8080
 {{if .Zipkin}}
