@@ -35,7 +35,6 @@ func getRootCmd() *cobra.Command {
 		injectConfig    string
 		namespace       string
 		port            int
-		initializerName string
 	}{}
 
 	rootCmd := &cobra.Command{
