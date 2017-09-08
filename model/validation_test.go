@@ -755,7 +755,7 @@ func TestValidateConnectTimeout(t *testing.T) {
 }
 
 func TestValidateProxyMeshConfig(t *testing.T) {
-	invalid := proxyconfig.ProxyMeshConfig{
+	invalid := proxyconfig.MeshConfig{
 		EgressProxyAddress: "10.0.0.100",
 		MixerAddress:       "10.0.0.100",
 		ProxyListenPort:    0,

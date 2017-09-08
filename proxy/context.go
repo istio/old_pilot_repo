@@ -39,7 +39,7 @@ type Environment struct {
 	model.IstioConfigStore
 
 	// Mesh is the mesh config (to be merged into the config store)
-	Mesh *proxyconfig.ProxyMeshConfig
+	Mesh *proxyconfig.MeshConfig
 }
 
 // Node defines the proxy attributes used by xDS identification
@@ -134,16 +134,16 @@ func DefaultProxyConfig() proxyconfig.ProxyConfig {
 }
 
 // DefaultMeshConfig configuration
-func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
-	return proxyconfig.ProxyMeshConfig{
+func DefaultMeshConfig() proxyconfig.MeshConfig {
+	return proxyconfig.MeshConfig{
 		EgressProxyAddress:    "istio-egress:80",
 		MixerAddress:          "",
 		DisablePolicyChecks:   false,
 		ProxyListenPort:       15001,
 		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
 		IngressClass:          "istio",
-		IngressControllerMode: proxyconfig.ProxyMeshConfig_STRICT,
-		AuthPolicy:            proxyconfig.ProxyMeshConfig_NONE,
+		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
+		AuthPolicy:            proxyconfig.MeshConfig_NONE,
 		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
 		ZipkinAddress:         "",
 		AccessLogFile:         "/dev/stdout",

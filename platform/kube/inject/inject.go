@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/tools/version"
 )
@@ -139,16 +140,16 @@ func ProxyImageName(hub string, tag string, debug bool) string {
 // Params describes configurable parameters for injecting istio proxy
 // into kubernetes resource.
 type Params struct {
-	InitImage         string                       `json:"initImage"`
-	ProxyImage        string                       `json:"proxyImage"`
-	Verbosity         int                          `json:"verbosity"`
-	SidecarProxyUID   int64                        `json:"sidecarProxyUID"`
-	Version           string                       `json:"version"`
-	EnableCoreDump    bool                         `json:"enableCoreDump"`
-	DebugMode         bool                         `json:"debugMode"`
-	Mesh              *proxyconfig.ProxyMeshConfig `json:"-"`
-	MeshConfigMapName string                       `json:"meshConfigMapName"`
-	ImagePullPolicy   string                       `json:"imagePullPolicy"`
+	InitImage         string                  `json:"initImage"`
+	ProxyImage        string                  `json:"proxyImage"`
+	Verbosity         int                     `json:"verbosity"`
+	SidecarProxyUID   int64                   `json:"sidecarProxyUID"`
+	Version           string                  `json:"version"`
+	EnableCoreDump    bool                    `json:"enableCoreDump"`
+	DebugMode         bool                    `json:"debugMode"`
+	Mesh              *proxyconfig.MeshConfig `json:"-"`
+	MeshConfigMapName string                  `json:"meshConfigMapName"`
+	ImagePullPolicy   string                  `json:"imagePullPolicy"`
 	// Comma separated list of IP ranges in CIDR form. If set, only
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
@@ -338,6 +339,12 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 
 	if p.Verbosity > 0 {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
+	}
+
+	if p.Mesh.DefaultConfig != nil {
+		if yaml, err := model.ToYAML(p.Mesh.DefaultConfig); err == nil {
+			args = append(args, "--config", yaml)
+		}
 	}
 
 	volumeMounts := []v1.VolumeMount{

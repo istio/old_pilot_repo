@@ -10,24 +10,24 @@ import (
 	"github.com/golang/glog"
 )
 
-// ResolveStatsAddr resolves a DNS address to an IP address
-func ResolveStatsdAddr(statsdAddr string) (string, error) {
-	if statsdAddr == "" {
+// ResolveAddr resolves an authority address to an IP address
+func ResolveAddr(addr string) (string, error) {
+	if addr == "" {
 		return "", nil
 	}
-	colon := strings.Index(statsdAddr, ":")
-	host := statsdAddr[:colon]
-	port := statsdAddr[colon:]
-	glog.Infof("Attempting to lookup statsd address: %s", host)
-	defer glog.Infof("Finished lookup of statsd address: %s", host)
-	// lookup the statsd udp address with a timeout of 15 seconds.
+	colon := strings.Index(addr, ":")
+	host := addr[:colon]
+	port := addr[colon:]
+	glog.Infof("Attempting to lookup address: %s", host)
+	defer glog.Infof("Finished lookup of address: %s", host)
+	// lookup the udp address with a timeout of 15 seconds.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	addrs, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if lookupErr != nil {
-		return "", fmt.Errorf("lookup failed for statsd udp address: %v", lookupErr)
+		return "", fmt.Errorf("lookup failed for udp address: %v", lookupErr)
 	}
 	resolvedAddr := fmt.Sprintf("%s%s", addrs[0].IP, port)
-	glog.Infof("Statsd Addr: %s", resolvedAddr)
+	glog.Infof("Addr resolved to: %s", resolvedAddr)
 	return resolvedAddr, nil
 }

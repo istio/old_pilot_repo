@@ -27,7 +27,7 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig,
+func buildIngressListeners(mesh *proxyconfig.MeshConfig,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore,
 	ingress proxy.Node) Listeners {
@@ -50,7 +50,7 @@ func buildIngressListeners(mesh *proxyconfig.ProxyMeshConfig,
 	return listeners
 }
 
-func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
+func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) (HTTPRouteConfigs, string) {
 	// build vhosts
@@ -120,7 +120,7 @@ func buildIngressRoutes(mesh *proxyconfig.ProxyMeshConfig,
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(mesh *proxyconfig.ProxyMeshConfig,
+func buildIngressRoute(mesh *proxyconfig.MeshConfig,
 	rule model.Config,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) ([]*HTTPRoute, string, error) {

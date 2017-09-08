@@ -252,7 +252,7 @@ func makeProxyConfig() proxyconfig.ProxyConfig {
 	return mesh
 }
 
-func makeMeshConfig() proxyconfig.ProxyMeshConfig {
+func makeMeshConfig() proxyconfig.MeshConfig {
 	mesh := proxy.DefaultMeshConfig()
 	mesh.MixerAddress = "localhost:9091"
 	mesh.EgressProxyAddress = "localhost:8888"

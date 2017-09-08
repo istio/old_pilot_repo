@@ -47,7 +47,7 @@ func (ctl *mockController) AppendInstanceHandler(_ func(*model.ServiceInstance, 
 }
 func (ctl *mockController) Run(_ <-chan struct{}) {}
 
-func makeDiscoveryService(t *testing.T, r model.ConfigStore, mesh *proxyconfig.ProxyMeshConfig) *DiscoveryService {
+func makeDiscoveryService(t *testing.T, r model.ConfigStore, mesh *proxyconfig.MeshConfig) *DiscoveryService {
 	out, err := NewDiscoveryService(
 		&mockController{},
 		nil,
@@ -158,7 +158,7 @@ func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
 
 func TestClusterDiscoveryWithSSLContext(t *testing.T) {
 	mesh := makeMeshConfig()
-	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 	registry := memory.Make(model.IstioConfigTypes)
 	ds := makeDiscoveryService(t, registry, &mesh)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
@@ -409,7 +409,7 @@ func TestSidecarListenerDiscovery(t *testing.T) {
 
 			// test with auth
 			mesh = makeMeshConfig()
-			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+			mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 			ds = makeDiscoveryService(t, registry, &mesh)
 			url = fmt.Sprintf("/v1/listeners/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
 			response = makeDiscoveryRequest(ds, "GET", url, t)
@@ -431,7 +431,7 @@ func TestListenerDiscoveryIngress(t *testing.T) {
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-ingress.json", t)
 
-	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 	ds = makeDiscoveryService(t, registry, &mesh)
 	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-ingress.json", t)
@@ -459,7 +459,7 @@ func TestListenerDiscoveryEgress(t *testing.T) {
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-egress.json", t)
 
-	mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 	ds = makeDiscoveryService(t, registry, &mesh)
 	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-egress-auth.json", t)

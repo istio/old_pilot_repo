@@ -91,14 +91,18 @@ var (
 			}
 
 			if proxyConfig.StatsdUdpAddress != "" {
-				if addr, err := proxy.ResolveStatsdAddr(proxyConfig.StatsdUdpAddress); err == nil {
+				if addr, err := proxy.ResolveAddr(proxyConfig.StatsdUdpAddress); err == nil {
 					proxyConfig.StatsdUdpAddress = addr
 				} else {
 					return err
 				}
 			}
 
-			glog.V(2).Infof("effective config: %#v", proxyConfig)
+			if err := model.ValidateProxyConfig(&proxyConfig); err != nil {
+				return err
+			}
+
+			glog.V(2).Infof("effective config: %s", proxyConfig.String())
 
 			certs := []envoy.CertSource{
 				{
@@ -110,6 +114,9 @@ var (
 					Files:     []string{"tls.crt", "tls.key"},
 				},
 			}
+
+			glog.V(2).Infof("monitored certs: %#v", certs)
+
 			envoyProxy := envoy.NewProxy(proxyConfig, role.ServiceNode())
 			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
 			watcher := envoy.NewWatcher(proxyConfig, agent, role, certs)

@@ -478,7 +478,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "750bae4f3e87b21f9f1af05b0a5b7253a81547c3",  # Sep 07, 2017
+    commit = "d68fa2d4cd9b022a1778401a43259a711c914530",  # Sep 07, 2017
     remote = "https://github.com/kyessenov/api.git",
 )
 

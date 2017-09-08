@@ -1042,7 +1042,7 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 }
 
 // ValidateProxyMeshConfig checks that the mesh config is well-formed
-func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
+func ValidateProxyMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid egress proxy address:"))
@@ -1064,7 +1064,7 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 	}
 
 	switch mesh.AuthPolicy {
-	case proxyconfig.ProxyMeshConfig_NONE, proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+	case proxyconfig.MeshConfig_NONE, proxyconfig.MeshConfig_MUTUAL_TLS:
 	default:
 		errs = multierror.Append(errs, fmt.Errorf("unrecognized auth policy %q", mesh.AuthPolicy))
 	}

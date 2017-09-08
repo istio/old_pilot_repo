@@ -54,7 +54,7 @@ type infra struct { // nolint: aligncheck
 	// map from app to pods
 	apps map[string][]string
 
-	Auth proxyconfig.ProxyMeshConfig_AuthPolicy
+	Auth proxyconfig.MeshConfig_AuthPolicy
 
 	// switches for infrastructure components
 	Mixer     bool
@@ -202,7 +202,7 @@ func (infra *infra) setup() error {
 		return err
 	}
 
-	if infra.Auth != proxyconfig.ProxyMeshConfig_NONE {
+	if infra.Auth != proxyconfig.MeshConfig_NONE {
 		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}

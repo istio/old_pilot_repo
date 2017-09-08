@@ -27,7 +27,7 @@ import (
 func applyClusterPolicy(cluster *Cluster,
 	instances []*model.ServiceInstance,
 	config model.IstioConfigStore,
-	mesh *proxyconfig.ProxyMeshConfig,
+	mesh *proxyconfig.MeshConfig,
 	accounts model.ServiceAccounts) {
 	duration := protoDurationToMS(mesh.ConnectTimeout)
 	cluster.ConnectTimeoutMs = duration
@@ -39,9 +39,9 @@ func applyClusterPolicy(cluster *Cluster,
 
 	// apply auth policies
 	switch mesh.AuthPolicy {
-	case proxyconfig.ProxyMeshConfig_NONE:
+	case proxyconfig.MeshConfig_NONE:
 		// do nothing
-	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+	case proxyconfig.MeshConfig_MUTUAL_TLS:
 		// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
 		ports := model.PortList{cluster.port}.GetNames()
 		serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)

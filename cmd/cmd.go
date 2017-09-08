@@ -33,7 +33,7 @@ import (
 )
 
 // ReadMeshConfig gets mesh configuration from a config file
-func ReadMeshConfig(filename string) (*proxyconfig.ProxyMeshConfig, error) {
+func ReadMeshConfig(filename string) (*proxyconfig.MeshConfig, error) {
 	yaml, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, multierror.Prefix(err, "cannot read mesh config file")
