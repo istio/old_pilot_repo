@@ -134,19 +134,20 @@ func (infra *infra) setup() error {
 	if err != nil {
 		return err
 	}
-
+	debug := true
 	infra.InjectConfig = &inject.Config{
 		Policy:     inject.InjectionPolicyOptOut,
 		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
 		Params: inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag, debug),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag, debug),
 			Verbosity:         infra.Verbosity,
 			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
 			EnableCoreDump:    true,
 			Version:           "integration-test",
 			Mesh:              mesh,
 			MeshConfigMapName: "istio",
+			DebugMode:         debug,
 		},
 	}
 
