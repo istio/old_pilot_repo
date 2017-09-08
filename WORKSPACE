@@ -478,8 +478,8 @@ go_proto_library(
     ],
 )
     """,
-    commit = "d68fa2d4cd9b022a1778401a43259a711c914530",  # Sep 07, 2017
-    remote = "https://github.com/kyessenov/api.git",
+    commit = "0ab63a64b7ce7900de2a95160c13dcf781d04d07",  # Sep 08, 2017
+    remote = "https://github.com/istio/api.git",
 )
 
 GOOGLEAPIS_BUILD_FILE = """

@@ -145,7 +145,7 @@ func DefaultMeshConfig() proxyconfig.MeshConfig {
 		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
 		AuthPolicy:            proxyconfig.MeshConfig_NONE,
 		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
-		ZipkinAddress:         "",
+		EnableTracing:         true,
 		AccessLogFile:         "/dev/stdout",
 	}
 }

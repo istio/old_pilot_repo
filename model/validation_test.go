@@ -761,7 +761,6 @@ func TestValidateProxyMeshConfig(t *testing.T) {
 		ProxyListenPort:    0,
 		ConnectTimeout:     ptypes.DurationProto(-1 * time.Second),
 		AuthPolicy:         -1,
-		ZipkinAddress:      "xx.f",
 		RdsRefreshDelay:    ptypes.DurationProto(-1 * time.Second),
 	}
 
@@ -772,7 +771,7 @@ func TestValidateProxyMeshConfig(t *testing.T) {
 		switch err.(type) {
 		case *multierror.Error:
 			// each field must cause an error in the field
-			if len(err.(*multierror.Error).Errors) < 7 {
+			if len(err.(*multierror.Error).Errors) < 6 {
 				t.Errorf("expected an error for each field %v", err)
 			}
 		default:

@@ -256,7 +256,6 @@ func makeMeshConfig() proxyconfig.MeshConfig {
 	mesh := proxy.DefaultMeshConfig()
 	mesh.MixerAddress = "localhost:9091"
 	mesh.EgressProxyAddress = "localhost:8888"
-	mesh.ZipkinAddress = "localhost:6000"
 	mesh.RdsRefreshDelay = ptypes.DurationProto(10 * time.Millisecond)
 	return mesh
 }

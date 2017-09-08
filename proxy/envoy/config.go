@@ -311,6 +311,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 		UseRemoteAddress: useRemoteAddress,
 		StatPrefix:       "http",
 		Filters:          filters,
+	}
 
 	if mesh.AccessLogFile != "" {
 		config.AccessLog = []AccessLog{{
@@ -318,7 +319,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 		}}
 	}
 
-	if mesh.ZipkinAddress != "" {
+	if mesh.EnableTracing {
 		config.GenerateRequestID = true
 		config.Tracing = &HTTPFilterTraceConfig{
 			OperationName: IngressTraceOperation,

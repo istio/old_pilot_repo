@@ -1069,12 +1069,6 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 		errs = multierror.Append(errs, fmt.Errorf("unrecognized auth policy %q", mesh.AuthPolicy))
 	}
 
-	if mesh.ZipkinAddress != "" {
-		if err := ValidateProxyAddress(mesh.ZipkinAddress); err != nil {
-			errs = multierror.Append(errs, multierror.Prefix(err, "invalid zipkin address:"))
-		}
-	}
-
 	if err := ValidateRefreshDelay(mesh.RdsRefreshDelay); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
 	}
