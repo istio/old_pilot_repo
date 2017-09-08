@@ -370,26 +370,25 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 			},
 		})
 
-	if p.Mesh.AuthPolicy == proxyconfig.ProxyMeshConfig_MUTUAL_TLS {
-		volumeMounts = append(volumeMounts, v1.VolumeMount{
-			Name:      istioCertVolumeName,
-			ReadOnly:  true,
-			MountPath: p.Mesh.AuthCertsPath,
-		})
+	volumeMounts = append(volumeMounts, v1.VolumeMount{
+		Name:      istioCertVolumeName,
+		ReadOnly:  true,
+		MountPath: p.Mesh.AuthCertsPath,
+	})
 
-		sa := spec.ServiceAccountName
-		if sa == "" {
-			sa = "default"
-		}
-		spec.Volumes = append(spec.Volumes, v1.Volume{
-			Name: istioCertVolumeName,
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName: istioCertSecretPrefix + sa,
-				},
-			},
-		})
+	sa := spec.ServiceAccountName
+	if sa == "" {
+		sa = "default"
 	}
+	spec.Volumes = append(spec.Volumes, v1.Volume{
+		Name: istioCertVolumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: istioCertSecretPrefix + sa,
+				Optional:   (func(b bool) *bool { return &b })(true),
+			},
+		},
+	})
 
 	// In debug mode we need to be able to write in the proxy container
 	// and change the iptables.
