@@ -41,8 +41,8 @@ func buildIngressListeners(mesh *proxyconfig.MeshConfig,
 	if secret != "" {
 		listener := buildHTTPListener(mesh, ingress, nil, nil, WildcardAddress, 443, "443", true)
 		listener.SSLContext = &SSLContext{
-			CertChainFile:  path.Join(proxy.IngressCertsPath, "tls.crt"),
-			PrivateKeyFile: path.Join(proxy.IngressCertsPath, "tls.key"),
+			CertChainFile:  path.Join(proxy.IngressCertsPath, proxy.IngressCertFilename),
+			PrivateKeyFile: path.Join(proxy.IngressCertsPath, proxy.IngressKeyFilename),
 		}
 		listeners = append(listeners, listener)
 	}

@@ -343,7 +343,7 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 
 	if p.Mesh.DefaultConfig != nil {
 		if yaml, err := model.ToYAML(p.Mesh.DefaultConfig); err == nil {
-			args = append(args, "--config", yaml)
+			args = append(args, "--configInline", yaml)
 		}
 	}
 

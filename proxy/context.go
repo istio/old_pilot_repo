@@ -114,6 +114,12 @@ const (
 
 	// RootCertFilename is mTLS root cert
 	RootCertFilename = "root-cert.pem"
+
+	// IngressCertFilename is the ingress cert file name
+	IngressCertFilename = "tls.crt"
+
+	// IngressKeyFilename is the ingress private key file name
+	IngressKeyFilename = "tls.key"
 )
 
 // DefaultProxyConfig for individual proxies

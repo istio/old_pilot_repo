@@ -1041,8 +1041,8 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 	return err
 }
 
-// ValidateProxyMeshConfig checks that the mesh config is well-formed
-func ValidateProxyMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
+// ValidateMeshConfig checks that the mesh config is well-formed
+func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid egress proxy address:"))

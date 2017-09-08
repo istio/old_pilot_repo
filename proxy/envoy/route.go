@@ -20,6 +20,7 @@ package envoy
 import (
 	"crypto/sha1"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -41,9 +42,9 @@ const (
 // buildListenerSSLContext returns an SSLContext struct.
 func buildListenerSSLContext(certsDir string) *SSLContext {
 	return &SSLContext{
-		CertChainFile:            certsDir + proxy.CertChainFilename,
-		PrivateKeyFile:           certsDir + proxy.KeyFilename,
-		CaCertFile:               certsDir + proxy.RootCertFilename,
+		CertChainFile:            path.Join(certsDir, proxy.CertChainFilename),
+		PrivateKeyFile:           path.Join(certsDir, proxy.KeyFilename),
+		CaCertFile:               path.Join(certsDir, proxy.RootCertFilename),
 		RequireClientCertificate: true,
 	}
 }
@@ -52,9 +53,9 @@ func buildListenerSSLContext(certsDir string) *SSLContext {
 // The list of service accounts may be empty but not nil.
 func buildClusterSSLContext(certsDir string, serviceAccounts []string) *SSLContextWithSAN {
 	return &SSLContextWithSAN{
-		CertChainFile:        certsDir + proxy.CertChainFilename,
-		PrivateKeyFile:       certsDir + proxy.KeyFilename,
-		CaCertFile:           certsDir + proxy.RootCertFilename,
+		CertChainFile:        path.Join(certsDir, proxy.CertChainFilename),
+		PrivateKeyFile:       path.Join(certsDir, proxy.KeyFilename),
+		CaCertFile:           path.Join(certsDir, proxy.RootCertFilename),
 		VerifySubjectAltName: serviceAccounts,
 	}
 }

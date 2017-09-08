@@ -16,7 +16,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/golang/glog"
@@ -35,6 +37,7 @@ var (
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
 	config          string
+	configFile      string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -46,7 +49,7 @@ var (
 		Use:   "proxy",
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
-			glog.V(2).Infof("version %s", version.Line())
+			glog.V(2).Infof("Version %s", version.Line())
 			role.Type = proxy.Sidecar
 			if len(args) > 0 {
 				role.Type = proxy.NodeType(args[0])
@@ -81,12 +84,22 @@ var (
 				}
 			}
 
-			glog.V(2).Infof("proxy role: %#v", role)
+			glog.V(2).Infof("Proxy role: %#v", role)
 
 			proxyConfig := proxy.DefaultProxyConfig()
-			if config != "" {
+			if config != "" && configFile != "" {
+				return errors.New("cannot specify both configuration content and file at the same time")
+			} else if config != "" {
 				if err := model.ApplyYAML(config, &proxyConfig); err != nil {
-					return multierror.Prefix(err, "failed to apply config YAML: ")
+					return multierror.Prefix(err, "failed to parse config YAML: ")
+				}
+			} else if configFile != "" {
+				yaml, err := ioutil.ReadFile(configFile)
+				if err != nil {
+					return multierror.Prefix(err, "failed to read config YAML file")
+				}
+				if err := model.ApplyYAML(string(yaml), &proxyConfig); err != nil {
+					return multierror.Prefix(err, "failed to parse config YAML: ")
 				}
 			}
 
@@ -102,7 +115,11 @@ var (
 				return err
 			}
 
-			glog.V(2).Infof("effective config: %s", proxyConfig.String())
+			if out, err := model.ToYAML(&proxyConfig); err == nil {
+				glog.V(2).Infof("Effective config: %s", out)
+			} else {
+				glog.V(2).Infof("Failed to serialize to YAML: %v", err)
+			}
 
 			certs := []envoy.CertSource{
 				{
@@ -114,11 +131,11 @@ var (
 			if role.Type == proxy.Ingress {
 				certs = append(certs, envoy.CertSource{
 					Directory: proxy.IngressCertsPath,
-					Files:     []string{"tls.crt", "tls.key"},
+					Files:     []string{proxy.IngressCertFilename, proxy.IngressKeyFilename},
 				})
 			}
 
-			glog.V(2).Infof("monitored certs: %#v", certs)
+			glog.V(2).Infof("Monitored certs: %#v", certs)
 
 			envoyProxy := envoy.NewProxy(proxyConfig, role.ServiceNode())
 			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
@@ -136,8 +153,10 @@ var (
 )
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar(&config, "config", "",
-		"Configuration overrides for the proxy as YAML/JSON")
+	proxyCmd.PersistentFlags().StringVar(&configFile, "configFile", "",
+		"File with configuration overrides for the proxy (YAML file)")
+	proxyCmd.PersistentFlags().StringVar(&config, "configInline", "",
+		"Configuration overrides for the proxy as an inline multi-line YAML/JSON content")
 	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry",
 		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",

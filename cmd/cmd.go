@@ -44,7 +44,7 @@ func ReadMeshConfig(filename string) (*proxyconfig.MeshConfig, error) {
 		return nil, multierror.Prefix(err, "failed to convert to proto.")
 	}
 
-	if err = model.ValidateProxyMeshConfig(&mesh); err != nil {
+	if err = model.ValidateMeshConfig(&mesh); err != nil {
 		return nil, err
 	}
 

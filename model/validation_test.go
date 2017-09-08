@@ -754,7 +754,7 @@ func TestValidateConnectTimeout(t *testing.T) {
 	}
 }
 
-func TestValidateProxyMeshConfig(t *testing.T) {
+func TestValidateMeshConfig(t *testing.T) {
 	invalid := proxyconfig.MeshConfig{
 		EgressProxyAddress: "10.0.0.100",
 		MixerAddress:       "10.0.0.100",
@@ -764,7 +764,7 @@ func TestValidateProxyMeshConfig(t *testing.T) {
 		RdsRefreshDelay:    ptypes.DurationProto(-1 * time.Second),
 	}
 
-	err := ValidateProxyMeshConfig(&invalid)
+	err := ValidateMeshConfig(&invalid)
 	if err == nil {
 		t.Errorf("expected an error on invalid proxy mesh config: %v", invalid)
 	} else {
