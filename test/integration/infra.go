@@ -39,7 +39,7 @@ const (
 	ingressSecretName = "istio-ingress-certs"
 )
 
-type infra struct {
+type infra struct { // nolint: aligncheck
 	Name string
 
 	// docker tags
@@ -68,10 +68,15 @@ type infra struct {
 
 	namespaceCreated      bool
 	istioNamespaceCreated bool
+	debugImagesAndMode    bool
 
 	// sidecar initializer
 	UseInitializer bool
 	InjectConfig   *inject.Config
+
+	// External Admission Webhook for validation
+	UseAdmissionWebhook  bool
+	AdmissionServiceName string
 
 	config model.IstioConfigStore
 }
@@ -134,19 +139,20 @@ func (infra *infra) setup() error {
 	if err != nil {
 		return err
 	}
-
+	debugMode := infra.debugImagesAndMode
 	infra.InjectConfig = &inject.Config{
 		Policy:     inject.InjectionPolicyOptOut,
 		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
 		Params: inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag, debugMode),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag, debugMode),
 			Verbosity:         infra.Verbosity,
 			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
 			EnableCoreDump:    true,
 			Version:           "integration-test",
 			Mesh:              mesh,
 			MeshConfigMapName: "istio",
+			DebugMode:         debugMode,
 		},
 	}
 
@@ -208,7 +214,7 @@ func (infra *infra) setup() error {
 		if err := deploy("ingress-proxy.yaml.tmpl", infra.Namespace); err != nil {
 			return err
 		}
-		// Update ingress key/cert in secret
+		// Create ingress key/cert in secret
 		key, err := ioutil.ReadFile("docker/certs/cert.key")
 		if err != nil {
 			return err
@@ -217,7 +223,7 @@ func (infra *infra) setup() error {
 		if err != nil {
 			return err
 		}
-		_, err = client.CoreV1().Secrets(infra.Namespace).Update(&v1.Secret{
+		_, err = client.CoreV1().Secrets(infra.Namespace).Create(&v1.Secret{
 			ObjectMeta: meta_v1.ObjectMeta{Name: ingressSecretName},
 			Data: map[string][]byte{
 				"tls.key": key,
