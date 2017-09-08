@@ -74,6 +74,8 @@ type infra struct {
 	InjectConfig   *inject.Config
 
 	config model.IstioConfigStore
+
+	debugImagesAndMode bool
 }
 
 func (infra *infra) setup() error {
@@ -134,20 +136,20 @@ func (infra *infra) setup() error {
 	if err != nil {
 		return err
 	}
-	debug := true
+	debugMode := infra.debugImagesAndMode
 	infra.InjectConfig = &inject.Config{
 		Policy:     inject.InjectionPolicyOptOut,
 		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
 		Params: inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag, debug),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag, debug),
+			InitImage:         inject.InitImageName(infra.Hub, infra.Tag, debugMode),
+			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag, debugMode),
 			Verbosity:         infra.Verbosity,
 			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
 			EnableCoreDump:    true,
 			Version:           "integration-test",
 			Mesh:              mesh,
 			MeshConfigMapName: "istio",
-			DebugMode:         debug,
+			DebugMode:         debugMode,
 		},
 	}
 
