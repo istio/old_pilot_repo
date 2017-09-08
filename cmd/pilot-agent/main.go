@@ -109,10 +109,13 @@ var (
 					Directory: proxy.AuthCertsPath,
 					Files:     []string{proxy.CertChainFilename, proxy.KeyFilename, proxy.RootCertFilename},
 				},
-				{
+			}
+
+			if role.Type == proxy.Ingress {
+				certs = append(certs, envoy.CertSource{
 					Directory: proxy.IngressCertsPath,
 					Files:     []string{"tls.crt", "tls.key"},
-				},
+				})
 			}
 
 			glog.V(2).Infof("monitored certs: %#v", certs)

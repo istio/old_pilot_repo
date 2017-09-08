@@ -57,7 +57,7 @@ spec:
           readOnly: true
         - mountPath: /etc/istio/proxy
           name: istio-envoy
-        - mountPath: /etc/certs
+        - mountPath: /etc/certs/
           name: istio-certs
           readOnly: true
       initContainers:
