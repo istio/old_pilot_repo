@@ -20,7 +20,6 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"istio.io/pilot/cmd"
@@ -31,10 +30,6 @@ import (
 )
 
 var (
-	configpath      string
-	binarypath      string
-	meshconfig      string
-	servicecluster  string
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
 
@@ -48,24 +43,10 @@ var (
 		Use:   "proxy",
 		Short: "Envoy proxy agent",
 		RunE: func(c *cobra.Command, args []string) error {
+			glog.V(2).Infof("version %s", version.Line())
 			role.Type = proxy.Sidecar
 			if len(args) > 0 {
 				role.Type = proxy.NodeType(args[0])
-			}
-
-			// receive mesh configuration
-			mesh, err := cmd.ReadMeshConfig(meshconfig)
-			if err != nil {
-				defaultMesh := proxy.DefaultMeshConfig()
-				mesh = &defaultMesh
-				glog.Warningf("failed to read mesh configuration, using default: %v", err)
-			}
-
-			glog.V(2).Infof("version %s", version.Line())
-			glog.V(2).Infof("mesh configuration %#v", mesh)
-
-			if err = os.MkdirAll(configpath, 0700); err != nil {
-				return multierror.Prefix(err, "failed to create directory for proxy configuration")
 			}
 
 			// set values from registry platform
@@ -99,12 +80,21 @@ var (
 
 			glog.V(2).Infof("proxy role: %#v", role)
 
-			envoyProxy := envoy.MakeProxy(mesh, servicecluster, role.ServiceNode(), configpath, binarypath)
-			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
-			watcher, err := envoy.NewWatcher(mesh, agent, role)
-			if err != nil {
-				return err
+			config := proxy.DefaultProxyConfig()
+
+			if config.StatsdUdpAddress != "" {
+				if addr, err := proxy.ResolveStatsdAddr(config.StatsdUdpAddress); err == nil {
+					config.StatsdUdpAddress = addr
+				} else {
+					return err
+				}
 			}
+
+			glog.V(2).Infof("effective config: %#v", config)
+
+			envoyProxy := envoy.NewProxy(config, role.ServiceNode())
+			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry)
+			watcher := envoy.NewWatcher(config, agent, role)
 			ctx, cancel := context.WithCancel(context.Background())
 			go watcher.Run(ctx)
 
@@ -122,20 +112,12 @@ func init() {
 		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
 			string(platform.KubernetesRegistry), string(platform.ConsulRegistry)))
-	proxyCmd.PersistentFlags().StringVar(&meshconfig, "meshconfig", "/etc/istio/config/mesh",
-		"File name for Istio mesh configuration")
-	proxyCmd.PersistentFlags().StringVar(&configpath, "configpath", "/etc/istio/proxy",
-		"Path to generated proxy configuration directory")
-	proxyCmd.PersistentFlags().StringVar(&binarypath, "binarypath", "/usr/local/bin/envoy",
-		"Path to Envoy binary")
 	proxyCmd.PersistentFlags().StringVar(&role.IPAddress, "ip", "",
 		"Proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&role.ID, "id", "",
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
-	proxyCmd.PersistentFlags().StringVar(&servicecluster, "servicecluster", "istio-proxy",
-		"Service cluster value")
 
 	cmd.AddFlags(rootCmd)
 

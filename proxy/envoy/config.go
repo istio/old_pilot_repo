@@ -72,41 +72,41 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 // buildConfig creates a proxy config with discovery services and admin port
-func buildConfig(listeners Listeners, clusters Clusters, lds bool, mesh *proxyconfig.ProxyMeshConfig) *Config {
+func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyconfig.ProxyConfig) *Config {
 	out := &Config{
 		Listeners: listeners,
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
-			Address:       fmt.Sprintf("tcp://%s:%d", LocalhostAddress, mesh.ProxyAdminPort),
+			Address:       fmt.Sprintf("tcp://%s:%d", LocalhostAddress, config.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
 			Clusters: append(clusters,
-				buildCluster(mesh.DiscoveryAddress, RDSName, mesh.ConnectTimeout)),
+				buildCluster(config.DiscoveryAddress, RDSName, config.ConnectTimeout)),
 			SDS: &DiscoveryCluster{
-				Cluster:        buildCluster(mesh.DiscoveryAddress, SDSName, mesh.ConnectTimeout),
-				RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
+				Cluster:        buildCluster(config.DiscoveryAddress, SDSName, config.ConnectTimeout),
+				RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
 			},
 			CDS: &DiscoveryCluster{
-				Cluster:        buildCluster(mesh.DiscoveryAddress, CDSName, mesh.ConnectTimeout),
-				RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
+				Cluster:        buildCluster(config.DiscoveryAddress, CDSName, config.ConnectTimeout),
+				RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
 			},
 		},
-		StatsdUDPIPAddress: mesh.StatsdUdpAddress,
+		StatsdUDPIPAddress: config.StatsdUdpAddress,
 	}
 
 	if lds {
 		out.LDS = &LDSCluster{
 			Cluster:        LDSName,
-			RefreshDelayMs: protoDurationToMS(mesh.DiscoveryRefreshDelay),
+			RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
 		}
 		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
-			buildCluster(mesh.DiscoveryAddress, LDSName, mesh.ConnectTimeout))
+			buildCluster(config.DiscoveryAddress, LDSName, config.ConnectTimeout))
 	}
 
-	if mesh.ZipkinAddress != "" {
+	if config.ZipkinAddress != "" {
 		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
-			buildCluster(mesh.ZipkinAddress, ZipkinCollectorCluster, mesh.ConnectTimeout))
-		out.Tracing = buildZipkinTracing(mesh)
+			buildCluster(config.ZipkinAddress, ZipkinCollectorCluster, config.ConnectTimeout))
+		out.Tracing = buildZipkinTracing()
 	}
 
 	return out
@@ -310,10 +310,12 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, insta
 		CodecType:        auto,
 		UseRemoteAddress: useRemoteAddress,
 		StatPrefix:       "http",
-		AccessLog: []AccessLog{{
-			Path: DefaultAccessLog,
-		}},
 		Filters: filters,
+
+	if mesh.AccessLogFile != "" {
+		config.AccessLog = []AccessLog{{
+			Path: mesh.AccessLogFile,
+		}}
 	}
 
 	if mesh.ZipkinAddress != "" {
@@ -327,7 +329,7 @@ func buildHTTPListener(mesh *proxyconfig.ProxyMeshConfig, node proxy.Node, insta
 		config.RDS = &RDS{
 			Cluster:         RDSName,
 			RouteConfigName: rds,
-			RefreshDelayMs:  protoDurationToMS(mesh.DiscoveryRefreshDelay),
+			RefreshDelayMs:  protoDurationToMS(mesh.RdsRefreshDelay),
 		}
 	} else {
 		config.RouteConfig = routeConfig
@@ -349,7 +351,7 @@ func applyInboundAuth(listener *Listener, mesh *proxyconfig.ProxyMeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.ProxyMeshConfig_NONE:
 	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-		listener.SSLContext = buildListenerSSLContext(mesh.AuthCertsPath)
+		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
 }
 

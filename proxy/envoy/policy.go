@@ -20,6 +20,7 @@ package envoy
 import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // applyClusterPolicy assumes an outbound cluster and inserts custom configuration for the cluster
@@ -44,7 +45,7 @@ func applyClusterPolicy(cluster *Cluster,
 		// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
 		ports := model.PortList{cluster.port}.GetNames()
 		serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
-		cluster.SSLContext = buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
+		cluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, serviceAccounts)
 	}
 
 	// apply destination policies

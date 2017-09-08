@@ -66,6 +66,13 @@ func TestParsePort(t *testing.T) {
 	}
 }
 
+func TestDefaultConfig(t *testing.T) {
+	config := proxy.DefaultMeshConfig()
+	if err := model.ValidateProxyMeshConfig(&config); err != nil {
+		t.Errorf("validation of default mesh config failed with %v", err)
+	}
+}
+
 func TestDefaultMeshConfig(t *testing.T) {
 	mesh := proxy.DefaultMeshConfig()
 	if err := model.ValidateProxyMeshConfig(&mesh); err != nil {

@@ -1,4 +1,4 @@
-package envoy
+package proxy
 
 import (
 	"context"
@@ -10,7 +10,8 @@ import (
 	"github.com/golang/glog"
 )
 
-func resolveStatsdAddr(statsdAddr string) (string, error) {
+// ResolveStatsAddr resolves a DNS address to an IP address
+func ResolveStatsdAddr(statsdAddr string) (string, error) {
 	if statsdAddr == "" {
 		return "", nil
 	}

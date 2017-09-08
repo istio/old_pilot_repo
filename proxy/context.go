@@ -102,27 +102,42 @@ const (
 
 	// IngressCertsPath is the path location for ingress certificates
 	IngressCertsPath = "/etc/istio/ingress-certs/"
+
+	// AuthCertsPath is the path location for mTLS certificates
+	AuthCertsPath = "/etc/certs/"
 )
+
+// DefaultProxyConfig for individual proxies
+func DefaultProxyConfig() proxyconfig.ProxyConfig {
+	return proxyconfig.ProxyConfig{
+		ConfigPath:             "/etc/istio/proxy",
+		BinaryPath:             "/usr/local/bin/envoy",
+		ServiceCluster:         "istio-proxy",
+		DrainDuration:          ptypes.DurationProto(2 * time.Second),
+		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
+		DiscoveryAddress:       "istio-pilot:8080",
+		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
+		ZipkinAddress:          "",
+		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
+		StatsdUdpAddress:       "",
+		ProxyAdminPort:         15000,
+	}
+}
 
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
 	return proxyconfig.ProxyMeshConfig{
-		DiscoveryAddress:   "istio-pilot:8080",
-		EgressProxyAddress: "istio-egress:80",
-
-		ProxyListenPort:        15001,
-		ProxyAdminPort:         15000,
-		DrainDuration:          ptypes.DurationProto(2 * time.Second),
-		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
-		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
-		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
-		IstioServiceCluster:    "istio-proxy",
-
+		EgressProxyAddress:    "istio-egress:80",
+		MixerAddress:          "",
+		DisablePolicyChecks:   false,
+		ProxyListenPort:       15001,
+		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
 		IngressClass:          "istio",
 		IngressControllerMode: proxyconfig.ProxyMeshConfig_STRICT,
-
-		AuthPolicy:    proxyconfig.ProxyMeshConfig_NONE,
-		AuthCertsPath: "/etc/certs",
+		AuthPolicy:            proxyconfig.ProxyMeshConfig_NONE,
+		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
+		ZipkinAddress:         "",
+		AccessLogFile:         "/dev/stdout",
 	}
 }
 
