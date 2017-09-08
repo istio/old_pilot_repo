@@ -71,10 +71,6 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		external = svc.Spec.ExternalName
 	}
 
-	if addr != "" && external != "" {
-		return nil
-	}
-
 	ports := make([]*model.Port, 0, len(svc.Spec.Ports))
 	for _, port := range svc.Spec.Ports {
 		ports = append(ports, convertPort(port))
