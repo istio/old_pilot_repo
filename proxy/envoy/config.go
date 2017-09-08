@@ -170,6 +170,10 @@ func buildSidecarListenersClusters(
 	managementPorts model.PortList,
 	node proxy.Node,
 	config model.IstioConfigStore) (Listeners, Clusters) {
+
+	// ensure services are ordered to simplify generation logic
+	sort.Slice(services, func(i, j int) bool { return services[i].Hostname < services[j].Hostname })
+
 	listeners := make(Listeners, 0)
 	clusters := make(Clusters, 0)
 
@@ -533,6 +537,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 	tcpClusters := make(Clusters, 0)
 
 	var originalDstCluster *Cluster
+	wildcardListenerPorts := make(map[int]bool)
 	for _, service := range services {
 		if service.External() {
 			continue // TODO TCP external services not currently supported
@@ -549,6 +554,14 @@ func buildOutboundTCPListeners(mesh *proxyconfig.ProxyMeshConfig, services []*mo
 					tcpClusters = append(tcpClusters, cluster)
 					tcpListeners = append(tcpListeners, listener)
 				} else {
+					// ensure only one wildcard listener is created per port
+					if wildcardListenerPorts[servicePort.Port] {
+						glog.V(4).Infof("Multiple definitions for passthrough port %d",
+							servicePort.Port)
+						continue
+					}
+					wildcardListenerPorts[servicePort.Port] = true
+
 					if originalDstCluster == nil {
 						originalDstCluster = buildOriginalDSTCluster(
 							"orig-dst-cluster-tcp", mesh.ConnectTimeout)
