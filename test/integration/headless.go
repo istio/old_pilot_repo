@@ -25,7 +25,7 @@ type headless struct {
 }
 
 func (t *headless) String() string {
-	return "headless-reachability"
+	return "tcp-headless-reachability"
 }
 
 func (t *headless) setup() error {
@@ -52,12 +52,7 @@ func (t *headless) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if t.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS && src == "t" {
-								// t cannot talk to envoy (a or b) with mTLS enabled.
-								if len(resp.code) == 0 || resp.code[0] != httpOk {
-									return nil
-								}
-							} else if len(resp.code) > 0 && resp.code[0] == httpOk {
+							if len(resp.code) > 0 && resp.code[0] == httpOk {
 								return nil
 							}
 							return errAgain

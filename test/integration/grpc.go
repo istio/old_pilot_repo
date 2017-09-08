@@ -53,6 +53,7 @@ func (t *grpc) makeRequests() error {
 	if t.Auth == proxyconfig.ProxyMeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		srcPods = append(srcPods, "t")
+		dstPods = append(dstPods, "t")
 		// mTLS is not supported for headless services
 		dstPods = append(dstPods, "headless")
 	}
