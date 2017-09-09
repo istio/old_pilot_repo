@@ -27,4 +27,7 @@ set -u
 set -x
 
 pwd
-echo CI test > ${GOPATH}/src/github.com/istio/pilot/_artifacts
+cd ${GOPATH}/src/github.com/istio/pilot/_artifacts
+ls -al
+touch a.log
+echo CI > ${GOPATH}/src/github.com/istio/pilot/_artifacts
