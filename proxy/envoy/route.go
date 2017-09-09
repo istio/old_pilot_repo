@@ -324,12 +324,3 @@ func buildTCPRoute(cluster *Cluster, addresses []string) *TCPRoute {
 	}
 	return route
 }
-
-func buildOriginalDSTCluster(name string, timeout *duration.Duration) *Cluster {
-	return &Cluster{
-		Name:             OutboundClusterPrefix + name,
-		Type:             ClusterTypeOriginalDST,
-		ConnectTimeoutMs: protoDurationToMS(timeout),
-		LbType:           LbTypeOriginalDST,
-	}
-}

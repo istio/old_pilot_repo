@@ -86,8 +86,14 @@ func createIngressRule(name, host, path, domainSuffix string,
 	}
 
 	if host != "" {
-		rule.Match.Request.Headers[model.HeaderAuthority] = &proxyconfig.StringMatch{
-			MatchType: &proxyconfig.StringMatch_Exact{Exact: host},
+		if isRegularExpression(host) {
+			rule.Match.Request.Headers[model.HeaderAuthority] = &proxyconfig.StringMatch{
+				MatchType: &proxyconfig.StringMatch_Regex{Regex: host},
+			}
+		} else {
+			rule.Match.Request.Headers[model.HeaderAuthority] = &proxyconfig.StringMatch{
+				MatchType: &proxyconfig.StringMatch_Exact{Exact: host},
+			}
 		}
 	}
 
