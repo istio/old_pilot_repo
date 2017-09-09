@@ -26,4 +26,3 @@ set -u
 # Print commands
 set -x
 
-
