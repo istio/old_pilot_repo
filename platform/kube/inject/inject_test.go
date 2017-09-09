@@ -159,12 +159,11 @@ func TestIntoResourceFile(t *testing.T) {
 	for _, c := range cases {
 		mesh := proxy.DefaultMeshConfig()
 		if c.enableAuth {
-			mesh.AuthPolicy = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
-			mesh.AuthCertsPath = c.authConfigPath
+			mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 		}
 
 		config := &Config{
-			Policy:     InjectionPolicyOptOut,
+			Policy:     InjectionPolicyEnabled,
 			Namespaces: []string{v1.NamespaceAll},
 			Params: Params{
 				InitImage:         InitImageName(unitTestHub, unitTestTag, c.debugMode),
@@ -204,13 +203,12 @@ func TestIntoResourceFile(t *testing.T) {
 
 func TestInjectRequired(t *testing.T) {
 	cases := []struct {
-		policy                         InjectionPolicy
-		meta                           *metav1.ObjectMeta
-		want                           bool
-		checkDeprecatedAlphaAnnotation bool
+		policy InjectionPolicy
+		meta   *metav1.ObjectMeta
+		want   bool
 	}{
 		{
-			policy: InjectionPolicyOptOut,
+			policy: InjectionPolicyEnabled,
 			meta: &metav1.ObjectMeta{
 				Name:        "no-policy",
 				Namespace:   "test-namespace",
@@ -219,84 +217,69 @@ func TestInjectRequired(t *testing.T) {
 			want: true,
 		},
 		{
-			policy: InjectionPolicyOptOut,
+			policy: InjectionPolicyEnabled,
 			meta: &metav1.ObjectMeta{
-				Name:        "default-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueDefault},
-			},
-			want: true,
-		},
-		{
-			policy: InjectionPolicyOptOut,
-			meta: &metav1.ObjectMeta{
-				Name:        "force-on-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOn},
-			},
-			want: true,
-		},
-		{
-			policy: InjectionPolicyOptOut,
-			meta: &metav1.ObjectMeta{
-				Name:        "force-off-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOff},
-			},
-			want: false,
-		},
-		{
-			policy: InjectionPolicyOptIn,
-			meta: &metav1.ObjectMeta{
-				Name:        "no-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{},
-			},
-			want: false,
-		},
-		{
-			policy: InjectionPolicyOptIn,
-			meta: &metav1.ObjectMeta{
-				Name:        "default-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueDefault},
-			},
-			want: false,
-		},
-		{
-			policy: InjectionPolicyOptIn,
-			meta: &metav1.ObjectMeta{
-				Name:        "force-on-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOn},
-			},
-			want: true,
-		},
-		{
-			policy: InjectionPolicyOptIn,
-			meta: &metav1.ObjectMeta{
-				Name:        "force-off-policy",
-				Namespace:   "test-namespace",
-				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: istioSidecarAnnotationPolicyValueForceOff},
-			},
-			want: false,
-		},
-		{
-			policy: InjectionPolicyOptOut,
-			meta: &metav1.ObjectMeta{
-				Name:      "no-policy",
+				Name:      "default-policy",
 				Namespace: "test-namespace",
-				Annotations: map[string]string{
-					deprecatedIstioSidecarAnnotationSidecarKey: deprecatedIstioSidecarAnnotationSidecarValue,
-				},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyEnabled,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-on-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: "true"},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyEnabled,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-off-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: "false"},
 			},
 			want: false,
-			checkDeprecatedAlphaAnnotation: true,
+		},
+		{
+			policy: InjectionPolicyDisabled,
+			meta: &metav1.ObjectMeta{
+				Name:        "no-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{},
+			},
+			want: false,
+		},
+		{
+			policy: InjectionPolicyDisabled,
+			meta: &metav1.ObjectMeta{
+				Name:      "default-policy",
+				Namespace: "test-namespace",
+			},
+			want: false,
+		},
+		{
+			policy: InjectionPolicyDisabled,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-on-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: "true"},
+			},
+			want: true,
+		},
+		{
+			policy: InjectionPolicyDisabled,
+			meta: &metav1.ObjectMeta{
+				Name:        "force-off-policy",
+				Namespace:   "test-namespace",
+				Annotations: map[string]string{istioSidecarAnnotationPolicyKey: "false"},
+			},
+			want: false,
 		},
 	}
 
 	for _, c := range cases {
-		checkDeprecatedAlphaAnnotation = c.checkDeprecatedAlphaAnnotation
 		if got := injectRequired(c.policy, c.meta); got != c.want {
 			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
 		}
@@ -402,7 +385,7 @@ func TestGetInitializerConfig(t *testing.T) {
 	defer util.DeleteNamespace(cl, ns)
 
 	goodConfig := Config{
-		Policy:          InjectionPolicyOptIn,
+		Policy:          InjectionPolicyDisabled,
 		InitializerName: DefaultInitializerName,
 		Params: Params{
 			InitImage:         InitImageName(unitTestHub, unitTestTag, false),

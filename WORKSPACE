@@ -429,7 +429,7 @@ go_repository(
 
 # Change this and the docker/Dockerfile.proxy* files together
 # This SHA is obtained from proxy/postsubmit job
-ISTIO_PROXY_BUCKET = "d4d12e155b3b14764e9045eb8f876129829389d1"  # Sept. 8 2017
+ISTIO_PROXY_BUCKET = "3bd1beb2b61887b4c8ff239d68e5f94f42f3002f"
 
 http_file(
     name = "envoy_binary",
@@ -478,7 +478,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "88dd261709ccd8fa8a43bec5e3c15071d39bfc7c",  # Sep 07, 2017
+    commit = "0ab63a64b7ce7900de2a95160c13dcf781d04d07",  # Sep 08, 2017
     remote = "https://github.com/istio/api.git",
 )
 
