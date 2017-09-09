@@ -27,6 +27,7 @@ set -u
 set -x
 
 pwd
+mkdir -p ${GOPATH}/src/github.com/istio/pilot/_artifacts
 cd ${GOPATH}/src/github.com/istio/pilot/_artifacts
 ls -al
 touch a.log
