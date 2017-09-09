@@ -18,8 +18,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -242,6 +245,11 @@ type IstioConfigStore interface {
 	// Policy returns a policy for a service version that match at least one of
 	// the source instances.  The labels must match precisely in the policy.
 	Policy(source []*ServiceInstance, destination string, labels Labels) *Config
+
+	// Mesh returns the mesh config
+	Mesh() *proxyconfig.MeshConfig
+
+	SetMesh(mesh *proxyconfig.MeshConfig) error
 }
 
 const (
@@ -259,6 +267,9 @@ const (
 
 	// NamespaceAll is a designated symbol for listing across all namespaces
 	NamespaceAll = ""
+
+	// DefaultMeshName is the name for default mesh
+	DefaultMeshName = "istio"
 )
 
 var (
@@ -273,6 +284,14 @@ var (
 			}
 			return nil
 		},
+	}
+
+	// MeshConfig describes the mesh config
+	MeshConfig = ProtoSchema{
+		Type:        "mesh-config",
+		Plural:      "mesh-configs",
+		MessageName: "istio.proxy.v1.config.MeshConfig",
+		Validate:    ValidateMeshConfig,
 	}
 
 	// RouteRule describes route rules
@@ -309,6 +328,7 @@ var (
 
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
+		MeshConfig,
 		RouteRule,
 		IngressRule,
 		EgressRule,
@@ -346,11 +366,17 @@ func ResolveHostname(meta ConfigMeta, svc *proxyconfig.IstioService) string {
 // from the generic config registry
 type istioConfigStore struct {
 	ConfigStore
+	meshName      string
+	meshNamespace string
 }
 
 // MakeIstioStore creates a wrapper around a store
-func MakeIstioStore(store ConfigStore) IstioConfigStore {
-	return &istioConfigStore{store}
+func MakeIstioStore(store ConfigStore, meshName, meshNamespace string) IstioConfigStore {
+	return &istioConfigStore{
+		ConfigStore:   store,
+		meshName:      meshName,
+		meshNamespace: meshNamespace,
+	}
 }
 
 // MatchSource checks that a rule applies for source service instances.
@@ -479,6 +505,71 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 	}
 
 	return out
+}
+
+// DefaultProxyConfig for individual proxies
+func DefaultProxyConfig() proxyconfig.ProxyConfig {
+	return proxyconfig.ProxyConfig{
+		ConfigPath:             "/etc/istio/proxy",
+		BinaryPath:             "/usr/local/bin/envoy",
+		ServiceCluster:         "istio-proxy",
+		DrainDuration:          ptypes.DurationProto(2 * time.Second),
+		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
+		DiscoveryAddress:       "istio-pilot:8080",
+		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
+		ZipkinAddress:          "",
+		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
+		StatsdUdpAddress:       "",
+		ProxyAdminPort:         15000,
+	}
+}
+
+// DefaultMeshConfig configuration
+func DefaultMeshConfig() proxyconfig.MeshConfig {
+	config := DefaultProxyConfig()
+	return proxyconfig.MeshConfig{
+		EgressProxyAddress:    "istio-egress:80",
+		MixerAddress:          "",
+		DisablePolicyChecks:   false,
+		ProxyListenPort:       15001,
+		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
+		IngressClass:          "istio",
+		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
+		AuthPolicy:            proxyconfig.MeshConfig_NONE,
+		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
+		EnableTracing:         true,
+		AccessLogFile:         "/dev/stdout",
+		DefaultConfig:         &config,
+	}
+}
+
+func (store *istioConfigStore) Mesh() *proxyconfig.MeshConfig {
+	config, exists := store.Get(MeshConfig.Type, store.meshName, store.meshNamespace)
+	if !exists {
+		glog.Warningf("missing mesh %q in %q", store.meshName, store.meshNamespace)
+		out := DefaultMeshConfig()
+		return &out
+	}
+	return config.Spec.(*proxyconfig.MeshConfig)
+}
+
+func (store *istioConfigStore) SetMesh(mesh *proxyconfig.MeshConfig) error {
+	config := Config{
+		ConfigMeta: ConfigMeta{
+			Type:      MeshConfig.Type,
+			Name:      store.meshName,
+			Namespace: store.meshNamespace,
+		},
+		Spec: mesh,
+	}
+	old, exists := store.Get(MeshConfig.Type, config.Name, config.Namespace)
+	if exists {
+		config.ResourceVersion = old.ResourceVersion
+		_, err := store.Update(config)
+		return err
+	}
+	_, err := store.Create(config)
+	return err
 }
 
 // RejectConflictingEgressRules rejects rules that have the destination which is equal to

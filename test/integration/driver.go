@@ -33,7 +33,6 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"k8s.io/client-go/kubernetes"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/test/util"
@@ -126,7 +125,7 @@ func main() {
 	}
 
 	params.Name = "(default infra)"
-	params.Auth = proxyconfig.MeshConfig_NONE
+	params.Auth = false
 	params.Mixer = true
 	params.Ingress = true
 	params.Egress = true
@@ -159,7 +158,7 @@ func main() {
 func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
-	out.Auth = proxyconfig.MeshConfig_MUTUAL_TLS
+	out.Auth = true
 	return out
 }
 

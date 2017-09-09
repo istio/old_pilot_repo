@@ -17,7 +17,7 @@
        "rds": {
         "cluster": "rds",
         "route_config_name": "http_proxy",
-        "refresh_delay_ms": 10
+        "refresh_delay_ms": 10000
        },
        "filters": [
         {

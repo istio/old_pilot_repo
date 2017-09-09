@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/proxy"
+	"istio.io/pilot/model"
 )
 
 func TestDecodeIngressRuleName(t *testing.T) {
@@ -90,7 +90,7 @@ func TestIsRegularExpression(t *testing.T) {
 }
 
 func TestIngressClass(t *testing.T) {
-	istio := proxy.DefaultMeshConfig().IngressClass
+	istio := model.DefaultMeshConfig().IngressClass
 	cases := []struct {
 		ingressMode   proxyconfig.MeshConfig_IngressControllerMode
 		ingressClass  string
@@ -120,14 +120,11 @@ func TestIngressClass(t *testing.T) {
 			},
 		}
 
-		mesh := proxy.DefaultMeshConfig()
-		mesh.IngressControllerMode = c.ingressMode
-
 		if c.ingressClass != "" {
 			ing.Annotations["kubernetes.io/ingress.class"] = c.ingressClass
 		}
 
-		if c.shouldProcess != shouldProcessIngress(&mesh, &ing) {
+		if c.shouldProcess != shouldProcessIngress(c.ingressMode, istio, &ing) {
 			t.Errorf("shouldProcessIngress(<ingress of class '%s'>) => %v, want %v",
 				c.ingressClass, !c.shouldProcess, c.shouldProcess)
 		}

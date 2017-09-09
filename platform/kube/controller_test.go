@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"istio.io/pilot/model"
-	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/util"
 )
 
@@ -77,7 +76,7 @@ const (
 func TestServices(t *testing.T) {
 	cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
+	ns, err := util.CreateNamespace(cl, "istio-unit-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -86,11 +85,10 @@ func TestServices(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	mesh := proxy.DefaultMeshConfig()
-	ctl := NewController(cl, &mesh, ControllerOptions{
-		Namespace:    ns,
-		ResyncPeriod: resync,
-		DomainSuffix: domainSuffix,
+	ctl := NewController(cl, ControllerOptions{
+		WatchedNamespace: ns,
+		ResyncPeriod:     resync,
+		DomainSuffix:     domainSuffix,
 	})
 	go ctl.Run(stop)
 
@@ -303,11 +301,10 @@ func TestController_GetIstioServiceAccounts(t *testing.T) {
 
 func makeFakeKubeAPIController() *Controller {
 	clientSet := fake.NewSimpleClientset()
-	mesh := proxy.DefaultMeshConfig()
-	return NewController(clientSet, &mesh, ControllerOptions{
-		Namespace:    "default",
-		ResyncPeriod: resync,
-		DomainSuffix: domainSuffix,
+	return NewController(clientSet, ControllerOptions{
+		WatchedNamespace: "default",
+		ResyncPeriod:     resync,
+		DomainSuffix:     domainSuffix,
 	})
 }
 

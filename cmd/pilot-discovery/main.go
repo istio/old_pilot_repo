@@ -23,9 +23,7 @@ import (
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	configaggregate "istio.io/pilot/adapter/config/aggregate"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/adapter/config/ingress"
@@ -52,8 +50,10 @@ type eurekaArgs struct {
 }
 
 type args struct {
-	kubeconfig string
-	meshconfig string
+	kubeconfig       string
+	mesh             string
+	namespace        string
+	ingressNamespace string
 
 	// ingress sync mode is set to off by default
 	controllerOptions kube.ControllerOptions
@@ -78,23 +78,18 @@ var (
 		Use:   "discovery",
 		Short: "Start Istio proxy discovery service",
 		RunE: func(c *cobra.Command, args []string) error {
-
-			// receive mesh configuration
-			mesh, fail := cmd.ReadMeshConfig(flags.meshconfig)
-			if fail != nil {
-				defaultMesh := proxy.DefaultMeshConfig()
-				mesh = &defaultMesh
-				glog.Warningf("failed to read mesh configuration, using default: %v", fail)
-			}
-
-			glog.V(2).Infof("mesh configuration %s", spew.Sdump(mesh))
 			glog.V(2).Infof("version %s", version.Line())
 			glog.V(2).Infof("flags %s", spew.Sdump(flags))
 
 			stop := make(chan struct{})
 
-			if flags.controllerOptions.Namespace == "" {
-				flags.controllerOptions.Namespace = os.Getenv("POD_NAMESPACE")
+			if flags.namespace == "" {
+				flags.namespace = os.Getenv("POD_NAMESPACE")
+			}
+
+			// TODO: temporary hack to avoid listening for ingresses cluster-wide when it is restricted
+			if flags.controllerOptions.WatchedNamespace != "" && flags.ingressNamespace == "" {
+				flags.ingressNamespace = flags.controllerOptions.WatchedNamespace
 			}
 
 			_, client, kuberr := kube.CreateInterface(flags.kubeconfig)
@@ -103,6 +98,7 @@ var (
 			}
 
 			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{
+				model.MeshConfig,
 				model.RouteRule,
 				model.EgressRule,
 				model.DestinationPolicy,
@@ -127,7 +123,7 @@ var (
 				glog.V(2).Infof("Adding %s registry adapter", serviceRegistry)
 				switch serviceRegistry {
 				case platform.KubernetesRegistry:
-					kubectl := kube.NewController(client, mesh, flags.controllerOptions)
+					kubectl := kube.NewController(client, flags.controllerOptions)
 					serviceControllers.AddRegistry(
 						aggregate.Registry{
 							Name:             serviceRegistry,
@@ -135,18 +131,20 @@ var (
 							ServiceAccounts:  kubectl,
 							Controller:       kubectl,
 						})
-					if mesh.IngressControllerMode != proxyconfig.MeshConfig_OFF {
-						configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
-							configController,
-							ingress.NewController(client, mesh, flags.controllerOptions),
-						})
-						if err != nil {
-							return err
-						}
-					}
+					mesh := model.MakeIstioStore(configClient, flags.mesh, flags.namespace).Mesh()
 
-					ingressSyncer := ingress.NewStatusSyncer(mesh, client, flags.controllerOptions)
+					configController, err = configaggregate.MakeCache([]model.ConfigStoreCache{
+						configController,
+						ingress.NewController(client, mesh.IngressControllerMode, mesh.IngressClass, kube.ControllerOptions{
+							WatchedNamespace: flags.ingressNamespace,
+							ResyncPeriod:     flags.controllerOptions.ResyncPeriod,
+							DomainSuffix:     flags.controllerOptions.DomainSuffix,
+						}),
+					})
 
+					ingressSyncer := ingress.NewStatusSyncer(client,
+						mesh.IngressService, flags.namespace, mesh.IngressClass, mesh.IngressControllerMode,
+						flags.controllerOptions)
 					go ingressSyncer.Run(stop)
 
 				case platform.ConsulRegistry:
@@ -182,8 +180,7 @@ var (
 			}
 
 			environment := proxy.Environment{
-				Mesh:             mesh,
-				IstioConfigStore: model.MakeIstioStore(configController),
+				IstioConfigStore: model.MakeIstioStore(configController, flags.mesh, flags.namespace),
 				ServiceDiscovery: serviceControllers,
 				ServiceAccounts:  serviceControllers,
 			}
@@ -202,10 +199,10 @@ var (
 			// controller. Fill in remaining admission controller
 			// options
 			flags.admissionArgs.Descriptor = configClient.ConfigDescriptor()
-			flags.admissionArgs.ServiceNamespace = flags.controllerOptions.Namespace
+			flags.admissionArgs.ServiceNamespace = flags.namespace
 			flags.admissionArgs.DomainSuffix = flags.controllerOptions.DomainSuffix
 			flags.admissionArgs.ValidateNamespaces = []string{
-				flags.controllerOptions.Namespace,
+				flags.namespace,
 				flags.controllerOptions.WatchedNamespace,
 			}
 			admissionController, err := admit.NewController(client, flags.admissionArgs)
@@ -230,15 +227,16 @@ func init() {
 			platform.KubernetesRegistry, platform.ConsulRegistry, platform.EurekaRegistry))
 	discoveryCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	discoveryCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshConfig", "/etc/istio/config/mesh",
-		fmt.Sprintf("File name for Istio mesh configuration"))
-	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.Namespace, "namespace", "n", "",
-		"Select a namespace for the controller loop. If not set, uses ${POD_NAMESPACE} environment variable")
-	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.WatchedNamespace, "app namespace",
-		"a", metav1.NamespaceAll,
-		"Restrict the applications namespace the controller manages; if not set, controller watches all namespaces")
+	discoveryCmd.PersistentFlags().StringVar(&flags.mesh, "mesh", model.DefaultMeshName,
+		"Name for mesh config resource")
+	discoveryCmd.PersistentFlags().StringVarP(&flags.namespace, "namespace", "n", "",
+		"Istio system namespace. If not set, uses ${POD_NAMESPACE} environment variable")
+	discoveryCmd.PersistentFlags().StringVarP(&flags.controllerOptions.WatchedNamespace, "appNamespace", "a", "",
+		"Restrict the applications namespaces CRD and service controllers manage (all if not set)")
+	discoveryCmd.PersistentFlags().StringVar(&flags.ingressNamespace, "ingressNamespace", "",
+		"Restrict the ingress controller namespace (all if not set)")
 	discoveryCmd.PersistentFlags().DurationVar(&flags.controllerOptions.ResyncPeriod, "resync", 60*time.Second,
-		"Controller resync interval")
+		"Controllers resync interval")
 	discoveryCmd.PersistentFlags().StringVar(&flags.controllerOptions.DomainSuffix, "domain", "cluster.local",
 		"DNS domain suffix")
 

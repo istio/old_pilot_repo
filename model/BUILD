@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//model/test:go_default_library",
         "@com_github_ghodss_yaml//:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
         "@com_github_golang_protobuf//jsonpb:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@com_github_golang_protobuf//ptypes:go_default_library",

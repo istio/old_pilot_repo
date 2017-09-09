@@ -81,7 +81,7 @@ spec:
         args:
         - discovery
         - --v={{.Verbosity}}
-        - -a
+        - --ingressNamespace
         - {{.Namespace}}
 {{if .UseAdmissionWebhook}}
         - --admission-service={{.AdmissionServiceName}}
@@ -108,18 +108,11 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/istio/config
 {{if .DebugPort}}
+        volumeMounts:
         - mountPath: "/data/debug"
           name: debug
-{{end}}
       volumes:
-      - name: config-volume
-        configMap:
-          name: istio
-{{if .DebugPort}}
       - name: debug
         persistentVolumeClaim:
           claimName: pilot-debug-claim

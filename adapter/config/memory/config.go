@@ -17,6 +17,7 @@ package memory
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"istio.io/pilot/model"
@@ -85,7 +86,7 @@ func (cr *store) List(typ, namespace string) ([]model.Config, error) {
 func (cr *store) Delete(typ, name, namespace string) error {
 	data, ok := cr.data[typ]
 	if !ok {
-		return errors.New("unknown type")
+		return fmt.Errorf("unknown type %q", typ)
 	}
 	ns, exists := data[namespace]
 	if !exists {
@@ -105,7 +106,7 @@ func (cr *store) Create(config model.Config) (string, error) {
 	typ := config.Type
 	schema, ok := cr.descriptor.GetByType(typ)
 	if !ok {
-		return "", errors.New("unknown type")
+		return "", fmt.Errorf("unknown type %q", typ)
 	}
 	if err := schema.Validate(config.Spec); err != nil {
 		return "", err
@@ -130,7 +131,7 @@ func (cr *store) Update(config model.Config) (string, error) {
 	typ := config.Type
 	schema, ok := cr.descriptor.GetByType(typ)
 	if !ok {
-		return "", errors.New("unknown type")
+		return "", fmt.Errorf("unknown type %q", typ)
 	}
 	if err := schema.Validate(config.Spec); err != nil {
 		return "", err

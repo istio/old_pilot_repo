@@ -27,8 +27,8 @@ import (
 func applyClusterPolicy(cluster *Cluster,
 	instances []*model.ServiceInstance,
 	config model.IstioConfigStore,
-	mesh *proxyconfig.MeshConfig,
 	accounts model.ServiceAccounts) {
+	mesh := config.Mesh()
 	duration := protoDurationToMS(mesh.ConnectTimeout)
 	cluster.ConnectTimeoutMs = duration
 

@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/proxy"
+	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"
 	"istio.io/pilot/tools/version"
 )
@@ -58,7 +58,6 @@ const unitTestDebugMode = true
 func TestIntoResourceFile(t *testing.T) {
 	cases := []struct {
 		authConfigPath  string
-		configMapName   string
 		enableAuth      bool
 		in              string
 		want            string
@@ -77,9 +76,8 @@ func TestIntoResourceFile(t *testing.T) {
 			want: "testdata/hello-probes.yaml.injected",
 		},
 		{
-			configMapName: "config-map-name",
-			in:            "testdata/hello.yaml",
-			want:          "testdata/hello-config-map-name.yaml.injected",
+			in:   "testdata/hello.yaml",
+			want: "testdata/hello-config-map-name.yaml.injected",
 		},
 		{
 			in:   "testdata/frontend.yaml",
@@ -157,7 +155,7 @@ func TestIntoResourceFile(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		mesh := proxy.DefaultMeshConfig()
+		mesh := model.DefaultMeshConfig()
 		if c.enableAuth {
 			mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 		}
@@ -166,21 +164,16 @@ func TestIntoResourceFile(t *testing.T) {
 			Policy:     InjectionPolicyEnabled,
 			Namespaces: []string{v1.NamespaceAll},
 			Params: Params{
-				InitImage:         InitImageName(unitTestHub, unitTestTag, c.debugMode),
-				ProxyImage:        ProxyImageName(unitTestHub, unitTestTag, c.debugMode),
-				ImagePullPolicy:   "IfNotPresent",
-				Verbosity:         DefaultVerbosity,
-				SidecarProxyUID:   DefaultSidecarProxyUID,
-				Version:           "12345678",
-				EnableCoreDump:    c.enableCoreDump,
-				Mesh:              &mesh,
-				MeshConfigMapName: "istio",
-				DebugMode:         c.debugMode,
+				InitImage:       InitImageName(unitTestHub, unitTestTag, c.debugMode),
+				ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, c.debugMode),
+				ImagePullPolicy: "IfNotPresent",
+				Verbosity:       DefaultVerbosity,
+				SidecarProxyUID: DefaultSidecarProxyUID,
+				Version:         "12345678",
+				EnableCoreDump:  c.enableCoreDump,
+				Mesh:            &mesh,
+				DebugMode:       c.debugMode,
 			},
-		}
-
-		if c.configMapName != "" {
-			config.Params.MeshConfigMapName = c.configMapName
 		}
 
 		if c.imagePullPolicy != "" {
@@ -286,99 +279,10 @@ func TestInjectRequired(t *testing.T) {
 	}
 }
 
-func TestGetMeshConfig(t *testing.T) {
-	_, cl := makeClient(t)
-	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer util.DeleteNamespace(cl, ns)
-
-	cases := []struct {
-		name      string
-		configMap *v1.ConfigMap
-		queryName string
-		wantErr   bool
-	}{
-		{
-			name:      "bad query name",
-			queryName: "bad-query-name-foo-bar",
-			configMap: &v1.ConfigMap{
-				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-				ObjectMeta: metav1.ObjectMeta{Name: "bad-query-name"},
-				Data: map[string]string{
-					ConfigMapKey: "", // empty config
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:      "bad config key",
-			queryName: "bad-config-key",
-			configMap: &v1.ConfigMap{
-				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-key"},
-				Data: map[string]string{
-					"bad-key": "",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:      "bad config data",
-			queryName: "bad-config-data",
-			configMap: &v1.ConfigMap{
-				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-data"},
-				Data: map[string]string{
-					ConfigMapKey: "bad config",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:      "good",
-			queryName: "good",
-			configMap: &v1.ConfigMap{
-				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-				ObjectMeta: metav1.ObjectMeta{Name: "good"},
-				Data: map[string]string{
-					ConfigMapKey: "", // empty config
-				},
-			},
-			wantErr: false,
-		},
-	}
-
-	want := proxy.DefaultMeshConfig()
-
-	for _, c := range cases {
-		_, err = cl.CoreV1().ConfigMaps(ns).Create(c.configMap)
-		if err != nil {
-			t.Fatalf("%v: Create failed: %v", c.name, err)
-		}
-		_, got, err := GetMeshConfig(cl, ns, c.queryName)
-		gotErr := err != nil
-		if gotErr != c.wantErr {
-			t.Fatalf("%v: GetMeshConfig returned wrong error value: got %v want %v: err=%v", c.name, gotErr, c.wantErr, err)
-		}
-		if gotErr {
-			continue
-		}
-		if !reflect.DeepEqual(got, &want) {
-			t.Fatalf("%v: GetMeshConfig returned the wrong result: \ngot  %v \nwant %v", c.name, got, &want)
-		}
-		if err = cl.CoreV1().ConfigMaps(ns).Delete(c.configMap.Name, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("%v: Delete failed: %v", c.name, err)
-		}
-	}
-}
-
 func TestGetInitializerConfig(t *testing.T) {
 	_, cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
+	ns, err := util.CreateNamespace(cl, "istio-initializer-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -388,11 +292,10 @@ func TestGetInitializerConfig(t *testing.T) {
 		Policy:          InjectionPolicyDisabled,
 		InitializerName: DefaultInitializerName,
 		Params: Params{
-			InitImage:         InitImageName(unitTestHub, unitTestTag, false),
-			ProxyImage:        ProxyImageName(unitTestHub, unitTestTag, false),
-			SidecarProxyUID:   1234,
-			MeshConfigMapName: "something",
-			ImagePullPolicy:   "Always",
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
 		},
 	}
 	goodConfigYAML, err := yaml.Marshal(&goodConfig)
@@ -442,11 +345,10 @@ func TestGetInitializerConfig(t *testing.T) {
 				Policy:          DefaultInjectionPolicy,
 				InitializerName: DefaultInitializerName,
 				Params: Params{
-					InitImage:         InitImageName(DefaultHub, version.Info.Version, false),
-					ProxyImage:        ProxyImageName(DefaultHub, version.Info.Version, false),
-					SidecarProxyUID:   DefaultSidecarProxyUID,
-					MeshConfigMapName: DefaultMeshConfigMapName,
-					ImagePullPolicy:   DefaultImagePullPolicy,
+					InitImage:       InitImageName(DefaultHub, version.Info.Version, false),
+					ProxyImage:      ProxyImageName(DefaultHub, version.Info.Version, false),
+					SidecarProxyUID: DefaultSidecarProxyUID,
+					ImagePullPolicy: DefaultImagePullPolicy,
 				},
 			},
 		},

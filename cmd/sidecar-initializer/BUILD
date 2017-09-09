@@ -5,7 +5,9 @@ go_library(
     srcs = ["main.go"],
     visibility = ["//visibility:private"],
     deps = [
+        "//adapter/config/crd:go_default_library",
         "//cmd:go_default_library",
+        "//model:go_default_library",
         "//platform/kube:go_default_library",
         "//platform/kube/inject:go_default_library",
         "//tools/version:go_default_library",

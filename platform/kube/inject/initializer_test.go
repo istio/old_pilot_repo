@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/util"
 )
 
@@ -61,7 +61,7 @@ func makeClient(t *testing.T) (*rest.Config, kubernetes.Interface) {
 func TestInitializerRun(t *testing.T) {
 	restConfig, cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
+	ns, err := util.CreateNamespace(cl, "istio-initializer-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -83,13 +83,13 @@ func TestInitializerRun(t *testing.T) {
 func TestInitialize(t *testing.T) {
 	restConfig, cl := makeClient(t)
 	t.Parallel()
-	ns, err := util.CreateNamespace(cl)
+	ns, err := util.CreateNamespace(cl, "istio-initializer-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	defer util.DeleteNamespace(cl, ns)
 
-	mesh := proxy.DefaultMeshConfig()
+	mesh := model.DefaultMeshConfig()
 
 	cases := []struct {
 		name                   string
@@ -152,14 +152,13 @@ func TestInitialize(t *testing.T) {
 			Policy:     c.policy,
 			Namespaces: []string{c.managedNamespace},
 			Params: Params{
-				InitImage:         InitImageName(unitTestHub, unitTestTag, c.wantDebug),
-				ProxyImage:        ProxyImageName(unitTestHub, unitTestTag, c.wantDebug),
-				ImagePullPolicy:   "IfNotPresent",
-				Verbosity:         DefaultVerbosity,
-				SidecarProxyUID:   DefaultSidecarProxyUID,
-				Version:           "12345678",
-				Mesh:              &mesh,
-				MeshConfigMapName: "istio",
+				InitImage:       InitImageName(unitTestHub, unitTestTag, c.wantDebug),
+				ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, c.wantDebug),
+				ImagePullPolicy: "IfNotPresent",
+				Verbosity:       DefaultVerbosity,
+				SidecarProxyUID: DefaultSidecarProxyUID,
+				Version:         "12345678",
+				Mesh:            &mesh,
 			},
 			InitializerName: DefaultInitializerName,
 		}

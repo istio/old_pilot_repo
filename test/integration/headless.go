@@ -16,8 +16,6 @@ package main
 
 import (
 	"fmt"
-
-	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 type headless struct {
@@ -36,7 +34,7 @@ func (t *headless) teardown() {
 }
 
 func (t *headless) run() error {
-	if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS {
+	if t.Auth {
 		return nil // TODO: mTLS
 	}
 

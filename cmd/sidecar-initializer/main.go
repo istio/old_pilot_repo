@@ -22,7 +22,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 
+	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
+	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/tools/version"
@@ -31,7 +33,6 @@ import (
 func getRootCmd() *cobra.Command {
 	flags := struct {
 		kubeconfig   string
-		meshconfig   string
 		injectConfig string
 		namespace    string
 		port         int
@@ -54,9 +55,11 @@ func getRootCmd() *cobra.Command {
 			}
 
 			// retrieve mesh configuration separately
-			if config.Params.Mesh, err = cmd.ReadMeshConfig(flags.meshconfig); err != nil {
-				return multierror.Prefix(err, "failed to read mesh configuration.")
+			configClient, err := crd.NewClient(flags.kubeconfig, model.ConfigDescriptor{model.MeshConfig}, "")
+			if err != nil {
+				return multierror.Prefix(err, "failed to access mesh config")
 			}
+			config.Params.Mesh = model.MakeIstioStore(configClient, config.Params.MeshName, flags.namespace).Mesh()
 
 			initializer, err := inject.NewInitializer(restConfig, config, client)
 			if err != nil {
@@ -78,12 +81,10 @@ func getRootCmd() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringVar(&flags.kubeconfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
-	rootCmd.PersistentFlags().StringVar(&flags.meshconfig, "meshconfig", "/etc/istio/config/mesh",
-		"File name for Istio mesh configuration")
 	rootCmd.PersistentFlags().StringVar(&flags.injectConfig, "injectConfig", "istio-inject",
 		"Name of initializer configuration ConfigMap")
 	rootCmd.PersistentFlags().StringVar(&flags.namespace, "namespace", v1.NamespaceDefault, // TODO istio-system?
-		"Namespace of initializer configuration ConfigMap")
+		"Namespace of initializer configuration ConfigMap and mesh configuration")
 	rootCmd.PersistentFlags().IntVar(&flags.port, "port", 8083,
 		"HTTP-based initializer service port. Zero value disables HTTP endpoint")
 

@@ -117,13 +117,13 @@ func buildListeners(env proxy.Environment, node proxy.Node) Listeners {
 	switch node.Type {
 	case proxy.Sidecar:
 		instances := env.HostInstances(map[string]bool{node.IPAddress: true})
-		listeners, _ := buildSidecarListenersClusters(env.Mesh, instances,
+		listeners, _ := buildSidecarListenersClusters(instances,
 			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
 		return listeners
 	case proxy.Ingress:
-		return buildIngressListeners(env.Mesh, env.ServiceDiscovery, env.IstioConfigStore, node)
+		return buildIngressListeners(env.ServiceDiscovery, env.IstioConfigStore, node)
 	case proxy.Egress:
-		return buildEgressListeners(env.Mesh, node)
+		return buildEgressListeners(env.Mesh(), node)
 	}
 	return nil
 }
@@ -134,26 +134,26 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 	switch node.Type {
 	case proxy.Sidecar:
 		instances = env.HostInstances(map[string]bool{node.IPAddress: true})
-		_, clusters = buildSidecarListenersClusters(env.Mesh, instances,
+		_, clusters = buildSidecarListenersClusters(instances,
 			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
 	case proxy.Ingress:
 		// TODO: decide upon instances for ingress proxy
-		httpRouteConfigs, _ := buildIngressRoutes(env.Mesh, env.ServiceDiscovery, env.IstioConfigStore)
+		httpRouteConfigs, _ := buildIngressRoutes(env.ServiceDiscovery, env.IstioConfigStore)
 		clusters = httpRouteConfigs.clusters().normalize()
 	case proxy.Egress:
 		// TODO: decide upon instances for egress proxy
-		httpRouteConfigs := buildEgressRoutes(env.Mesh, env.ServiceDiscovery)
+		httpRouteConfigs := buildEgressRoutes(env.Mesh(), env.ServiceDiscovery)
 		clusters = httpRouteConfigs.clusters().normalize()
 	}
 
 	// apply custom policies for outbound clusters
 	for _, cluster := range clusters {
-		applyClusterPolicy(cluster, instances, env.IstioConfigStore, env.Mesh, env.ServiceAccounts)
+		applyClusterPolicy(cluster, instances, env.IstioConfigStore, env.ServiceAccounts)
 	}
 
 	// append Mixer service definition if necessary
-	if env.Mesh.MixerAddress != "" {
-		clusters = append(clusters, buildMixerCluster(env.Mesh))
+	if env.Mesh().MixerAddress != "" {
+		clusters = append(clusters, buildMixerCluster(env.Mesh()))
 	}
 
 	return clusters
@@ -164,12 +164,12 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 // There is a lot of potential to cache and reuse cluster definitions across proxies and also
 // skip computing the actual HTTP routes
 func buildSidecarListenersClusters(
-	mesh *proxyconfig.MeshConfig,
 	instances []*model.ServiceInstance,
 	services []*model.Service,
 	managementPorts model.PortList,
 	node proxy.Node,
 	config model.IstioConfigStore) (Listeners, Clusters) {
+	mesh := config.Mesh()
 
 	// ensure services are ordered to simplify generation logic
 	sort.Slice(services, func(i, j int) bool { return services[i].Hostname < services[j].Hostname })
@@ -221,7 +221,7 @@ func buildSidecarListenersClusters(
 	// enable HTTP PROXY port if necessary; this will add an RDS route for this port
 	if mesh.ProxyHttpPort > 0 {
 		// only HTTP outbound clusters are needed
-		httpOutbound := buildOutboundHTTPRoutes(mesh, node, instances, services, config)
+		httpOutbound := buildOutboundHTTPRoutes(node, instances, services, config)
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
@@ -236,19 +236,21 @@ func buildSidecarListenersClusters(
 // The route name is assumed to be the port number used by the route in the
 // listener, or the special value for _all routes_.
 // TODO: this can be optimized by querying for a specific HTTP port in the table
-func buildRDSRoute(mesh *proxyconfig.MeshConfig, node proxy.Node, routeName string,
-	discovery model.ServiceDiscovery, config model.IstioConfigStore) *HTTPRouteConfig {
+func buildRDSRoute(node proxy.Node,
+	routeName string,
+	discovery model.ServiceDiscovery,
+	config model.IstioConfigStore) *HTTPRouteConfig {
 	var configs HTTPRouteConfigs
 	switch node.Type {
 	case proxy.Ingress:
-		configs, _ = buildIngressRoutes(mesh, discovery, config)
+		configs, _ = buildIngressRoutes(discovery, config)
 	case proxy.Egress:
-		configs = buildEgressRoutes(mesh, discovery)
+		configs = buildEgressRoutes(config.Mesh(), discovery)
 	case proxy.Sidecar:
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
-		configs = buildOutboundHTTPRoutes(mesh, node, instances, services, config)
-		configs = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), configs)
+		configs = buildOutboundHTTPRoutes(node, instances, services, config)
+		configs = buildEgressFromSidecarHTTPRoutes(config.Mesh(), config.EgressRules(), configs)
 	default:
 		return nil
 	}
@@ -402,7 +404,7 @@ func buildOutboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node, in
 	listeners, clusters := buildOutboundTCPListeners(mesh, services)
 
 	// note that outbound HTTP routes are supplied through RDS
-	httpOutbound := buildOutboundHTTPRoutes(mesh, sidecar, instances, services, config)
+	httpOutbound := buildOutboundHTTPRoutes(sidecar, instances, services, config)
 	httpOutbound = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), httpOutbound)
 
 	for port, routeConfig := range httpOutbound {
@@ -473,9 +475,12 @@ func buildDestinationHTTPRoutes(service *model.Service,
 
 // buildOutboundHTTPRoutes creates HTTP route configs indexed by ports for the
 // traffic outbound from the proxy instance
-func buildOutboundHTTPRoutes(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
-	instances []*model.ServiceInstance, services []*model.Service, config model.IstioConfigStore) HTTPRouteConfigs {
+func buildOutboundHTTPRoutes(sidecar proxy.Node,
+	instances []*model.ServiceInstance,
+	services []*model.Service,
+	config model.IstioConfigStore) HTTPRouteConfigs {
 	httpConfigs := make(HTTPRouteConfigs)
+	mesh := config.Mesh()
 	suffix := strings.Split(sidecar.Domain, ".")
 
 	// outbound connections/requests are directed to service ports; we create a

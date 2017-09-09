@@ -18,12 +18,9 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/ptypes"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 )
 
@@ -37,9 +34,6 @@ type Environment struct {
 
 	// Config interface for listing routing rules
 	model.IstioConfigStore
-
-	// Mesh is the mesh config (to be merged into the config store)
-	Mesh *proxyconfig.MeshConfig
 }
 
 // Node defines the proxy attributes used by xDS identification
@@ -121,42 +115,6 @@ const (
 	// IngressKeyFilename is the ingress private key file name
 	IngressKeyFilename = "tls.key"
 )
-
-// DefaultProxyConfig for individual proxies
-func DefaultProxyConfig() proxyconfig.ProxyConfig {
-	return proxyconfig.ProxyConfig{
-		ConfigPath:             "/etc/istio/proxy",
-		BinaryPath:             "/usr/local/bin/envoy",
-		ServiceCluster:         "istio-proxy",
-		DrainDuration:          ptypes.DurationProto(2 * time.Second),
-		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
-		DiscoveryAddress:       "istio-pilot:8080",
-		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
-		ZipkinAddress:          "",
-		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
-		StatsdUdpAddress:       "",
-		ProxyAdminPort:         15000,
-	}
-}
-
-// DefaultMeshConfig configuration
-func DefaultMeshConfig() proxyconfig.MeshConfig {
-	config := DefaultProxyConfig()
-	return proxyconfig.MeshConfig{
-		EgressProxyAddress:    "istio-egress:80",
-		MixerAddress:          "",
-		DisablePolicyChecks:   false,
-		ProxyListenPort:       15001,
-		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
-		IngressClass:          "istio",
-		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
-		AuthPolicy:            proxyconfig.MeshConfig_NONE,
-		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
-		EnableTracing:         true,
-		AccessLogFile:         "/dev/stdout",
-		DefaultConfig:         &config,
-	}
-}
 
 // ParsePort extracts port number from a valid proxy address
 func ParsePort(addr string) int {

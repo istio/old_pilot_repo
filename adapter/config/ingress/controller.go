@@ -35,8 +35,9 @@ import (
 )
 
 type controller struct {
-	mesh         *proxyconfig.MeshConfig
 	domainSuffix string
+	mode         proxyconfig.MeshConfig_IngressControllerMode
+	ingressClass string
 
 	client   kubernetes.Interface
 	queue    kube.Queue
@@ -49,15 +50,15 @@ var (
 )
 
 // NewController creates a new Kubernetes controller
-func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
+func NewController(client kubernetes.Interface,
+	mode proxyconfig.MeshConfig_IngressControllerMode,
+	ingressClass string,
 	options kube.ControllerOptions) model.ConfigStoreCache {
 	handler := &kube.ChainHandler{}
 
 	// queue requires a time duration for a retry delay after a handler error
 	queue := kube.NewQueue(1 * time.Second)
 
-	glog.V(2).Infof("Ingress controller running in namespace %s, watching namespaces %s",
-		options.Namespace, options.WatchedNamespace)
 	// informer framework from Kubernetes
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -98,8 +99,9 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
 	})
 
 	return &controller{
-		mesh:         mesh,
 		domainSuffix: options.DomainSuffix,
+		mode:         mode,
+		ingressClass: ingressClass,
 		client:       client,
 		queue:        queue,
 		informer:     informer,
@@ -110,7 +112,7 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
 func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) {
 	c.handler.Append(func(obj interface{}, event model.Event) error {
 		ingress := obj.(*v1beta1.Ingress)
-		if !shouldProcessIngress(c.mesh, ingress) {
+		if !shouldProcessIngress(c.mode, c.ingressClass, ingress) {
 			return nil
 		}
 
@@ -163,7 +165,7 @@ func (c *controller) Get(typ, name, namespace string) (*model.Config, bool) {
 	}
 
 	ingress := obj.(*v1beta1.Ingress)
-	if !shouldProcessIngress(c.mesh, ingress) {
+	if !shouldProcessIngress(c.mode, c.ingressClass, ingress) {
 		return nil, false
 	}
 
@@ -188,7 +190,7 @@ func (c *controller) List(typ, namespace string) ([]model.Config, error) {
 			continue
 		}
 
-		if !shouldProcessIngress(c.mesh, ingress) {
+		if !shouldProcessIngress(c.mode, c.ingressClass, ingress) {
 			continue
 		}
 
