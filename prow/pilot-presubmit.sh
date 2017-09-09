@@ -31,4 +31,4 @@ mkdir -p ${GOPATH}/src/github.com/istio/pilot/_artifacts
 cd ${GOPATH}/src/github.com/istio/pilot/_artifacts
 ls -al
 touch a.log
-echo CI > ${GOPATH}/src/github.com/istio/pilot/_artifacts
+echo CI > ${GOPATH}/src/github.com/istio/pilot/_artifacts/a.log
