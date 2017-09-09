@@ -141,6 +141,7 @@ func DefaultProxyConfig() proxyconfig.ProxyConfig {
 
 // DefaultMeshConfig configuration
 func DefaultMeshConfig() proxyconfig.MeshConfig {
+	config := DefaultProxyConfig()
 	return proxyconfig.MeshConfig{
 		EgressProxyAddress:    "istio-egress:80",
 		MixerAddress:          "",
@@ -153,6 +154,7 @@ func DefaultMeshConfig() proxyconfig.MeshConfig {
 		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
 		EnableTracing:         true,
 		AccessLogFile:         "/dev/stdout",
+		DefaultConfig:         &config,
 	}
 }
 

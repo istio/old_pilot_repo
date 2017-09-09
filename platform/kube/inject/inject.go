@@ -30,6 +30,8 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/duration"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
 	"istio.io/pilot/tools/version"
 )
@@ -275,6 +276,14 @@ func injectRequired(namespacePolicy InjectionPolicy, obj metav1.Object) bool {
 	return !ok
 }
 
+func timeString(dur *duration.Duration) string {
+	out, err := ptypes.Duration(dur)
+	if err != nil {
+		glog.Warning(err)
+	}
+	return out.String()
+}
+
 func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 	// proxy initContainer 1.6 spec
 	initArgs := []string{
@@ -341,11 +350,18 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
 
-	if p.Mesh.DefaultConfig != nil {
-		if yaml, err := model.ToYAML(p.Mesh.DefaultConfig); err == nil {
-			args = append(args, "--configInline", yaml)
-		}
-	}
+	// set all proxy config flags
+	args = append(args, "--configPath", p.Mesh.DefaultConfig.ConfigPath)
+	args = append(args, "--binaryPath", p.Mesh.DefaultConfig.BinaryPath)
+	args = append(args, "--serviceCluster", p.Mesh.DefaultConfig.ServiceCluster)
+	args = append(args, "--drainDuration", timeString(p.Mesh.DefaultConfig.DrainDuration))
+	args = append(args, "--parentShutdownDuration", timeString(p.Mesh.DefaultConfig.ParentShutdownDuration))
+	args = append(args, "--discoveryAddress", p.Mesh.DefaultConfig.DiscoveryAddress)
+	args = append(args, "--discoveryRefreshDelay", timeString(p.Mesh.DefaultConfig.DiscoveryRefreshDelay))
+	args = append(args, "--zipkinAddress", p.Mesh.DefaultConfig.ZipkinAddress)
+	args = append(args, "--connectTimeout", timeString(p.Mesh.DefaultConfig.ConnectTimeout))
+	args = append(args, "--statsdUdpAddress", p.Mesh.DefaultConfig.StatsdUdpAddress)
+	args = append(args, "--proxyAdminPort", fmt.Sprintf("%d", p.Mesh.DefaultConfig.ProxyAdminPort))
 
 	volumeMounts := []v1.VolumeMount{
 		{

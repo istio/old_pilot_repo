@@ -1073,6 +1073,12 @@ func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
 	}
 
+	if mesh.DefaultConfig == nil {
+		errs = multierror.Append(errs, errors.New("missing default config"))
+	} else if err := ValidateProxyConfig(mesh.DefaultConfig); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
 	return
 }
 

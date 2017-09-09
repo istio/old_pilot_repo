@@ -5,9 +5,17 @@ metadata:
 data:
   mesh: |-
     defaultConfig:
-      discoveryAddress: istio-pilot.{{.IstioNamespace}}:8080
+      configPath:             "/etc/istio/proxy"
+      binaryPath:             "/usr/local/bin/envoy"
+      serviceCluster:         istio-proxy
+      drainDuration:          2s
+      parentShutdownDuration: 3s
+      discoveryAddress:       istio-pilot.{{.IstioNamespace}}:8080
+      discoveryRefreshDelay:  1s
+      connectTimeout:         1s
+      proxyAdminPort:         15000
 {{if .Zipkin}}
-      zipkinAddress: zipkin.{{.IstioNamespace}}:9411
+      zipkinAddress:          zipkin.{{.IstioNamespace}}:9411
 {{end}}
     egressProxyAddress: istio-egress.{{.Namespace}}:80
 {{if .Mixer}}

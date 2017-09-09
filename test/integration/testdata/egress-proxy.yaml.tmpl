@@ -40,11 +40,11 @@ spec:
         - egress
         - -v
         - "{{.Verbosity}}"
-        - --configInline
-        - |
-          discoveryAddress: istio-pilot.{{.IstioNamespace}}:8080
+        - --discoveryAddress
+        - istio-pilot.{{.IstioNamespace}}:8080
 {{if .Zipkin}}
-          zipkinAddress: zipkin.{{.IstioNamespace}}:9411
+        - --zipkinAddress
+        - zipkin.{{.IstioNamespace}}:9411
 {{end}}
         env:
         - name: POD_NAME

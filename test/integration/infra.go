@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,6 +141,7 @@ func (infra *infra) setup() error {
 		return err
 	}
 	debugMode := infra.debugImagesAndMode
+	glog.Infof("mesh %s", spew.Sdump(mesh))
 	infra.InjectConfig = &inject.Config{
 		Policy:     inject.InjectionPolicyEnabled,
 		Namespaces: []string{infra.Namespace, infra.IstioNamespace},

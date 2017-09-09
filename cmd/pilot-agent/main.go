@@ -16,15 +16,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
-	multierror "github.com/hashicorp/go-multierror"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/spf13/cobra"
 
+	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform"
@@ -36,8 +37,19 @@ import (
 var (
 	role            proxy.Node
 	serviceregistry platform.ServiceRegistry
-	config          string
-	configFile      string
+
+	// proxy config flags (named identically)
+	configPath             string
+	binaryPath             string
+	serviceCluster         string
+	drainDuration          time.Duration
+	parentShutdownDuration time.Duration
+	discoveryAddress       string
+	discoveryRefreshDelay  time.Duration
+	zipkinAddress          string
+	connectTimeout         time.Duration
+	statsdUdpAddress       string // nolint: golint
+	proxyAdminPort         int
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -86,23 +98,22 @@ var (
 
 			glog.V(2).Infof("Proxy role: %#v", role)
 
-			proxyConfig := proxy.DefaultProxyConfig()
-			if config != "" && configFile != "" {
-				return errors.New("cannot specify both configuration content and file at the same time")
-			} else if config != "" {
-				if err := model.ApplyYAML(config, &proxyConfig); err != nil {
-					return multierror.Prefix(err, "failed to parse config YAML: ")
-				}
-			} else if configFile != "" {
-				yaml, err := ioutil.ReadFile(configFile)
-				if err != nil {
-					return multierror.Prefix(err, "failed to read config YAML file")
-				}
-				if err := model.ApplyYAML(string(yaml), &proxyConfig); err != nil {
-					return multierror.Prefix(err, "failed to parse config YAML: ")
-				}
-			}
+			proxyConfig := proxyconfig.ProxyConfig{}
 
+			// set all flags
+			proxyConfig.ConfigPath = configPath
+			proxyConfig.BinaryPath = binaryPath
+			proxyConfig.ServiceCluster = serviceCluster
+			proxyConfig.DrainDuration = ptypes.DurationProto(drainDuration)
+			proxyConfig.ParentShutdownDuration = ptypes.DurationProto(parentShutdownDuration)
+			proxyConfig.DiscoveryAddress = discoveryAddress
+			proxyConfig.DiscoveryRefreshDelay = ptypes.DurationProto(discoveryRefreshDelay)
+			proxyConfig.ZipkinAddress = zipkinAddress
+			proxyConfig.ConnectTimeout = ptypes.DurationProto(connectTimeout)
+			proxyConfig.StatsdUdpAddress = statsdUdpAddress
+			proxyConfig.ProxyAdminPort = int32(proxyAdminPort)
+
+			// resolve statsd address
 			if proxyConfig.StatsdUdpAddress != "" {
 				if addr, err := proxy.ResolveAddr(proxyConfig.StatsdUdpAddress); err == nil {
 					proxyConfig.StatsdUdpAddress = addr
@@ -152,11 +163,15 @@ var (
 	}
 )
 
+func timeDuration(dur *duration.Duration) time.Duration {
+	out, err := ptypes.Duration(dur)
+	if err != nil {
+		glog.Warning(err)
+	}
+	return out
+}
+
 func init() {
-	proxyCmd.PersistentFlags().StringVar(&configFile, "configFile", "",
-		"File with configuration overrides for the proxy (YAML file)")
-	proxyCmd.PersistentFlags().StringVar(&config, "configInline", "",
-		"Configuration overrides for the proxy as an inline multi-line YAML/JSON content")
 	proxyCmd.PersistentFlags().StringVar((*string)(&serviceregistry), "serviceregistry",
 		string(platform.KubernetesRegistry),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s}",
@@ -167,6 +182,35 @@ func init() {
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.Domain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
+
+	// Flags for proxy configuration
+	values := proxy.DefaultProxyConfig()
+	proxyCmd.PersistentFlags().StringVar(&configPath, "configPath", values.ConfigPath,
+		"Path to the generated configuration file directory")
+	proxyCmd.PersistentFlags().StringVar(&binaryPath, "binaryPath", values.BinaryPath,
+		"Path to the proxy binary")
+	proxyCmd.PersistentFlags().StringVar(&serviceCluster, "serviceCluster", values.ServiceCluster,
+		"Service cluster")
+	proxyCmd.PersistentFlags().DurationVar(&drainDuration, "drainDuration",
+		timeDuration(values.DrainDuration),
+		"The time in seconds that Envoy will drain connections during a hot restart")
+	proxyCmd.PersistentFlags().DurationVar(&parentShutdownDuration, "parentShutdownDuration",
+		timeDuration(values.ParentShutdownDuration),
+		"The time in seconds that Envoy will wait before shutting down the parent process during a hot restart")
+	proxyCmd.PersistentFlags().StringVar(&discoveryAddress, "discoveryAddress", values.DiscoveryAddress,
+		"Address of the discovery service exposing xDS (e.g. istio-pilot:8080)")
+	proxyCmd.PersistentFlags().DurationVar(&discoveryRefreshDelay, "discoveryRefreshDelay",
+		timeDuration(values.DiscoveryRefreshDelay),
+		"Polling interval for service discovery (used by EDS, CDS, LDS, but not RDS)")
+	proxyCmd.PersistentFlags().StringVar(&zipkinAddress, "zipkinAddress", values.ZipkinAddress,
+		"Address of the Zipkin service (e.g. zipkin:9411)")
+	proxyCmd.PersistentFlags().DurationVar(&connectTimeout, "connectTimeout",
+		timeDuration(values.ConnectTimeout),
+		"Connection timeout used by Envoy for supporting services")
+	proxyCmd.PersistentFlags().StringVar(&statsdUdpAddress, "statsdUdpAddress", values.StatsdUdpAddress,
+		"IP Address and Port of a statsd UDP listener (e.g. 10.75.241.127:9125)")
+	proxyCmd.PersistentFlags().IntVar(&proxyAdminPort, "proxyAdminPort", int(values.ProxyAdminPort),
+		"Port on which Envoy should listen for administrative commands")
 
 	cmd.AddFlags(rootCmd)
 
