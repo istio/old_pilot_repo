@@ -26,37 +26,4 @@ set -u
 # Print commands
 set -x
 
-if [ "${CI:-}" == "bootstrap" ]; then
-    # Use the provided pull head sha, from prow.
-    GIT_SHA="${PULL_PULL_SHA}"
-    # Using fixed directory for bazel cache
-    ISTIO_TMP_DIR="${GOPATH}/src/istio.io/istio"
-    mkdir -p "${ISTIO_TMP_DIR}"
-else
-    # Use the current commit.
-    GIT_SHA="$(git rev-parse --verify HEAD)"
-    ISTIO_TMP_DIR="$(mktemp -d istio-XXXXX)"
-fi
 
-echo "=== Clone istio/istio ==="
-git clone --depth 1 https://github.com/istio/istio "${ISTIO_TMP_DIR}"
-cd "${ISTIO_TMP_DIR}"
-
-HUB="gcr.io/istio-testing"
-BUCKET="istio-artifacts"
-ISTIOCTL_URL="https://storage.googleapis.com/${BUCKET}/pilot/${GIT_SHA}/artifacts/istioctl"
-export ARTIFACTS_DIR="${GOPATH}/src/github.com/istio/pilot/_artifacts"
-
-echo "=== Smoke Test ==="
-# Note: These tests use the default ~/.kube/config file. The prow container mounts the test cluster
-# kubeconfig at this path. On the other hand, when running this script locally, the test framework
-# uses your current kube context!
-#
-# In the future, this should be parameterized similarly to the integration tests, with the kubeconfig
-# location specified explicitly.
-./prow/e2e-suite-rbac-no_auth.sh \
-    --pilot_hub="${HUB}" \
-    --pilot_tag="${GIT_SHA}" \
-    --istioctl_url="${ISTIOCTL_URL}"
-
-rm -rf "${ISTIO_TMP_DIR}"
