@@ -53,9 +53,11 @@ func (r *http) run() error {
 func (r *http) makeRequests() error {
 	srcPods := []string{"a", "b", "t"}
 	dstPods := []string{"a", "b"}
-	if r.Auth == proxyconfig.ProxyMeshConfig_NONE {
+	if r.Auth == proxyconfig.MeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		dstPods = append(dstPods, "t")
+		// mTLS is not supported for headless services
+		dstPods = append(dstPods, "headless")
 	}
 	funcs := make(map[string]func() status)
 	for _, src := range srcPods {
@@ -71,7 +73,7 @@ func (r *http) makeRequests() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := r.clientRequest(src, url, 1, "")
-							if r.Auth == proxyconfig.ProxyMeshConfig_MUTUAL_TLS && src == "t" {
+							if r.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && src == "t" {
 								if len(resp.id) == 0 {
 									// Expected no match for t->a
 									return nil
@@ -84,7 +86,13 @@ func (r *http) makeRequests() error {
 									r.logs.add(src, id, name)
 								}
 								if dst != "t" {
-									r.logs.add(dst, id, name)
+									if dst == "headless" { // headless points to b
+										if src != "b" {
+											r.logs.add("b", id, name)
+										}
+									} else {
+										r.logs.add(dst, id, name)
+									}
 								}
 								// mixer filter is invoked on the server side, that is when dst is not "t"
 								if r.Mixer && dst != "t" {

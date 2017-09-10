@@ -1,0 +1,23 @@
+[
+	{
+		"name": "ISTIO_PROXY_BUCKET",
+		"repoName": "proxy",
+		"prodBranch": "master",
+		"file": "WORKSPACE",
+		"lastStableSHA": "3bd1beb2b61887b4c8ff239d68e5f94f42f3002f"
+	},
+	{
+		"name": "/envoy",
+		"repoName": "proxy",
+		"prodBranch": "master",
+		"file": "docker/Dockerfile.proxy",
+		"lastStableSHA": "3bd1beb2b61887b4c8ff239d68e5f94f42f3002f"
+	},
+	{
+		"name": "/envoy-debug",
+		"repoName": "proxy",
+		"prodBranch": "master",
+		"file": "docker/Dockerfile.proxy_debug",
+		"lastStableSHA": "3bd1beb2b61887b4c8ff239d68e5f94f42f3002f"
+	}
+]

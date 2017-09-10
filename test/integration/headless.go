@@ -20,48 +20,39 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
-type tcp struct {
+type headless struct {
 	*infra
 }
 
-func (t *tcp) String() string {
-	return "tcp-reachability"
+func (t *headless) String() string {
+	return "tcp-headless-reachability"
 }
 
-func (t *tcp) setup() error {
+func (t *headless) setup() error {
 	return nil
 }
 
-func (t *tcp) teardown() {
+func (t *headless) teardown() {
 }
 
-func (t *tcp) run() error {
-	srcPods := []string{"a", "b", "t"}
-	dstPods := []string{"a", "b"}
-	if t.Auth == proxyconfig.MeshConfig_NONE {
-		// t is not behind proxy, so it cannot talk in Istio auth.
-		dstPods = append(dstPods, "t")
+func (t *headless) run() error {
+	if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS {
+		return nil // TODO: mTLS
 	}
+
+	srcPods := []string{"a", "b", "t"}
+	dstPods := []string{"headless"}
 	funcs := make(map[string]func() status)
 	for _, src := range srcPods {
 		for _, dst := range dstPods {
-			if src == "t" && dst == "t" {
-				// this is flaky in minikube
-				continue
-			}
-			for _, port := range []string{":90", ":9090"} {
+			for _, port := range []string{":10090", ":19090"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
 					name := fmt.Sprintf("TCP connection from %s to %s%s%s", src, dst, domain, port)
 					funcs[name] = (func(src, dst, port, domain string) func() status {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && src == "t" {
-								// t cannot talk to envoy (a or b) with mTLS enabled.
-								if len(resp.code) == 0 || resp.code[0] != httpOk {
-									return nil
-								}
-							} else if len(resp.code) > 0 && resp.code[0] == httpOk {
+							if len(resp.code) > 0 && resp.code[0] == httpOk {
 								return nil
 							}
 							return errAgain

@@ -25,10 +25,13 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/duration"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,28 +41,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
+	"istio.io/pilot/proxy"
 	"istio.io/pilot/tools/version"
 )
 
-// TODO - Temporally retain the deprecated alpha annotations to ease
-// migration to k8s sidecar initializer.
-var (
-	insertDeprecatedAlphaAnnotation = true
-	checkDeprecatedAlphaAnnotation  = true
-)
-
-const istioSidecarAnnotationStatusKey = "status.sidecar.istio.io"
-
-// per-sidecar policy (deployment, job, statefulset, pod, etc)
+// per-sidecar policy and status (deployment, job, statefulset, pod, etc)
 const (
-	istioSidecarAnnotationPolicyKey           = "policy.sidecar.istio.io"
-	istioSidecarAnnotationPolicyValueDefault  = "policy.sidecar.istio.io/default"
-	istioSidecarAnnotationPolicyValueForceOn  = "policy.sidecar.istio.io/force-on"
-	istioSidecarAnnotationPolicyValueForceOff = "policy.sidecar.istio.io/force-off"
+	istioSidecarAnnotationPolicyKey = "sidecar.istio.io/inject"
+	istioSidecarAnnotationStatusKey = "sidecar.istio.io/status"
 )
 
-// InjectionPolicy determines the policy for injecting the sidecar
-// proxy into the watched namespace(s).
+// InjectionPolicy determines the policy for injecting the
+// sidecar proxy into the watched namespace(s).
 type InjectionPolicy string
 
 const (
@@ -69,22 +62,22 @@ const (
 	// resources.
 	InjectionPolicyOff InjectionPolicy = "off"
 
-	// InjectionPolicyOptIn specifies that the initializer will not
+	// InjectionPolicyDisabled specifies that the initializer will not
 	// inject the sidecar into resources by default for the
-	// namespace(s) being watched. Resources can opt-in using the
-	// "policy.sidecar.istio.io" annotation with value of
-	// policy.sidecar.istio.io/force-on.
-	InjectionPolicyOptIn InjectionPolicy = "opt-in"
+	// namespace(s) being watched. Resources can enable injection
+	// using the "sidecar.istio.io/inject" annotation with value of
+	// true.
+	InjectionPolicyDisabled InjectionPolicy = "disabled"
 
-	// InjectionPolicyOptOut specifies that the initializer will
+	// InjectionPolicyEnabled specifies that the initializer will
 	// inject the sidecar into resources by default for the
-	// namespace(s) being watched. Resources can opt-out using the
-	// "policy.sidecar.istio.io" annotation with value of
-	// policy.sidecar.istio.io/force-off.
-	InjectionPolicyOptOut InjectionPolicy = "opt-out"
+	// namespace(s) being watched. Resources can disable injection
+	// using the "sidecar.istio.io/inject" annotation with value of
+	// false.
+	InjectionPolicyEnabled InjectionPolicy = "enabled"
 
 	// DefaultInjectionPolicy is the default injection policy.
-	DefaultInjectionPolicy = InjectionPolicyOptOut
+	DefaultInjectionPolicy = InjectionPolicyEnabled
 )
 
 // Defaults values for injecting istio proxy into kubernetes
@@ -98,10 +91,6 @@ const (
 )
 
 const (
-	// deprecated - remove after istio/istio is updated to use new templates
-	deprecatedIstioSidecarAnnotationSidecarKey   = "alpha.istio.io/sidecar"
-	deprecatedIstioSidecarAnnotationSidecarValue = "injected(deprecated)"
-
 	// InitContainerName is the name for init container
 	InitContainerName = "istio-init"
 
@@ -129,6 +118,9 @@ const (
 	// DefaultResyncPeriod specifies how frequently to retrieve the
 	// full list of watched resources for initialization.
 	DefaultResyncPeriod = 30 * time.Second
+
+	// DefaultInitializerName specifies the name of the initializer.
+	DefaultInitializerName = "sidecar.initializer.istio.io"
 )
 
 // InitImageName returns the fully qualified image name for the istio
@@ -149,16 +141,16 @@ func ProxyImageName(hub string, tag string, debug bool) string {
 // Params describes configurable parameters for injecting istio proxy
 // into kubernetes resource.
 type Params struct {
-	InitImage         string                       `json:"initImage"`
-	ProxyImage        string                       `json:"proxyImage"`
-	Verbosity         int                          `json:"verbosity"`
-	SidecarProxyUID   int64                        `json:"sidecarProxyUID"`
-	Version           string                       `json:"version"`
-	EnableCoreDump    bool                         `json:"enableCoreDump"`
-	DebugMode         bool                         `json:"debugMode"`
-	Mesh              *proxyconfig.ProxyMeshConfig `json:"-"`
-	MeshConfigMapName string                       `json:"meshConfigMapName"`
-	ImagePullPolicy   string                       `json:"imagePullPolicy"`
+	InitImage         string                  `json:"initImage"`
+	ProxyImage        string                  `json:"proxyImage"`
+	Verbosity         int                     `json:"verbosity"`
+	SidecarProxyUID   int64                   `json:"sidecarProxyUID"`
+	Version           string                  `json:"version"`
+	EnableCoreDump    bool                    `json:"enableCoreDump"`
+	DebugMode         bool                    `json:"debugMode"`
+	Mesh              *proxyconfig.MeshConfig `json:"-"`
+	MeshConfigMapName string                  `json:"meshConfigMapName"`
+	ImagePullPolicy   string                  `json:"imagePullPolicy"`
 	// Comma separated list of IP ranges in CIDR form. If set, only
 	// redirect outbound traffic to Envoy for these IP
 	// ranges. Otherwise all outbound traffic is redirected to Envoy.
@@ -177,14 +169,17 @@ type Config struct {
 
 	// Params specifies the parameters of the injected sidcar template
 	Params Params `json:"params"`
+
+	// InitializerName specifies the name of the initializer.
+	InitializerName string `json:"initializerName"`
 }
 
 // GetInitializerConfig fetches the initializer configuration from a Kubernetes ConfigMap.
-func GetInitializerConfig(kube kubernetes.Interface, namespace, name string) (*Config, error) {
+func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName string) (*Config, error) {
 	var configMap *v1.ConfigMap
 	var err error
 	if errPoll := wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
-		if configMap, err = kube.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if configMap, err = kube.CoreV1().ConfigMaps(namespace).Get(injectConfigName, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -203,7 +198,7 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, name string) (*C
 
 	// apply safe defaults if not specified
 	switch c.Policy {
-	case InjectionPolicyOff, InjectionPolicyOptIn, InjectionPolicyOptOut:
+	case InjectionPolicyOff, InjectionPolicyDisabled, InjectionPolicyEnabled:
 	default:
 		c.Policy = DefaultInjectionPolicy
 	}
@@ -222,46 +217,55 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, name string) (*C
 	if c.Params.ImagePullPolicy == "" {
 		c.Params.ImagePullPolicy = DefaultImagePullPolicy
 	}
+	if c.InitializerName == "" {
+		c.InitializerName = DefaultInitializerName
+	}
 
 	return &c, nil
 }
 
 func injectRequired(namespacePolicy InjectionPolicy, obj metav1.Object) bool {
-	var resourcePolicy string
+	var useDefault bool
+	var inject bool
 
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
-		resourcePolicy = istioSidecarAnnotationPolicyValueDefault
+		useDefault = true
 	} else {
-		var ok bool
-		if resourcePolicy, ok = annotations[istioSidecarAnnotationPolicyKey]; !ok {
-			resourcePolicy = istioSidecarAnnotationPolicyValueDefault
+		if value, ok := annotations[istioSidecarAnnotationPolicyKey]; !ok {
+			useDefault = true
+		} else {
+			// http://yaml.org/type/bool.html
+			switch strings.ToLower(value) {
+			case "y", "yes", "true", "on":
+				inject = true
+			}
 		}
 	}
 
 	var required bool
+
 	switch namespacePolicy {
-	case InjectionPolicyOptIn:
-		if resourcePolicy == istioSidecarAnnotationPolicyValueForceOn {
-			required = true
+	default: // InjectionPolicyOff
+		required = false
+	case InjectionPolicyDisabled:
+		if useDefault {
+			required = false
+		} else {
+			required = inject
 		}
-	case InjectionPolicyOptOut:
-		if resourcePolicy != istioSidecarAnnotationPolicyValueForceOff {
+	case InjectionPolicyEnabled:
+		if useDefault {
 			required = true
+		} else {
+			required = inject
 		}
 	}
 
 	status, ok := annotations[istioSidecarAnnotationStatusKey]
 
-	// avoid injecting sidecar to resources previously modified with kube-inject
-	if annotations != nil && checkDeprecatedAlphaAnnotation {
-		if _, ok = annotations[deprecatedIstioSidecarAnnotationSidecarKey]; ok {
-			required = false
-		}
-	}
-
-	glog.V(2).Infof("Sidecar injection policy for %v/%v: namespace:%v resource:%v status:%q required:%v",
-		obj.GetNamespace(), obj.GetName(), namespacePolicy, resourcePolicy, status, required)
+	glog.V(2).Infof("Sidecar injection policy for %v/%v: namespace:%v useDefault:%v inject:%v status:%q required:%v",
+		obj.GetNamespace(), obj.GetName(), namespacePolicy, useDefault, inject, status, required)
 
 	if !required {
 		return false
@@ -270,6 +274,14 @@ func injectRequired(namespacePolicy InjectionPolicy, obj metav1.Object) bool {
 	// TODO - add version check for sidecar upgrade
 
 	return !ok
+}
+
+func timeString(dur *duration.Duration) string {
+	out, err := ptypes.Duration(dur)
+	if err != nil {
+		glog.Warning(err)
+	}
+	return out.String()
 }
 
 func injectIntoSpec(p *Params, spec *v1.PodSpec) {
@@ -338,6 +350,19 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 		args = append(args, "-v", strconv.Itoa(p.Verbosity))
 	}
 
+	// set all proxy config flags
+	args = append(args, "--configPath", p.Mesh.DefaultConfig.ConfigPath)
+	args = append(args, "--binaryPath", p.Mesh.DefaultConfig.BinaryPath)
+	args = append(args, "--serviceCluster", p.Mesh.DefaultConfig.ServiceCluster)
+	args = append(args, "--drainDuration", timeString(p.Mesh.DefaultConfig.DrainDuration))
+	args = append(args, "--parentShutdownDuration", timeString(p.Mesh.DefaultConfig.ParentShutdownDuration))
+	args = append(args, "--discoveryAddress", p.Mesh.DefaultConfig.DiscoveryAddress)
+	args = append(args, "--discoveryRefreshDelay", timeString(p.Mesh.DefaultConfig.DiscoveryRefreshDelay))
+	args = append(args, "--zipkinAddress", p.Mesh.DefaultConfig.ZipkinAddress)
+	args = append(args, "--connectTimeout", timeString(p.Mesh.DefaultConfig.ConnectTimeout))
+	args = append(args, "--statsdUdpAddress", p.Mesh.DefaultConfig.StatsdUdpAddress)
+	args = append(args, "--proxyAdminPort", fmt.Sprintf("%d", p.Mesh.DefaultConfig.ProxyAdminPort))
+
 	volumeMounts := []v1.VolumeMount{
 		{
 			Name:      istioConfigVolumeName,
@@ -373,7 +398,7 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec) {
 	volumeMounts = append(volumeMounts, v1.VolumeMount{
 		Name:      istioCertVolumeName,
 		ReadOnly:  true,
-		MountPath: p.Mesh.AuthCertsPath,
+		MountPath: proxy.AuthCertsPath,
 	})
 
 	sa := spec.ServiceAccountName
@@ -468,11 +493,6 @@ func intoObject(c *Config, in interface{}) (interface{}, error) {
 			m.Annotations = make(map[string]string)
 		}
 		m.Annotations[istioSidecarAnnotationStatusKey] = "injected-version-" + c.Params.Version
-
-		if insertDeprecatedAlphaAnnotation {
-			m.Annotations[deprecatedIstioSidecarAnnotationSidecarKey] =
-				deprecatedIstioSidecarAnnotationSidecarValue
-		}
 	}
 
 	injectIntoSpec(&c.Params, templatePodSpec)

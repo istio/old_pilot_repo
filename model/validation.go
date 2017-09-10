@@ -235,10 +235,24 @@ func ValidateFQDN(fqdn string) error {
 
 // ValidateIstioService checks for validity of a service reference
 func ValidateIstioService(svc *proxyconfig.IstioService) (errs error) {
-	if svc.Name == "" {
-		errs = multierror.Append(errs, errors.New("name is mandatory for a service reference"))
-	} else if !IsDNS1123Label(svc.Name) {
-		errs = multierror.Append(errs, fmt.Errorf("name %q must be a valid label", svc.Name))
+	if svc.Name == "" && svc.Service == "" {
+		errs = multierror.Append(errs, errors.New("name or service is mandatory for a service reference"))
+	} else if svc.Service != "" && svc.Name != "" {
+		errs = multierror.Append(errs, errors.New("specify either name or service, not both"))
+	} else if svc.Service != "" {
+		if err := ValidateEgressRuleDomain(svc.Service); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if svc.Namespace != "" {
+			errs = multierror.Append(errs, errors.New("namespace is not valid when service is provided"))
+		}
+		if svc.Domain != "" {
+			errs = multierror.Append(errs, errors.New("domain is not valid when service is provided"))
+		}
+	} else if svc.Name != "" {
+		if !IsDNS1123Label(svc.Name) {
+			errs = multierror.Append(errs, fmt.Errorf("name %q must be a valid label", svc.Name))
+		}
 	}
 
 	if svc.Namespace != "" && !IsDNS1123Label(svc.Namespace) {
@@ -250,8 +264,6 @@ func ValidateIstioService(svc *proxyconfig.IstioService) (errs error) {
 			errs = multierror.Append(errs, err)
 		}
 	}
-
-	// TODO: handle service reference
 
 	if err := Labels(svc.Labels).Validate(); err != nil {
 		errs = multierror.Append(errs, err)
@@ -1041,21 +1053,12 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 	return err
 }
 
-// ValidateProxyMeshConfig checks that the mesh config is well-formed
-func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
+// ValidateMeshConfig checks that the mesh config is well-formed
+func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid egress proxy address:"))
 		}
-	}
-
-	// discovery address is mandatory since mutual TLS relies on CDS.
-	// strictly speaking, proxies can operate without RDS/CDS and with hot restarts
-	// but that requires additional test validation
-	if mesh.DiscoveryAddress == "" {
-		errs = multierror.Append(errs, errors.New("discovery address must be set to the proxy discovery service"))
-	} else if err := ValidateProxyAddress(mesh.DiscoveryAddress); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid discovery address:"))
 	}
 
 	if mesh.MixerAddress != "" {
@@ -1064,44 +1067,82 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 		}
 	}
 
-	if mesh.StatsdUdpAddress != "" {
-		if err := ValidateProxyAddress(mesh.StatsdUdpAddress); err != nil {
-			errs = multierror.Append(errs, multierror.Prefix(err, "invalid statsd udp address:"))
-		}
-	}
-
 	if err := ValidatePort(int(mesh.ProxyListenPort)); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy listen port:"))
-	}
-
-	if err := ValidatePort(int(mesh.ProxyAdminPort)); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
-	}
-
-	if mesh.IstioServiceCluster == "" {
-		errs = multierror.Append(errs, errors.New("Istio service cluster must be set"))
-	}
-
-	if err := ValidateParentAndDrain(mesh.DrainDuration, mesh.ParentShutdownDuration); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
-	}
-
-	if err := ValidateRefreshDelay(mesh.DiscoveryRefreshDelay); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
 	}
 
 	if err := ValidateConnectTimeout(mesh.ConnectTimeout); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid connect timeout:"))
 	}
 
-	if mesh.AuthCertsPath == "" {
-		errs = multierror.Append(errs, errors.New("invalid auth certificates path"))
-	}
-
 	switch mesh.AuthPolicy {
-	case proxyconfig.ProxyMeshConfig_NONE, proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+	case proxyconfig.MeshConfig_NONE, proxyconfig.MeshConfig_MUTUAL_TLS:
 	default:
 		errs = multierror.Append(errs, fmt.Errorf("unrecognized auth policy %q", mesh.AuthPolicy))
+	}
+
+	if err := ValidateRefreshDelay(mesh.RdsRefreshDelay); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
+	}
+
+	if mesh.DefaultConfig == nil {
+		errs = multierror.Append(errs, errors.New("missing default config"))
+	} else if err := ValidateProxyConfig(mesh.DefaultConfig); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return
+}
+
+// ValidateProxyConfig checks that the mesh config is well-formed
+func ValidateProxyConfig(config *proxyconfig.ProxyConfig) (errs error) {
+	if config.ConfigPath == "" {
+		errs = multierror.Append(errs, errors.New("config path must be set"))
+	}
+
+	if config.BinaryPath == "" {
+		errs = multierror.Append(errs, errors.New("binary path must be set"))
+	}
+
+	if config.ServiceCluster == "" {
+		errs = multierror.Append(errs, errors.New("service cluster must be set"))
+	}
+
+	if err := ValidateParentAndDrain(config.DrainDuration, config.ParentShutdownDuration); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
+	}
+
+	if err := ValidateRefreshDelay(config.DiscoveryRefreshDelay); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
+	}
+
+	// discovery address is mandatory since mutual TLS relies on CDS.
+	// strictly speaking, proxies can operate without RDS/CDS and with hot restarts
+	// but that requires additional test validation
+	if config.DiscoveryAddress == "" {
+		errs = multierror.Append(errs, errors.New("discovery address must be set to the proxy discovery service"))
+	} else if err := ValidateProxyAddress(config.DiscoveryAddress); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid discovery address:"))
+	}
+
+	if config.ZipkinAddress != "" {
+		if err := ValidateProxyAddress(config.ZipkinAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid zipkin address:"))
+		}
+	}
+
+	if err := ValidateConnectTimeout(config.ConnectTimeout); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid connect timeout:"))
+	}
+
+	if config.StatsdUdpAddress != "" {
+		if err := ValidateProxyAddress(config.StatsdUdpAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid statsd udp address:"))
+		}
+	}
+
+	if err := ValidatePort(int(config.ProxyAdminPort)); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
 	}
 
 	return

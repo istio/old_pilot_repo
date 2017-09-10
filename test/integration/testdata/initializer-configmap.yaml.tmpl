@@ -9,12 +9,14 @@ data:
 {{ range $namespace := .Namespaces}}
     - "{{$namespace}}"
 {{ end }}
+    initializerName: "sidecar.initializer.istio.io"
     params:
       initImage: "{{.Params.InitImage}}"
       proxyImage: "{{.Params.ProxyImage}}"
       verbosity: {{.Params.Verbosity}}
       SidecarProxyUID: {{.Params.SidecarProxyUID}}
       Version: "{{.Params.Version}}"
+      DebugMode: {{.Params.DebugMode}}
       EnableCoreDump: {{.Params.EnableCoreDump}}
       MeshConfigMapName: "{{.Params.MeshConfigMapName}}"
       ImagePullPolicy: "{{.Params.ImagePullPolicy}}"

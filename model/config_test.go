@@ -118,7 +118,7 @@ func TestProtoSchemaConversions(t *testing.T) {
 		t.Errorf("FromYAML should have failed using ProtoSchema with bad MessageName")
 	}
 
-	gotYAML, err := routeRuleSchema.ToYAML(msg)
+	gotYAML, err := model.ToYAML(msg)
 	if err != nil {
 		t.Errorf("ToYAML failed: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestProtoSchemaConversions(t *testing.T) {
 		t.Errorf("FromYAML failed: got %+v want %+v", spew.Sdump(gotFromYAML), spew.Sdump(msg))
 	}
 
-	gotJSONMap, err := routeRuleSchema.ToJSONMap(msg)
+	gotJSONMap, err := model.ToJSONMap(msg)
 	if err != nil {
 		t.Errorf("ToJSONMap failed: %v", err)
 	}
@@ -293,7 +293,8 @@ func TestResolveHostname(t *testing.T) {
 		},
 		{
 			meta: model.ConfigMeta{Namespace: "foo", Domain: "foo"},
-			svc:  &proxyconfig.IstioService{Name: "hello", Namespace: "default", Domain: "svc.cluster.local"},
+			svc: &proxyconfig.IstioService{Name: "hello",
+				Namespace: "default", Domain: "svc.cluster.local"},
 			want: "hello.default.svc.cluster.local",
 		},
 		{
@@ -305,6 +306,28 @@ func TestResolveHostname(t *testing.T) {
 			meta: model.ConfigMeta{Namespace: "default"},
 			svc:  &proxyconfig.IstioService{Name: "hello"},
 			want: "hello.default",
+		},
+		{
+			meta: model.ConfigMeta{Namespace: "default", Domain: "cluster.local"},
+			svc:  &proxyconfig.IstioService{Service: "reviews.service.consul"},
+			want: "reviews.service.consul",
+		},
+		{
+			meta: model.ConfigMeta{Namespace: "foo", Domain: "foo"},
+			svc: &proxyconfig.IstioService{Name: "hello", Service: "reviews.service.consul",
+				Namespace: "default", Domain: "svc.cluster.local"},
+			want: "reviews.service.consul",
+		},
+		{
+			meta: model.ConfigMeta{Namespace: "default", Domain: "cluster.local"},
+			svc:  &proxyconfig.IstioService{Service: "*cnn.com"},
+			want: "*cnn.com",
+		},
+		{
+			meta: model.ConfigMeta{Namespace: "foo", Domain: "foo"},
+			svc: &proxyconfig.IstioService{Name: "hello", Service: "*cnn.com",
+				Namespace: "default", Domain: "svc.cluster.local"},
+			want: "*cnn.com",
 		},
 	}
 
