@@ -126,8 +126,8 @@ func (proxy envoy) args(fname string, epoch int) []string {
 		"--service-node", proxy.node,
 	}...)
 
-	if len(proxy.config.ServiceZone) > 0 {
-		startupArgs = append(startupArgs, []string {"--service-zone", proxy.config.ServiceZone}...)
+	if len(proxy.config.AvailabilityZone) > 0 {
+		startupArgs = append(startupArgs, []string{"--service-zone", proxy.config.AvailabilityZone}...)
 	}
 
 	return startupArgs

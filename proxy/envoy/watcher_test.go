@@ -24,7 +24,7 @@ import (
 func TestEnvoyArgs(t *testing.T) {
 	config := proxy.DefaultProxyConfig()
 	config.ServiceCluster = "my-cluster"
-	config.ServiceZone = "my-zone"
+	config.AvailabilityZone = "my-zone"
 
 	test := envoy{config: config, node: "my-node"}
 	got := test.args("test.json", 5)
