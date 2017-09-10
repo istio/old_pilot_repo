@@ -482,7 +482,7 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 }
 
 // RejectConflictingEgressRules rejects rules that have the destination which is equal to
-// the destination of some other rule.
+// the destionation of some other rule.
 // According to Envoy's virtual host specification, no virtual hosts can share the same domain.
 // The following code rejects conflicting rules deterministically, by a lexicographical order -
 // a rule with a smaller key lexicographically wins.

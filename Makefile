@@ -14,6 +14,12 @@
 
 SHELL := /bin/bash
 
+detected_OS := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+BUILD_FLAGS = ""
+ifeq ($(detected_OS),Darwin)  # Mac OS X
+    BUILD_FLAGS = --cpu=k8
+endif
+
 .PHONY: setup
 setup: platform/kube/config
 	@bin/install-prereqs.sh
@@ -25,7 +31,7 @@ fmt:
 
 .PHONY: build
 build:	
-	@bazel build //...
+	@bazel build ${BUILD_FLAGS} //...
 
 .PHONY: clean
 clean:
@@ -33,7 +39,7 @@ clean:
 
 .PHONY: test
 test: build
-	@bazel test //...
+	@bazel test ${BUILD_FLAGS} //...
 
 .PHONY: coverage
 coverage:
@@ -49,7 +55,7 @@ gazelle:
 
 .PHONY: racetest
 racetest:
-	@bazel test --features=race //...
+	@bazel test ${BUILD_FLAGS} --features=race //...
 
 platform/kube/config:
 	@ln -s ~/.kube/config platform/kube/
