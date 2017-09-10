@@ -739,7 +739,7 @@ func buildMgmtPortListeners(mesh *proxyconfig.MeshConfig, managementPorts model.
 
 // buildEgressHTTPRoutes builds virtual hosts for services found in egress rules.
 // In addition, routing rules that match with egress services are also applied.
-func buildEgressHTTPRoutes(mesh *proxyconfig.ProxyMeshConfig, instances []*model.ServiceInstance,
+func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.ServiceInstance,
 	config model.IstioConfigStore, httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
 
 	// Convert all egress rules into services and add route rules if any
