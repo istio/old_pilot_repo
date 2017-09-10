@@ -42,6 +42,7 @@ var (
 	configPath             string
 	binaryPath             string
 	serviceCluster         string
+	serviceZone            string
 	drainDuration          time.Duration
 	parentShutdownDuration time.Duration
 	discoveryAddress       string
@@ -104,6 +105,7 @@ var (
 			proxyConfig.ConfigPath = configPath
 			proxyConfig.BinaryPath = binaryPath
 			proxyConfig.ServiceCluster = serviceCluster
+			proxyConfig.ServiceZone = serviceZone
 			proxyConfig.DrainDuration = ptypes.DurationProto(drainDuration)
 			proxyConfig.ParentShutdownDuration = ptypes.DurationProto(parentShutdownDuration)
 			proxyConfig.DiscoveryAddress = discoveryAddress
@@ -191,6 +193,8 @@ func init() {
 		"Path to the proxy binary")
 	proxyCmd.PersistentFlags().StringVar(&serviceCluster, "serviceCluster", values.ServiceCluster,
 		"Service cluster")
+	proxyCmd.PersistentFlags().StringVar(&serviceZone, "serviceZone", values.ServiceZone,
+		"Service zone")
 	proxyCmd.PersistentFlags().DurationVar(&drainDuration, "drainDuration",
 		timeDuration(values.DrainDuration),
 		"The time in seconds that Envoy will drain connections during a hot restart")
