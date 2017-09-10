@@ -8,16 +8,8 @@ if [ $PDIR != "${GOPATH-$HOME/go}/src/istio.io/pilot" ]; then
        exit 1
 fi
 
-detected_OS=`uname -s 2>/dev/null || echo not`
-BUILD_FLAGS="--output_groups=static"
-SUFFIX=".static"
-if [ "${detected_OS}" == "Darwin" ]; then # Mac OS X
-    BUILD_FLAGS="--cpu=k8"
-    SUFFIX=""
-fi
-
 # Building and testing with Bazel
-bazel build ${BUILD_FLAGS} //...
+bazel build //...
 
 # Clean up vendor dir
 rm -rf $(pwd)/vendor
