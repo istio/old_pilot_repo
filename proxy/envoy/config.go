@@ -451,9 +451,9 @@ func buildDestinationHTTPRoutes(service *model.Service,
 		}
 
 		return routes
-
 	case model.ProtocolHTTPS:
 		// as an exception, external name HTTPS port is sent in plain-text HTTP/1.1
+		// TODO: Possible bug? Route rules are not being applied
 		if service.External() {
 			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 			return []*HTTPRoute{buildDefaultRoute(cluster)}
@@ -761,7 +761,19 @@ func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.Serv
 			servicePort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
 			destination := rule.Destination.Service
 			svc := &model.Service{Hostname: destination}
+			// We build normal HTTP route rules for all ports, HTTPS inclusive because
+			// egress services with HTTPS ports are expected to talk to proxy via HTTP
+			// and the proxy is expected to perform TLS origination.
+			// If the application wants to use HTTPS only, it should set the --includeIPRanges flag
+			// to avoid capturing HTTPS service traffic.
+			// buildDestinationHTTPRoutes applies route rules only for HTTP traffic. So, temporarily
+			// set the protocol to be HTTP and then revert after building the routes.
+			if protocol == model.ProtocolHTTPS {
+				// How do we know if its HTTP2? Shouldn't matter because Envoy auto upgrades inbound
+				servicePort.Protocol = model.ProtocolHTTP
+			}
 			routes := buildDestinationHTTPRoutes(svc, servicePort, instances, config)
+			servicePort.Protocol = protocol
 
 			if len(routes) > 0 {
 				for _, route := range routes {
@@ -789,7 +801,6 @@ func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.Serv
 					}
 					route.Cluster = cluster.Name
 					route.clusters = []*Cluster{cluster}
-
 				}
 
 				host := &VirtualHost{
