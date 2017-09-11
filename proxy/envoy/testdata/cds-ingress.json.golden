@@ -3,20 +3,20 @@
    {
     "name": "out.81c187d71467b1608736c57bb0734f9ef9b68f7d",
     "service_name": "hello.default.svc.cluster.local|http-status",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "sds",
     "lb_type": "round_robin"
    },
    {
     "name": "out.a2263b90cd24e500e9ed95f79ae47eabdc77dc74",
     "service_name": "world.default.svc.cluster.local|http",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "sds",
     "lb_type": "round_robin"
    },
    {
     "name": "mixer_server",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [

@@ -55,17 +55,17 @@ spec:
         - --serviceCluster
         - istio-proxy
         - --drainDuration
-        - 2s
+        - 1m0s
         - --parentShutdownDuration
-        - 3s
+        - 1m0s
         - --discoveryAddress
         - istio-pilot:8080
         - --discoveryRefreshDelay
-        - 1s
+        - 30s
         - --zipkinAddress
         - ""
         - --connectTimeout
-        - 1s
+        - 10s
         - --statsdUdpAddress
         - ""
         - --proxyAdminPort
