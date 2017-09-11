@@ -758,7 +758,8 @@ func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.Serv
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
 			intPort := int(port.Port)
-			servicePort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
+			servicePort := &model.Port{Name: fmt.Sprintf("external-%v-%d", protocol, intPort),
+				Port: intPort, Protocol: protocol}
 			destination := rule.Destination.Service
 			svc := &model.Service{Hostname: destination}
 			// We build normal HTTP route rules for all ports, HTTPS inclusive because

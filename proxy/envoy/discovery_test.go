@@ -86,8 +86,8 @@ func makeDiscoveryRequest(ds *DiscoveryService, method, url string, t *testing.T
 func commonSetup(t *testing.T) (*proxyconfig.MeshConfig, model.ConfigStore, *DiscoveryService) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)
-	ds := makeDiscoveryService(t, registry, &mesh)
 	addConfig(registry, egressRule, t)
+	ds := makeDiscoveryService(t, registry, &mesh)
 	return &mesh, registry, ds
 }
 
