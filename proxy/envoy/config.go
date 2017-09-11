@@ -666,7 +666,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				filter := &NetworkFilter{
 					Type:   both,
 					Name:   MixerFilter,
-					Config: mixerTCPConfig(sidecar, mesh.DisablePolicyChecks),
+					Config: mixerTCPConfig(sidecar, !mesh.DisablePolicyChecks),
 				}
 				listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 			}
