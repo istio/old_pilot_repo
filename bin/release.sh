@@ -50,3 +50,5 @@ gcloud kms decrypt \
 ./bin/upload-istioctl -r -p gs://istio-release/releases/"${TAG_NAME}"/istioctl
 
 ./bin/push-docker -hub gcr.io/istio-io,docker.io/istio -tag "${TAG_NAME}"
+
+./bin/push-debian.sh -c opt -v "${TAG_NAME}"
