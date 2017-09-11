@@ -31,8 +31,8 @@ func TestEnvoyArgs(t *testing.T) {
 	want := []string{
 		"-c", "test.json",
 		"--restart-epoch", "5",
-		"--drain-time-s", "2",
-		"--parent-shutdown-time-s", "3",
+		"--drain-time-s", "60",
+		"--parent-shutdown-time-s", "60",
 		"--service-cluster", "my-cluster",
 		"--service-node", "my-node",
 		"--service-zone", "my-zone",
