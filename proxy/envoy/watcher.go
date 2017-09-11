@@ -117,14 +117,13 @@ func NewProxy(config proxyconfig.ProxyConfig, node string) proxy.Proxy {
 }
 
 func (proxy envoy) args(fname string, epoch int) []string {
-	startupArgs := make([]string, 0)
-	startupArgs = append(startupArgs, []string{"-c", fname,
+	startupArgs := []string{"-c", fname,
 		"--restart-epoch", fmt.Sprint(epoch),
 		"--drain-time-s", fmt.Sprint(int(convertDuration(proxy.config.DrainDuration) / time.Second)),
 		"--parent-shutdown-time-s", fmt.Sprint(int(convertDuration(proxy.config.ParentShutdownDuration) / time.Second)),
 		"--service-cluster", proxy.config.ServiceCluster,
 		"--service-node", proxy.node,
-	}...)
+	}
 
 	if len(proxy.config.AvailabilityZone) > 0 {
 		startupArgs = append(startupArgs, []string{"--service-zone", proxy.config.AvailabilityZone}...)
