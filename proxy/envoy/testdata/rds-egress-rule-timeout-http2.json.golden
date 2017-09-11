@@ -1,0 +1,23 @@
+{
+  "virtual_hosts": [
+   {
+    "name": "*.google.com:8080",
+    "domains": [
+     "*.google.com",
+     "*.google.com:8080"
+    ],
+    "routes": [
+     {
+      "prefix": "/",
+      "cluster": "out.02875f9311443c8773650d3fa21cee271505806f",
+      "timeout_ms": 30000,
+      "retry_policy": {
+       "retry_on": "5xx,connect-failure,refused-stream",
+       "num_retries": 1,
+       "per_try_timeout_ms": 5000
+      }
+     }
+    ]
+   }
+  ]
+ }
