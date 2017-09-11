@@ -499,14 +499,17 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 // Here the key of the rule is the key of the Istio configuration objects - see
 // `func (meta *ConfigMeta) Key() string`
 func removeDuplicateEgressServices(egressRules []Config) ([]Config, error) {
-	filteredEgressRules := make([]Config, len(egressRules))
+	filteredEgressRules := make([]Config, 0)
 	var errs error
 
 	// domains - a map where keys are of the form domain:port and values are the keys of
 	// egress-rule configuration objects
 	domains := make(map[string]string)
 	for _, r := range egressRules {
-		rule := r.Spec.(*proxyconfig.EgressRule)
+		rule, ok := r.Spec.(*proxyconfig.EgressRule)
+		if !ok {
+			continue
+		}
 		domain := rule.Destination.Service
 		duplicateRuleName, exists := domains[domain]
 		if exists {

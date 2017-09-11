@@ -499,7 +499,7 @@ func TestPolicy(t *testing.T) {
 	}
 }
 
-func TestRejectConflictingEgressRules(t *testing.T) {
+func TestEgressRules(t *testing.T) {
 	cases := []struct {
 		name  string
 		in    map[string]*proxyconfig.EgressRule
@@ -527,18 +527,18 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 					},
 				},
 			},
-			out: map[string]*proxyconfig.EgressRule{"cnn": {
+			out: map[string]*proxyconfig.EgressRule{"bbc": {
 				Destination: &proxyconfig.IstioService{
-					Service: "*cnn.com",
+					Service: "*bbc.com",
 				},
 				Ports: []*proxyconfig.EgressRule_Port{
 					{Port: 80, Protocol: "http"},
 					{Port: 443, Protocol: "https"},
 				},
 			},
-				"bbc": {
+				"cnn": {
 					Destination: &proxyconfig.IstioService{
-						Service: "*bbc.com",
+						Service: "*cnn.com",
 					},
 					Ports: []*proxyconfig.EgressRule_Port{
 						{Port: 80, Protocol: "http"},
@@ -655,14 +655,36 @@ func TestRejectConflictingEgressRules(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got, errs := model.RejectConflictingEgressRules(c.in)
+		store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes))
+
+		for key, rule := range c.in {
+			inputConfig := model.Config{
+				ConfigMeta: model.ConfigMeta{
+					Type: model.EgressRule.Type,
+					Name: key,
+				},
+				Spec: rule,
+			}
+
+			if _, err := store.Create(inputConfig); err != nil {
+				t.Error(err)
+			}
+		}
+
+		outputConfigs, errs := store.EgressRules()
 		if (errs == nil) != c.valid {
-			t.Errorf("RejectConflictingEgressRules failed on %s: got valid=%v but wanted valid=%v",
+			t.Errorf("EgressRules failed on '%s': got valid=%v but wanted valid=%v",
 				c.name, errs == nil, c.valid)
 		}
+
+		got := make(map[string]*proxyconfig.EgressRule)
+		for _, rule := range outputConfigs {
+			got[rule.Name] = rule.Spec.(*proxyconfig.EgressRule)
+		}
+
 		if !reflect.DeepEqual(got, c.out) {
-			t.Errorf("RejectConflictingEgressRules failed on %s: got=%v but wanted %v: %v",
-				c.name, got, c.in)
+			t.Errorf("EgressRules failed on '%s': got=%v but wanted %v",
+				c.name, got, c.out)
 		}
 	}
 }

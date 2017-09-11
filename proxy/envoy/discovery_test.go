@@ -150,6 +150,7 @@ func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
 	// add weighted rule to split into two clusters
 	addConfig(registry, weightedRouteRule, t)
 	addConfig(registry, cbPolicy, t)
+	addConfig(registry, egressCBPolicy, t)
 	ds := makeDiscoveryService(t, registry, &mesh)
 	url := fmt.Sprintf("/v1/clusters/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
 	response := makeDiscoveryRequest(ds, "GET", url, t)
@@ -338,6 +339,26 @@ func TestRouteDiscoveryEgress(t *testing.T) {
 	compareResponse(response, "testdata/rds-egress.json", t)
 }
 
+func TestRouteDiscoveryEgressTimeout(t *testing.T) {
+	mesh := makeMeshConfig()
+	registry := memory.Make(model.IstioConfigTypes)
+	addConfig(registry, egressRule, t)
+	addConfig(registry, egressTimeoutRule, t)
+	ds := makeDiscoveryService(t, registry, &mesh)
+
+	url := fmt.Sprintf("/v1/routes/80/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
+	response := makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-egress-rule-timeout-http.json", t)
+
+	url = fmt.Sprintf("/v1/routes/8080/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-egress-rule-timeout-http2.json", t)
+
+	url = fmt.Sprintf("/v1/routes/443/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
+	response = makeDiscoveryRequest(ds, "GET", url, t)
+	compareResponse(response, "testdata/rds-egress-rule-timeout-ssl.json", t)
+}
+
 func TestSidecarListenerDiscovery(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -373,6 +394,10 @@ func TestSidecarListenerDiscovery(t *testing.T) {
 		{
 			name: "fault",
 			file: faultRouteRule,
+		},
+		{
+			name: "egressrule",
+			file: egressRule,
 		},
 	}
 
@@ -443,6 +468,8 @@ func TestListenerDiscoveryHttpProxy(t *testing.T) {
 	mesh.ProxyHttpPort = 15002
 	registry := memory.Make(model.IstioConfigTypes)
 	ds := makeDiscoveryService(t, registry, &mesh)
+	addConfig(registry, egressRule, t)
+
 	url := fmt.Sprintf("/v1/listeners/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
 	response := makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/lds-httpproxy.json", t)
