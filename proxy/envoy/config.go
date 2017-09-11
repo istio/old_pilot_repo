@@ -742,14 +742,19 @@ func buildMgmtPortListeners(mesh *proxyconfig.MeshConfig, managementPorts model.
 func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.ServiceInstance,
 	config model.IstioConfigStore, httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
 
-	// Convert all egress rules into services and add route rules if any
-	egressRules, errs := model.RejectConflictingEgressRules(config.EgressRules())
+	// A sorted list of egress rules
+	egressRules, errs := config.EgressRules()
 
 	if errs != nil {
 		glog.Warningf("Rejected rules: %v", errs)
 	}
 
-	for _, rule := range egressRules {
+	if egressRules == nil {
+		return httpConfigs
+	}
+
+	for _, r := range egressRules {
+		rule := r.Spec.(*proxyconfig.EgressRule)
 		for _, port := range rule.Ports {
 			protocol := model.Protocol(strings.ToUpper(port.Protocol))
 			intPort := int(port.Port)
@@ -760,23 +765,31 @@ func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.Serv
 
 			if len(routes) > 0 {
 				for _, route := range routes {
-					for _, cluster := range route.clusters {
-						// must use egress proxy to route external name services
-						if rule.UseEgressProxy {
-							cluster.ServiceName = ""
-							cluster.Type = ClusterTypeStrictDNS
-							cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
-						} else {
-							// Retain unique orig_dst clusters per destination so that
-							// we can apply destination policies
-							cluster.Type = ClusterTypeOriginalDST
-							cluster.LbType = LbTypeOriginalDST
-							cluster.Hosts = nil
-							if protocol == model.ProtocolHTTPS {
-								cluster.SSLContext = &SSLContextExternal{}
-							}
+					// Remove any weighted clusters. Egress routes have only one cluster
+					// The only reason for using buildDestinationHTTPRoutes was to take
+					// advantage of the common machinery for setting route fields like
+					// timeouts, retries, faults, etc.
+					// default route for the destination
+					cluster := buildOutboundCluster(destination, servicePort, nil)
+
+					// must use egress proxy to route external name services
+					if rule.UseEgressProxy {
+						cluster.ServiceName = ""
+						cluster.Type = ClusterTypeStrictDNS
+						cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
+					} else {
+						// Retain unique orig_dst clusters per destination so that
+						// we can apply destination policies
+						cluster.Type = ClusterTypeOriginalDST
+						cluster.LbType = LbTypeOriginalDST
+						cluster.Hosts = nil
+						if protocol == model.ProtocolHTTPS {
+							cluster.SSLContext = &SSLContextExternal{}
 						}
 					}
+					route.Cluster = cluster.Name
+					route.clusters = []*Cluster{cluster}
+
 				}
 
 				host := &VirtualHost{
