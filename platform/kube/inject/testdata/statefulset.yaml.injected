@@ -40,7 +40,7 @@ spec:
         - --serviceCluster
         - istio-proxy
         - --drainDuration
-        - 1m0s
+        - 45s
         - --parentShutdownDuration
         - 1m0s
         - --discoveryAddress
