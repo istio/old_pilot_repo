@@ -61,14 +61,17 @@ func applyClusterPolicy(cluster *Cluster,
 
 	policy := policyConfig.Spec.(*proxyconfig.DestinationPolicy)
 
-	if policy.LoadBalancing != nil {
-		switch policy.LoadBalancing.GetName() {
-		case proxyconfig.LoadBalancing_ROUND_ROBIN:
-			cluster.LbType = LbTypeRoundRobin
-		case proxyconfig.LoadBalancing_LEAST_CONN:
-			cluster.LbType = LbTypeLeastRequest
-		case proxyconfig.LoadBalancing_RANDOM:
-			cluster.LbType = LbTypeRandom
+	// Cannot change the LB policy for Orig dst clusters.
+	if cluster.Type != ClusterTypeOriginalDST {
+		if policy.LoadBalancing != nil {
+			switch policy.LoadBalancing.GetName() {
+			case proxyconfig.LoadBalancing_ROUND_ROBIN:
+				cluster.LbType = LbTypeRoundRobin
+			case proxyconfig.LoadBalancing_LEAST_CONN:
+				cluster.LbType = LbTypeLeastRequest
+			case proxyconfig.LoadBalancing_RANDOM:
+				cluster.LbType = LbTypeRandom
+			}
 		}
 	}
 
