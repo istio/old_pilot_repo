@@ -19,4 +19,4 @@ spec:
       httpDetectionInterval: 30s
       httpMaxEjectionPercent: 100
   loadBalancing:
-    name: RANDOM
+    name: ROUND_ROBIN
