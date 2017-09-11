@@ -22,3 +22,5 @@ data:
     mixerAddress: istio-mixer.{{.IstioNamespace}}:9091
 {{end}}
     authPolicy: {{ .Auth }}
+    disablePolicyChecks: false
+    enableTracing: true
