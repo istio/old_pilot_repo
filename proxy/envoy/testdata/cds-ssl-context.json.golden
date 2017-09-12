@@ -218,20 +218,20 @@
    },
    {
     "name": "out.orig-dst-cluster-http",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "original_dst",
     "lb_type": "original_dst_lb"
    },
    {
     "name": "out.orig-dst-cluster-http2",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "original_dst",
     "lb_type": "original_dst_lb",
     "features": "http2"
    },
    {
     "name": "out.orig-dst-cluster-https",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "original_dst",
     "lb_type": "original_dst_lb",
     "ssl_context": {}
