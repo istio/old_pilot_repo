@@ -102,7 +102,13 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 					return err
 				}
 				writer = file
-				defer func() { err = file.Close() }()
+				defer func() {
+					// don't overwrite error if preceding injection failed
+					errClose := file.Close()
+					if err == nil {
+						err = errClose
+					}
+				}()
 			}
 
 			if versionStr == "" {
@@ -113,7 +119,29 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 			if err != nil {
 				return err
 			}
-			meshConfig := model.MakeIstioStore(configClient, meshName, istioNamespace).Mesh()
+
+      meshConfig := model.MakeIstioStore(configClient, meshName, istioNamespace).Mesh()
+     /**
+			_, meshConfig, err := inject.GetMeshConfig(client, namespace, meshConfigMapName)
+			if err != nil {
+				// Temporary hack (few days), until this is properly implemented
+				// https://github.com/istio/pilot/issues/1153
+				istioMeshConfigMap, istioMeshConfig, err := inject.GetMeshConfig(client,
+					istioNamespace, meshConfigMapName)
+				if err != nil {
+					return fmt.Errorf("could not read valid configmap %q from namespace %q or %q: %v - "+
+						"Re-run kube-inject with `-i <istioSystemNamespace> and ensure valid MeshConfig exists",
+						meshConfigMapName, namespace, istioNamespace, err)
+				}
+
+				meshConfig = istioMeshConfig
+				_, err = inject.CreateMeshConfigMap(client, namespace, meshConfigMapName, istioMeshConfigMap)
+				if err != nil {
+					return fmt.Errorf("cannot create Istio configuration map in namespace %s: %v",
+						namespace, err)
+				}
+			}
+      */
 
 			config := &inject.Config{
 				Policy:     inject.DefaultInjectionPolicy,

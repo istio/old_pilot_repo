@@ -116,6 +116,45 @@ const (
 	IngressKeyFilename = "tls.key"
 )
 
+/**
+// DefaultProxyConfig for individual proxies
+func DefaultProxyConfig() proxyconfig.ProxyConfig {
+	return proxyconfig.ProxyConfig{
+		ConfigPath:             "/etc/istio/proxy",
+		BinaryPath:             "/usr/local/bin/envoy",
+		ServiceCluster:         "istio-proxy",
+		AvailabilityZone:       "", //no service zone by default, i.e. AZ-aware routing is disabled
+		DrainDuration:          ptypes.DurationProto(2 * time.Second),
+		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
+		DiscoveryAddress:       "istio-pilot:8080",
+		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
+		ZipkinAddress:          "",
+		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
+		StatsdUdpAddress:       "",
+		ProxyAdminPort:         15000,
+	}
+}
+
+// DefaultMeshConfig configuration
+func DefaultMeshConfig() proxyconfig.MeshConfig {
+	config := DefaultProxyConfig()
+	return proxyconfig.MeshConfig{
+		EgressProxyAddress:    "istio-egress:80",
+		MixerAddress:          "",
+		DisablePolicyChecks:   false,
+		ProxyListenPort:       15001,
+		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
+		IngressClass:          "istio",
+		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
+		AuthPolicy:            proxyconfig.MeshConfig_NONE,
+		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
+		EnableTracing:         true,
+		AccessLogFile:         "/dev/stdout",
+		DefaultConfig:         &config,
+	}
+}
+*/
+
 // ParsePort extracts port number from a valid proxy address
 func ParsePort(addr string) int {
 	port, err := strconv.Atoi(addr[strings.Index(addr, ":")+1:])
