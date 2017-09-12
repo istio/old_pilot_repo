@@ -31,7 +31,7 @@ fi
 set -ex
 
 bazel ${BAZEL_STARTUP_ARGS} build \
-  ${BAZEL_CONFIG} --output_groups=static \
+  ${BAZEL_CONFIG} \
   "//tools/deb:istio-agent"
 gsutil -m cp -r \
   bazel-bin/tools/deb/istio-agent_${ISTIO_VERSION}_amd64.* \
