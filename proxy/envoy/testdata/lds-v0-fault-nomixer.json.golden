@@ -112,42 +112,6 @@
     "bind_to_port": false
    },
    {
-    "address": "tcp://0.0.0.0:8080",
-    "name": "http_0.0.0.0_8080",
-    "filters": [
-     {
-      "type": "read",
-      "name": "http_connection_manager",
-      "config": {
-       "codec_type": "auto",
-       "stat_prefix": "http",
-       "generate_request_id": true,
-       "tracing": {
-        "operation_name": "ingress"
-       },
-       "rds": {
-        "cluster": "rds",
-        "route_config_name": "8080",
-        "refresh_delay_ms": 10
-       },
-       "filters": [
-        {
-         "type": "decoder",
-         "name": "router",
-         "config": {}
-        }
-       ],
-       "access_log": [
-        {
-         "path": "/dev/stdout"
-        }
-       ]
-      }
-     }
-    ],
-    "bind_to_port": false
-   },
-   {
     "address": "tcp://0.0.0.0:81",
     "name": "http_0.0.0.0_81",
     "filters": [
