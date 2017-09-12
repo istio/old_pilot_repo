@@ -248,7 +248,6 @@ func buildRDSRoute(mesh *proxyconfig.MeshConfig, node proxy.Node, routeName stri
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
 		configs = buildOutboundHTTPRoutes(mesh, node, instances, services, config)
-		configs = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), configs)
 	default:
 		return nil
 	}
@@ -403,7 +402,6 @@ func buildOutboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node, in
 
 	// note that outbound HTTP routes are supplied through RDS
 	httpOutbound := buildOutboundHTTPRoutes(mesh, sidecar, instances, services, config)
-	httpOutbound = buildEgressFromSidecarHTTPRoutes(mesh, config.EgressRules(), httpOutbound)
 
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners,
@@ -453,9 +451,9 @@ func buildDestinationHTTPRoutes(service *model.Service,
 		}
 
 		return routes
-
 	case model.ProtocolHTTPS:
 		// as an exception, external name HTTPS port is sent in plain-text HTTP/1.1
+		// TODO: Possible bug? Route rules are not being applied
 		if service.External() {
 			cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
 			return []*HTTPRoute{buildDefaultRoute(cluster)}
@@ -516,6 +514,7 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 		}
 	}
 
+	httpConfigs = buildEgressHTTPRoutes(mesh, instances, config, httpConfigs)
 	return httpConfigs.normalize()
 }
 
@@ -696,71 +695,6 @@ func appendPortToDomains(domains []string, port int) []string {
 	return domainsWithPorts
 }
 
-func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
-	mesh *proxyconfig.MeshConfig, port *model.Port) *VirtualHost {
-	var externalTrafficCluster *Cluster
-
-	protocolToHandle := port.Protocol
-	if protocolToHandle == model.ProtocolGRPC {
-		protocolToHandle = model.ProtocolHTTP2
-	}
-	protocolSuffix := "-" + strings.ToLower(string(protocolToHandle))
-
-	if rule.UseEgressProxy {
-		externalTrafficCluster = buildOutboundCluster("istio-egress", port, nil)
-		externalTrafficCluster.ServiceName = ""
-		externalTrafficCluster.Type = ClusterTypeStrictDNS
-		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
-	} else {
-		externalTrafficCluster = buildOriginalDSTCluster("orig-dst-cluster"+protocolSuffix, mesh.ConnectTimeout)
-
-		if protocolToHandle == model.ProtocolHTTPS {
-			externalTrafficCluster.SSLContext = &SSLContextExternal{}
-		}
-
-		if protocolToHandle == model.ProtocolHTTP2 {
-			externalTrafficCluster.Features = ClusterFeatureHTTP2
-		}
-	}
-
-	externalTrafficRoute := buildDefaultRoute(externalTrafficCluster)
-
-	domain := rule.Destination.Service
-	virtualHostName := domain + ":" + strconv.Itoa(port.Port)
-	return &VirtualHost{
-		Name:    virtualHostName,
-		Domains: appendPortToDomains([]string{domain}, port.Port),
-		Routes:  []*HTTPRoute{externalTrafficRoute},
-	}
-}
-
-func buildEgressFromSidecarHTTPRoutes(mesh *proxyconfig.MeshConfig, egressRules map[string]*proxyconfig.EgressRule,
-	httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
-
-	egressRules, errs := model.RejectConflictingEgressRules(egressRules)
-
-	if errs != nil {
-		glog.Warningf("Rejected rules: %v", errs)
-	}
-
-	for _, rule := range egressRules {
-		for _, port := range rule.Ports {
-			protocol := model.Protocol(strings.ToUpper(port.Protocol))
-			if protocol != model.ProtocolHTTP && protocol != model.ProtocolHTTPS &&
-				protocol != model.ProtocolHTTP2 && protocol != model.ProtocolGRPC {
-				continue
-			}
-			intPort := int(port.Port)
-			modelPort := &model.Port{Name: "external-traffic-port", Port: intPort, Protocol: protocol}
-			httpConfig := httpConfigs.EnsurePort(intPort)
-			httpConfig.VirtualHosts = append(httpConfig.VirtualHosts,
-				buildEgressFromSidecarVirtualHostOnPort(rule, mesh, modelPort))
-		}
-	}
-
-	return httpConfigs.normalize()
-}
-
 // buildMgmtPortListeners creates inbound TCP only listeners for the management ports on
 // server (inbound). The function also returns all inbound clusters since
 // they are statically declared in the proxy configuration and do not
@@ -801,4 +735,92 @@ func buildMgmtPortListeners(mesh *proxyconfig.MeshConfig, managementPorts model.
 	}
 
 	return listeners, clusters
+}
+
+// buildEgressHTTPRoutes builds virtual hosts for services found in egress rules.
+// In addition, routing rules that match with egress services are also applied.
+func buildEgressHTTPRoutes(mesh *proxyconfig.MeshConfig, instances []*model.ServiceInstance,
+	config model.IstioConfigStore, httpConfigs HTTPRouteConfigs) HTTPRouteConfigs {
+
+	// A sorted list of egress rules
+	egressRules, errs := config.EgressRules()
+
+	if errs != nil {
+		glog.Warningf("Rejected rules: %v", errs)
+	}
+
+	if egressRules == nil {
+		return httpConfigs
+	}
+
+	for _, r := range egressRules {
+		rule := r.Spec.(*proxyconfig.EgressRule)
+		for _, port := range rule.Ports {
+			protocol := model.Protocol(strings.ToUpper(port.Protocol))
+			intPort := int(port.Port)
+			servicePort := &model.Port{Name: fmt.Sprintf("external-%v-%d", protocol, intPort),
+				Port: intPort, Protocol: protocol}
+			destination := rule.Destination.Service
+			svc := &model.Service{Hostname: destination}
+			// We build normal HTTP route rules for all ports, HTTPS inclusive because
+			// egress services with HTTPS ports are expected to talk to proxy via HTTP
+			// and the proxy is expected to perform TLS origination.
+			// If the application wants to use HTTPS only, it should set the --includeIPRanges flag
+			// to avoid capturing HTTPS service traffic.
+			// buildDestinationHTTPRoutes applies route rules only for HTTP traffic. So, temporarily
+			// set the protocol to be HTTP and then revert after building the routes.
+			if protocol == model.ProtocolHTTPS {
+				// How do we know if its HTTP2? Shouldn't matter because Envoy auto upgrades inbound
+				servicePort.Protocol = model.ProtocolHTTP
+			}
+			routes := buildDestinationHTTPRoutes(svc, servicePort, instances, config)
+			servicePort.Protocol = protocol
+
+			if len(routes) > 0 {
+				for _, route := range routes {
+					// Remove any weighted clusters. Egress routes have only one cluster
+					// The only reason for using buildDestinationHTTPRoutes was to take
+					// advantage of the common machinery for setting route fields like
+					// timeouts, retries, faults, etc.
+					// default route for the destination
+					cluster := buildOutboundCluster(destination, servicePort, nil)
+
+					// must use egress proxy to route external name services
+					if rule.UseEgressProxy {
+						cluster.ServiceName = ""
+						cluster.Type = ClusterTypeStrictDNS
+						cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
+					} else {
+						// Retain unique orig_dst clusters per destination so that
+						// we can apply destination policies
+						cluster.Type = ClusterTypeOriginalDST
+						cluster.LbType = LbTypeOriginalDST
+						cluster.Hosts = nil
+						if protocol == model.ProtocolHTTPS {
+							cluster.SSLContext = &SSLContextExternal{}
+						}
+					}
+					route.Cluster = cluster.Name
+					route.clusters = []*Cluster{cluster}
+				}
+
+				host := &VirtualHost{
+					Name:    destination + ":" + strconv.Itoa(servicePort.Port),
+					Domains: appendPortToDomains([]string{destination}, servicePort.Port),
+					Routes:  routes,
+				}
+				http := httpConfigs.EnsurePort(servicePort.Port)
+
+				// there should be at most one occurrence of the service for the same
+				// port since service port values are distinct; that means the virtual
+				// host domains, which include the sole domain name for the service, do
+				// not overlap for the same route config.
+				// for example, a service "a" with two ports 80 and 8080, would have virtual
+				// hosts on 80 and 8080 listeners that contain domain "a".
+				http.VirtualHosts = append(http.VirtualHosts, host)
+			}
+		}
+	}
+
+	return httpConfigs
 }

@@ -226,7 +226,7 @@ type IstioConfigStore interface {
 	ConfigStore
 
 	// EgressRules lists all egress rules
-	EgressRules() map[string]*proxyconfig.EgressRule
+	EgressRules() ([]Config, error)
 
 	// RouteRules selects routing rules by source service instances and
 	// destination service.  A rule must match at least one of the input service
@@ -436,18 +436,28 @@ func (store *istioConfigStore) RouteRulesByDestination(instances []*ServiceInsta
 	return out
 }
 
-func (store *istioConfigStore) EgressRules() map[string]*proxyconfig.EgressRule {
-	out := make(map[string]*proxyconfig.EgressRule)
-	rs, err := store.List(EgressRule.Type, "")
+func (store *istioConfigStore) EgressRules() ([]Config, error) {
+	out := make([]Config, 0)
+	configs, err := store.List(EgressRule.Type, NamespaceAll)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	for _, r := range rs {
-		if rule, ok := r.Spec.(*proxyconfig.EgressRule); ok {
-			out[r.Key()] = rule
+
+	for _, config := range configs {
+		if _, ok := config.Spec.(*proxyconfig.EgressRule); ok {
+			out = append(out, config)
 		}
 	}
-	return out
+
+	sort.Slice(out, func(i, j int) bool {
+		// protect against incompatible types
+		irule, _ := out[i].Spec.(*proxyconfig.EgressRule)
+		jrule, _ := out[j].Spec.(*proxyconfig.EgressRule)
+		return irule == nil || jrule == nil ||
+			(out[i].Key() < out[j].Key())
+	})
+
+	return removeDuplicateEgressServices(out)
 }
 
 func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination string, labels Labels) *Config {
@@ -481,44 +491,36 @@ func (store *istioConfigStore) Policy(instances []*ServiceInstance, destination 
 	return out
 }
 
-// RejectConflictingEgressRules rejects rules that have the destination which is equal to
-// the destionation of some other rule.
+// removeDuplicateEgressServices removes rules that have the destination which is equal to
+// the destination of some other rule.
 // According to Envoy's virtual host specification, no virtual hosts can share the same domain.
 // The following code rejects conflicting rules deterministically, by a lexicographical order -
 // a rule with a smaller key lexicographically wins.
 // Here the key of the rule is the key of the Istio configuration objects - see
 // `func (meta *ConfigMeta) Key() string`
-func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule) ( // long line split
-	map[string]*proxyconfig.EgressRule, error) {
-	filteredEgressRules := make(map[string]*proxyconfig.EgressRule)
+func removeDuplicateEgressServices(egressRules []Config) ([]Config, error) {
+	filteredEgressRules := make([]Config, 0)
 	var errs error
-
-	var keys []string
-
-	// the key here is the key of the Istio configuration objects - see
-	// `func (meta *ConfigMeta) Key() string`
-	for key := range egressRules {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
 
 	// domains - a map where keys are of the form domain:port and values are the keys of
 	// egress-rule configuration objects
 	domains := make(map[string]string)
-	for _, egressRuleKey := range keys {
-		egressRule := egressRules[egressRuleKey]
-		domain := egressRule.Destination.Service
-		keyOfAnEgressRuleWithTheSameDomain, conflictingRule := domains[domain]
-		if conflictingRule {
+	for _, r := range egressRules {
+		rule, ok := r.Spec.(*proxyconfig.EgressRule)
+		if !ok {
+			continue
+		}
+		domain := rule.Destination.Service
+		duplicateRuleName, exists := domains[domain]
+		if exists {
 			errs = multierror.Append(errs,
-				fmt.Errorf("rule %q conflicts with rule %q on domain "+
-					"%s, is rejected", egressRuleKey,
-					keyOfAnEgressRuleWithTheSameDomain, domain))
+				fmt.Errorf("rule %q conflicts with rule %q on destination.service. "+
+					"%s, is rejected", r.Key(), duplicateRuleName, domain))
 			continue
 		}
 
-		domains[domain] = egressRuleKey
-		filteredEgressRules[egressRuleKey] = egressRule
+		domains[domain] = r.Key()
+		filteredEgressRules = append(filteredEgressRules, r)
 	}
 
 	return filteredEgressRules, errs

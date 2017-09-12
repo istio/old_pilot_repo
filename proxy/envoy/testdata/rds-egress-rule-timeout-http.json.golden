@@ -9,7 +9,13 @@
     "routes": [
      {
       "prefix": "/",
-      "cluster": "out.241817cc0b7d464b36565d486ed22d9494b67a27"
+      "cluster": "out.241817cc0b7d464b36565d486ed22d9494b67a27",
+      "timeout_ms": 30000,
+      "retry_policy": {
+       "retry_on": "5xx,connect-failure,refused-stream",
+       "num_retries": 1,
+       "per_try_timeout_ms": 5000
+      }
      }
     ]
    },
@@ -30,11 +36,6 @@
      "10.1.0.0"
     ],
     "routes": [
-     {
-      "prefix": "/websocket",
-      "cluster": "out.e5c9564b7c4dbb0355a4f740e9d29277ccca97cd",
-      "use_websocket": true
-     },
      {
       "prefix": "/",
       "cluster": "out.e5c9564b7c4dbb0355a4f740e9d29277ccca97cd"

@@ -37,15 +37,19 @@ func applyClusterPolicy(cluster *Cluster,
 		return
 	}
 
-	// apply auth policies
-	switch mesh.AuthPolicy {
-	case proxyconfig.MeshConfig_NONE:
-		// do nothing
-	case proxyconfig.MeshConfig_MUTUAL_TLS:
-		// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
-		ports := model.PortList{cluster.port}.GetNames()
-		serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
-		cluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, serviceAccounts)
+	// Original DST cluster are used to route to services outside the mesh
+	// where Istio auth does not apply.
+	if cluster.Type != ClusterTypeOriginalDST {
+		// apply auth policies
+		switch mesh.AuthPolicy {
+		case proxyconfig.MeshConfig_NONE:
+			// do nothing
+		case proxyconfig.MeshConfig_MUTUAL_TLS:
+			// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
+			ports := model.PortList{cluster.port}.GetNames()
+			serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
+			cluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, serviceAccounts)
+		}
 	}
 
 	// apply destination policies
@@ -57,14 +61,17 @@ func applyClusterPolicy(cluster *Cluster,
 
 	policy := policyConfig.Spec.(*proxyconfig.DestinationPolicy)
 
-	if policy.LoadBalancing != nil {
-		switch policy.LoadBalancing.GetName() {
-		case proxyconfig.LoadBalancing_ROUND_ROBIN:
-			cluster.LbType = LbTypeRoundRobin
-		case proxyconfig.LoadBalancing_LEAST_CONN:
-			cluster.LbType = LbTypeLeastRequest
-		case proxyconfig.LoadBalancing_RANDOM:
-			cluster.LbType = LbTypeRandom
+	// Cannot change the LB policy for Orig dst clusters.
+	if cluster.Type != ClusterTypeOriginalDST {
+		if policy.LoadBalancing != nil {
+			switch policy.LoadBalancing.GetName() {
+			case proxyconfig.LoadBalancing_ROUND_ROBIN:
+				cluster.LbType = LbTypeRoundRobin
+			case proxyconfig.LoadBalancing_LEAST_CONN:
+				cluster.LbType = LbTypeLeastRequest
+			case proxyconfig.LoadBalancing_RANDOM:
+				cluster.LbType = LbTypeRandom
+			}
 		}
 	}
 
