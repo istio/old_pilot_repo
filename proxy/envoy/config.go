@@ -618,7 +618,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 
 			// set server-side mixer filter config for inbound HTTP routes
 			if mesh.MixerAddress != "" {
-				defaultRoute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
+				defaultRoute.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, false)
 			}
 
 			host := &VirtualHost{
@@ -643,7 +643,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 						// Note: websocket routes do not call the filter chain. Will be
 						// resolved in future.
 						if mesh.MixerAddress != "" {
-							websocketRoute.OpaqueConfig = buildMixerOpaqueConfig(true, false)
+							websocketRoute.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, false)
 						}
 
 						host.Routes = append(host.Routes, websocketRoute)
@@ -667,7 +667,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				filter := &NetworkFilter{
 					Type:   both,
 					Name:   MixerFilter,
-					Config: mixerTCPConfig(sidecar),
+					Config: mixerTCPConfig(sidecar, !mesh.DisablePolicyChecks),
 				}
 				listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 			}
