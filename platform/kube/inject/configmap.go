@@ -52,19 +52,23 @@ func GetMeshConfig(kube kubernetes.Interface, namespace,
 	if err = model.ApplyYAML(yaml, &user); err != nil {
 		return nil, nil, multierror.Prefix(err, "failed to convert to proto.")
 	}
-	userProxyConfigYAML, err := model.ToYAML(user.DefaultConfig)
-	if err != nil {
-		return nil, nil, multierror.Prefix(err, "failed to re-encode default proxy config")
+	var userProxyConfigYAML string
+	if user.DefaultConfig != nil {
+		userProxyConfigYAML, err = model.ToYAML(user.DefaultConfig)
+		if err != nil {
+			return nil, nil, multierror.Prefix(err, "failed to re-encode default proxy config")
+		}
 	}
-
 	mesh := proxy.DefaultMeshConfig()
 	if err = model.ApplyYAML(yaml, &mesh); err != nil {
 		return nil, nil, multierror.Prefix(err, "failed to convert to proto.")
 	}
 	defaultProxyConfig := proxy.DefaultProxyConfig()
 	mesh.DefaultConfig = &defaultProxyConfig
-	if err = model.ApplyYAML(userProxyConfigYAML, user.DefaultConfig); err != nil {
-		return nil, nil, multierror.Prefix(err, "failed to convert to proto.")
+	if userProxyConfigYAML != "" {
+		if err = model.ApplyYAML(userProxyConfigYAML, user.DefaultConfig); err != nil {
+			return nil, nil, multierror.Prefix(err, "failed to convert to proto.")
+		}
 	}
 	if err = model.ValidateMeshConfig(&mesh); err != nil {
 		return nil, nil, err
