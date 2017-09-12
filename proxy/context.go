@@ -18,12 +18,9 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/ptypes"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 )
 
@@ -37,9 +34,6 @@ type Environment struct {
 
 	// Config interface for listing routing rules
 	model.IstioConfigStore
-
-	// Mesh is the mesh config (to be merged into the config store)
-	Mesh *proxyconfig.MeshConfig
 }
 
 // Node defines the proxy attributes used by xDS identification
@@ -122,6 +116,7 @@ const (
 	IngressKeyFilename = "tls.key"
 )
 
+/**
 // DefaultProxyConfig for individual proxies
 func DefaultProxyConfig() proxyconfig.ProxyConfig {
 	return proxyconfig.ProxyConfig{
@@ -158,6 +153,7 @@ func DefaultMeshConfig() proxyconfig.MeshConfig {
 		DefaultConfig:         &config,
 	}
 }
+*/
 
 // ParsePort extracts port number from a valid proxy address
 func ParsePort(addr string) int {

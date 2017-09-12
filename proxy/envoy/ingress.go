@@ -27,19 +27,18 @@ import (
 	"istio.io/pilot/proxy"
 )
 
-func buildIngressListeners(mesh *proxyconfig.MeshConfig,
-	discovery model.ServiceDiscovery,
+func buildIngressListeners(discovery model.ServiceDiscovery,
 	config model.IstioConfigStore,
 	ingress proxy.Node) Listeners {
 	listeners := Listeners{
-		buildHTTPListener(mesh, ingress, nil, nil, WildcardAddress, 80, "80", true),
+		buildHTTPListener(config.Mesh(), ingress, nil, nil, WildcardAddress, 80, "80", true),
 	}
 
 	// lack of SNI in Envoy implies that TLS secrets are attached to listeners
 	// therefore, we should first check that TLS endpoint is needed before shipping TLS listener
-	_, secret := buildIngressRoutes(mesh, discovery, config)
+	_, secret := buildIngressRoutes(discovery, config)
 	if secret != "" {
-		listener := buildHTTPListener(mesh, ingress, nil, nil, WildcardAddress, 443, "443", true)
+		listener := buildHTTPListener(config.Mesh(), ingress, nil, nil, WildcardAddress, 443, "443", true)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, proxy.IngressCertFilename),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, proxy.IngressKeyFilename),
@@ -50,9 +49,7 @@ func buildIngressListeners(mesh *proxyconfig.MeshConfig,
 	return listeners
 }
 
-func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
-	discovery model.ServiceDiscovery,
-	config model.IstioConfigStore) (HTTPRouteConfigs, string) {
+func buildIngressRoutes(discovery model.ServiceDiscovery, config model.IstioConfigStore) (HTTPRouteConfigs, string) {
 	// build vhosts
 	vhosts := make(map[string][]*HTTPRoute)
 	vhostsTLS := make(map[string][]*HTTPRoute)
@@ -60,7 +57,7 @@ func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 
 	rules, _ := config.List(model.IngressRule.Type, model.NamespaceAll)
 	for _, rule := range rules {
-		routes, tls, err := buildIngressRoute(mesh, rule, discovery, config)
+		routes, tls, err := buildIngressRoute(rule, discovery, config)
 		if err != nil {
 			glog.Warningf("Error constructing Envoy route from ingress rule: %v", err)
 			continue
@@ -120,8 +117,7 @@ func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
-func buildIngressRoute(mesh *proxyconfig.MeshConfig,
-	rule model.Config,
+func buildIngressRoute(rule model.Config,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) ([]*HTTPRoute, string, error) {
 	ingress := rule.Spec.(*proxyconfig.IngressRule)
@@ -155,7 +151,7 @@ func buildIngressRoute(mesh *proxyconfig.MeshConfig,
 	out := make([]*HTTPRoute, 0)
 	for _, route := range routes {
 		// enable mixer check on the route
-		if mesh.MixerAddress != "" {
+		if config.Mesh().MixerAddress != "" {
 			route.OpaqueConfig = buildMixerOpaqueConfig(true, true)
 		}
 

@@ -18,11 +18,11 @@ import (
 	"reflect"
 	"testing"
 
-	"istio.io/pilot/proxy"
+	"istio.io/pilot/model"
 )
 
 func TestEnvoyArgs(t *testing.T) {
-	config := proxy.DefaultProxyConfig()
+	config := model.DefaultProxyConfig()
 	config.ServiceCluster = "my-cluster"
 	config.AvailabilityZone = "my-zone"
 

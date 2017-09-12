@@ -67,7 +67,7 @@ func makeTempClient(t *testing.T) (*Client, string, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ns, err := util.CreateNamespace(client)
+	ns, err := util.CreateNamespace(client, "istio-crd-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}

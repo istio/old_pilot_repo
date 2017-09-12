@@ -222,6 +222,7 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 
 	if configCache != nil {
 		configHandler := func(model.Config, model.Event) { out.clearCache() }
+		configCache.RegisterEventHandler(model.MeshConfig.Type, configHandler)
 		configCache.RegisterEventHandler(model.RouteRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.IngressRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.EgressRule.Type, configHandler)
@@ -462,7 +463,7 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 		}
 
 		routeConfigName := request.PathParameter(RouteConfigName)
-		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
+		routeConfig := buildRDSRoute(role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, "RDS "+err.Error())
 			return

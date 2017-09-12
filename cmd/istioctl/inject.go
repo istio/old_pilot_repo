@@ -16,29 +16,29 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 
-	"istio.io/pilot/platform/kube"
+	"istio.io/pilot/adapter/config/crd"
+	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/tools/version"
 )
 
 var (
-	hub               string
-	tag               string
-	sidecarProxyUID   int64
-	verbosity         int
-	versionStr        string // override build version
-	enableCoreDump    bool
-	meshConfigMapName string
-	imagePullPolicy   string
-	includeIPRanges   string
-	debugMode         bool
+	hub             string
+	tag             string
+	sidecarProxyUID int64
+	verbosity       int
+	versionStr      string // override build version
+	enableCoreDump  bool
+	meshName        string
+	imagePullPolicy string
+	includeIPRanges string
+	debugMode       bool
 
 	inFilename  string
 	outFilename string
@@ -115,11 +115,13 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 				versionStr = version.Line()
 			}
 
-			_, client, err := kube.CreateInterface(kubeconfig)
+			configClient, err := crd.NewClient(kubeconfig, model.ConfigDescriptor{model.MeshConfig}, "")
 			if err != nil {
 				return err
 			}
 
+      meshConfig := model.MakeIstioStore(configClient, meshName, istioNamespace).Mesh()
+     /**
 			_, meshConfig, err := inject.GetMeshConfig(client, namespace, meshConfigMapName)
 			if err != nil {
 				// Temporary hack (few days), until this is properly implemented
@@ -139,22 +141,22 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 						namespace, err)
 				}
 			}
+      */
 
 			config := &inject.Config{
 				Policy:     inject.DefaultInjectionPolicy,
 				Namespaces: []string{v1.NamespaceAll},
 				Params: inject.Params{
-					InitImage:         inject.InitImageName(hub, tag, debugMode),
-					ProxyImage:        inject.ProxyImageName(hub, tag, debugMode),
-					Verbosity:         verbosity,
-					SidecarProxyUID:   sidecarProxyUID,
-					Version:           versionStr,
-					EnableCoreDump:    enableCoreDump,
-					Mesh:              meshConfig,
-					MeshConfigMapName: meshConfigMapName,
-					ImagePullPolicy:   imagePullPolicy,
-					IncludeIPRanges:   includeIPRanges,
-					DebugMode:         debugMode,
+					InitImage:       inject.InitImageName(hub, tag, debugMode),
+					ProxyImage:      inject.ProxyImageName(hub, tag, debugMode),
+					Verbosity:       verbosity,
+					SidecarProxyUID: sidecarProxyUID,
+					Version:         versionStr,
+					EnableCoreDump:  enableCoreDump,
+					Mesh:            meshConfig,
+					ImagePullPolicy: imagePullPolicy,
+					IncludeIPRanges: includeIPRanges,
+					DebugMode:       debugMode,
 				},
 			}
 			return inject.IntoResourceFile(config, reader, writer)
@@ -178,8 +180,8 @@ func init() {
 		inject.DefaultSidecarProxyUID, "Envoy sidecar UID")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
-	injectCmd.PersistentFlags().StringVar(&meshConfigMapName, "meshConfigMapName", "istio",
-		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", inject.ConfigMapKey))
+	injectCmd.PersistentFlags().StringVar(&meshName, "mesh", model.DefaultMeshName,
+		"MeshConfig name")
 
 	// Default --coreDump=true for pre-alpha development. Core dump
 	// settings (i.e. sysctl kernel.*) affect all pods in a node and

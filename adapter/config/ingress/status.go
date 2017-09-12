@@ -52,9 +52,10 @@ func (s *StatusSyncer) Run(stopCh <-chan struct{}) {
 }
 
 // NewStatusSyncer creates a new instance
-func NewStatusSyncer(mesh *proxyconfig.MeshConfig, client kubernetes.Interface,
+func NewStatusSyncer(client kubernetes.Interface,
+	ingressService, ingressNamespace, ingressClass string,
+	mode proxyconfig.MeshConfig_IngressControllerMode,
 	options kube.ControllerOptions) *StatusSyncer {
-
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
@@ -68,11 +69,11 @@ func NewStatusSyncer(mesh *proxyconfig.MeshConfig, client kubernetes.Interface,
 	)
 
 	var publishService string
-	if mesh.IngressService != "" {
-		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
+	if ingressService != "" {
+		publishService = fmt.Sprintf("%v/%v", ingressNamespace, ingressService)
 	}
 	glog.V(2).Infof("INGRESS STATUS publishService %s", publishService)
-	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)
+	ingressClass, defaultIngressClass := convertIngressControllerMode(mode, ingressClass)
 
 	customIngressStatus := func(*betaext.Ingress) []v1.LoadBalancerIngress {
 		return nil

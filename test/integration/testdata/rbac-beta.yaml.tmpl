@@ -50,6 +50,9 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: istio-sidecar-initializer
 rules:
+- apiGroups: ["config.istio.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["*"]
   resources: ["deployments", "statefulsets", "jobs", "cronjobs", "daemonsets", "replicasets", "replicationcontrollers"]
   verbs: ["initialize", "patch", "watch", "list"]

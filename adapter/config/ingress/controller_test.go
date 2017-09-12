@@ -30,7 +30,6 @@ import (
 	"istio.io/pilot/adapter/config/ingress"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
-	"istio.io/pilot/proxy"
 	"istio.io/pilot/test/mock"
 	"istio.io/pilot/test/util"
 )
@@ -58,7 +57,7 @@ func makeTempClient(t *testing.T) (string, kubernetes.Interface, func()) {
 		t.Fatal(err)
 	}
 
-	ns, err := util.CreateNamespace(client)
+	ns, err := util.CreateNamespace(client, "istio-ingress-")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -72,9 +71,8 @@ func TestIngressController(t *testing.T) {
 	ns, cl, cleanup := makeTempClient(t)
 	defer cleanup()
 
-	mesh := proxy.DefaultMeshConfig()
-	ctl := ingress.NewController(cl, &mesh, kube.ControllerOptions{
-		Namespace:        ns,
+	mesh := model.DefaultMeshConfig()
+	ctl := ingress.NewController(cl, mesh.IngressControllerMode, mesh.IngressClass, kube.ControllerOptions{
 		WatchedNamespace: ns,
 		ResyncPeriod:     resync,
 	})

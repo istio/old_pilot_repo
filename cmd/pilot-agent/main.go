@@ -186,7 +186,7 @@ func init() {
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
 
 	// Flags for proxy configuration
-	values := proxy.DefaultProxyConfig()
+	values := model.DefaultProxyConfig()
 	proxyCmd.PersistentFlags().StringVar(&configPath, "configPath", values.ConfigPath,
 		"Path to the generated configuration file directory")
 	proxyCmd.PersistentFlags().StringVar(&binaryPath, "binaryPath", values.BinaryPath,

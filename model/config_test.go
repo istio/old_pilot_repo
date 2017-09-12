@@ -406,7 +406,7 @@ func TestSortRouteRules(t *testing.T) {
 }
 
 func TestRouteRules(t *testing.T) {
-	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes))
+	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes), "istio", "default")
 	instance := mock.MakeInstance(mock.HelloService, mock.PortHTTP, 0)
 
 	routerule1 := &proxyconfig.RouteRule{
@@ -456,7 +456,7 @@ func TestRouteRules(t *testing.T) {
 }
 
 func TestPolicy(t *testing.T) {
-	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes))
+	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes), "istio", "default")
 	labels := map[string]string{"version": "v1"}
 	instances := []*model.ServiceInstance{mock.MakeInstance(mock.HelloService, mock.PortHTTP, 0)}
 

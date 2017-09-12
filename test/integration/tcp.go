@@ -16,8 +16,6 @@ package main
 
 import (
 	"fmt"
-
-	proxyconfig "istio.io/api/proxy/v1/config"
 )
 
 type tcp struct {
@@ -38,7 +36,7 @@ func (t *tcp) teardown() {
 func (t *tcp) run() error {
 	srcPods := []string{"a", "b", "t"}
 	dstPods := []string{"a", "b"}
-	if t.Auth == proxyconfig.MeshConfig_NONE {
+	if !t.Auth {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		dstPods = append(dstPods, "t")
 	}
@@ -56,7 +54,7 @@ func (t *tcp) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && src == "t" {
+							if t.Auth && src == "t" {
 								// t cannot talk to envoy (a or b) with mTLS enabled.
 								if len(resp.code) == 0 || resp.code[0] != httpOk {
 									return nil

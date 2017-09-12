@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/ptypes"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -55,9 +55,8 @@ type infra struct { // nolint: aligncheck
 	// map from app to pods
 	apps map[string][]string
 
-	Auth proxyconfig.MeshConfig_AuthPolicy
-
 	// switches for infrastructure components
+	Auth      bool
 	Mixer     bool
 	Ingress   bool
 	Egress    bool
@@ -80,6 +79,7 @@ type infra struct { // nolint: aligncheck
 	AdmissionServiceName string
 
 	config model.IstioConfigStore
+	mesh   *proxyconfig.MeshConfig
 }
 
 func (infra *infra) setup() error {
@@ -91,11 +91,9 @@ func (infra *infra) setup() error {
 		return err
 	}
 
-	infra.config = model.MakeIstioStore(crdclient)
-
 	if infra.Namespace == "" {
 		var err error
-		if infra.Namespace, err = util.CreateNamespace(client); err != nil {
+		if infra.Namespace, err = util.CreateNamespace(client, "istio-app-"); err != nil {
 			return err
 		}
 		infra.namespaceCreated = true
@@ -107,7 +105,7 @@ func (infra *infra) setup() error {
 
 	if infra.IstioNamespace == "" {
 		var err error
-		if infra.IstioNamespace, err = util.CreateNamespace(client); err != nil {
+		if infra.IstioNamespace, err = util.CreateNamespace(client, "istio-sys-"); err != nil {
 			return err
 		}
 		infra.istioNamespaceCreated = true
@@ -115,6 +113,44 @@ func (infra *infra) setup() error {
 		if _, err := client.Core().Namespaces().Get(infra.IstioNamespace, meta_v1.GetOptions{}); err != nil {
 			return err
 		}
+	}
+
+	infra.config = model.MakeIstioStore(crdclient, "istio", infra.IstioNamespace)
+	infra.mesh = &proxyconfig.MeshConfig{
+		DefaultConfig: &proxyconfig.ProxyConfig{
+			ConfigPath:             "/etc/istio/proxy",
+			BinaryPath:             "/usr/local/bin/envoy",
+			ServiceCluster:         "istio-proxy",
+			DrainDuration:          ptypes.DurationProto(2 * time.Second),
+			ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
+			DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
+			ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
+			DiscoveryAddress:       fmt.Sprintf("istio-pilot.%s:8080", infra.IstioNamespace),
+			ProxyAdminPort:         15000,
+		},
+		EgressProxyAddress:    fmt.Sprintf("istio-egress.%s:80", infra.IstioNamespace),
+		DisablePolicyChecks:   false,
+		ProxyListenPort:       15001,
+		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
+		IngressClass:          "istio",
+		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
+		AuthPolicy:            proxyconfig.MeshConfig_NONE,
+		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
+		EnableTracing:         true,
+		AccessLogFile:         "/dev/stdout",
+	}
+	if infra.Zipkin {
+		infra.mesh.DefaultConfig.ZipkinAddress = fmt.Sprintf("zipkin.%s:9411", infra.IstioNamespace)
+	}
+	if infra.Mixer {
+		infra.mesh.MixerAddress = fmt.Sprintf("istio-mixer.%s:9091", infra.IstioNamespace)
+	}
+	if infra.Auth {
+		infra.mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
+	}
+
+	if err := infra.config.SetMesh(infra.mesh); err != nil {
+		return err
 	}
 
 	deploy := func(name, namespace string) error {
@@ -128,33 +164,21 @@ func (infra *infra) setup() error {
 	if err := deploy("rbac-beta.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("config.yaml.tmpl", infra.Namespace); err != nil {
-		return err
-	}
 
-	if err := deploy("config.yaml.tmpl", infra.IstioNamespace); err != nil {
-		return err
-	}
-
-	_, mesh, err := inject.GetMeshConfig(client, infra.IstioNamespace, "istio")
-	if err != nil {
-		return err
-	}
 	debugMode := infra.debugImagesAndMode
-	glog.Infof("mesh %s", spew.Sdump(mesh))
 	infra.InjectConfig = &inject.Config{
 		Policy:     inject.InjectionPolicyEnabled,
 		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
 		Params: inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag, debugMode),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag, debugMode),
-			Verbosity:         infra.Verbosity,
-			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
-			EnableCoreDump:    true,
-			Version:           "integration-test",
-			Mesh:              mesh,
-			MeshConfigMapName: "istio",
-			DebugMode:         debugMode,
+			InitImage:       inject.InitImageName(infra.Hub, infra.Tag, debugMode),
+			ProxyImage:      inject.ProxyImageName(infra.Hub, infra.Tag, debugMode),
+			Verbosity:       infra.Verbosity,
+			SidecarProxyUID: inject.DefaultSidecarProxyUID,
+			EnableCoreDump:  true,
+			Version:         "integration-test",
+			Mesh:            infra.mesh,
+			MeshName:        "istio",
+			DebugMode:       debugMode,
 		},
 	}
 
@@ -204,7 +228,7 @@ func (infra *infra) setup() error {
 		return err
 	}
 
-	if infra.Auth != proxyconfig.MeshConfig_NONE {
+	if infra.Auth {
 		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
@@ -213,7 +237,7 @@ func (infra *infra) setup() error {
 		return err
 	}
 	if infra.Ingress {
-		if err := deploy("ingress-proxy.yaml.tmpl", infra.Namespace); err != nil {
+		if err := deploy("ingress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 		// Create ingress key/cert in secret
@@ -225,7 +249,7 @@ func (infra *infra) setup() error {
 		if err != nil {
 			return err
 		}
-		_, err = client.CoreV1().Secrets(infra.Namespace).Create(&v1.Secret{
+		_, err = client.CoreV1().Secrets(infra.IstioNamespace).Create(&v1.Secret{
 			ObjectMeta: meta_v1.ObjectMeta{Name: ingressSecretName},
 			Data: map[string][]byte{
 				"tls.key": key,
@@ -237,7 +261,7 @@ func (infra *infra) setup() error {
 		}
 	}
 	if infra.Egress {
-		if err := deploy("egress-proxy.yaml.tmpl", infra.Namespace); err != nil {
+		if err := deploy("egress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}

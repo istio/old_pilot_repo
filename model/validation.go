@@ -1054,7 +1054,12 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 }
 
 // ValidateMeshConfig checks that the mesh config is well-formed
-func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
+func ValidateMeshConfig(msg proto.Message) (errs error) {
+	mesh, ok := msg.(*proxyconfig.MeshConfig)
+	if !ok {
+		return fmt.Errorf("cannot cast to mesh config")
+	}
+
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid egress proxy address:"))
@@ -1067,8 +1072,16 @@ func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 		}
 	}
 
-	if err := ValidatePort(int(mesh.ProxyListenPort)); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy listen port:"))
+	if mesh.ProxyListenPort != 0 {
+		if err := ValidatePort(int(mesh.ProxyListenPort)); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy listen port:"))
+		}
+	}
+
+	if mesh.ProxyHttpPort != 0 {
+		if err := ValidatePort(int(mesh.ProxyHttpPort)); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid HTTP_PROXY port:"))
+		}
 	}
 
 	if err := ValidateConnectTimeout(mesh.ConnectTimeout); err != nil {

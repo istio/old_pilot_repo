@@ -27,25 +27,24 @@ import (
 	restful "github.com/emicklei/go-restful"
 	v1 "k8s.io/api/core/v1"
 
-	"istio.io/pilot/proxy"
+	"istio.io/pilot/model"
 	"istio.io/pilot/test/util"
 )
 
 var (
-	mesh           = proxy.DefaultMeshConfig()
+	mesh           = model.DefaultMeshConfig()
 	httpTestConfig = &Config{
 		Policy:     InjectionPolicyEnabled,
 		Namespaces: []string{v1.NamespaceAll},
 		Params: Params{
-			InitImage:         InitImageName(unitTestHub, unitTestTag, unitTestDebugMode),
-			ProxyImage:        ProxyImageName(unitTestHub, unitTestTag, unitTestDebugMode),
-			ImagePullPolicy:   "IfNotPresent",
-			Verbosity:         DefaultVerbosity,
-			SidecarProxyUID:   DefaultSidecarProxyUID,
-			Version:           "12345678",
-			Mesh:              &mesh,
-			MeshConfigMapName: "istio",
-			DebugMode:         unitTestDebugMode,
+			InitImage:       InitImageName(unitTestHub, unitTestTag, unitTestDebugMode),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, unitTestDebugMode),
+			ImagePullPolicy: "IfNotPresent",
+			Verbosity:       DefaultVerbosity,
+			SidecarProxyUID: DefaultSidecarProxyUID,
+			Version:         "12345678",
+			Mesh:            &mesh,
+			DebugMode:       unitTestDebugMode,
 		},
 	}
 )

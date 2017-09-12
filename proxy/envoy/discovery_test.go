@@ -48,14 +48,19 @@ func (ctl *mockController) AppendInstanceHandler(_ func(*model.ServiceInstance, 
 func (ctl *mockController) Run(_ <-chan struct{}) {}
 
 func makeDiscoveryService(t *testing.T, r model.ConfigStore, mesh *proxyconfig.MeshConfig) *DiscoveryService {
+	name, namespace := "istio", "default"
+	store := model.MakeIstioStore(r, name, namespace)
+	if err := store.SetMesh(mesh); err != nil {
+		t.Fatal(err)
+	}
+
 	out, err := NewDiscoveryService(
 		&mockController{},
 		nil,
 		proxy.Environment{
 			ServiceDiscovery: mock.Discovery,
 			ServiceAccounts:  mock.Discovery,
-			IstioConfigStore: model.MakeIstioStore(r),
-			Mesh:             mesh,
+			IstioConfigStore: store,
 		},
 		DiscoveryServiceOptions{
 			EnableCaching:   true,
