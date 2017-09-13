@@ -17,7 +17,7 @@ Kubernetes [DynamicAdmissionControl](https://kubernetes.io/docs/admin/extensible
 
 ```bash
 gcloud container clusters create NAME \               
-    --cluster-version=1.7.3 \
+    --cluster-version=1.7.5 \
     --enable-kubernetes-alpha \ 
     --machine-type=n1-standard-2 \
     --num-nodes=4 \
@@ -49,7 +49,7 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-ad
 ```bash
 minikube start \
     --extra-config=apiserver.Admission.PluginNames="Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,GenericAdmissionWebhook,ResourceQuota" \
-    --kubernetes-version=v1.7.3
+    --kubernetes-version=v1.7.5
 ```
 
 Add `--extra-config=apiserver.Authorization.Mode=RBAC` to the list of minikube flags to enable RBAC in minikube.
