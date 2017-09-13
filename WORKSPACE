@@ -448,11 +448,10 @@ go_repository(
     importpath = "github.com/golang/protobuf",
 )
 
-http_archive(
+git_repository(
     name = "com_github_google_protobuf",
-    sha256 = "a839d3f1519ff9d68ab908de5a0f269650ef1fc501c10f6eefd4cae51d29b86f",
-    strip_prefix = "protobuf-3.2.0",
-    url = "https://github.com/google/protobuf/archive/v3.2.0.tar.gz",
+    commit = "593e917c176b5bc5aafa57bf9f6030d749d91cd5",  # Jan 2017 3.2.0
+    remote = "https://github.com/google/protobuf.git",
 )
 
 go_repository(
