@@ -2,7 +2,7 @@
   "clusters": [
    {
     "name": "242bc3028e0f3fe0682e6d972e167ab415b2321d",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [
@@ -14,7 +14,7 @@
    },
    {
     "name": "ae8d3361601f8293abe6ac5e4d807124612cf42e",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [
@@ -25,7 +25,7 @@
    },
    {
     "name": "mixer_server",
-    "connect_timeout_ms": 1000,
+    "connect_timeout_ms": 10000,
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [
