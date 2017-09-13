@@ -6,7 +6,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: istio-pilot
+  name: istio-pilot-{{.IstioNamespace}}
 rules:
 - apiGroups: ["config.istio.io"]
   resources: ["*"]
@@ -36,7 +36,7 @@ rules:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: istio-ca
+  name: istio-ca-{{.IstioNamespace}}
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -48,7 +48,7 @@ rules:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: istio-sidecar-initializer
+  name: istio-sidecar-initializer-{{.IstioNamespace}}
 rules:
 - apiGroups: ["*"]
   resources: ["deployments", "statefulsets", "jobs", "cronjobs", "daemonsets", "replicasets", "replicationcontrollers"]
