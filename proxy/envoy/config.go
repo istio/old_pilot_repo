@@ -711,7 +711,6 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 
 	if rule.UseEgressProxy {
 		externalTrafficCluster = buildOutboundCluster("istio-egress", port, nil)
-		externalTrafficCluster.ServiceName = ""
 		externalTrafficCluster.Type = ClusterTypeStrictDNS
 		externalTrafficCluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
 	} else {
@@ -721,6 +720,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 		key := svc.Key(port, nil)
 		name := fmt.Sprintf("%x", sha1.Sum([]byte(key)))
 		externalTrafficCluster = buildOriginalDSTCluster(name, mesh.ConnectTimeout)
+		externalTrafficCluster.ServiceName = key
 
 		if protocolToHandle == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
