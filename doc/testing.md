@@ -46,6 +46,8 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-ad
 
 * Minikube
 
+Minikube version >= v0.22.1 is required for proper certificate configuration for GenericAdmissionWebhook feature. Get the latest version from https://github.com/kubernetes/minikube/releases.
+
 ```bash
 minikube start \
     --extra-config=apiserver.Admission.PluginNames="Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,GenericAdmissionWebhook,ResourceQuota" \
