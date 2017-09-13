@@ -21,6 +21,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 	"istio.io/pilot/proxy"
+	"fmt"
 )
 
 // applyClusterPolicy assumes an outbound cluster and inserts custom configuration for the cluster
@@ -32,6 +33,7 @@ func applyClusterPolicy(cluster *Cluster,
 	duration := protoDurationToMS(mesh.ConnectTimeout)
 	cluster.ConnectTimeoutMs = duration
 
+	fmt.Printf("processing cluster %v\n", cluster)
 	// skip remaining policies for non mesh-local outbound clusters
 	if !cluster.outbound {
 		return
