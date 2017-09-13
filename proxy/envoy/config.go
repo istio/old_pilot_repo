@@ -722,6 +722,7 @@ func buildEgressFromSidecarVirtualHostOnPort(rule *proxyconfig.EgressRule,
 		externalTrafficCluster = buildOriginalDSTCluster(name, mesh.ConnectTimeout)
 		externalTrafficCluster.ServiceName = key
 		externalTrafficCluster.hostname = destination
+		externalTrafficCluster.port = port
 		if protocolToHandle == model.ProtocolHTTPS {
 			externalTrafficCluster.SSLContext = &SSLContextExternal{}
 		}
