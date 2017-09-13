@@ -450,7 +450,7 @@ go_repository(
 
 http_archive(
     name = "com_github_google_protobuf",
-    sha256 = "2a25c2b71c707c5552ec9afdfb22532a93a339e1ca5d38f163fe4107af08c54c",
+    sha256 = "a839d3f1519ff9d68ab908de5a0f269650ef1fc501c10f6eefd4cae51d29b86f",
     strip_prefix = "protobuf-3.2.0",
     url = "https://github.com/google/protobuf/archive/v3.2.0.tar.gz",
 )
