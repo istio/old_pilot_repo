@@ -2,7 +2,7 @@ workspace(name = "com_github_istio_pilot")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "eba68677493422112dd25f6a0b4bbdb02387e5a4",  # Aug 1, 2017
+    commit = "44231d643dfaf0c40bcad7eb4b8b2c3e7a08a63f",  # Sep 5, 2017
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -477,7 +477,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "6838a2bfc42260cf0513552a64a457f1cf39041c",  # Sep 10, 2017
+    commit = "f25de4f0d4f9812a567974b868c44366253e22c5",  # Sep 14, 2017
     remote = "https://github.com/istio/api.git",
 )
 
