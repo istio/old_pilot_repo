@@ -83,6 +83,7 @@ const (
 	instancePath      = "%s/eureka/v2/apps/%s/%s"
 )
 
+// agent is a simple state machine that maintains an instance's registration with Eureka.
 type agent struct {
 	stop     <-chan struct{}
 	client   http.Client
@@ -93,14 +94,12 @@ type agent struct {
 // TODO: stop is synchronous, which may be slow
 func (a *agent) Run(stop <-chan struct{}) {
 	log.Printf("Starting registration agent for %s", a.instance.ID)
-	// FIXME: stop as member var?
 	a.stop = stop
 	go a.unregistered()
 	<-stop
 }
 
 func (a *agent) unregistered() {
-	// try to register
 	var retry, heartbeatDelay <-chan time.Time
 	if err := a.register(); err != nil {
 		log.Println(err)
@@ -208,21 +207,6 @@ func (a *agent) buildRegisterPath() string {
 
 func (a *agent) buildInstancePath() string {
 	return fmt.Sprintf(instancePath, a.url, a.instance.App, a.instance.ID)
-}
-
-func createInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	lf := func(opts meta_v1.ListOptions) (runtime.Object, error) {
-		return client.CoreV1().Endpoints(namespace).List(opts)
-	}
-	wf := func(opts meta_v1.ListOptions) (watch.Interface, error) {
-		return client.CoreV1().Endpoints(namespace).Watch(opts)
-	}
-
-	informer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{ListFunc: lf, WatchFunc: wf}, &v1.Endpoints{},
-		resyncPeriod, cache.Indexers{})
-
-	return informer
 }
 
 type mirror struct {
@@ -339,6 +323,21 @@ func convertEndpoints(ep *v1.Endpoints) []*Instance {
 		}
 	}
 	return instances
+}
+
+func createInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	lf := func(opts meta_v1.ListOptions) (runtime.Object, error) {
+		return client.CoreV1().Endpoints(namespace).List(opts)
+	}
+	wf := func(opts meta_v1.ListOptions) (watch.Interface, error) {
+		return client.CoreV1().Endpoints(namespace).Watch(opts)
+	}
+
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{ListFunc: lf, WatchFunc: wf}, &v1.Endpoints{},
+		resyncPeriod, cache.Indexers{})
+
+	return informer
 }
 
 func main() {
