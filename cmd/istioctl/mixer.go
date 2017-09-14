@@ -28,6 +28,7 @@ var (
 This method of configuring Mixer is removed in favor of kubectl
 `,
 		SilenceUsage: true,
+		Hidden:       true,
 		RunE: func(c *cobra.Command, args []string) error {
 			return errors.New("this method of configuring Mixer is removed in favor of kubectl")
 		},
