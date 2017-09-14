@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	mixerCmd = &cobra.Command{
+	mixerFile string
+	mixerCmd  = &cobra.Command{
 		Use:   "mixer",
 		Short: "Istio Mixer configuration (deprecated)",
 		Long: `
@@ -36,5 +37,8 @@ This method of configuring Mixer is removed in favor of kubectl
 )
 
 func init() {
+	// flag is maintained so that the user gets the correct error message.
+	mixerCmd.PersistentFlags().StringVarP(&mixerFile, "file", "f", "",
+		"Input file with contents of the Mixer rule")
 	rootCmd.AddCommand(mixerCmd)
 }
