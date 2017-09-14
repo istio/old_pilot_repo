@@ -29,22 +29,6 @@
        "filters": [
         {
          "type": "decoder",
-         "name": "mixer",
-         "config": {
-          "mixer_attributes": {
-           "destination.ip": "10.1.1.0",
-           "destination.service": "hello.default.svc.cluster.local",
-           "destination.uid": "kubernetes://v0.default"
-          },
-          "forward_attributes": {
-           "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://v0.default"
-          },
-          "quota_name": "RequestCount"
-         }
-        },
-        {
-         "type": "decoder",
          "name": "router",
          "config": {}
         }
@@ -81,52 +65,40 @@
        "filters": [
         {
          "type": "decoder",
-         "name": "mixer",
-         "config": {
-          "mixer_attributes": {
-           "destination.ip": "10.1.1.0",
-           "destination.service": "hello.default.svc.cluster.local",
-           "destination.uid": "kubernetes://v0.default"
-          },
-          "forward_attributes": {
-           "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://v0.default"
-          },
-          "quota_name": "RequestCount"
-         }
-        },
+         "name": "router",
+         "config": {}
+        }
+       ],
+       "access_log": [
         {
-         "type": "decoder",
-         "name": "fault",
-         "config": {
-          "abort": {
-           "abort_percent": 100,
-           "http_status": 503
-          },
-          "delay": {
-           "type": "fixed",
-           "fixed_delay_percent": 100,
-           "fixed_duration_ms": 5000
-          },
-          "headers": [
-           {
-            "name": "animal",
-            "value": "^dog\\.cat.*",
-            "regex": true
-           },
-           {
-            "name": "name",
-            "value": "sco+do+",
-            "regex": true
-           },
-           {
-            "name": "scooby",
-            "value": "doo"
-           }
-          ],
-          "upstream_cluster": "out.66fcc955b8875b19844f9eaf6cfda47c778c609e"
-         }
-        },
+         "path": "/dev/stdout"
+        }
+       ]
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://0.0.0.0:8080",
+    "name": "http_0.0.0.0_8080",
+    "filters": [
+     {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+       "codec_type": "auto",
+       "stat_prefix": "http",
+       "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
+       "rds": {
+        "cluster": "rds",
+        "route_config_name": "8080",
+        "refresh_delay_ms": 10
+       },
+       "filters": [
         {
          "type": "decoder",
          "name": "router",
@@ -163,54 +135,6 @@
         "refresh_delay_ms": 10
        },
        "filters": [
-        {
-         "type": "decoder",
-         "name": "mixer",
-         "config": {
-          "mixer_attributes": {
-           "destination.ip": "10.1.1.0",
-           "destination.service": "hello.default.svc.cluster.local",
-           "destination.uid": "kubernetes://v0.default"
-          },
-          "forward_attributes": {
-           "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://v0.default"
-          },
-          "quota_name": "RequestCount"
-         }
-        },
-        {
-         "type": "decoder",
-         "name": "fault",
-         "config": {
-          "abort": {
-           "abort_percent": 100,
-           "http_status": 503
-          },
-          "delay": {
-           "type": "fixed",
-           "fixed_delay_percent": 100,
-           "fixed_duration_ms": 5000
-          },
-          "headers": [
-           {
-            "name": "animal",
-            "value": "^dog\\.cat.*",
-            "regex": true
-           },
-           {
-            "name": "name",
-            "value": "sco+do+",
-            "regex": true
-           },
-           {
-            "name": "scooby",
-            "value": "doo"
-           }
-          ],
-          "upstream_cluster": "out.b9de37be5d0723747a2d3b5cc02f264049e666d6"
-         }
-        },
         {
          "type": "decoder",
          "name": "router",
@@ -283,8 +207,8 @@
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:1081",
-    "name": "http_10.1.1.0_1081",
+    "address": "tcp://10.1.1.1:1081",
+    "name": "http_10.1.1.1_1081",
     "filters": [
      {
       "type": "read",
@@ -306,34 +230,13 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.1081",
-            "opaque_config": {
-             "mixer_check": "on",
-             "mixer_forward": "off",
-             "mixer_report": "on"
-            }
+            "cluster": "in.1081"
            }
           ]
          }
         ]
        },
        "filters": [
-        {
-         "type": "decoder",
-         "name": "mixer",
-         "config": {
-          "mixer_attributes": {
-           "destination.ip": "10.1.1.0",
-           "destination.service": "hello.default.svc.cluster.local",
-           "destination.uid": "kubernetes://v0.default"
-          },
-          "forward_attributes": {
-           "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://v0.default"
-          },
-          "quota_name": "RequestCount"
-         }
-        },
         {
          "type": "decoder",
          "name": "router",
@@ -348,28 +251,12 @@
       }
      }
     ],
-    "ssl_context": {
-     "cert_chain_file": "/etc/certs/cert-chain.pem",
-     "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem",
-     "require_client_certificate": true
-    },
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:1090",
-    "name": "tcp_10.1.1.0_1090",
+    "address": "tcp://10.1.1.1:1090",
+    "name": "tcp_10.1.1.1_1090",
     "filters": [
-     {
-      "type": "both",
-      "name": "mixer",
-      "config": {
-       "mixer_attributes": {
-        "destination.ip": "10.1.1.0",
-        "destination.uid": "kubernetes://v0.default"
-       }
-      }
-     },
      {
       "type": "read",
       "name": "tcp_proxy",
@@ -380,7 +267,7 @@
          {
           "cluster": "in.1090",
           "destination_ip_list": [
-           "10.1.1.0/32"
+           "10.1.1.1/32"
           ]
          }
         ]
@@ -388,28 +275,12 @@
       }
      }
     ],
-    "ssl_context": {
-     "cert_chain_file": "/etc/certs/cert-chain.pem",
-     "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem",
-     "require_client_certificate": true
-    },
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:1100",
-    "name": "mongo_10.1.1.0_1100",
+    "address": "tcp://10.1.1.1:1100",
+    "name": "mongo_10.1.1.1_1100",
     "filters": [
-     {
-      "type": "both",
-      "name": "mixer",
-      "config": {
-       "mixer_attributes": {
-        "destination.ip": "10.1.1.0",
-        "destination.uid": "kubernetes://v0.default"
-       }
-      }
-     },
      {
       "type": "both",
       "name": "mongo_proxy",
@@ -427,7 +298,7 @@
          {
           "cluster": "in.1100",
           "destination_ip_list": [
-           "10.1.1.0/32"
+           "10.1.1.1/32"
           ]
          }
         ]
@@ -435,17 +306,11 @@
       }
      }
     ],
-    "ssl_context": {
-     "cert_chain_file": "/etc/certs/cert-chain.pem",
-     "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem",
-     "require_client_certificate": true
-    },
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:3333",
-    "name": "tcp_10.1.1.0_3333",
+    "address": "tcp://10.1.1.1:3333",
+    "name": "tcp_10.1.1.1_3333",
     "filters": [
      {
       "type": "read",
@@ -457,7 +322,7 @@
          {
           "cluster": "in.3333",
           "destination_ip_list": [
-           "10.1.1.0/32"
+           "10.1.1.1/32"
           ]
          }
         ]
@@ -468,8 +333,8 @@
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:80",
-    "name": "http_10.1.1.0_80",
+    "address": "tcp://10.1.1.1:80",
+    "name": "http_10.1.1.1_80",
     "filters": [
      {
       "type": "read",
@@ -491,34 +356,13 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.80",
-            "opaque_config": {
-             "mixer_check": "on",
-             "mixer_forward": "off",
-             "mixer_report": "on"
-            }
+            "cluster": "in.80"
            }
           ]
          }
         ]
        },
        "filters": [
-        {
-         "type": "decoder",
-         "name": "mixer",
-         "config": {
-          "mixer_attributes": {
-           "destination.ip": "10.1.1.0",
-           "destination.service": "hello.default.svc.cluster.local",
-           "destination.uid": "kubernetes://v0.default"
-          },
-          "forward_attributes": {
-           "source.ip": "10.1.1.0",
-           "source.uid": "kubernetes://v0.default"
-          },
-          "quota_name": "RequestCount"
-         }
-        },
         {
          "type": "decoder",
          "name": "router",
@@ -533,17 +377,11 @@
       }
      }
     ],
-    "ssl_context": {
-     "cert_chain_file": "/etc/certs/cert-chain.pem",
-     "private_key_file": "/etc/certs/key.pem",
-     "ca_cert_file": "/etc/certs/root-cert.pem",
-     "require_client_certificate": true
-    },
     "bind_to_port": false
    },
    {
-    "address": "tcp://10.1.1.0:9999",
-    "name": "tcp_10.1.1.0_9999",
+    "address": "tcp://10.1.1.1:9999",
+    "name": "tcp_10.1.1.1_9999",
     "filters": [
      {
       "type": "read",
@@ -555,7 +393,7 @@
          {
           "cluster": "in.9999",
           "destination_ip_list": [
-           "10.1.1.0/32"
+           "10.1.1.1/32"
           ]
          }
         ]
