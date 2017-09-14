@@ -57,7 +57,7 @@ func convertPort(port v1.ServicePort) *model.Port {
 	return &model.Port{
 		Name:     port.Name,
 		Port:     int(port.Port),
-		Protocol: convertProtocol(port.Name, port.Protocol),
+		Protocol: ConvertProtocol(port.Name, port.Protocol),
 	}
 }
 
@@ -136,7 +136,7 @@ func parseHostname(hostname string) (name string, namespace string, err error) {
 	return
 }
 
-func convertProtocol(name string, proto v1.Protocol) model.Protocol {
+func ConvertProtocol(name string, proto v1.Protocol) model.Protocol {
 	out := model.ProtocolTCP
 	switch proto {
 	case v1.ProtocolUDP:

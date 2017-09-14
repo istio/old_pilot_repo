@@ -83,6 +83,10 @@ spec:
         - --v={{.Verbosity}}
         - -a
         - {{.Namespace}}
+        - --registries
+        - Eureka
+        - --eurekaserverURL
+        - http://eureka:8080
 {{if .UseAdmissionWebhook}}
         - --admission-service={{.AdmissionServiceName}}
 {{end}}

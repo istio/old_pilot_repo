@@ -203,6 +203,9 @@ func (infra *infra) setup() error {
 	if err := deploy("mixer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
+	if err := deploy("eureka.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
+	}
 
 	if infra.Auth != proxyconfig.MeshConfig_NONE {
 		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {

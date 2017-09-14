@@ -1,0 +1,3 @@
+FROM scratch
+ADD eurekamirror /usr/local/bin/eurekamirror
+ENTRYPOINT ["/usr/local/bin/eurekamirror"]
