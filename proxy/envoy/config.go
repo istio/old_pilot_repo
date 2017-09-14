@@ -550,15 +550,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.MeshConfig, services []*model.S
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
 			case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
-				if service.Address != "" {
-					cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
-					route := buildTCPRoute(cluster, []string{service.Address})
-					config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
-					listener := buildTCPListener(
-						config, service.Address, servicePort.Port, servicePort.Protocol)
-					tcpClusters = append(tcpClusters, cluster)
-					tcpListeners = append(tcpListeners, listener)
-				} else {
+				if service.LoadBalancingDisabled {
 					// ensure only one wildcard listener is created per port
 					if wildcardListenerPorts[servicePort.Port] {
 						glog.V(4).Infof("Multiple definitions for passthrough port %d",
@@ -578,6 +570,31 @@ func buildOutboundTCPListeners(mesh *proxyconfig.MeshConfig, services []*model.S
 					listener := buildTCPListener(
 						config, WildcardAddress, servicePort.Port, servicePort.Protocol)
 					tcpListeners = append(tcpListeners, listener)
+				} else {
+					if service.Address != "" {
+						cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+						route := buildTCPRoute(cluster, []string{service.Address})
+						config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
+						listener := buildTCPListener(
+							config, service.Address, servicePort.Port, servicePort.Protocol)
+						tcpClusters = append(tcpClusters, cluster)
+						tcpListeners = append(tcpListeners, listener)
+					} else {
+						// ensure only one wildcard listener is created per port
+						if wildcardListenerPorts[servicePort.Port] {
+							glog.V(4).Infof("Multiple definitions for port %d", servicePort.Port)
+							continue
+						}
+						wildcardListenerPorts[servicePort.Port] = true
+
+						cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+						route := buildTCPRoute(cluster, nil)
+						config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
+						listener := buildTCPListener(
+							config, WildcardAddress, servicePort.Port, servicePort.Protocol)
+						tcpClusters = append(tcpClusters, cluster)
+						tcpListeners = append(tcpListeners, listener)
+					}
 				}
 			}
 		}
