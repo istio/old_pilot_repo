@@ -169,19 +169,19 @@
     "connect_timeout_ms": 1000,
     "type": "sds",
     "lb_type": "random",
-    "max_requests_per_connection": 9,
+    "max_requests_per_connection": 100,
     "circuit_breakers": {
      "default": {
-      "max_connections": 9,
-      "max_pending_requests": 9,
-      "max_requests": 9
+      "max_connections": 100,
+      "max_pending_requests": 100,
+      "max_requests": 100
      }
     },
     "outlier_detection": {
-     "consecutive_5xx": 9,
-     "interval_ms": 9000,
-     "base_ejection_time_ms": 9000,
-     "max_ejection_percent": 9
+     "consecutive_5xx": 10,
+     "interval_ms": 30000,
+     "base_ejection_time_ms": 15500,
+     "max_ejection_percent": 100
     }
    },
    {
@@ -222,19 +222,19 @@
     "connect_timeout_ms": 1000,
     "type": "sds",
     "lb_type": "random",
-    "max_requests_per_connection": 9,
+    "max_requests_per_connection": 100,
     "circuit_breakers": {
      "default": {
-      "max_connections": 9,
-      "max_pending_requests": 9,
-      "max_requests": 9
+      "max_connections": 100,
+      "max_pending_requests": 100,
+      "max_requests": 100
      }
     },
     "outlier_detection": {
-     "consecutive_5xx": 9,
-     "interval_ms": 9000,
-     "base_ejection_time_ms": 9000,
-     "max_ejection_percent": 9
+     "consecutive_5xx": 10,
+     "interval_ms": 30000,
+     "base_ejection_time_ms": 15500,
+     "max_ejection_percent": 100
     }
    },
    {
