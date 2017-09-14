@@ -97,34 +97,54 @@
         },
         {
          "type": "decoder",
-         "name": "fault",
+         "name": "router",
+         "config": {}
+        }
+       ],
+       "access_log": [
+        {
+         "path": "/dev/stdout"
+        }
+       ]
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://0.0.0.0:8080",
+    "name": "http_0.0.0.0_8080",
+    "filters": [
+     {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+       "codec_type": "auto",
+       "stat_prefix": "http",
+       "generate_request_id": true,
+       "tracing": {
+        "operation_name": "ingress"
+       },
+       "rds": {
+        "cluster": "rds",
+        "route_config_name": "8080",
+        "refresh_delay_ms": 10
+       },
+       "filters": [
+        {
+         "type": "decoder",
+         "name": "mixer",
          "config": {
-          "abort": {
-           "abort_percent": 100,
-           "http_status": 503
+          "mixer_attributes": {
+           "destination.ip": "10.1.1.0",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v0.default"
           },
-          "delay": {
-           "type": "fixed",
-           "fixed_delay_percent": 100,
-           "fixed_duration_ms": 5000
+          "forward_attributes": {
+           "source.ip": "10.1.1.0",
+           "source.uid": "kubernetes://v0.default"
           },
-          "headers": [
-           {
-            "name": "animal",
-            "value": "^dog\\.cat.*",
-            "regex": true
-           },
-           {
-            "name": "name",
-            "value": "sco+do+",
-            "regex": true
-           },
-           {
-            "name": "scooby",
-            "value": "doo"
-           }
-          ],
-          "upstream_cluster": "out.66fcc955b8875b19844f9eaf6cfda47c778c609e"
+          "quota_name": "RequestCount"
          }
         },
         {
@@ -177,38 +197,6 @@
            "source.uid": "kubernetes://v0.default"
           },
           "quota_name": "RequestCount"
-         }
-        },
-        {
-         "type": "decoder",
-         "name": "fault",
-         "config": {
-          "abort": {
-           "abort_percent": 100,
-           "http_status": 503
-          },
-          "delay": {
-           "type": "fixed",
-           "fixed_delay_percent": 100,
-           "fixed_duration_ms": 5000
-          },
-          "headers": [
-           {
-            "name": "animal",
-            "value": "^dog\\.cat.*",
-            "regex": true
-           },
-           {
-            "name": "name",
-            "value": "sco+do+",
-            "regex": true
-           },
-           {
-            "name": "scooby",
-            "value": "doo"
-           }
-          ],
-          "upstream_cluster": "out.b9de37be5d0723747a2d3b5cc02f264049e666d6"
          }
         },
         {
