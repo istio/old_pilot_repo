@@ -171,9 +171,9 @@ func TestGetByPort(t *testing.T) {
 	}}
 
 	if port, exists := ports.GetByPort(80); !exists || port == nil || port.Name != "http" {
-		t.Errorf("GetByPort(80) => want http but got %v, %b", port, exists)
+		t.Errorf("GetByPort(80) => want http but got %v, %t", port, exists)
 	}
 	if port, exists := ports.GetByPort(88); exists || port != nil {
-		t.Errorf("GetByPort(88) => want none but got %v, %b", port, exists)
+		t.Errorf("GetByPort(88) => want none but got %v, %t", port, exists)
 	}
 }
