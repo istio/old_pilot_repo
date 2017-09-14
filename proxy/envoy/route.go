@@ -150,11 +150,11 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 	if len(rule.Route) > 0 {
 		route.WeightedClusters = &WeightedCluster{}
 		for _, dst := range rule.Route {
-			real_destination := destination
+			actualDestination := destination
 			if dst.Destination != nil {
-				real_destination = model.ResolveHostname(config.ConfigMeta, dst.Destination)
+				actualDestination = model.ResolveHostname(config.ConfigMeta, dst.Destination)
 			}
-			cluster := buildOutboundCluster(real_destination, port, dst.Labels)
+			cluster := buildOutboundCluster(actualDestination, port, dst.Labels)
 			route.clusters = append(route.clusters, cluster)
 			route.WeightedClusters.Clusters = append(route.WeightedClusters.Clusters, &WeightedClusterEntry{
 				Name:   cluster.Name,
