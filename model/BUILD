@@ -44,7 +44,10 @@ go_test(
 go_test(
     name = "go_default_xtest",
     size = "small",
-    srcs = ["config_test.go"],
+    srcs = [
+        "config_test.go",
+        "conversion_test.go",
+    ],
     deps = [
         ":go_default_library",
         "//adapter/config/memory:go_default_library",
