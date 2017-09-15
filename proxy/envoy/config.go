@@ -567,7 +567,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.MeshConfig, services []*model.S
 						}
 						cluster = originalDstCluster
 					} else {
-						cluster := buildOutboundCluster(service.Hostname, servicePort, nil)
+						cluster = buildOutboundCluster(service.Hostname, servicePort, nil)
 						tcpClusters = append(tcpClusters, cluster)
 					}
 					route := buildTCPRoute(cluster, nil)
