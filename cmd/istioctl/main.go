@@ -501,6 +501,9 @@ func preprocMixerConfig(configs []crd.IstioKind) error {
 		if config.Namespace == "" {
 			configs[i].Namespace = namespace
 		}
+		if config.APIVersion == "" {
+			configs[i].APIVersion = fmt.Sprintf("%s/%s", model.IstioAPIGroup, model.IstioAPIVersion)
+		}
 		// TODO: invokes the mixer validation webhook.
 	}
 	return nil
