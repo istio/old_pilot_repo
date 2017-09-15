@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
@@ -461,9 +462,24 @@ func printShortOutput(_ *crd.Client, configList []model.Config) {
 
 // Print as YAML
 func printYamlOutput(configClient *crd.Client, configList []model.Config) {
-	for _, c := range configList {
-		yaml, _ := configClient.ConfigDescriptor().ToYAML(c)
-		fmt.Print(yaml)
+	descriptor := configClient.ConfigDescriptor()
+	for _, config := range configList {
+		schema, exists := descriptor.GetByType(config.Type)
+		if !exists {
+			fmt.Errorf("Unknown kind %q for %v", crd.ResourceName(config.Type), config.Name)
+			continue
+		}
+		obj, err := crd.ConvertConfig(schema, config)
+		if err != nil {
+			fmt.Errorf("Could not decode %v: %v", config.Name, err)
+			continue
+		}
+		bytes, err := yaml.Marshal(obj)
+		if err != nil {
+			fmt.Errorf("Could not convert %v to YAML: %v", config, err)
+			continue
+		}
+		fmt.Print(string(bytes))
 		fmt.Println("---")
 	}
 }
