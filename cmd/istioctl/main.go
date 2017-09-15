@@ -362,12 +362,14 @@ func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 // readInputs reads multiple documents from the input and checks with the schema
 func readInputs() ([]model.Config, error) {
 	var reader io.Reader
-	if file == "" {
+	switch file {
+	case "":
+		return nil, errors.New("filename not specified (see --filename or -f)")
+	case "-":
 		reader = os.Stdin
-	} else {
+	default:
 		var err error
-		reader, err = os.Open(file)
-		if err != nil {
+		if reader, err = os.Open(file); err != nil {
 			return nil, err
 		}
 	}
