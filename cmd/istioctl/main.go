@@ -165,13 +165,13 @@ and destination policies.
 		Short: "Retrieve policies and rules",
 		Example: `
 		# List all route rules
-		istioctl get route-rules
+		istioctl get routerules
 
 		# List all destination policies
-		istioctl get destination-policies
+		istioctl get destinationpolicies
 
 		# Get a specific rule named productpage-default
-		istioctl get route-rule productpage-default
+		istioctl get routerule productpage-default
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
 			configClient, err := newClient()
@@ -231,7 +231,7 @@ and destination policies.
 		istioctl delete -f example-routing.yaml
 
 		# Delete the rule productpage-default
-		istioctl delete route-rule productpage-default
+		istioctl delete routerule productpage-default
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
 			configClient, errs := newClient()
@@ -340,7 +340,7 @@ func main() {
 	}
 }
 
-// The schema is based on the kind (for example "route-rule" or "destination-policy")
+// The schema is based on the kind (for example "routerule" or "destinationpolicy")
 func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 	for _, desc := range configClient.ConfigDescriptor() {
 		switch typ {
@@ -393,7 +393,7 @@ func readInputs() ([]model.Config, error) {
 func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 	var varr []model.Config
 
-	// We store route-rules as a YaML stream; there may be more than one decoder.
+	// We store routerules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
 		obj := crd.IstioKind{}
@@ -432,7 +432,7 @@ func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 func readInputsLegacy(reader io.Reader) ([]model.Config, error) {
 	var varr []model.Config
 
-	// We store route-rules as a YaML stream; there may be more than one decoder.
+	// We store routerules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
 	for {
 		v := model.JSONConfig{}
