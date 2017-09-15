@@ -344,7 +344,8 @@ func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 	for _, desc := range configClient.ConfigDescriptor() {
 		switch typ {
 		case desc.Type, desc.Plural: // legacy hyphenated resources names
-			return desc, nil
+			return model.ProtoSchema{}, fmt.Errorf("%q not recognized. Please use non-hyphenated resource name %q",
+				typ, crd.ResourceName(typ))
 		case crd.ResourceName(desc.Type), crd.ResourceName(desc.Plural):
 			return desc, nil
 		}
