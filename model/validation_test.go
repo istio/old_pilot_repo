@@ -159,6 +159,14 @@ func TestServiceInstanceValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "bad label",
+			instance: &ServiceInstance{
+				Service:  service1,
+				Labels:   Labels{"*": "-"},
+				Endpoint: endpoint1,
+			},
+		},
+		{
 			name: "invalid service",
 			instance: &ServiceInstance{
 				Service: &Service{},
@@ -279,6 +287,15 @@ func TestLabelsValidate(t *testing.T) {
 		if got := c.tags.Validate(); (got == nil) != c.valid {
 			t.Errorf("%s failed: got valid=%v but wanted valid=%v: %v", c.name, got == nil, c.valid, got)
 		}
+	}
+}
+
+func TestValidateFQDN(t *testing.T) {
+	if ValidateFQDN(strings.Repeat("x", 256)) == nil {
+		t.Error("expected error on long FQDN")
+	}
+	if ValidateFQDN("") == nil {
+		t.Error("expected error on empty FQDN")
 	}
 }
 
@@ -614,10 +631,12 @@ func TestValidateDestinationPolicy(t *testing.T) {
 		},
 			valid: true},
 		{in: &proxyconfig.DestinationPolicy{
-			Destination: &proxyconfig.IstioService{
-				Name:   "",
-				Labels: map[string]string{"@": "~"},
-			},
+			Destination:   &proxyconfig.IstioService{Name: "foobar"},
+			LoadBalancing: &proxyconfig.LoadBalancing{},
+		},
+			valid: false},
+		{in: &proxyconfig.DestinationPolicy{
+			Source: &proxyconfig.IstioService{},
 		},
 			valid: false},
 	}
@@ -701,11 +720,11 @@ func TestValidateParentAndDrain(t *testing.T) {
 		},
 		{
 			Parent: duration.Duration{Seconds: 2},
-			Drain:  duration.Duration{Seconds: 1, Nanos: 1},
+			Drain:  duration.Duration{Seconds: 1, Nanos: 1000000},
 			Valid:  false,
 		},
 		{
-			Parent: duration.Duration{Seconds: 2, Nanos: 1},
+			Parent: duration.Duration{Seconds: 2, Nanos: 1000000},
 			Drain:  duration.Duration{Seconds: 1},
 			Valid:  false,
 		},
@@ -717,6 +736,16 @@ func TestValidateParentAndDrain(t *testing.T) {
 		{
 			Parent: duration.Duration{Seconds: 2},
 			Drain:  duration.Duration{Seconds: -1},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 1 + int64(time.Hour/time.Second)},
+			Drain:  duration.Duration{Seconds: 10},
+			Valid:  false,
+		},
+		{
+			Parent: duration.Duration{Seconds: 10},
+			Drain:  duration.Duration{Seconds: 1 + int64(time.Hour/time.Second)},
 			Valid:  false,
 		},
 	}
@@ -755,6 +784,10 @@ func TestValidateConnectTimeout(t *testing.T) {
 }
 
 func TestValidateMeshConfig(t *testing.T) {
+	if ValidateMeshConfig(&proxyconfig.MeshConfig{}) == nil {
+		t.Error("expected an error on an empty mesh config")
+	}
+
 	invalid := proxyconfig.MeshConfig{
 		EgressProxyAddress: "10.0.0.100",
 		MixerAddress:       "10.0.0.100",
@@ -762,6 +795,7 @@ func TestValidateMeshConfig(t *testing.T) {
 		ConnectTimeout:     ptypes.DurationProto(-1 * time.Second),
 		AuthPolicy:         -1,
 		RdsRefreshDelay:    ptypes.DurationProto(-1 * time.Second),
+		DefaultConfig:      &proxyconfig.ProxyConfig{},
 	}
 
 	err := ValidateMeshConfig(&invalid)
@@ -781,6 +815,10 @@ func TestValidateMeshConfig(t *testing.T) {
 }
 
 func TestValidateProxyConfig(t *testing.T) {
+	if ValidateProxyConfig(&proxyconfig.ProxyConfig{}) == nil {
+		t.Error("expected an error on an empty proxy config")
+	}
+
 	invalid := proxyconfig.ProxyConfig{
 		ConfigPath:             "",
 		BinaryPath:             "",
@@ -820,6 +858,14 @@ func TestValidateIstioService(t *testing.T) {
 	services := []IstioService{
 		{
 			Service: proxyconfig.IstioService{Name: "", Service: "", Domain: "", Namespace: ""},
+			Valid:   false,
+		},
+		{
+			Service: proxyconfig.IstioService{Service: "**cnn.com"},
+			Valid:   false,
+		},
+		{
+			Service: proxyconfig.IstioService{Service: "cnn.com", Labels: Labels{"*": ":"}},
 			Valid:   false,
 		},
 		{
