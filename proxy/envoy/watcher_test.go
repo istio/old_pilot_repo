@@ -64,6 +64,7 @@ func TestRunReload(t *testing.T) {
 		cancel()
 	case <-time.After(time.Second):
 		t.Errorf("The callback is not called within time limit " + time.Now().String())
+		cancel()
 	}
 }
 
@@ -101,6 +102,7 @@ func TestWatchCerts(t *testing.T) {
 		cancel()
 	case <-time.After(time.Second):
 		t.Errorf("The callback is not called within time limit " + time.Now().String())
+		cancel()
 	}
 
 	// should terminate immediately
