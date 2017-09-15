@@ -375,9 +375,9 @@ func readInputs() ([]model.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if out, err := readInputsLegacy(bytes.NewReader(input)); err == nil {
-		return out, nil
-	}
+	// if out, err := readInputsLegacy(bytes.NewReader(input)); err == nil {
+	// 	return out, nil
+	// }
 	return readInputsKubectl(bytes.NewReader(input))
 }
 
@@ -426,6 +426,7 @@ func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 
 // readInputsLegacy reads multiple documents from the input and checks
 // with the schema.
+// nolint: deadcode, megacheck
 func readInputsLegacy(reader io.Reader) ([]model.Config, error) {
 	var varr []model.Config
 
