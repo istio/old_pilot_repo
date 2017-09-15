@@ -42,7 +42,9 @@ go_test(
         "route_test.go",
         "watcher_test.go",
     ],
-    data = glob(["testdata/*.golden"]),
+    data = glob(["testdata/*.golden"]) + [
+        ":envoy_binary",
+    ],
     library = ":go_default_library",
     deps = [
         "//adapter/config/memory:go_default_library",
@@ -58,24 +60,8 @@ go_test(
 )
 
 genrule(
-    name = "envoy_bin",
+    name = "envoy_binary",
     srcs = ["@envoy_binary//file"],
     outs = ["envoy"],
     cmd = "tar xzf $(location @envoy_binary//file); mv usr/local/bin/envoy $@",
-)
-
-sh_test(
-    name = "envoy_config_test",
-    size = "small",
-    srcs = ["config_test.sh"],
-    args = [
-        "$(location envoy)",
-        "$(location testdata/envoy.json.golden)",
-        "0",
-    ],
-    data = [
-        "envoy",
-        "testdata/envoy.json.golden",
-    ],
-    tags = ["exclusive"],
 )
