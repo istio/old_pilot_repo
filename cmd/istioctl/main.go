@@ -21,8 +21,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
@@ -46,6 +48,7 @@ var (
 	kubeconfig     string
 	namespace      string
 	istioNamespace string
+	kubectlcommand string
 
 	// input file name
 	file string
@@ -85,11 +88,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("create takes no arguments")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to create")
 			}
 			for _, config := range varr {
@@ -97,15 +100,20 @@ and destination policies.
 					config.Namespace = namespace
 				}
 
-				configClient, err := newClient()
-				if err != nil {
+				var configClient *crd.Client
+				if configClient, err = newClient(); err != nil {
 					return err
 				}
-				rev, err := configClient.Create(config)
-				if err != nil {
+				var rev string
+				if rev, err = configClient.Create(config); err != nil {
 					return err
 				}
 				fmt.Printf("Created config %v at revision %v\n", config.Key(), rev)
+			}
+			if len(others) > 0 {
+				if err = runKubectl("create", others); err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -123,11 +131,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("replace takes no arguments")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to replace")
 			}
 			for _, config := range varr {
@@ -135,8 +143,8 @@ and destination policies.
 					config.Namespace = namespace
 				}
 
-				configClient, err := newClient()
-				if err != nil {
+				var configClient *crd.Client
+				if configClient, err = newClient(); err != nil {
 					return err
 				}
 				// fill up revision
@@ -147,12 +155,18 @@ and destination policies.
 					}
 				}
 
-				newRev, err := configClient.Update(config)
-				if err != nil {
+				var newRev string
+				if newRev, err = configClient.Update(config); err != nil {
 					return err
 				}
 
 				fmt.Printf("Updated config %v to revision %v\n", config.Key(), newRev)
+			}
+
+			if len(others) > 0 {
+				if err = runKubectl("replace", others); err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -263,11 +277,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to delete")
 			}
 			for _, config := range varr {
@@ -282,6 +296,13 @@ and destination policies.
 					fmt.Printf("Deleted config: %v\n", config.Key())
 				}
 			}
+
+			if len(others) > 0 {
+				if err = runKubectl("delete", others); err != nil {
+					errs = multierror.Append(errs, err)
+				}
+			}
+
 			return errs
 		},
 	}
@@ -314,8 +335,12 @@ func init() {
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
+	postCmd.PersistentFlags().StringVar(&kubectlcommand, "kubectl", "",
+		"The path to kubectl command for uploading mixer config. If not set, kubectl will be found from $PATH.")
 	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
+	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("kubectl"))
 	deleteCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
+	deleteCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("kubectl"))
 
 	getCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "short",
 		"Output format. One of:yaml|short")
@@ -351,7 +376,7 @@ func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
-func readInputs() ([]model.Config, error) {
+func readInputs() ([]model.Config, []crd.IstioKind, error) {
 	var reader io.Reader
 	if file == "" {
 		reader = os.Stdin
@@ -359,15 +384,15 @@ func readInputs() ([]model.Config, error) {
 		var err error
 		reader, err = os.Open(file)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	input, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if out, err := readInputsLegacy(bytes.NewReader(input)); err == nil {
-		return out, nil
+		return out, nil, nil
 	}
 	return readInputsKubectl(bytes.NewReader(input))
 }
@@ -379,8 +404,9 @@ func readInputs() ([]model.Config, error) {
 // ObjectMeta as identified by the fields in model.ConfigMeta. This
 // would typically only be a problem if a user dumps an configuration
 // object with kubectl and then re-ingests it through istioctl.
-func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
+func readInputsKubectl(reader io.Reader) ([]model.Config, []crd.IstioKind, error) {
 	var varr []model.Config
+	var others []crd.IstioKind
 
 	// We store route-rules as a YaML stream; there may be more than one decoder.
 	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
@@ -391,28 +417,30 @@ func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
+			return nil, nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
 
 		schema, exists := model.IstioConfigTypes.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
 		if !exists {
-			return nil, fmt.Errorf("unrecognized type %v", obj.Kind)
+			glog.V(7).Infof("Unrecognized type %v; considering as mixer config", obj.Kind)
+			others = append(others, obj)
+			continue
 		}
 
 		config, err := crd.ConvertObject(schema, &obj, "")
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
+			return nil, nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
 
 		if err := schema.Validate(config.Spec); err != nil {
-			return nil, fmt.Errorf("configuration is invalid: %v", err)
+			return nil, nil, fmt.Errorf("configuration is invalid: %v", err)
 		}
 
 		varr = append(varr, *config)
 	}
 	glog.V(2).Infof("parsed %d inputs", len(varr))
 
-	return varr, nil
+	return varr, others, nil
 }
 
 // readInputsLegacy reads multiple documents from the input and checks
@@ -466,4 +494,56 @@ func newClient() (*crd.Client, error) {
 		model.EgressRule,
 		model.DestinationPolicy,
 	}, "")
+}
+
+func preprocMixerConfig(configs []crd.IstioKind) error {
+	for i, config := range configs {
+		if config.Namespace == "" {
+			configs[i].Namespace = namespace
+		}
+		// TODO: invokes the mixer validation webhook.
+	}
+	return nil
+}
+
+func runKubectl(subcommand string, configs []crd.IstioKind) error {
+	if err := preprocMixerConfig(configs); err != nil {
+		return err
+	}
+
+	kubectl := kubectlcommand
+	if kubectl == "" {
+		kubectl = "kubectl"
+	}
+	cmd := exec.Command(kubectl, subcommand, "-f", "-")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	go func() {
+		defer stdin.Close()
+		var bytes []byte
+		for _, config := range configs {
+			bytes, err = yaml.Marshal(config)
+			if err != nil {
+				glog.Errorf("Failed to marshal: %v", err)
+				return
+			}
+			if _, err = stdin.Write([]byte("\n---\n")); err != nil {
+				glog.Errorf("Failed to write into pipe: %v", err)
+				return
+			}
+			if _, err = stdin.Write(bytes); err != nil {
+				glog.Errorf("Failed to write into pipe: %v", err)
+				return
+			}
+		}
+	}()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		glog.Errorf("Error on kubectl: output\n%s", out)
+	} else {
+		glog.V(6).Infof("kubectl output:\n%s", out)
+	}
+	return err
 }
