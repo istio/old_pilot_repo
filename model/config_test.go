@@ -15,6 +15,7 @@
 package model_test
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -70,82 +71,6 @@ func TestEventString(t *testing.T) {
 		if got := c.in.String(); got != c.want {
 			t.Errorf("Failed: got %q want %q", got, c.want)
 		}
-	}
-}
-
-func TestProtoSchemaConversions(t *testing.T) {
-	routeRuleSchema := &model.ProtoSchema{MessageName: model.RouteRule.MessageName}
-
-	msg := &proxyconfig.RouteRule{
-		Destination: &proxyconfig.IstioService{
-			Name: "foo",
-		},
-		Precedence: 5,
-		Route: []*proxyconfig.DestinationWeight{
-			{Destination: "bar", Weight: 75},
-			{Destination: "baz", Weight: 25},
-		},
-	}
-
-	wantYAML := "destination:\n" +
-		"  name: foo\n" +
-		"precedence: 5\n" +
-		"route:\n" +
-		"- destination: bar\n" +
-		"  weight: 75\n" +
-		"- destination: baz\n" +
-		"  weight: 25\n"
-
-	wantJSONMap := map[string]interface{}{
-		"destination": map[string]interface{}{
-			"name": "foo",
-		},
-		"precedence": 5.0,
-		"route": []interface{}{
-			map[string]interface{}{
-				"destination": "bar",
-				"weight":      75.0,
-			},
-			map[string]interface{}{
-				"destination": "baz",
-				"weight":      25.0,
-			},
-		},
-	}
-
-	badSchema := &model.ProtoSchema{MessageName: "bad-name"}
-	if _, err := badSchema.FromYAML(wantYAML); err == nil {
-		t.Errorf("FromYAML should have failed using ProtoSchema with bad MessageName")
-	}
-
-	gotYAML, err := model.ToYAML(msg)
-	if err != nil {
-		t.Errorf("ToYAML failed: %v", err)
-	}
-	if !reflect.DeepEqual(gotYAML, wantYAML) {
-		t.Errorf("ToYAML failed: got %+v want %+v", spew.Sdump(gotYAML), spew.Sdump(wantYAML))
-	}
-	gotFromYAML, err := routeRuleSchema.FromYAML(wantYAML)
-	if err != nil {
-		t.Errorf("FromYAML failed: %v", err)
-	}
-	if !reflect.DeepEqual(gotFromYAML, msg) {
-		t.Errorf("FromYAML failed: got %+v want %+v", spew.Sdump(gotFromYAML), spew.Sdump(msg))
-	}
-
-	gotJSONMap, err := model.ToJSONMap(msg)
-	if err != nil {
-		t.Errorf("ToJSONMap failed: %v", err)
-	}
-	if !reflect.DeepEqual(gotJSONMap, wantJSONMap) {
-		t.Errorf("ToJSONMap failed: \ngot %vwant %v", spew.Sdump(gotJSONMap), spew.Sdump(wantJSONMap))
-	}
-	gotFromJSONMap, err := routeRuleSchema.FromJSONMap(wantJSONMap)
-	if err != nil {
-		t.Errorf("FromJSONMap failed: %v", err)
-	}
-	if !reflect.DeepEqual(gotFromJSONMap, msg) {
-		t.Errorf("FromJSONMap failed: got %+v want %+v", spew.Sdump(gotFromJSONMap), spew.Sdump(msg))
 	}
 }
 
@@ -405,6 +330,32 @@ func TestSortRouteRules(t *testing.T) {
 	}
 }
 
+type errorStore struct{}
+
+func (errorStore) ConfigDescriptor() model.ConfigDescriptor {
+	return model.IstioConfigTypes
+}
+
+func (errorStore) Get(typ, name, namespace string) (*model.Config, bool) {
+	return nil, false
+}
+
+func (errorStore) List(typ, namespace string) ([]model.Config, error) {
+	return nil, errors.New("fail")
+}
+
+func (errorStore) Create(config model.Config) (string, error) {
+	return "", errors.New("fail more")
+}
+
+func (errorStore) Update(config model.Config) (string, error) {
+	return "", errors.New("yes, fail again")
+}
+
+func (errorStore) Delete(typ, name, namespace string) error {
+	return errors.New("just keep failing")
+}
+
 func TestRouteRules(t *testing.T) {
 	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes))
 	instance := mock.MakeInstance(mock.HelloService, mock.PortHTTP, 0)
@@ -453,6 +404,55 @@ func TestRouteRules(t *testing.T) {
 	if out := store.RouteRulesByDestination([]*model.ServiceInstance{instance}); len(out) != 0 {
 		t.Error("RouteRulesByDestination() => expected no match")
 	}
+
+	// erroring out list
+	if out := model.MakeIstioStore(errorStore{}).RouteRules([]*model.ServiceInstance{instance},
+		mock.WorldService.Hostname); len(out) != 0 {
+		t.Errorf("RouteRules() => expected nil but got %v", out)
+	}
+	if out := model.MakeIstioStore(errorStore{}).RouteRulesByDestination([]*model.ServiceInstance{world}); len(out) != 0 {
+		t.Errorf("RouteRulesByDestination() => expected nil but got %v", out)
+	}
+}
+
+func TestEgressRules(t *testing.T) {
+	store := model.MakeIstioStore(memory.Make(model.IstioConfigTypes))
+	rule := &proxyconfig.EgressRule{
+		Destination: &proxyconfig.IstioService{
+			Service: "*.foo.com",
+		},
+		Ports: []*proxyconfig.EgressRule_Port{{
+			Port:     80,
+			Protocol: "HTTP",
+		}},
+	}
+
+	config := model.Config{
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.EgressRule.Type,
+			Name:      "example",
+			Namespace: "default",
+			Domain:    "cluster.local",
+		},
+		Spec: rule,
+	}
+
+	if _, err := store.Create(config); err != nil {
+		t.Error(err)
+	}
+
+	want := map[string]*proxyconfig.EgressRule{
+		"egress-rule/default/example": rule,
+	}
+	got := store.EgressRules()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("EgressRules() => expected %#v, got %#v", want, got)
+	}
+
+	// erroring out list
+	if out := model.MakeIstioStore(errorStore{}).EgressRules(); len(out) != 0 {
+		t.Errorf("EgressRules() => expected nil but got %v", out)
+	}
 }
 
 func TestPolicy(t *testing.T) {
@@ -496,6 +496,11 @@ func TestPolicy(t *testing.T) {
 	}
 	if out := store.Policy(nil, mock.WorldService.Hostname, labels); out != nil {
 		t.Error("Policy() => expected no match for source-matched policy")
+	}
+
+	// erroring out list
+	if out := model.MakeIstioStore(errorStore{}).Policy(instances, mock.WorldService.Hostname, labels); out != nil {
+		t.Errorf("Policy() => expected nil but got %v", out)
 	}
 }
 
