@@ -466,17 +466,17 @@ func printYamlOutput(configClient *crd.Client, configList []model.Config) {
 	for _, config := range configList {
 		schema, exists := descriptor.GetByType(config.Type)
 		if !exists {
-			fmt.Errorf("Unknown kind %q for %v", crd.ResourceName(config.Type), config.Name)
+			glog.Errorf("Unknown kind %q for %v", crd.ResourceName(config.Type), config.Name)
 			continue
 		}
 		obj, err := crd.ConvertConfig(schema, config)
 		if err != nil {
-			fmt.Errorf("Could not decode %v: %v", config.Name, err)
+			glog.Errorf("Could not decode %v: %v", config.Name, err)
 			continue
 		}
 		bytes, err := yaml.Marshal(obj)
 		if err != nil {
-			fmt.Errorf("Could not convert %v to YAML: %v", config, err)
+			glog.Errorf("Could not convert %v to YAML: %v", config, err)
 			continue
 		}
 		fmt.Print(string(bytes))
