@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -181,7 +182,7 @@ and destination policies.
 			if len(args) < 1 {
 				c.Println(c.UsageString())
 				return fmt.Errorf("specify the type of resource to get. Types are %v",
-					strings.Join(configClient.ConfigDescriptor().Types(), ", "))
+					strings.Join(supportedTypes(configClient), ", "))
 			}
 
 			typ, err := schema(configClient, args[0])
@@ -351,12 +352,8 @@ func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 			return desc, nil
 		}
 	}
-	types := configClient.ConfigDescriptor().Types()
-	for i := range types {
-		types[i] = crd.ResourceName(types[i])
-	}
 	return model.ProtoSchema{}, fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
-		typ, strings.Join(types, ", "))
+		typ, strings.Join(supportedTypes(configClient), ", "))
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
@@ -458,9 +455,13 @@ func readInputsLegacy(reader io.Reader) ([]model.Config, error) {
 
 // Print a simple list of names
 func printShortOutput(_ *crd.Client, configList []model.Config) {
+	var w tabwriter.Writer
+	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
+	fmt.Fprintf(&w, "NAME\tKIND\tNAMESPACE\n")
 	for _, c := range configList {
-		fmt.Printf("%v\n", c.Key())
+		fmt.Fprintf(&w, "%s\t%s\t%s\n", c.Name, c.Type, c.Namespace)
 	}
+	w.Flush() // nolint: errcheck
 }
 
 // Print as YAML
@@ -493,4 +494,12 @@ func newClient() (*crd.Client, error) {
 		model.EgressRule,
 		model.DestinationPolicy,
 	}, "")
+}
+
+func supportedTypes(configClient *crd.Client) []string {
+	types := configClient.ConfigDescriptor().Types()
+	for i := range types {
+		types[i] = crd.ResourceName(types[i])
+	}
+	return types
 }
