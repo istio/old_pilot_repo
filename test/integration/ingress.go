@@ -16,7 +16,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/golang/glog"
@@ -43,16 +42,14 @@ func (t *ingress) setup() error {
 	t.logs = makeAccessLogs()
 
 	// parse and send yamls
-	yamlFile, err := ioutil.ReadFile("test/integration/testdata/ingress.yaml")
-	if err != nil {
+	if yaml, err := fill("ingress.yaml.tmpl", t.infra); err != nil {
 		return err
-	}
-	if err = t.kubeApply(string(yamlFile), t.Namespace); err != nil {
+	} else if err = t.kubeApply(yaml, t.Namespace); err != nil {
 		return err
 	}
 
 	// send route rules for "c" only
-	if err = t.applyConfig("rule-default-route.yaml.tmpl", nil); err != nil {
+	if err := t.applyConfig("rule-default-route.yaml.tmpl", nil); err != nil {
 		return err
 	}
 
