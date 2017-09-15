@@ -71,7 +71,7 @@ func ResourceName(s string) string {
 }
 
 // kabobCaseToCamelCase converts "my-name" to "MyName"
-func kabobCaseToCamelCase(s string) string {
+func KabobCaseToCamelCase(s string) string {
 	words := strings.Split(s, "-")
 	out := ""
 	for _, word := range words {
