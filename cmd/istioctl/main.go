@@ -342,12 +342,19 @@ func main() {
 // The schema is based on the kind (for example "route-rule" or "destination-policy")
 func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 	for _, desc := range configClient.ConfigDescriptor() {
-		if desc.Type == typ || desc.Plural == typ {
+		switch typ {
+		case desc.Type, desc.Plural: // legacy hyphenated resources names
+			return desc, nil
+		case crd.ResourceName(desc.Type), crd.ResourceName(desc.Plural):
 			return desc, nil
 		}
 	}
+	types := configClient.ConfigDescriptor().Types()
+	for i := range types {
+		types[i] = crd.ResourceName(types[i])
+	}
 	return model.ProtoSchema{}, fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
-		typ, strings.Join(configClient.ConfigDescriptor().Types(), ", "))
+		typ, strings.Join(types, ", "))
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
