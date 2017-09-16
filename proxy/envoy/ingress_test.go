@@ -9,8 +9,6 @@ import (
 	"istio.io/pilot/model"
 )
 
-const ()
-
 func addIngressRoutes(r model.ConfigStore, t *testing.T) {
 	addConfig(r, ingressRouteRule1, t)
 	addConfig(r, ingressRouteRule2, t)
