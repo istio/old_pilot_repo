@@ -257,6 +257,6 @@ func TestIngressController(t *testing.T) {
 		t.Error("List() => got no error for route rules")
 	}
 	if elts, err := ctl.List(model.IngressRule.Type, "missing"); err != nil || len(elts) > 0 {
-		t.Error("List() => got %v, %v for a missing namespace", elts, err)
+		t.Errorf("List() => got %#v, %v for a missing namespace", elts, err)
 	}
 }
