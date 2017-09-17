@@ -219,7 +219,6 @@ type HTTPRoute struct {
 
 	Path   string `json:"path,omitempty"`
 	Prefix string `json:"prefix,omitempty"`
-	Regex  string `json:"regex,omitempty"`
 
 	PrefixRewrite string `json:"prefix_rewrite,omitempty"`
 	HostRewrite   string `json:"host_rewrite,omitempty"`
@@ -250,6 +249,36 @@ type HTTPRoute struct {
 // CatchAll returns true if the route matches all requests
 func (route *HTTPRoute) CatchAll() bool {
 	return len(route.Headers) == 0 && route.Path == "" && route.Prefix == "/"
+}
+
+// CombinePathPrefix checks that the route applies for a given path and prefix
+// match and updates the path and the prefix in the route. If the route is
+// incompatible with the path or the prefix, returns nil.  Either path or
+// prefix must be set but not both.  The resulting route must match exactly the
+// requests that match both the original route and the supplied path and
+// prefix.
+func (route *HTTPRoute) CombinePathPrefix(path, prefix string) *HTTPRoute {
+	switch {
+	case path == "" && route.Path == "" && strings.HasPrefix(route.Prefix, prefix):
+		// pick the longest prefix if both are prefix matches
+		return route
+	case path == "" && route.Path == "" && strings.HasPrefix(prefix, route.Prefix):
+		route.Prefix = prefix
+		return route
+	case prefix == "" && route.Prefix == "" && route.Path == path:
+		// pick only if path matches if both are path matches
+		return route
+	case path == "" && route.Prefix == "" && strings.HasPrefix(route.Path, prefix):
+		// if mixed, pick if route path satisfies the prefix
+		return route
+	case prefix == "" && route.Path == "" && strings.HasPrefix(path, route.Prefix):
+		// if mixed, pick if route prefix satisfies the path and change route to path
+		route.Path = path
+		route.Prefix = ""
+		return route
+	default:
+		return nil
+	}
 }
 
 // RetryPolicy definition

@@ -83,11 +83,6 @@ func makeDiscoveryRequest(ds *DiscoveryService, method, url string, t *testing.T
 	return body
 }
 
-func addIngressRoutes(r model.ConfigStore, t *testing.T) {
-	addConfig(r, ingressRouteRule1, t)
-	addConfig(r, ingressRouteRule2, t)
-}
-
 func commonSetup(t *testing.T) (*proxyconfig.MeshConfig, model.ConfigStore, *DiscoveryService) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)

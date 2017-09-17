@@ -66,9 +66,18 @@ func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 			continue
 		}
 
-		host := getAuthorityFromIngressRule(rule)
-		if host == "*" {
-			continue
+		host := "*"
+		ingress := rule.Spec.(*proxyconfig.IngressRule)
+		if ingress.Match != nil && ingress.Match.Request != nil {
+			if authority, ok := ingress.Match.Request.Headers[model.HeaderAuthority]; ok {
+				switch match := authority.GetMatchType().(type) {
+				case *proxyconfig.StringMatch_Exact:
+					host = match.Exact
+				default:
+					glog.Warningf("Unsupported match type for authority condition %T, falling back to %q", match, host)
+					continue
+				}
+			}
 		}
 		if tls != "" {
 			vhostsTLS[host] = append(vhostsTLS[host], routes...)
@@ -115,14 +124,14 @@ func buildIngressRoute(mesh *proxyconfig.MeshConfig,
 	rule model.Config,
 	discovery model.ServiceDiscovery,
 	config model.IstioConfigStore) ([]*HTTPRoute, string, error) {
-	ingressRule := rule.Spec.(*proxyconfig.IngressRule)
-	destination := model.ResolveHostname(rule.ConfigMeta, ingressRule.Destination)
+	ingress := rule.Spec.(*proxyconfig.IngressRule)
+	destination := model.ResolveHostname(rule.ConfigMeta, ingress.Destination)
 	service, exists := discovery.GetService(destination)
 	if !exists {
 		return nil, "", fmt.Errorf("cannot find service %q", destination)
 	}
-	tls := ingressRule.TlsSecret
-	servicePort, err := extractPort(service, ingressRule)
+	tls := ingress.TlsSecret
+	servicePort, err := extractPort(service, ingress)
 	if err != nil {
 		return nil, "", err
 	}
@@ -133,47 +142,25 @@ func buildIngressRoute(mesh *proxyconfig.MeshConfig,
 	// unfold the rules for the destination port
 	routes := buildDestinationHTTPRoutes(service, servicePort, nil, config)
 
-	// Select the routes for a destination that are applicable from Ingress.
-	// Instead of creating composite rules (combining prefixes), to avoid ambiguity
-	// we require end users to create dedicated route rules that match exactly with
-	// the match condition allowed at the Ingress controller (path/prefix/regex + host)
-	// Once a matching route is found, other properties of the route such as header match,
-	// can be applied to the ingress route.
+	// filter by path, prefix from the ingress
+	ingressRoute := buildHTTPRouteMatch(ingress.Match)
+
+	// TODO: not handling header match in ingress apart from uri and authority (uri must not be regex)
+	if len(ingressRoute.Headers) > 0 {
+		if len(ingressRoute.Headers) > 1 || ingressRoute.Headers[0].Name != model.HeaderAuthority {
+			return nil, "", errors.New("header matches in ingress rule not supported")
+		}
+	}
+
 	out := make([]*HTTPRoute, 0)
-
-	// filter by path, prefix, regex from the ingress
-	ingressRoute := buildHTTPRouteMatch(ingressRule.Match)
-	ingressHost := getAuthorityFromIngressRule(rule)
-
 	for _, route := range routes {
-		// Only consider routes whose path/prefix/regex and host
-		// match EXACTLY with the ingress Rule's values.
-		if route.Path == ingressRoute.Path &&
-			route.Prefix == ingressRoute.Prefix &&
-			route.Regex == ingressRoute.Regex {
+		// enable mixer check on the route
+		if mesh.MixerAddress != "" {
+			route.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, true)
+		}
 
-			matchFound := true
-			for _, h := range route.Headers {
-				if h.Name == model.HeaderAuthority {
-					if len(h.Value) > 0 && h.Value != ingressHost {
-						// The rule's authority field does not match with ingressHost
-						matchFound = false
-					}
-					break
-				}
-			}
-
-			// if the rule did not have any Authority header based match, its valid as well.
-			if matchFound {
-				// We don't have to add a header match for authority since we are already
-				// setting the virtual host domain field.
-
-				// enable mixer check on the route
-				if mesh.MixerAddress != "" {
-					route.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, true)
-				}
-				out = append(out, route)
-			}
+		if applied := route.CombinePathPrefix(ingressRoute.Path, ingressRoute.Prefix); applied != nil {
+			out = append(out, applied)
 		}
 	}
 
@@ -199,20 +186,4 @@ func extractPort(svc *model.Service, ingress *proxyconfig.IngressRule) (*model.P
 		return port, nil
 	}
 	return nil, errors.New("unrecognized destination port")
-}
-
-func getAuthorityFromIngressRule(rule model.Config) string {
-	ingressRule := rule.Spec.(*proxyconfig.IngressRule)
-	ingressHost := "*"
-	if ingressRule.Match != nil && ingressRule.Match.Request != nil {
-		if authority, ok := ingressRule.Match.Request.Headers[model.HeaderAuthority]; ok {
-			switch match := authority.GetMatchType().(type) {
-			case *proxyconfig.StringMatch_Exact:
-				ingressHost = match.Exact
-			default:
-				glog.Warningf("Unsupported match type for authority condition %T, falling back to %q", match, ingressHost)
-			}
-		}
-	}
-	return ingressHost
 }
