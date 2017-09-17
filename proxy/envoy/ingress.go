@@ -205,12 +205,12 @@ func getAuthorityFromIngressRule(rule model.Config) string {
 	ingressRule := rule.Spec.(*proxyconfig.IngressRule)
 	ingressHost := "*"
 	if ingressRule.Match != nil && ingressRule.Match.Request != nil {
-		if authority, ok := ingress.Match.Request.Headers[model.HeaderAuthority]; ok {
+		if authority, ok := ingressRule.Match.Request.Headers[model.HeaderAuthority]; ok {
 			switch match := authority.GetMatchType().(type) {
 			case *proxyconfig.StringMatch_Exact:
 				ingressHost = match.Exact
 			default:
-				glog.Warningf("Unsupported match type for authority condition %T, falling back to %q", match, host)
+				glog.Warningf("Unsupported match type for authority condition %T, falling back to %q", match, ingressHost)
 			}
 		}
 	}
