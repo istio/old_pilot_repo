@@ -50,7 +50,6 @@ var (
 	kubeconfig     string
 	namespace      string
 	istioNamespace string
-	kubectlcommand string
 
 	// input file name
 	file string
@@ -432,12 +431,8 @@ func init() {
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
-	postCmd.PersistentFlags().StringVar(&kubectlcommand, "kubectl", "",
-		"The path to kubectl command for uploading mixer config. If not set, kubectl will be found from $PATH.")
 	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
-	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("kubectl"))
 	deleteCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
-	deleteCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("kubectl"))
 
 	getCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "short",
 		"Output format. One of:yaml|short")
