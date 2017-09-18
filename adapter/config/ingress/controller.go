@@ -56,8 +56,7 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
 	// queue requires a time duration for a retry delay after a handler error
 	queue := kube.NewQueue(1 * time.Second)
 
-	glog.V(2).Infof("Ingress controller running in namespace %s, watching namespaces %s",
-		options.Namespace, options.WatchedNamespace)
+	glog.V(2).Infof("Ingress controller watching namespaces %q", options.WatchedNamespace)
 	// informer framework from Kubernetes
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -67,8 +66,7 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
 			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).Watch(opts)
 			},
-		}, &v1beta1.Ingress{},
-		options.ResyncPeriod, cache.Indexers{})
+		}, &v1beta1.Ingress{}, options.ResyncPeriod, cache.Indexers{})
 
 	informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -109,8 +107,8 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.MeshConfig,
 
 func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) {
 	c.handler.Append(func(obj interface{}, event model.Event) error {
-		ingress := obj.(*v1beta1.Ingress)
-		if !shouldProcessIngress(c.mesh, ingress) {
+		ingress, ok := obj.(*v1beta1.Ingress)
+		if !ok || !shouldProcessIngress(c.mesh, ingress) {
 			return nil
 		}
 
@@ -146,19 +144,12 @@ func (c *controller) Get(typ, name, namespace string) (*model.Config, bool) {
 
 	ingressName, _, _, err := decodeIngressRuleName(name)
 	if err != nil {
-		glog.V(2).Infof("decodeIngressRuleName(%s) => error %v", name, err)
 		return nil, false
 	}
 
 	storeKey := kube.KeyFunc(ingressName, namespace)
-
 	obj, exists, err := c.informer.GetStore().GetByKey(storeKey)
-	if err != nil {
-		glog.V(2).Infof("GetByKey(%s) => error %v", storeKey, err)
-		return nil, false
-	}
-
-	if !exists {
+	if err != nil || !exists {
 		return nil, false
 	}
 
