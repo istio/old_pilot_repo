@@ -17,7 +17,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -116,7 +115,7 @@ func (t *egressRules) verifyReachable(url string, shouldBeReachable bool) error 
 				resp := t.clientRequest(src, url, 1, fmt.Sprintf("-key Trace-Id -val %q", trace))
 				reachable := len(resp.code) > 0 && resp.code[0] == httpOk && strings.Contains(resp.body, trace)
 				if reachable && !shouldBeReachable {
-					return errors.New(fmt.Sprintf("Error: %s is reachable from %s (should be unreachable)", url, src))
+					return fmt.Errorf("Error: %s is reachable from %s (should be unreachable)", url, src)
 				}
 				if !reachable && shouldBeReachable {
 					return errAgain
