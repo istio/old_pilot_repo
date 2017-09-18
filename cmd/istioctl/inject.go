@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"
@@ -28,15 +29,16 @@ import (
 )
 
 var (
-	hub             string
-	tag             string
-	sidecarProxyUID int64
-	verbosity       int
-	versionStr      string // override build version
-	enableCoreDump  bool
-	meshConfig      string
-	imagePullPolicy string
-	includeIPRanges string
+	hub               string
+	tag               string
+	sidecarProxyUID   int64
+	verbosity         int
+	versionStr        string // override build version
+	enableCoreDump    bool
+	meshConfigMapName string
+	imagePullPolicy   string
+	includeIPRanges   string
+	debugMode         bool
 
 	inFilename  string
 	outFilename string
@@ -100,37 +102,43 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 					return err
 				}
 				writer = file
-				defer func() { err = file.Close() }()
+				defer func() {
+					// don't overwrite error if preceding injection failed
+					errClose := file.Close()
+					if err == nil {
+						err = errClose
+					}
+				}()
 			}
 
 			if versionStr == "" {
 				versionStr = version.Line()
 			}
 
-			client, err := kube.CreateInterface(kubeconfig)
+			_, client, err := kube.CreateInterface(kubeconfig)
 			if err != nil {
 				return err
 			}
 
-			mesh, err := inject.GetMeshConfig(client, namespace, meshConfig)
-			if err != nil {
-				return fmt.Errorf("Istio configuration not found. Verify istio configmap is "+
-					"installed in namespace %q with `kubectl get -n %s configmap istio`",
-					namespace, namespace)
+			_, meshConfig, err := inject.GetMeshConfig(client, istioNamespace, meshConfigMapName)
+
+			config := &inject.Config{
+				Policy:     inject.DefaultInjectionPolicy,
+				Namespaces: []string{v1.NamespaceAll},
+				Params: inject.Params{
+					InitImage:       inject.InitImageName(hub, tag, debugMode),
+					ProxyImage:      inject.ProxyImageName(hub, tag, debugMode),
+					Verbosity:       verbosity,
+					SidecarProxyUID: sidecarProxyUID,
+					Version:         versionStr,
+					EnableCoreDump:  enableCoreDump,
+					Mesh:            meshConfig,
+					ImagePullPolicy: imagePullPolicy,
+					IncludeIPRanges: includeIPRanges,
+					DebugMode:       debugMode,
+				},
 			}
-			params := &inject.Params{
-				InitImage:         inject.InitImageName(hub, tag),
-				ProxyImage:        inject.ProxyImageName(hub, tag),
-				Verbosity:         verbosity,
-				SidecarProxyUID:   sidecarProxyUID,
-				Version:           versionStr,
-				EnableCoreDump:    enableCoreDump,
-				Mesh:              mesh,
-				MeshConfigMapName: meshConfig,
-				ImagePullPolicy:   imagePullPolicy,
-				IncludeIPRanges:   includeIPRanges,
-			}
-			return inject.IntoResourceFile(params, reader, writer)
+			return inject.IntoResourceFile(config, reader, writer)
 		},
 	}
 )
@@ -138,7 +146,7 @@ kubectl get deployment -o yaml | istioctl kube-inject -f - | kubectl apply -f -
 func init() {
 	rootCmd.AddCommand(injectCmd)
 
-	injectCmd.PersistentFlags().StringVar(&hub, "hub", "docker.io/istio", "Docker hub")
+	injectCmd.PersistentFlags().StringVar(&hub, "hub", inject.DefaultHub, "Docker hub")
 	injectCmd.PersistentFlags().StringVar(&tag, "tag", version.Info.Version, "Docker tag")
 
 	injectCmd.PersistentFlags().StringVarP(&inFilename, "filename", "f",
@@ -151,7 +159,7 @@ func init() {
 		inject.DefaultSidecarProxyUID, "Envoy sidecar UID")
 	injectCmd.PersistentFlags().StringVar(&versionStr, "setVersionString",
 		"", "Override version info injected into resource")
-	injectCmd.PersistentFlags().StringVar(&meshConfig, "meshConfig", "istio",
+	injectCmd.PersistentFlags().StringVar(&meshConfigMapName, "meshConfigMapName", "istio",
 		fmt.Sprintf("ConfigMap name for Istio mesh configuration, key should be %q", inject.ConfigMapKey))
 
 	// Default --coreDump=true for pre-alpha development. Core dump
@@ -161,10 +169,11 @@ func init() {
 	injectCmd.PersistentFlags().BoolVar(&enableCoreDump, "coreDump",
 		true, "Enable/Disable core dumps in injected Envoy sidecar (--coreDump=true affects "+
 			"all pods in a node and should only be used the cluster admin)")
-	injectCmd.PersistentFlags().StringVar(&imagePullPolicy, "imagePullPolicy", "IfNotPresent",
+	injectCmd.PersistentFlags().StringVar(&imagePullPolicy, "imagePullPolicy", inject.DefaultImagePullPolicy,
 		"Sets the container image pull policy. Valid options are Always,IfNotPresent,Never."+
 			"The default policy is IfNotPresent.")
 	injectCmd.PersistentFlags().StringVar(&includeIPRanges, "includeIPRanges", "",
 		"Comma separated list of IP ranges in CIDR form. If set, only redirect outbound "+
 			"traffic to Envoy for IP ranges. Otherwise all outbound traffic is redirected")
+	injectCmd.PersistentFlags().BoolVar(&debugMode, "debug", true, "Use debug images and settings for the sidecar")
 }

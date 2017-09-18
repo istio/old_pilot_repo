@@ -171,7 +171,7 @@ func (instance *ServiceInstance) Validate() error {
 		errs = multierror.Append(errs, err)
 	}
 
-	if err := instance.Tags.Validate(); err != nil {
+	if err := instance.Labels.Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -202,7 +202,7 @@ func (instance *ServiceInstance) Validate() error {
 }
 
 // Validate ensures tag is well-formed
-func (t Tags) Validate() error {
+func (t Labels) Validate() error {
 	var errs error
 	for k, v := range t {
 		if !tagRegexp.MatchString(k) {
@@ -233,59 +233,96 @@ func ValidateFQDN(fqdn string) error {
 	return nil
 }
 
-// ValidateMatchCondition validates a match condition
-func ValidateMatchCondition(mc *proxyconfig.MatchCondition) (errs error) {
-	if mc.Source != "" {
-		if err := ValidateFQDN(mc.Source); err != nil {
+// ValidateIstioService checks for validity of a service reference
+func ValidateIstioService(svc *proxyconfig.IstioService) (errs error) {
+	if svc.Name == "" && svc.Service == "" {
+		errs = multierror.Append(errs, errors.New("name or service is mandatory for a service reference"))
+	} else if svc.Service != "" && svc.Name != "" {
+		errs = multierror.Append(errs, errors.New("specify either name or service, not both"))
+	} else if svc.Service != "" {
+		if err := ValidateEgressRuleDomain(svc.Service); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if svc.Namespace != "" {
+			errs = multierror.Append(errs, errors.New("namespace is not valid when service is provided"))
+		}
+		if svc.Domain != "" {
+			errs = multierror.Append(errs, errors.New("domain is not valid when service is provided"))
+		}
+	} else if svc.Name != "" {
+		if !IsDNS1123Label(svc.Name) {
+			errs = multierror.Append(errs, fmt.Errorf("name %q must be a valid label", svc.Name))
+		}
+	}
+
+	if svc.Namespace != "" && !IsDNS1123Label(svc.Namespace) {
+		errs = multierror.Append(errs, fmt.Errorf("namespace %q must be a valid label", svc.Namespace))
+	}
+
+	if svc.Domain != "" {
+		if err := ValidateFQDN(svc.Domain); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
 
-	if err := Tags(mc.SourceTags).Validate(); err != nil {
+	if err := Labels(svc.Labels).Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
-	if mc.GetTcp() != nil {
-		if err := ValidateL4MatchAttributes(mc.GetTcp()); err != nil {
+	return
+}
+
+// ValidateMatchCondition validates a match condition
+func ValidateMatchCondition(mc *proxyconfig.MatchCondition) (errs error) {
+	if mc.Source != nil {
+		if err := ValidateIstioService(mc.Source); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
 
-	if mc.GetUdp() != nil {
-		if err := ValidateL4MatchAttributes(mc.GetUdp()); err != nil {
+	if mc.Tcp != nil {
+		if err := ValidateL4MatchAttributes(mc.Tcp); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	if mc.Udp != nil {
+		if err := ValidateL4MatchAttributes(mc.Udp); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 		errs = multierror.Append(errs, fmt.Errorf("Istio does not support UDP protocol yet"))
 	}
 
-	for name, value := range mc.GetHttpHeaders() {
-		if err := ValidateHTTPHeaderName(name); err != nil {
-			errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("header name %q invalid: ", name)))
-		}
-		if err := ValidateStringMatch(value); err != nil {
-			errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("header %q value invalid: ", name)))
-		}
+	if mc.Request != nil {
+		for name, value := range mc.Request.Headers {
+			if err := ValidateHTTPHeaderName(name); err != nil {
+				errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("header name %q invalid: ", name)))
+			}
+			if err := ValidateStringMatch(value); err != nil {
+				errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("header %q value invalid: ", name)))
+			}
 
-		// validate special `uri` header:
-		// absolute path must be non-empty (https://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2)
-		if name == HeaderURI {
-			switch m := value.MatchType.(type) {
-			case *proxyconfig.StringMatch_Exact:
-				if m.Exact == "" {
-					errs = multierror.Append(errs, fmt.Errorf("exact header value for %q must be non-empty", HeaderURI))
-				}
-			case *proxyconfig.StringMatch_Prefix:
-				if m.Prefix == "" {
-					errs = multierror.Append(errs, fmt.Errorf("prefix header value for %q must be non-empty", HeaderURI))
-				}
-			case *proxyconfig.StringMatch_Regex:
-				if m.Regex == "" {
-					errs = multierror.Append(errs, fmt.Errorf("regex header value for %q must be non-empty", HeaderURI))
+			// validate special `uri` header:
+			// absolute path must be non-empty (https://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2)
+			if name == HeaderURI {
+				switch m := value.MatchType.(type) {
+				case *proxyconfig.StringMatch_Exact:
+					if m.Exact == "" {
+						errs = multierror.Append(errs, fmt.Errorf("exact header value for %q must be non-empty", HeaderURI))
+					}
+				case *proxyconfig.StringMatch_Prefix:
+					if m.Prefix == "" {
+						errs = multierror.Append(errs, fmt.Errorf("prefix header value for %q must be non-empty", HeaderURI))
+					}
+				case *proxyconfig.StringMatch_Regex:
+					if m.Regex == "" {
+						errs = multierror.Append(errs, fmt.Errorf("regex header value for %q must be non-empty", HeaderURI))
+					}
 				}
 			}
-		}
 
-		// TODO authority special header
+			// TODO validate authority special header
+		}
 	}
 
 	return
@@ -344,13 +381,9 @@ func ValidateFloatPercent(val float32) error {
 
 // ValidateDestinationWeight validates DestinationWeight
 func ValidateDestinationWeight(dw *proxyconfig.DestinationWeight) (errs error) {
-	if dw.Destination != "" {
-		if err := ValidateFQDN(dw.Destination); err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}
+	// TODO: fix destination in destination weight to be an istio service
 
-	if err := Tags(dw.Tags).Validate(); err != nil {
+	if err := Labels(dw.Labels).Validate(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -569,6 +602,9 @@ func ValidateThrottle(throttle *proxyconfig.L4FaultInjection_Throttle) (errs err
 
 // ValidateLoadBalancing validates Load Balancing
 func ValidateLoadBalancing(lb *proxyconfig.LoadBalancing) (errs error) {
+	if lb.LbPolicy == nil {
+		errs = multierror.Append(errs, errors.New("must set load balancing if specified"))
+	}
 	// Currently the policy is just a name, and we don't validate it
 	return
 }
@@ -619,7 +655,7 @@ func ValidateCircuitBreaker(cb *proxyconfig.CircuitBreaker) (errs error) {
 }
 
 // ValidateWeights checks that destination weights sum to 100
-func ValidateWeights(routes []*proxyconfig.DestinationWeight, defaultDestination string) (errs error) {
+func ValidateWeights(routes []*proxyconfig.DestinationWeight) (errs error) {
 	// Sum weights
 	sum := 0
 	for _, destWeight := range routes {
@@ -647,11 +683,15 @@ func ValidateRouteRule(msg proto.Message) error {
 	}
 
 	var errs error
-	if value.Destination == "" {
+	if value.Destination == nil {
 		errs = multierror.Append(errs, fmt.Errorf("route rule must have a destination service"))
-	}
-	if err := ValidateFQDN(value.Destination); err != nil {
-		errs = multierror.Append(errs, err)
+	} else {
+		if err := ValidateIstioService(value.Destination); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if len(value.Destination.Labels) > 0 {
+			errs = multierror.Append(errs, errors.New("route rule destination labels must be empty"))
+		}
 	}
 
 	// We don't validate precedence because any int32 is legal
@@ -696,7 +736,7 @@ func ValidateRouteRule(msg proto.Message) error {
 				errs = multierror.Append(errs, err)
 			}
 		}
-		if err := ValidateWeights(value.Route, value.Destination); err != nil {
+		if err := ValidateWeights(value.Route); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -737,56 +777,162 @@ func ValidateIngressRule(msg proto.Message) error {
 	}
 
 	var errs error
-	if value.Name == "" {
-		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a name"))
-	}
-	if !IsDNS1123Label(value.Name) {
-		errs = multierror.Append(errs, fmt.Errorf("ingress rule name must be a host name label"))
-	}
-	if value.Destination == "" {
+	if value.Destination == nil {
 		errs = multierror.Append(errs, fmt.Errorf("ingress rule must have a destination service"))
-	}
-	if err := ValidateFQDN(value.Destination); err != nil {
-		errs = multierror.Append(errs, err)
+	} else {
+		if err := ValidateIstioService(value.Destination); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if len(value.Destination.Labels) > 0 {
+			errs = multierror.Append(errs, errors.New("ingress rule destination labels must be empty"))
+		}
 	}
 
 	// TODO: complete validation for ingress
 	return errs
 }
 
+// ValidateEgressRule checks egress rules
+func ValidateEgressRule(msg proto.Message) error {
+	rule, ok := msg.(*proxyconfig.EgressRule)
+	if !ok {
+		return fmt.Errorf("cannot cast to egress rule")
+	}
+
+	var errs error
+
+	if err := ValidateEgressRuleDestination(rule.Destination); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	if len(rule.Ports) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("egress rule must have a ports list"))
+	}
+
+	ports := make(map[int32]bool)
+	for _, port := range rule.Ports {
+		if _, exists := ports[port.Port]; exists {
+			errs = multierror.Append(errs, fmt.Errorf("duplicate port: %d", port.Port))
+		}
+		ports[port.Port] = true
+
+		if err := ValidateEgressRulePort(port); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	if rule.UseEgressProxy {
+		errs = multierror.Append(errs, fmt.Errorf("directing traffic through egress proxy is not implemented yet"))
+	}
+
+	return errs
+}
+
+//ValidateEgressRuleDestination checks that valid destination is used for an egress-rule
+// only service field is allowed, all other fields are forbidden
+func ValidateEgressRuleDestination(destination *proxyconfig.IstioService) error {
+	if destination == nil {
+		return fmt.Errorf("destination of egress rule must have destination field")
+	}
+
+	var errs error
+	if destination.Name != "" {
+		errs = multierror.Append(errs, fmt.Errorf("destination of egress rule must not have name field"))
+	}
+
+	if destination.Namespace != "" {
+		errs = multierror.Append(errs,
+			fmt.Errorf("destination of egress rule must not have namespace field"))
+	}
+
+	if destination.Domain != "" {
+		errs = multierror.Append(errs, fmt.Errorf("destination of egress rule must not have domain field"))
+	}
+
+	if len(destination.Labels) > 0 {
+		errs = multierror.Append(errs, fmt.Errorf("destination of egress rule must not have labels field"))
+	}
+
+	if err := ValidateEgressRuleDomain(destination.Service); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	return errs
+}
+
+// ValidateEgressRuleDomain validates domains in the egress rules
+// domains are according to the definion of Envoy's domain of virtual hosts.
+//
+// Wildcard hosts are supported in the form of “*.foo.com” or “*-bar.foo.com”.
+// Note that the wildcard will not match the empty string. e.g. “*-bar.foo.com” will match “baz-bar.foo.com”
+// but not “-bar.foo.com”.  Additionally, a special entry “*” is allowed which will match any host/authority header.
+func ValidateEgressRuleDomain(domain string) error {
+	if len(domain) < 1 {
+		return fmt.Errorf("domain must not be empty string")
+	}
+
+	if domain[0] == '*' {
+		domain = domain[1:]   // wildcard * is allowed only at the first position
+		if len(domain) == 0 { // the domain was just * and it is OK
+			return nil
+		}
+		if domain[0] == '.' || domain[0] == '-' {
+			// the domain started with '*.' or '*-' - the rest of the domain should be validate FDQN
+			domain = domain[1:]
+		}
+	}
+	if err := ValidateFQDN(domain); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ValidateEgressRulePort checks the port of the egress rule (communication port and protocol)
+func ValidateEgressRulePort(port *proxyconfig.EgressRule_Port) error {
+
+	if err := ValidatePort(int(port.Port)); err != nil {
+		return err
+	}
+
+	protocol := Protocol(strings.ToUpper(port.Protocol))
+	switch protocol {
+	case ProtocolHTTP, ProtocolHTTPS, ProtocolHTTP2, ProtocolGRPC:
+	default:
+		return fmt.Errorf("Support for non-HTTP protocols is not yet available")
+	}
+
+	return nil
+}
+
 // ValidateDestinationPolicy checks proxy policies
 func ValidateDestinationPolicy(msg proto.Message) error {
-	value, ok := msg.(*proxyconfig.DestinationPolicy)
+	policy, ok := msg.(*proxyconfig.DestinationPolicy)
 	if !ok {
 		return fmt.Errorf("cannot cast to destination policy")
 	}
 
 	var errs error
+	if policy.Destination == nil {
+		errs = multierror.Append(errs, errors.New("destination is required in the destination policy"))
+	} else if err := ValidateIstioService(policy.Destination); err != nil {
+		errs = multierror.Append(errs, err)
+	}
 
-	if value.Destination == "" {
-		errs = multierror.Append(errs,
-			fmt.Errorf("destination policy should have a valid service name in its destination field"))
-	} else {
-		if err := ValidateFQDN(value.Destination); err != nil {
+	if policy.Source != nil {
+		if err := ValidateIstioService(policy.Source); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
 
-	for _, policy := range value.Policy {
-		if err := Tags(policy.Tags).Validate(); err != nil {
+	if policy.LoadBalancing != nil {
+		if err := ValidateLoadBalancing(policy.LoadBalancing); err != nil {
 			errs = multierror.Append(errs, err)
 		}
+	}
 
-		if policy.GetLoadBalancing() != nil {
-			if err := ValidateLoadBalancing(policy.GetLoadBalancing()); err != nil {
-				errs = multierror.Append(errs, err)
-			}
-		}
-
-		if policy.GetCircuitBreaker() != nil {
-			if err := ValidateCircuitBreaker(policy.GetCircuitBreaker()); err != nil {
-				errs = multierror.Append(errs, err)
-			}
+	if policy.CircuitBreaker != nil {
+		if err := ValidateCircuitBreaker(policy.CircuitBreaker); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 
@@ -906,21 +1052,12 @@ func ValidateConnectTimeout(timeout *duration.Duration) error {
 	return err
 }
 
-// ValidateProxyMeshConfig checks that the mesh config is well-formed
-func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
+// ValidateMeshConfig checks that the mesh config is well-formed
+func ValidateMeshConfig(mesh *proxyconfig.MeshConfig) (errs error) {
 	if mesh.EgressProxyAddress != "" {
 		if err := ValidateProxyAddress(mesh.EgressProxyAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid egress proxy address:"))
 		}
-	}
-
-	// discovery address is mandatory since mutual TLS relies on CDS.
-	// strictly speaking, proxies can operate without RDS/CDS and with hot restarts
-	// but that requires additional test validation
-	if mesh.DiscoveryAddress == "" {
-		errs = multierror.Append(errs, errors.New("discovery address must be set to the proxy discovery service"))
-	} else if err := ValidateProxyAddress(mesh.DiscoveryAddress); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid discovery address:"))
 	}
 
 	if mesh.MixerAddress != "" {
@@ -929,44 +1066,82 @@ func ValidateProxyMeshConfig(mesh *proxyconfig.ProxyMeshConfig) (errs error) {
 		}
 	}
 
-	if mesh.StatsdUdpAddress != "" {
-		if err := ValidateProxyAddress(mesh.StatsdUdpAddress); err != nil {
-			errs = multierror.Append(errs, multierror.Prefix(err, "invalid statsd udp address:"))
-		}
-	}
-
 	if err := ValidatePort(int(mesh.ProxyListenPort)); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy listen port:"))
-	}
-
-	if err := ValidatePort(int(mesh.ProxyAdminPort)); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
-	}
-
-	if mesh.IstioServiceCluster == "" {
-		errs = multierror.Append(errs, errors.New("Istio service cluster must be set"))
-	}
-
-	if err := ValidateParentAndDrain(mesh.DrainDuration, mesh.ParentShutdownDuration); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
-	}
-
-	if err := ValidateRefreshDelay(mesh.DiscoveryRefreshDelay); err != nil {
-		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
 	}
 
 	if err := ValidateConnectTimeout(mesh.ConnectTimeout); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid connect timeout:"))
 	}
 
-	if mesh.AuthCertsPath == "" {
-		errs = multierror.Append(errs, errors.New("invalid auth certificates path"))
-	}
-
 	switch mesh.AuthPolicy {
-	case proxyconfig.ProxyMeshConfig_NONE, proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
+	case proxyconfig.MeshConfig_NONE, proxyconfig.MeshConfig_MUTUAL_TLS:
 	default:
 		errs = multierror.Append(errs, fmt.Errorf("unrecognized auth policy %q", mesh.AuthPolicy))
+	}
+
+	if err := ValidateRefreshDelay(mesh.RdsRefreshDelay); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
+	}
+
+	if mesh.DefaultConfig == nil {
+		errs = multierror.Append(errs, errors.New("missing default config"))
+	} else if err := ValidateProxyConfig(mesh.DefaultConfig); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return
+}
+
+// ValidateProxyConfig checks that the mesh config is well-formed
+func ValidateProxyConfig(config *proxyconfig.ProxyConfig) (errs error) {
+	if config.ConfigPath == "" {
+		errs = multierror.Append(errs, errors.New("config path must be set"))
+	}
+
+	if config.BinaryPath == "" {
+		errs = multierror.Append(errs, errors.New("binary path must be set"))
+	}
+
+	if config.ServiceCluster == "" {
+		errs = multierror.Append(errs, errors.New("service cluster must be set"))
+	}
+
+	if err := ValidateParentAndDrain(config.DrainDuration, config.ParentShutdownDuration); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
+	}
+
+	if err := ValidateRefreshDelay(config.DiscoveryRefreshDelay); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid refresh delay:"))
+	}
+
+	// discovery address is mandatory since mutual TLS relies on CDS.
+	// strictly speaking, proxies can operate without RDS/CDS and with hot restarts
+	// but that requires additional test validation
+	if config.DiscoveryAddress == "" {
+		errs = multierror.Append(errs, errors.New("discovery address must be set to the proxy discovery service"))
+	} else if err := ValidateProxyAddress(config.DiscoveryAddress); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid discovery address:"))
+	}
+
+	if config.ZipkinAddress != "" {
+		if err := ValidateProxyAddress(config.ZipkinAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid zipkin address:"))
+		}
+	}
+
+	if err := ValidateConnectTimeout(config.ConnectTimeout); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid connect timeout:"))
+	}
+
+	if config.StatsdUdpAddress != "" {
+		if err := ValidateProxyAddress(config.StatsdUdpAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid statsd udp address:"))
+		}
+	}
+
+	if err := ValidatePort(int(config.ProxyAdminPort)); err != nil {
+		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
 	}
 
 	return

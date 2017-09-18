@@ -16,14 +16,19 @@ package crd
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"strings"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 
 	"istio.io/pilot/model"
 )
 
-func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config, error) {
+// ConvertObject converts an IstioObject k8s-style object to the
+// internal configuration model.
+func ConvertObject(schema model.ProtoSchema, object IstioObject, domain string) (*model.Config, error) {
 	data, err := schema.FromJSONMap(object.GetSpec())
 	if err != nil {
 		return nil, err
@@ -34,6 +39,7 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 			Type:            schema.Type,
 			Name:            meta.Name,
 			Namespace:       meta.Namespace,
+			Domain:          domain,
 			Labels:          meta.Labels,
 			Annotations:     meta.Annotations,
 			ResourceVersion: meta.ResourceVersion,
@@ -42,9 +48,9 @@ func convertObject(schema model.ProtoSchema, object IstioObject) (*model.Config,
 	}, nil
 }
 
-// convertConfig translates Istio config to k8s config JSON
-func convertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
-	spec, err := schema.ToJSONMap(config.Spec)
+// ConvertConfig translates Istio config to k8s config JSON
+func ConvertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, error) {
+	spec, err := model.ToJSONMap(config.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +67,14 @@ func convertConfig(schema model.ProtoSchema, config model.Config) (IstioObject, 
 	return out, nil
 }
 
-// camelCaseToKabobCase converts "my-name" to "MyName"
-func kabobCaseToCamelCase(s string) string {
+// ResourceName converts "my-name" to "myname".
+// This is needed by k8s API server as dashes prevent kubectl from accessing CRDs
+func ResourceName(s string) string {
+	return strings.Replace(s, "-", "", -1)
+}
+
+// KabobCaseToCamelCase converts "my-name" to "MyName"
+func KabobCaseToCamelCase(s string) string {
 	words := strings.Split(s, "-")
 	out := ""
 	for _, word := range words {
@@ -71,9 +83,8 @@ func kabobCaseToCamelCase(s string) string {
 	return out
 }
 
-// camelCaseToKabobCase converts "MyName" to "my-name"
-// nolint: deadcode
-func camelCaseToKabobCase(s string) string {
+// CamelCaseToKabobCase converts "MyName" to "my-name"
+func CamelCaseToKabobCase(s string) string {
 	var out bytes.Buffer
 	for i := range s {
 		if 'A' <= s[i] && s[i] <= 'Z' {
@@ -86,4 +97,47 @@ func camelCaseToKabobCase(s string) string {
 		}
 	}
 	return out.String()
+}
+
+// ParseInputs reads multiple documents from `kubectl` output and checks with
+// the schema.
+//
+// NOTE: This function only decodes a subset of the complete k8s
+// ObjectMeta as identified by the fields in model.ConfigMeta. This
+// would typically only be a problem if a user dumps an configuration
+// object with kubectl and then re-ingests it.
+func ParseInputs(inputs string) ([]model.Config, error) {
+	var varr []model.Config
+	reader := bytes.NewReader([]byte(inputs))
+
+	// We store configs as a YaML stream; there may be more than one decoder.
+	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
+	for {
+		obj := IstioKind{}
+		err := yamlDecoder.Decode(&obj)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse proto message: %v", err)
+		}
+
+		schema, exists := model.IstioConfigTypes.GetByType(CamelCaseToKabobCase(obj.Kind))
+		if !exists {
+			return nil, fmt.Errorf("unrecognized type %v", obj.Kind)
+		}
+
+		config, err := ConvertObject(schema, &obj, "")
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse proto message: %v", err)
+		}
+
+		if err := schema.Validate(config.Spec); err != nil {
+			return nil, fmt.Errorf("configuration is invalid: %v", err)
+		}
+
+		varr = append(varr, *config)
+	}
+
+	return varr, nil
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes"
+	multierror "github.com/hashicorp/go-multierror"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
@@ -38,11 +39,8 @@ type Environment struct {
 	// Config interface for listing routing rules
 	model.IstioConfigStore
 
-	// Access to TLS secrets from ingress proxies
-	model.SecretRegistry
-
 	// Mesh is the mesh config (to be merged into the config store)
-	Mesh *proxyconfig.ProxyMeshConfig
+	Mesh *proxyconfig.MeshConfig
 }
 
 // Node defines the proxy attributes used by xDS identification
@@ -105,28 +103,92 @@ const (
 
 	// IngressCertsPath is the path location for ingress certificates
 	IngressCertsPath = "/etc/istio/ingress-certs/"
+
+	// AuthCertsPath is the path location for mTLS certificates
+	AuthCertsPath = "/etc/certs/"
+
+	// CertChainFilename is mTLS chain file
+	CertChainFilename = "cert-chain.pem"
+
+	// KeyFilename is mTLS private key
+	KeyFilename = "key.pem"
+
+	// RootCertFilename is mTLS root cert
+	RootCertFilename = "root-cert.pem"
+
+	// IngressCertFilename is the ingress cert file name
+	IngressCertFilename = "tls.crt"
+
+	// IngressKeyFilename is the ingress private key file name
+	IngressKeyFilename = "tls.key"
 )
 
-// DefaultMeshConfig configuration
-func DefaultMeshConfig() proxyconfig.ProxyMeshConfig {
-	return proxyconfig.ProxyMeshConfig{
-		DiscoveryAddress:   "istio-pilot:8080",
-		EgressProxyAddress: "istio-egress:80",
-
-		ProxyListenPort:        15001,
-		ProxyAdminPort:         15000,
+// DefaultProxyConfig for individual proxies
+func DefaultProxyConfig() proxyconfig.ProxyConfig {
+	return proxyconfig.ProxyConfig{
+		ConfigPath:             "/etc/istio/proxy",
+		BinaryPath:             "/usr/local/bin/envoy",
+		ServiceCluster:         "istio-proxy",
+		AvailabilityZone:       "", //no service zone by default, i.e. AZ-aware routing is disabled
 		DrainDuration:          ptypes.DurationProto(2 * time.Second),
 		ParentShutdownDuration: ptypes.DurationProto(3 * time.Second),
+		DiscoveryAddress:       "istio-pilot:8080",
 		DiscoveryRefreshDelay:  ptypes.DurationProto(1 * time.Second),
+		ZipkinAddress:          "",
 		ConnectTimeout:         ptypes.DurationProto(1 * time.Second),
-		IstioServiceCluster:    "istio-proxy",
-
-		IngressClass:          "istio",
-		IngressControllerMode: proxyconfig.ProxyMeshConfig_STRICT,
-
-		AuthPolicy:    proxyconfig.ProxyMeshConfig_NONE,
-		AuthCertsPath: "/etc/certs",
+		StatsdUdpAddress:       "",
+		ProxyAdminPort:         15000,
 	}
+}
+
+// DefaultMeshConfig configuration
+func DefaultMeshConfig() proxyconfig.MeshConfig {
+	config := DefaultProxyConfig()
+	return proxyconfig.MeshConfig{
+		EgressProxyAddress:    "istio-egress:80",
+		MixerAddress:          "",
+		DisablePolicyChecks:   false,
+		ProxyListenPort:       15001,
+		ConnectTimeout:        ptypes.DurationProto(1 * time.Second),
+		IngressClass:          "istio",
+		IngressControllerMode: proxyconfig.MeshConfig_STRICT,
+		AuthPolicy:            proxyconfig.MeshConfig_NONE,
+		RdsRefreshDelay:       ptypes.DurationProto(1 * time.Second),
+		EnableTracing:         true,
+		AccessLogFile:         "/dev/stdout",
+		DefaultConfig:         &config,
+	}
+}
+
+// ApplyMeshConfigDefaults returns a new MeshConfig decoded from the
+// input YAML with defaults applied to omitted configuration values.
+func ApplyMeshConfigDefaults(yaml string) (*proxyconfig.MeshConfig, error) {
+	out := DefaultMeshConfig()
+	if err := model.ApplyYAML(yaml, &out); err != nil {
+		return nil, multierror.Prefix(err, "failed to convert to proto.")
+	}
+
+	// Reset the default ProxyConfig as jsonpb.UnmarshalString doesn't
+	// handled nested decode properly for our use case.
+	prevDefaultConfig := out.DefaultConfig
+	defaultProxyConfig := DefaultProxyConfig()
+	out.DefaultConfig = &defaultProxyConfig
+
+	// Re-apply defaults to ProxyConfig if they were defined in the
+	// original input MeshConfig.ProxyConfig.
+	if prevDefaultConfig != nil {
+		origProxyConfigYAML, err := model.ToYAML(prevDefaultConfig)
+		if err != nil {
+			return nil, multierror.Prefix(err, "failed to re-encode default proxy config")
+		}
+		if err := model.ApplyYAML(origProxyConfigYAML, out.DefaultConfig); err != nil {
+			return nil, multierror.Prefix(err, "failed to convert to proto.")
+		}
+	}
+	if err := model.ValidateMeshConfig(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // ParsePort extracts port number from a valid proxy address

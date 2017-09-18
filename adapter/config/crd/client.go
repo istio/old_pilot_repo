@@ -65,6 +65,9 @@ type Client struct {
 
 	// dynamic REST client for accessing config CRDs
 	dynamic *rest.RESTClient
+
+	// domainSuffix for the config metadata
+	domainSuffix string
 }
 
 // CreateRESTConfig for cluster API server, pass empty config file for in-cluster
@@ -106,7 +109,7 @@ func CreateRESTConfig(kubeconfig string) (config *rest.Config, err error) {
 // NewClient creates a client to Kubernetes API using a kubeconfig file.
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
-func NewClient(config string, descriptor model.ConfigDescriptor) (*Client, error) {
+func NewClient(config string, descriptor model.ConfigDescriptor, domainSuffix string) (*Client, error) {
 	for _, typ := range descriptor {
 		if _, exists := knownTypes[typ.Type]; !exists {
 			return nil, fmt.Errorf("missing known type for %q", typ.Type)
@@ -129,9 +132,10 @@ func NewClient(config string, descriptor model.ConfigDescriptor) (*Client, error
 	}
 
 	out := &Client{
-		descriptor: descriptor,
-		restconfig: restconfig,
-		dynamic:    dynamic,
+		descriptor:   descriptor,
+		restconfig:   restconfig,
+		dynamic:      dynamic,
+		domainSuffix: domainSuffix,
 	}
 
 	return out, nil
@@ -145,7 +149,7 @@ func (cl *Client) RegisterResources() error {
 	}
 
 	for _, schema := range cl.descriptor {
-		name := schema.Plural + "." + model.IstioAPIGroup
+		name := ResourceName(schema.Plural) + "." + model.IstioAPIGroup
 		crd := &apiextensionsv1beta1.CustomResourceDefinition{
 			ObjectMeta: meta_v1.ObjectMeta{
 				Name: name,
@@ -155,8 +159,8 @@ func (cl *Client) RegisterResources() error {
 				Version: model.IstioAPIVersion,
 				Scope:   apiextensionsv1beta1.NamespaceScoped,
 				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-					Plural: schema.Plural,
-					Kind:   kabobCaseToCamelCase(schema.Type),
+					Plural: ResourceName(schema.Plural),
+					Kind:   KabobCaseToCamelCase(schema.Type),
 				},
 			},
 		}
@@ -171,7 +175,7 @@ func (cl *Client) RegisterResources() error {
 	errPoll := wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
 	descriptor:
 		for _, schema := range cl.descriptor {
-			name := schema.Plural + "." + model.IstioAPIGroup
+			name := ResourceName(schema.Plural) + "." + model.IstioAPIGroup
 			crd, errGet := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, meta_v1.GetOptions{})
 			if errGet != nil {
 				return false, errGet
@@ -190,7 +194,7 @@ func (cl *Client) RegisterResources() error {
 				}
 			}
 			glog.V(2).Infof("missing status condition for %q", name)
-			return false, err
+			return false, nil
 		}
 		return true, nil
 	})
@@ -198,9 +202,9 @@ func (cl *Client) RegisterResources() error {
 	if errPoll != nil {
 		deleteErr := cl.DeregisterResources()
 		if deleteErr != nil {
-			return multierror.Append(err, deleteErr)
+			return multierror.Append(errPoll, deleteErr)
 		}
-		return err
+		return errPoll
 	}
 
 	return nil
@@ -215,7 +219,7 @@ func (cl *Client) DeregisterResources() error {
 
 	var errs error
 	for _, schema := range cl.descriptor {
-		name := schema.Plural + "." + model.IstioAPIGroup
+		name := ResourceName(schema.Plural) + "." + model.IstioAPIGroup
 		err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(name, nil)
 		errs = multierror.Append(errs, err)
 	}
@@ -237,7 +241,7 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 	config := knownTypes[typ].object.DeepCopyObject().(IstioObject)
 	err := cl.dynamic.Get().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(ResourceName(schema.Plural)).
 		Name(name).
 		Do().Into(config)
 
@@ -246,7 +250,7 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 		return nil, false
 	}
 
-	out, err := convertObject(schema, config)
+	out, err := ConvertObject(schema, config, cl.domainSuffix)
 	if err != nil {
 		glog.Warning(err)
 		return nil, false
@@ -265,7 +269,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 
-	out, err := convertConfig(schema, config)
+	out, err := ConvertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}
@@ -273,7 +277,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 	obj := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Post().
 		Namespace(out.GetObjectMeta().Namespace).
-		Resource(schema.Plural).
+		Resource(ResourceName(schema.Plural)).
 		Body(out).
 		Do().Into(obj)
 	if err != nil {
@@ -298,7 +302,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 		return "", fmt.Errorf("revision is required")
 	}
 
-	out, err := convertConfig(schema, config)
+	out, err := ConvertConfig(schema, config)
 	if err != nil {
 		return "", err
 	}
@@ -306,7 +310,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 	obj := knownTypes[schema.Type].object.DeepCopyObject().(IstioObject)
 	err = cl.dynamic.Put().
 		Namespace(out.GetObjectMeta().Namespace).
-		Resource(schema.Plural).
+		Resource(ResourceName(schema.Plural)).
 		Name(out.GetObjectMeta().Name).
 		Body(out).
 		Do().Into(obj)
@@ -326,7 +330,7 @@ func (cl *Client) Delete(typ, name, namespace string) error {
 
 	return cl.dynamic.Delete().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(ResourceName(schema.Plural)).
 		Name(name).
 		Do().Error()
 }
@@ -341,12 +345,12 @@ func (cl *Client) List(typ, namespace string) ([]model.Config, error) {
 	list := knownTypes[schema.Type].collection.DeepCopyObject().(IstioObjectList)
 	errs := cl.dynamic.Get().
 		Namespace(namespace).
-		Resource(schema.Plural).
+		Resource(ResourceName(schema.Plural)).
 		Do().Into(list)
 
 	out := make([]model.Config, 0)
 	for _, item := range list.GetItems() {
-		obj, err := convertObject(schema, item)
+		obj, err := ConvertObject(schema, item, cl.domainSuffix)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		} else {

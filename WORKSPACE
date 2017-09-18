@@ -275,7 +275,7 @@ go_repository(
     name = "io_k8s_apiserver",
     build_file_generation = "on",
     build_file_name = "BUILD.bazel",
-    commit = "ab57ed5a72c3b67058f665d660e23bae18339fc2",
+    commit = "149fc2228647cea28b0670c240ec582e985e8eda",  # Jul Aug 1, 2017
     importpath = "k8s.io/apiserver",
 )
 
@@ -365,7 +365,7 @@ go_repository(
 
 go_repository(
     name = "com_github_russross_blackfriday",
-    commit = "35eb537633d9950afc8ae7bdf0edb6134584e9fc",  # Mar 19, 2017 (no releases)
+    commit = "4048872b16cc0fc2c5fd9eacf0ed2c2fedaa0c8c",
     importpath = "github.com/russross/blackfriday",
 )
 
@@ -429,7 +429,7 @@ go_repository(
 
 # Change this and the docker/Dockerfile.proxy* files together
 # This SHA is obtained from proxy/postsubmit job
-ISTIO_PROXY_BUCKET = "62755c63d9c80c043ece26504c4288845a929cc4"  # Aug 24 2017
+ISTIO_PROXY_BUCKET = "c9f369bca03fae0afa0921d78f8af530ce576e91"
 
 http_file(
     name = "envoy_binary",
@@ -448,11 +448,10 @@ go_repository(
     importpath = "github.com/golang/protobuf",
 )
 
-http_archive(
+git_repository(
     name = "com_github_google_protobuf",
-    sha256 = "2a25c2b71c707c5552ec9afdfb22532a93a339e1ca5d38f163fe4107af08c54c",
-    strip_prefix = "protobuf-3.2.0",
-    url = "https://github.com/google/protobuf/archive/v3.2.0.tar.gz",
+    commit = "593e917c176b5bc5aafa57bf9f6030d749d91cd5",  # Jan 2017 3.2.0
+    remote = "https://github.com/google/protobuf.git",
 )
 
 go_repository(
@@ -478,7 +477,7 @@ go_proto_library(
     ],
 )
     """,
-    commit = "846cbe55455f0b3b2ed742b52edc520cc94326a9",  # Aug 18, 2017
+    commit = "f25de4f0d4f9812a567974b868c44366253e22c5",  # Sep 14, 2017
     remote = "https://github.com/istio/api.git",
 )
 
@@ -527,6 +526,6 @@ go_repository(
 
 git_repository(
     name = "com_github_istio_test_infra",
-    commit = "b0822890273f91d5aa8c40ea1a89ba01e0f0ee9d",  # Aug 22, 2017
+    commit = "67e73ad01f9d1074a7d787a91201d41938ad4310",  # Aug 25, 2017
     remote = "https://github.com/istio/test-infra.git",
 )

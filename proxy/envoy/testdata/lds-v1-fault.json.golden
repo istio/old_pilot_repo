@@ -32,9 +32,9 @@
          "name": "mixer",
          "config": {
           "mixer_attributes": {
-           "target.ip": "10.1.1.1",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://v1.default"
+           "destination.ip": "10.1.1.1",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v1.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.1",
@@ -84,9 +84,9 @@
          "name": "mixer",
          "config": {
           "mixer_attributes": {
-           "target.ip": "10.1.1.1",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://v1.default"
+           "destination.ip": "10.1.1.1",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v1.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.1",
@@ -136,9 +136,9 @@
          "name": "mixer",
          "config": {
           "mixer_attributes": {
-           "target.ip": "10.1.1.1",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://v1.default"
+           "destination.ip": "10.1.1.1",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v1.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.1",
@@ -158,6 +158,37 @@
          "path": "/dev/stdout"
         }
        ]
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.0.0:100",
+    "name": "mongo_10.1.0.0_100",
+    "filters": [
+     {
+      "type": "both",
+      "name": "mongo_proxy",
+      "config": {
+       "stat_prefix": "mongo"
+      }
+     },
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "out.6fc71bd0fc240b9cf1b3437a82c18a5c97d40890",
+          "destination_ip_list": [
+           "10.1.0.0/32"
+          ]
+         }
+        ]
+       }
       }
      }
     ],
@@ -213,8 +244,9 @@
             "prefix": "/",
             "cluster": "in.1081",
             "opaque_config": {
-             "mixer_control": "on",
-             "mixer_forward": "off"
+             "mixer_check": "on",
+             "mixer_forward": "off",
+             "mixer_report": "on"
             }
            }
           ]
@@ -227,9 +259,9 @@
          "name": "mixer",
          "config": {
           "mixer_attributes": {
-           "target.ip": "10.1.1.1",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://v1.default"
+           "destination.ip": "10.1.1.1",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v1.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.1",
@@ -263,8 +295,8 @@
       "name": "mixer",
       "config": {
        "mixer_attributes": {
-        "target.ip": "10.1.1.1",
-        "target.uid": "kubernetes://v1.default"
+        "destination.ip": "10.1.1.1",
+        "destination.uid": "kubernetes://v1.default"
        }
       }
      },
@@ -277,6 +309,47 @@
         "routes": [
          {
           "cluster": "in.1090",
+          "destination_ip_list": [
+           "10.1.1.1/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.1.1.1:1100",
+    "name": "mongo_10.1.1.1_1100",
+    "filters": [
+     {
+      "type": "both",
+      "name": "mixer",
+      "config": {
+       "mixer_attributes": {
+        "destination.ip": "10.1.1.1",
+        "destination.uid": "kubernetes://v1.default"
+       }
+      }
+     },
+     {
+      "type": "both",
+      "name": "mongo_proxy",
+      "config": {
+       "stat_prefix": "mongo"
+      }
+     },
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "in.1100",
           "destination_ip_list": [
            "10.1.1.1/32"
           ]
@@ -338,8 +411,9 @@
             "prefix": "/",
             "cluster": "in.80",
             "opaque_config": {
-             "mixer_control": "on",
-             "mixer_forward": "off"
+             "mixer_check": "on",
+             "mixer_forward": "off",
+             "mixer_report": "on"
             }
            }
           ]
@@ -352,9 +426,9 @@
          "name": "mixer",
          "config": {
           "mixer_attributes": {
-           "target.ip": "10.1.1.1",
-           "target.service": "hello.default.svc.cluster.local",
-           "target.uid": "kubernetes://v1.default"
+           "destination.ip": "10.1.1.1",
+           "destination.service": "hello.default.svc.cluster.local",
+           "destination.uid": "kubernetes://v1.default"
           },
           "forward_attributes": {
            "source.ip": "10.1.1.1",
@@ -394,6 +468,37 @@
           "cluster": "in.9999",
           "destination_ip_list": [
            "10.1.1.1/32"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    ],
+    "bind_to_port": false
+   },
+   {
+    "address": "tcp://10.2.0.0:100",
+    "name": "mongo_10.2.0.0_100",
+    "filters": [
+     {
+      "type": "both",
+      "name": "mongo_proxy",
+      "config": {
+       "stat_prefix": "mongo"
+      }
+     },
+     {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+       "stat_prefix": "tcp",
+       "route_config": {
+        "routes": [
+         {
+          "cluster": "out.152eb365b2958596c93b3d847abe47b5bc3f1e9a",
+          "destination_ip_list": [
+           "10.2.0.0/32"
           ]
          }
         ]

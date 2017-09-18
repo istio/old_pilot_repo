@@ -54,7 +54,7 @@ bazel test //...
 echo  '=== Code Coverage ==='
 ./bin/codecov.sh | tee codecov.report
 if [ "${CI:-}" == 'bootstrap' ]; then
-    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME='pilot/postsubmit' bin/toolbox/pkg_coverage.sh
+    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME='pilot/postsubmit'
 
     curl -s https://codecov.io/bash \
       | CI_JOB_ID="${JOB_NAME}" CI_BUILD_ID="${BUILD_NUMBER}" bash /dev/stdin \
@@ -62,12 +62,16 @@ if [ "${CI:-}" == 'bootstrap' ]; then
 else
     echo 'Not in bootstrap environment, skipping code coverage publishing'
 fi
+#./bin/toolbox/pkg_coverage.sh
 
 echo '=== Build istioctl ==='
 ./bin/upload-istioctl -r -p "gs://istio-artifacts/pilot/${GIT_SHA}/artifacts/istioctl"
 
+echo "=== Pushing Debian Packages ==="
+bin/push-debian.sh -c opt -p "gs://istio-artifacts/pilot/${GIT_SHA}/artifacts/debs"
+
 echo '=== Running e2e Tests ==='
-bin/e2e.sh -count 10 -logs=false -tag "${GIT_SHA}"
+bin/e2e.sh -logs=false -tag "${GIT_SHA}"
 
 if [ "${CI:-}" == 'bootstrap' ]; then
     echo "=== Building githubctl ==="

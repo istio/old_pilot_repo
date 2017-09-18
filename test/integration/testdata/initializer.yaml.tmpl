@@ -9,9 +9,11 @@ kind: Deployment
 metadata:
   name: istio-sidecar-initializer
   annotations:
-    policy.sidecar.istio.io: "policy.sidecar.istio.io/force-off"
+    sidecar.istio.io/inject: "false"
+{{if .UseInitializer }}
   initializers:
     pending: []
+{{end}}
   labels:
     istio: istio-sidecar-initializer
 spec:
@@ -22,7 +24,7 @@ spec:
       labels:
         istio: sidecar-initializer
       annotations:
-        policy.sidecar.istio.io: "policy.sidecar.istio.io/force-off"
+        sidecar.istio.io/inject: "false"
     spec:
       serviceAccountName: istio-sidecar-initializer-service-account
       containers:
@@ -30,10 +32,8 @@ spec:
           image: {{.Hub}}/sidecar_initializer:{{.Tag}}
           imagePullPolicy: IfNotPresent
           args:
-            - --hub={{.Hub}}
-            - --tag={{.Tag}}
-            - --namespace={{.Namespace}}
-            - --policy={{.InjectionPolicy}}
+            - --port=8083
+            - --namespace={{.IstioNamespace}}
             - -v=2
           volumeMounts:
           - name: config-volume

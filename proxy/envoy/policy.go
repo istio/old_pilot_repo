@@ -20,11 +20,15 @@ package envoy
 import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
+	"istio.io/pilot/proxy"
 )
 
 // applyClusterPolicy assumes an outbound cluster and inserts custom configuration for the cluster
-func applyClusterPolicy(cluster *Cluster, config model.IstioConfigStore,
-	mesh *proxyconfig.ProxyMeshConfig, accounts model.ServiceAccounts) {
+func applyClusterPolicy(cluster *Cluster,
+	instances []*model.ServiceInstance,
+	config model.IstioConfigStore,
+	mesh *proxyconfig.MeshConfig,
+	accounts model.ServiceAccounts) {
 	duration := protoDurationToMS(mesh.ConnectTimeout)
 	cluster.ConnectTimeoutMs = duration
 
@@ -33,25 +37,33 @@ func applyClusterPolicy(cluster *Cluster, config model.IstioConfigStore,
 		return
 	}
 
-	// apply auth policies
-	switch mesh.AuthPolicy {
-	case proxyconfig.ProxyMeshConfig_NONE:
-		// do nothing
-	case proxyconfig.ProxyMeshConfig_MUTUAL_TLS:
-		// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
-		ports := model.PortList{cluster.port}.GetNames()
-		serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
-		cluster.SSLContext = buildClusterSSLContext(mesh.AuthCertsPath, serviceAccounts)
+	// Original DST cluster are used to route to services outside the mesh
+	// where Istio auth does not apply.
+	if cluster.Type != ClusterTypeOriginalDST {
+		// apply auth policies
+		switch mesh.AuthPolicy {
+		case proxyconfig.MeshConfig_NONE:
+			// do nothing
+		case proxyconfig.MeshConfig_MUTUAL_TLS:
+			// apply SSL context to enable mutual TLS between Envoy proxies for outbound clusters
+			ports := model.PortList{cluster.port}.GetNames()
+			serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)
+			cluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, serviceAccounts)
+		}
 	}
 
 	// apply destination policies
-	policy := config.DestinationPolicy(cluster.hostname, cluster.tags)
+	policyConfig := config.Policy(instances, cluster.hostname, cluster.tags)
 
-	if policy == nil {
+	if policyConfig == nil {
 		return
 	}
 
-	if policy.LoadBalancing != nil {
+	policy := policyConfig.Spec.(*proxyconfig.DestinationPolicy)
+
+	// Load balancing policies do not apply for Original DST clusters
+	// as the intent is to go directly to the instance.
+	if policy.LoadBalancing != nil && cluster.Type != ClusterTypeOriginalDST {
 		switch policy.LoadBalancing.GetName() {
 		case proxyconfig.LoadBalancing_ROUND_ROBIN:
 			cluster.LbType = LbTypeRoundRobin

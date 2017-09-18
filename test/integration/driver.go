@@ -34,8 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
-	"istio.io/pilot/adapter/config/crd"
-	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/test/util"
@@ -57,11 +55,11 @@ var (
 )
 
 const (
-	// CA image tag is the short SHA *update manually*
-	caTag = "689b447"
+	// caImage specifies the default istio-ca docker image used for e2e testing *update manually*
+	caImage = "gcr.io/istio-testing/istio-ca:2baec6baacecbd516ea0880573b6fc3cd5736739"
 
-	// Mixer image tag is the short SHA *update manually*
-	mixerImage = "gcr.io/istio-testing/mixer:49e721e15d481cd5d92d9a2b30b5e8fcdcafdb63"
+	// mixerImage specifies the default mixer docker image used for e2e testing *update manually*
+	mixerImage = "gcr.io/istio-testing/mixer:345feec92a1fe660badef33c74df446d8b106307"
 
 	// retry budget
 	budget = 90
@@ -70,10 +68,8 @@ const (
 func init() {
 	flag.StringVar(&params.Hub, "hub", "gcr.io/istio-testing", "Docker hub")
 	flag.StringVar(&params.Tag, "tag", "", "Docker tag")
-	flag.StringVar(&params.CaImage, "ca", "gcr.io/istio-testing/istio-ca:"+caTag,
-		"CA Docker image")
-	flag.StringVar(&params.MixerImage, "mixer", mixerImage,
-		"Mixer Docker image")
+	flag.StringVar(&params.CaImage, "ca", caImage, "CA Docker image")
+	flag.StringVar(&params.MixerImage, "mixer", mixerImage, "Mixer Docker image")
 	flag.StringVar(&params.IstioNamespace, "ns", "",
 		"Namespace in which to install Istio components (empty to create/delete temporary one)")
 	flag.StringVar(&params.Namespace, "n", "",
@@ -92,8 +88,22 @@ func init() {
 	// Keep disabled until default no-op initializer is distributed
 	// and running in test clusters.
 	flag.BoolVar(&params.UseInitializer, "use-initializer", false, "Use k8s sidecar initializer")
+	flag.BoolVar(&params.UseAdmissionWebhook, "use-admission-webhook", false,
+		"Use k8s external admission webhook for config validation")
+
+	// TODO(github.com/kubernetes/kubernetes/issues/49987) - use
+	// `istio-pilot-external` for the registered service name and
+	// provide `istio-pilot` as --service-name argument to
+	// platform/kube/admit/webhook-workaround.sh. Once this bug is
+	// fixed (and for non-GKE k8s) the admission-service-name should
+	// be `istio-pilot`.
+	flag.StringVar(&params.AdmissionServiceName, "admission-service-name", "istio-pilot-external",
+		"Name of admission webhook service name")
 
 	flag.IntVar(&params.DebugPort, "debugport", 0, "Debugging port")
+
+	flag.BoolVar(&params.debugImagesAndMode, "debug", true, "Use debug images and mode (false for prod)")
+
 }
 
 type test interface {
@@ -115,12 +125,8 @@ func main() {
 		params.Verbosity = 2
 	}
 
-	if err := setupClient(); err != nil {
-		glog.Fatal(err)
-	}
-
 	params.Name = "(default infra)"
-	params.Auth = proxyconfig.ProxyMeshConfig_NONE
+	params.Auth = proxyconfig.MeshConfig_NONE
 	params.Mixer = true
 	params.Ingress = true
 	params.Egress = true
@@ -131,6 +137,13 @@ func main() {
 			params.Namespace, authmode)
 		return
 	}
+
+	var err error
+	_, client, err = kube.CreateInterface(kubeconfig)
+	if err != nil {
+		glog.Fatal(err)
+	}
+
 	switch authmode {
 	case "enable":
 		runTests(setAuth(params))
@@ -146,7 +159,7 @@ func main() {
 func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
-	out.Auth = proxyconfig.ProxyMeshConfig_MUTUAL_TLS
+	out.Auth = proxyconfig.MeshConfig_MUTUAL_TLS
 	return out
 }
 
@@ -178,11 +191,16 @@ func runTests(envs ...infra) {
 
 		nslist := []string{istio.IstioNamespace, istio.Namespace}
 		istio.apps, errs = util.GetAppPods(client, nslist)
+		if errs != nil {
+			result = multierror.Append(result, errs)
+			break
+		}
 
 		tests := []test{
 			&http{infra: &istio},
 			&grpc{infra: &istio},
 			&tcp{infra: &istio},
+			&headless{infra: &istio},
 			&ingress{infra: &istio},
 			&egress{infra: &istio},
 			&routing{infra: &istio},
@@ -235,7 +253,7 @@ func runTests(envs ...infra) {
 		}
 
 		// always remove infra even if the tests fail
-		log("Tearing down infrastructure", spew.Sdump(istio))
+		log("Tearing down infrastructure", istio.Name)
 		istio.teardown()
 
 		if errs == nil {
@@ -314,15 +332,17 @@ func parallel(fs map[string]func() status) error {
 	return g.Wait()
 }
 
-// connect to K8S cluster and register TPRs
-func setupClient() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
-	if err != nil {
-		return err
+// repeat a check up to budget until it does not return an error
+func repeat(f func() error, budget int, delay time.Duration) error {
+	var errs error
+	for i := 0; i < budget; i++ {
+		err := f()
+		if err == nil {
+			return nil
+		}
+		errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("attempt %d", i)))
+		glog.Infof("attempt #%d failed with %v", i, err)
+		time.Sleep(delay)
 	}
-	client, err = kube.CreateInterface(kubeconfig)
-	if err != nil {
-		return err
-	}
-	return istioClient.RegisterResources()
+	return errs
 }

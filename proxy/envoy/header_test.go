@@ -29,46 +29,51 @@ func TestHTTPMatch(t *testing.T) {
 	}{
 		{
 			in:   &proxyconfig.MatchCondition{},
-			want: &HTTPRoute{Path: "", Prefix: "/"},
+			want: &HTTPRoute{Path: "", Prefix: "/", Regex: ""},
 		},
 		{
 			in: &proxyconfig.MatchCondition{
-				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Exact{Exact: "/path"}},
+				Request: &proxyconfig.MatchRequest{
+					Headers: map[string]*proxyconfig.StringMatch{
+						model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Exact{Exact: "/path"}},
+					},
 				},
 			},
-			want: &HTTPRoute{Path: "/path", Prefix: ""},
+			want: &HTTPRoute{Path: "/path", Prefix: "", Regex: ""},
 		},
 		{
 			in: &proxyconfig.MatchCondition{
-				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "/prefix"}},
+				Request: &proxyconfig.MatchRequest{
+					Headers: map[string]*proxyconfig.StringMatch{
+						model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "/prefix"}},
+					},
 				},
 			},
-			want: &HTTPRoute{Path: "", Prefix: "/prefix"},
+			want: &HTTPRoute{Path: "", Prefix: "/prefix", Regex: ""},
 		},
 		{
 			in: &proxyconfig.MatchCondition{
-				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
+				Request: &proxyconfig.MatchRequest{
+					Headers: map[string]*proxyconfig.StringMatch{
+						model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
+					},
 				},
 			},
-			want: &HTTPRoute{Path: "", Prefix: "/", Headers: Headers{
-				{Name: model.HeaderURI, Value: "/.*", Regex: true},
-			}},
+			want: &HTTPRoute{Path: "", Prefix: "", Regex: "/.*"},
 		},
 		{
 			in: &proxyconfig.MatchCondition{
-				HttpHeaders: map[string]*proxyconfig.StringMatch{
-					model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
-					"cookie":        {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "user=jason?"}},
-					"test":          {MatchType: &proxyconfig.StringMatch_Exact{Exact: "value"}},
+				Request: &proxyconfig.MatchRequest{
+					Headers: map[string]*proxyconfig.StringMatch{
+						model.HeaderURI: {MatchType: &proxyconfig.StringMatch_Regex{Regex: "/.*"}},
+						"cookie":        {MatchType: &proxyconfig.StringMatch_Prefix{Prefix: "user=jason?"}},
+						"test":          {MatchType: &proxyconfig.StringMatch_Exact{Exact: "value"}},
+					},
 				},
 			},
-			want: &HTTPRoute{Path: "", Prefix: "/", Headers: Headers{
+			want: &HTTPRoute{Path: "", Prefix: "", Regex: "/.*", Headers: Headers{
 				{Name: "cookie", Value: "^user=jason\\?.*", Regex: true},
 				{Name: "test", Value: "value"},
-				{Name: model.HeaderURI, Value: "/.*", Regex: true},
 			}},
 		},
 	}

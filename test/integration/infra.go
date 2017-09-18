@@ -18,12 +18,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -33,7 +36,11 @@ import (
 	"istio.io/pilot/test/util"
 )
 
-type infra struct {
+const (
+	ingressSecretName = "istio-ingress-certs"
+)
+
+type infra struct { // nolint: aligncheck
 	Name string
 
 	// docker tags
@@ -48,7 +55,7 @@ type infra struct {
 	// map from app to pods
 	apps map[string][]string
 
-	Auth proxyconfig.ProxyMeshConfig_AuthPolicy
+	Auth proxyconfig.MeshConfig_AuthPolicy
 
 	// switches for infrastructure components
 	Mixer     bool
@@ -62,13 +69,30 @@ type infra struct {
 
 	namespaceCreated      bool
 	istioNamespaceCreated bool
+	debugImagesAndMode    bool
 
 	// sidecar initializer
-	UseInitializer  bool
-	InjectionPolicy inject.InjectionPolicy
+	UseInitializer bool
+	InjectConfig   *inject.Config
+
+	// External Admission Webhook for validation
+	UseAdmissionWebhook  bool
+	AdmissionServiceName string
+
+	config model.IstioConfigStore
 }
 
 func (infra *infra) setup() error {
+	crdclient, crderr := crd.NewClient(kubeconfig, model.IstioConfigTypes, "")
+	if crderr != nil {
+		return crderr
+	}
+	if err := crdclient.RegisterResources(); err != nil {
+		return err
+	}
+
+	infra.config = model.MakeIstioStore(crdclient)
+
 	if infra.Namespace == "" {
 		var err error
 		if infra.Namespace, err = util.CreateNamespace(client); err != nil {
@@ -104,25 +128,38 @@ func (infra *infra) setup() error {
 	if err := deploy("rbac-beta.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("config.yaml.tmpl", infra.Namespace); err != nil {
-		return err
-	}
 
 	if err := deploy("config.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
 
-	if infra.UseInitializer {
-		infra.InjectionPolicy = inject.InjectionPolicyOptOut
+	_, mesh, err := inject.GetMeshConfig(client, infra.IstioNamespace, "istio")
+	if err != nil {
+		return err
+	}
+	debugMode := infra.debugImagesAndMode
+	glog.Infof("mesh %s", spew.Sdump(mesh))
+	infra.InjectConfig = &inject.Config{
+		Policy:     inject.InjectionPolicyEnabled,
+		Namespaces: []string{infra.Namespace, infra.IstioNamespace},
+		Params: inject.Params{
+			InitImage:       inject.InitImageName(infra.Hub, infra.Tag, debugMode),
+			ProxyImage:      inject.ProxyImageName(infra.Hub, infra.Tag, debugMode),
+			Verbosity:       infra.Verbosity,
+			SidecarProxyUID: inject.DefaultSidecarProxyUID,
+			EnableCoreDump:  true,
+			Version:         "integration-test",
+			Mesh:            mesh,
+			DebugMode:       debugMode,
+		},
+	}
 
-		// NOTE: InitializerConfiguration is cluster-scoped and may be
-		// created and used by other tests in the same test
-		// cluster.
+	// NOTE: InitializerConfiguration is cluster-scoped and may be
+	// created and used by other tests in the same test cluster.
+	if infra.UseInitializer {
 		if err := deploy("initializer-config.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
-	} else {
-		infra.InjectionPolicy = inject.InjectionPolicyOff
 	}
 
 	// TODO - Initializer configs can block initializers from being
@@ -141,16 +178,19 @@ func (infra *infra) setup() error {
 	//
 	// See github.com/kubernetes/kubernetes/issues/49048 for k8s
 	// tracking issue.
-	if infra.UseInitializer {
-		if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
-			return err
-		} else if err = infra.kubeDelete(yaml); err != nil {
-			glog.Infof("Sidecar initializer could not be deleted: %v", err)
-		}
+	if yaml, err := fill("initializer.yaml.tmpl", infra); err != nil {
+		return err
+	} else if err = infra.kubeDelete(yaml, infra.IstioNamespace); err != nil {
+		glog.Infof("Sidecar initializer could not be deleted: %v", err)
+	}
 
-		if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
-			return err
-		}
+	if yaml, err := fill("initializer-configmap.yaml.tmpl", &infra.InjectConfig); err != nil {
+		return err
+	} else if err = infra.kubeApply(yaml, infra.IstioNamespace); err != nil {
+		return err
+	}
+	if err := deploy("initializer.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
 	}
 
 	if err := deploy("pilot.yaml.tmpl", infra.IstioNamespace); err != nil {
@@ -160,13 +200,35 @@ func (infra *infra) setup() error {
 		return err
 	}
 
-	if infra.Auth != proxyconfig.ProxyMeshConfig_NONE {
+	if infra.Auth != proxyconfig.MeshConfig_NONE {
 		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
 			return err
 		}
 	}
+	if err := deploy("headless.yaml.tmpl", infra.Namespace); err != nil {
+		return err
+	}
 	if infra.Ingress {
 		if err := deploy("ingress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
+			return err
+		}
+		// Create ingress key/cert in secret
+		key, err := ioutil.ReadFile("docker/certs/cert.key")
+		if err != nil {
+			return err
+		}
+		crt, err := ioutil.ReadFile("docker/certs/cert.crt")
+		if err != nil {
+			return err
+		}
+		_, err = client.CoreV1().Secrets(infra.IstioNamespace).Create(&v1.Secret{
+			ObjectMeta: meta_v1.ObjectMeta{Name: ingressSecretName},
+			Data: map[string][]byte{
+				"tls.key": key,
+				"tls.crt": crt,
+			},
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -175,6 +237,7 @@ func (infra *infra) setup() error {
 			return err
 		}
 	}
+
 	if infra.Zipkin {
 		if err := deploy("zipkin.yaml", infra.IstioNamespace); err != nil {
 			return err
@@ -228,22 +291,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 	writer := new(bytes.Buffer)
 
 	if injectProxy && !infra.UseInitializer {
-		mesh, err := inject.GetMeshConfig(client, infra.Namespace, "istio")
-		if err != nil {
-			return err
-		}
-
-		p := &inject.Params{
-			InitImage:         inject.InitImageName(infra.Hub, infra.Tag),
-			ProxyImage:        inject.ProxyImageName(infra.Hub, infra.Tag),
-			Verbosity:         infra.Verbosity,
-			SidecarProxyUID:   inject.DefaultSidecarProxyUID,
-			EnableCoreDump:    true,
-			Version:           "integration-test",
-			Mesh:              mesh,
-			MeshConfigMapName: "istio",
-		}
-		if err := inject.IntoResourceFile(p, strings.NewReader(w), writer); err != nil {
+		if err := inject.IntoResourceFile(infra.InjectConfig, strings.NewReader(w), writer); err != nil {
 			return err
 		}
 	} else {
@@ -256,6 +304,14 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 }
 
 func (infra *infra) teardown() {
+
+	if yaml, err := fill("rbac-beta.yaml.tmpl", infra); err != nil {
+		glog.Infof("RBAC template could could not be processed, please delete stale ClusterRoleBindings: %v",
+			err)
+	} else if err = infra.kubeDelete(yaml, infra.IstioNamespace); err != nil {
+		glog.Infof("RBAC config could could not be deleted: %v", err)
+	}
+
 	if infra.namespaceCreated {
 		util.DeleteNamespace(client, infra.Namespace)
 		infra.Namespace = ""
@@ -271,9 +327,9 @@ func (infra *infra) kubeApply(yaml, namespace string) error {
 		kubeconfig, namespace), yaml)
 }
 
-func (infra *infra) kubeDelete(yaml string) error {
+func (infra *infra) kubeDelete(yaml, namespace string) error {
 	return util.RunInput(fmt.Sprintf("kubectl delete --kubeconfig %s -n %s -f -",
-		kubeconfig, infra.Namespace), yaml)
+		kubeconfig, namespace), yaml)
 }
 
 type response struct {
@@ -341,25 +397,25 @@ func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 		return err
 	}
 
-	v, err := model.IstioConfigTypes.FromYAML([]byte(config))
+	vs, err := crd.ParseInputs(config)
 	if err != nil {
 		return err
 	}
 
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
-	if err != nil {
-		return err
-	}
+	for _, v := range vs {
+		// fill up namespace for the config
+		v.Namespace = infra.Namespace
 
-	old, exists := istioClient.Get(v.Type, v.Name, v.Namespace)
-	if exists {
-		v.ResourceVersion = old.ResourceVersion
-		_, err = istioClient.Update(*v)
-	} else {
-		_, err = istioClient.Create(*v)
-	}
-	if err != nil {
-		return err
+		old, exists := infra.config.Get(v.Type, v.Name, v.Namespace)
+		if exists {
+			v.ResourceVersion = old.ResourceVersion
+			_, err = infra.config.Update(v)
+		} else {
+			_, err = infra.config.Create(v)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	glog.Info("Sleeping for the config to propagate")
@@ -368,18 +424,14 @@ func (infra *infra) applyConfig(inFile string, data map[string]string) error {
 }
 
 func (infra *infra) deleteAllConfigs() error {
-	istioClient, err := crd.NewClient(kubeconfig, model.IstioConfigTypes)
-	if err != nil {
-		return err
-	}
-	for _, desc := range istioClient.ConfigDescriptor() {
-		configs, err := istioClient.List(desc.Type, infra.Namespace)
+	for _, desc := range infra.config.ConfigDescriptor() {
+		configs, err := infra.config.List(desc.Type, infra.Namespace)
 		if err != nil {
 			return err
 		}
 		for _, config := range configs {
 			glog.Infof("Delete config %s", config.Key())
-			if err = istioClient.Delete(desc.Type, config.Name, config.Namespace); err != nil {
+			if err = infra.config.Delete(desc.Type, config.Name, config.Namespace); err != nil {
 				return err
 			}
 		}

@@ -1,25 +1,25 @@
-type: route-rule
-name: fault-route
-spec:
-  destination: world.default.svc.cluster.local
-  match:
-    source: hello.default.svc.cluster.local
-    source_tags:
+destination:
+  name: world
+match:
+  source:
+    name: hello
+    labels:
       version: v0
-    httpHeaders:
+  request:
+    headers:
       scooby:
         exact: doo
       animal:
         prefix: dog.cat
       name:
         regex: "sco+do+"
-  route:
-    - tags:
-         version: v1
-  http_fault:
-    delay:
-      percent: 100
-      fixed_delay: 5s
-    abort:
-      percent: 100
-      http_status: 503
+route:
+  - labels:
+       version: v1
+httpFault:
+  delay:
+    percent: 100
+    fixed_delay: 5s
+  abort:
+    percent: 100
+    http_status: 503

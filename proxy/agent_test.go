@@ -29,6 +29,29 @@ var (
 	}
 )
 
+// TestProxy sample struct for proxy
+type TestProxy struct {
+	run     func(interface{}, int, <-chan error) error
+	cleanup func(int)
+	panic   func(interface{})
+}
+
+func (tp TestProxy) Run(config interface{}, epoch int, stop <-chan error) error {
+	return tp.run(config, epoch, stop)
+}
+
+func (tp TestProxy) Cleanup(epoch int) {
+	if tp.cleanup != nil {
+		tp.cleanup(epoch)
+	}
+}
+
+func (tp TestProxy) Panic(config interface{}) {
+	if tp.panic != nil {
+		tp.panic(config)
+	}
+}
+
 // TestStartStop tests basic start, cleanup sequence
 func TestStartStop(t *testing.T) {
 	current := -1
@@ -56,7 +79,7 @@ func TestStartStop(t *testing.T) {
 		}
 		cancel()
 	}
-	a := NewAgent(Proxy{start, cleanup, nil}, testRetry)
+	a := NewAgent(TestProxy{start, cleanup, nil}, testRetry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(desired)
 	<-ctx.Done()
@@ -74,7 +97,7 @@ func TestApplyTwice(t *testing.T) {
 		return nil
 	}
 	cleanup := func(epoch int) {}
-	a := NewAgent(Proxy{start, cleanup, nil}, testRetry)
+	a := NewAgent(TestProxy{start, cleanup, nil}, testRetry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(desired)
 	a.ScheduleConfigUpdate(desired)
@@ -112,7 +135,7 @@ func TestApplyThrice(t *testing.T) {
 	}
 	retry := testRetry
 	retry.MaxRetries = 0
-	a = NewAgent(Proxy{start, cleanup, nil}, retry)
+	a = NewAgent(TestProxy{start, cleanup, nil}, retry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(good)
 	a.ScheduleConfigUpdate(bad)
@@ -159,7 +182,7 @@ func TestAbort(t *testing.T) {
 	}
 	retry := testRetry
 	retry.InitialInterval = 10 * time.Second
-	a := NewAgent(Proxy{start, cleanup, nil}, retry)
+	a := NewAgent(TestProxy{start, cleanup, nil}, retry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(good1)
 	a.ScheduleConfigUpdate(good2)
@@ -188,7 +211,7 @@ func TestStartFail(t *testing.T) {
 		return nil
 	}
 	cleanup := func(epoch int) {}
-	a := NewAgent(Proxy{start, cleanup, nil}, testRetry)
+	a := NewAgent(TestProxy{start, cleanup, nil}, testRetry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate("test")
 	<-ctx.Done()
@@ -220,7 +243,7 @@ func TestExceedBudget(t *testing.T) {
 	}
 	retryDelay := testRetry
 	retryDelay.MaxRetries = 1
-	a := NewAgent(Proxy{start, cleanup, func(_ interface{}) { cancel() }}, retryDelay)
+	a := NewAgent(TestProxy{start, cleanup, func(_ interface{}) { cancel() }}, retryDelay)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate("test")
 	<-ctx.Done()
@@ -273,7 +296,7 @@ func TestStartTwiceStop(t *testing.T) {
 			cancel()
 		}
 	}
-	a := NewAgent(Proxy{start, cleanup, nil}, testRetry)
+	a := NewAgent(TestProxy{start, cleanup, nil}, testRetry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(desired0)
 	a.ScheduleConfigUpdate(desired1)
@@ -297,7 +320,7 @@ func TestRecovery(t *testing.T) {
 		<-ctx.Done()
 		return nil
 	}
-	a := NewAgent(Proxy{start, func(_ int) {}, nil}, testRetry)
+	a := NewAgent(TestProxy{start, func(_ int) {}, nil}, testRetry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(desired)
 
@@ -334,7 +357,7 @@ func TestCascadingAbort(t *testing.T) {
 	}
 	retry := testRetry
 	retry.InitialInterval = 1 * time.Second
-	a := NewAgent(Proxy{start, func(_ int) {}, nil}, retry)
+	a := NewAgent(TestProxy{start, func(_ int) {}, nil}, retry)
 	go a.Run(ctx)
 	a.ScheduleConfigUpdate(0)
 	a.ScheduleConfigUpdate(1)

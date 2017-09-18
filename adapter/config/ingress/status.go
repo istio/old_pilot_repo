@@ -15,10 +15,11 @@
 package ingress
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	betaext "k8s.io/api/extensions/v1beta1"
@@ -53,16 +54,24 @@ func (s *StatusSyncer) Run(stopCh <-chan struct{}) {
 }
 
 // NewStatusSyncer creates a new instance
-func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interface,
-	options kube.ControllerOptions) *StatusSyncer {
+func NewStatusSyncer(mesh *proxyconfig.MeshConfig,
+	client kubernetes.Interface,
+	ingressNamespace string,
+	options kube.ControllerOptions) (*StatusSyncer, error) {
+	if _, exists := os.LookupEnv("POD_NAME"); !exists {
+		return nil, errors.New("POD_NAME environment variable must be defined")
+	}
+	if _, exists := os.LookupEnv("POD_NAMESPACE"); !exists {
+		return nil, errors.New("POD_NAMESPACE environment variable must be defined")
+	}
 
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).List(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).List(opts)
 			},
 			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.AppNamespace).Watch(opts)
+				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).Watch(opts)
 			},
 		},
 		&v1beta1.Ingress{}, options.ResyncPeriod, cache.Indexers{},
@@ -70,9 +79,9 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 
 	var publishService string
 	if mesh.IngressService != "" {
-		publishService = fmt.Sprintf("%v/%v", options.Namespace, mesh.IngressService)
+		publishService = fmt.Sprintf("%v/%v", ingressNamespace, mesh.IngressService)
 	}
-	glog.V(2).Infof("INGRESS STATUS publishService %s", publishService)
+	glog.V(2).Infof("ingress status syncer publishService %s", publishService)
 	ingressClass, defaultIngressClass := convertIngressControllerMode(mesh.IngressControllerMode, mesh.IngressClass)
 
 	customIngressStatus := func(*betaext.Ingress) []v1.LoadBalancerIngress {
@@ -92,20 +101,20 @@ func NewStatusSyncer(mesh *proxyconfig.ProxyMeshConfig, client kubernetes.Interf
 	return &StatusSyncer{
 		sync:     sync,
 		informer: informer,
-	}
+	}, nil
 }
 
 // convertIngressControllerMode converts Ingress controller mode into k8s ingress status syncer ingress class and
 // default ingress class. Ingress class and default ingress class are used by the syncer to determine whether or not to
 // update the IP of a ingress resource.
-func convertIngressControllerMode(mode proxyconfig.ProxyMeshConfig_IngressControllerMode,
+func convertIngressControllerMode(mode proxyconfig.MeshConfig_IngressControllerMode,
 	class string) (string, string) {
 	var ingressClass, defaultIngressClass string
 	switch mode {
-	case proxyconfig.ProxyMeshConfig_DEFAULT:
+	case proxyconfig.MeshConfig_DEFAULT:
 		defaultIngressClass = class
 		ingressClass = class
-	case proxyconfig.ProxyMeshConfig_STRICT:
+	case proxyconfig.MeshConfig_STRICT:
 		ingressClass = class
 	}
 	return ingressClass, defaultIngressClass
