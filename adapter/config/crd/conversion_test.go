@@ -84,7 +84,7 @@ func TestParseInputs(t *testing.T) {
 		t.Error("ParseInput(\"a\") => got no error")
 	}
 	if _, others, err := ParseInputs("kind: Pod"); err != nil || len(others) != 1 {
-		t.Error("ParseInput(\"kind: Pod\") => got %v, %v", others, err)
+		t.Errorf("ParseInput(\"kind: Pod\") => got %v, %v", others, err)
 	}
 	if _, _, err := ParseInputs("kind: RouteRule\nspec:\n  destination: x"); err == nil {
 		t.Error("ParseInput(bad spec) => got no error")
