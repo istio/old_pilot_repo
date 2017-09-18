@@ -159,7 +159,8 @@ func buildIngressRoute(mesh *proxyconfig.MeshConfig,
 			route.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, true)
 		}
 
-		if applied := route.CombinePathPrefixRegex(ingressRoute.Path, ingressRoute.Prefix, ingressRoute.Regex); applied != nil {
+		if applied := route.CombinePathPrefixRegex(ingressRoute.Path, ingressRoute.Prefix,
+			ingressRoute.Regex); applied != nil {
 			out = append(out, applied)
 		}
 	}

@@ -256,11 +256,11 @@ func (route *HTTPRoute) CatchAll() bool {
 
 const (
 	// MatchPath indicates if the route rule or match condition uses exact path match
-	MatchPath   = iota
+	MatchPath = iota
 	// MatchPrefix indicates if the route rule or match condition uses prefix path match
 	MatchPrefix = iota
 	// MatchRegex indicates if the route rule or match condition uses regex path match
-	MatchRegex  = iota
+	MatchRegex = iota
 )
 
 // CombinePathPrefixRegex checks that the route applies for a given path, prefix
@@ -270,31 +270,31 @@ const (
 // that match both the original route and the supplied path, prefix and regex.
 func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTPRoute {
 
-	var ingress_match, route_match int
+	var ingressMatch, routeMatch int
 
 	// assumption is that the validation engine has ensured that only path/prefix/regex is set
 	// for both ingress and route
 	switch {
 	case path != "":
-		ingress_match = MatchPath
+		ingressMatch = MatchPath
 	case prefix != "":
-		ingress_match = MatchPrefix
+		ingressMatch = MatchPrefix
 	case regex != "":
-		ingress_match = MatchRegex
+		ingressMatch = MatchRegex
 	}
 
 	switch {
 	case route.Path != "":
-		route_match = MatchPath
+		routeMatch = MatchPath
 	case route.Prefix != "":
-		route_match = MatchPrefix
+		routeMatch = MatchPrefix
 	case route.Regex != "":
-		route_match = MatchRegex
+		routeMatch = MatchRegex
 	}
 
-	switch ingress_match {
+	switch ingressMatch {
 	case MatchPath:
-		switch route_match {
+		switch routeMatch {
 		case MatchPath:
 			// pick only if both patch match
 			if route.Path == path {
@@ -318,7 +318,7 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 		}
 		return nil
 	case MatchPrefix:
-		switch route_match {
+		switch routeMatch {
 		case MatchPath:
 			// if mixed, pick if route path satisfies the prefix
 			if strings.HasPrefix(route.Path, prefix) {
@@ -343,7 +343,7 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 		}
 		return nil
 	case MatchRegex:
-		switch route_match {
+		switch routeMatch {
 		case MatchPath:
 			// pick path if it matches route's regex
 			if matched, _ := regexp.MatchString(regex, route.Path); matched {
