@@ -58,7 +58,7 @@ iptables -t nat -A OUTPUT -p tcp -j REDIRECT ! -s 127.0.0.1/32 \
 ```     
 
 - pro: No envoy change required
-- con: Requires coordinating UID between proxy and init-container. Istio may not necessarily have control over UID (e.g. set by docker). The UID could be made configurable / overridable so the proxy UID does not conflict with other end-user UID and processes. See (Security Context)[https://kubernetes.io/docs/user-guide/security-context]. 
+- con: Requires coordinating UID between proxy and init-container. Istio may not necessarily have control over UID (e.g. set by docker). The UID could be made configurable / overridable so the proxy UID does not conflict with other end-user UID and processes. See [Security Context](https://kubernetes.io/docs/user-guide/security-context). 
 
 ## Alternatives considered
 
