@@ -62,7 +62,7 @@ func (t *egressRules) run() error {
 			description: "prohibit external traffic to cloud.google.com",
 			config:      "egress-rule-httpbin.yaml.tmpl",
 			check: func() error {
-				return t.verifyReachable("https://cloud.google.com", false)
+				return t.verifyReachable("http://cloud.google.com:443", false)
 			},
 		},
 		{
