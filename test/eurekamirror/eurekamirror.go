@@ -27,7 +27,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
 	"bytes"
@@ -38,6 +37,7 @@ import (
 	"syscall"
 
 	"istio.io/pilot/model"
+	"sync"
 )
 
 var (
@@ -211,12 +211,14 @@ func (a *agent) buildInstancePath() string {
 
 type mirror struct {
 	url    string
+	podCache *PodCache
 	agents map[string]map[string]chan struct{}
 }
 
-func newMirror(url string) *mirror {
+func newMirror(url string, podCache *PodCache) *mirror {
 	return &mirror{
 		url:    url,
+		podCache: podCache,
 		agents: make(map[string]map[string]chan struct{}),
 	}
 }
@@ -224,7 +226,7 @@ func newMirror(url string) *mirror {
 // TODO: logic for endpoint deletion
 func (m *mirror) Sync(endpoints <-chan *v1.Endpoints) {
 	for endpoint := range endpoints {
-		instances := convertEndpoints(endpoint)
+		instances := m.convertEndpoints(endpoint)
 
 		newIDs := make(map[string]bool)
 		for _, instance := range instances {
@@ -285,12 +287,18 @@ func (m *mirror) stopAgent(name, id string) {
 	delete(m.agents[name], id)
 }
 
-func convertEndpoints(ep *v1.Endpoints) []*Instance {
+func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*Instance {
 	instances := make([]*Instance, 0)
 	for _, ss := range ep.Subsets {
 		for _, addr := range ss.Addresses {
 			for _, port := range ss.Ports {
 				metadata := make(Metadata)
+				pod, exists := m.podCache.getByIP(addr.IP)
+				if exists {
+					for k, v := range pod.Labels {
+						metadata[k] = v
+					}
+				}
 
 				protocol := kube.ConvertProtocol(port.Name, port.Protocol)
 				switch protocol {
@@ -325,20 +333,79 @@ func convertEndpoints(ep *v1.Endpoints) []*Instance {
 	return instances
 }
 
-func createInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	lf := func(opts meta_v1.ListOptions) (runtime.Object, error) {
-		return client.CoreV1().Endpoints(namespace).List(opts)
-	}
-	wf := func(opts meta_v1.ListOptions) (watch.Interface, error) {
-		return client.CoreV1().Endpoints(namespace).Watch(opts)
-	}
+func createInformer(
+	obj runtime.Object,
+	lf cache.ListFunc,
+	wf cache.WatchFunc,
+	resyncPeriod time.Duration) cache.SharedIndexInformer {
 
 	informer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{ListFunc: lf, WatchFunc: wf}, &v1.Endpoints{},
+		&cache.ListWatch{ListFunc: lf, WatchFunc: wf}, obj,
 		resyncPeriod, cache.Indexers{})
 
 	return informer
 }
+
+type PodCache struct {
+	mutex sync.Mutex
+	cache map[string]string
+	store cache.Store
+}
+
+func NewPodCache(informer cache.SharedIndexInformer) *PodCache {
+	c := &PodCache{
+		cache: make(map[string]string),
+		store: informer.GetStore(),
+	}
+
+	informer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				c.mutex.Lock()
+				defer c.mutex.Unlock()
+				pod := obj.(*v1.Pod)
+				if pod.Status.PodIP != "" {
+					c.cache[pod.Status.PodIP] = pod.Namespace + "/" + pod.Name
+				}
+			},
+			UpdateFunc: func(old, cur interface{}) {
+				// TODO: delete old ref
+				c.mutex.Lock()
+				defer c.mutex.Unlock()
+				pod := cur.(*v1.Pod)
+				if pod.Status.PodIP != "" {
+					c.cache[pod.Status.PodIP] = pod.Namespace + "/" + pod.Name
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				c.mutex.Lock()
+				defer c.mutex.Unlock()
+				pod := obj.(*v1.Pod)
+				delete(c.cache, pod.Namespace + "/" + pod.Name)
+			},
+		},
+	)
+
+	return c
+}
+
+func (c *PodCache) getByIP(addr string) (*v1.Pod, bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	name, exists := c.cache[addr]
+	if !exists {
+		return nil, false
+	}
+	obj, exists, err := c.store.GetByKey(name)
+	if err != nil {
+		log.Println(err)
+	}
+	if !exists {
+		return nil, false
+	}
+	return obj.(*v1.Pod), true
+}
+
 
 func main() {
 	flag.Parse()
@@ -348,13 +415,17 @@ func main() {
 		log.Println(err)
 		return
 	}
-
-	m := newMirror(eurekaURL)
-
 	endpoints := make(chan *v1.Endpoints, 1)
 
-	informer := createInformer(client, namespace, 2*time.Second)
-	informer.AddEventHandler(
+	endpointInformer := createInformer(&v1.Endpoints{},
+		func(opts meta_v1.ListOptions) (runtime.Object, error) {
+			return client.CoreV1().Endpoints(namespace).List(opts)
+		},
+		func(opts meta_v1.ListOptions) (watch.Interface, error) {
+			return client.CoreV1().Endpoints(namespace).Watch(opts)
+		},
+		1*time.Second)
+	endpointInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				endpoints <- obj.(*v1.Endpoints)
@@ -367,6 +438,19 @@ func main() {
 			},
 		},
 	)
+
+	podInformer := createInformer(&v1.Pod{},
+		func(opts meta_v1.ListOptions) (runtime.Object, error) {
+			return client.CoreV1().Pods(namespace).List(opts)
+		},
+		func(opts meta_v1.ListOptions) (watch.Interface, error) {
+			return client.CoreV1().Pods(namespace).Watch(opts)
+		},
+		1*time.Second)
+
+	podCache := NewPodCache(podInformer)
+
+	m := newMirror(eurekaURL, podCache)
 
 	stop := make(chan struct{})
 
@@ -381,7 +465,8 @@ func main() {
 		}
 	}()
 
-	go informer.Run(stop)
+	go endpointInformer.Run(stop)
+	go podInformer.Run(stop)
 	go m.Sync(endpoints)
 	<-stop
 }
