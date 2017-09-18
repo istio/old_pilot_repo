@@ -139,7 +139,8 @@ and destination policies.
 						errs = multierror.Append(errs, err)
 						continue
 					}
-					fmt.Printf("Created config %s at revision %v\n", model.Key(config.Kind, config.Name, config.Namespace), updated.ResourceVersion)
+					key := model.Key(config.Kind, config.Name, config.Namespace)
+					fmt.Printf("Created config %s at revision %v\n", key, updated.ResourceVersion)
 				}
 				if errs != nil {
 					return errs
@@ -233,7 +234,8 @@ and destination policies.
 						errs = multierror.Append(errs, err)
 						continue
 					}
-					fmt.Printf("Updated config %s to revision %v\n", model.Key(config.Kind, config.Name, config.Namespace), updated.ResourceVersion)
+					key := model.Key(config.Kind, config.Name, config.Namespace)
+					fmt.Printf("Updated config %s to revision %v\n", key, updated.ResourceVersion)
 				}
 				if errs != nil {
 					return errs
