@@ -255,9 +255,12 @@ func (route *HTTPRoute) CatchAll() bool {
 }
 
 const (
-	MATCH_PATH   = iota
-	MATCH_PREFIX = iota
-	MATCH_REGEX  = iota
+	// MatchPath indicates if the route rule or match condition uses exact path match
+	MatchPath   = iota
+	// MatchPrefix indicates if the route rule or match condition uses prefix path match
+	MatchPrefix = iota
+	// MatchRegex indicates if the route rule or match condition uses regex path match
+	MatchRegex  = iota
 )
 
 // CombinePathPrefixRegex checks that the route applies for a given path, prefix
@@ -273,38 +276,38 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 	// for both ingress and route
 	switch {
 	case path != "":
-		ingress_match = MATCH_PATH
+		ingress_match = MatchPath
 	case prefix != "":
-		ingress_match = MATCH_PREFIX
+		ingress_match = MatchPrefix
 	case regex != "":
-		ingress_match = MATCH_REGEX
+		ingress_match = MatchRegex
 	}
 
 	switch {
 	case route.Path != "":
-		route_match = MATCH_PATH
+		route_match = MatchPath
 	case route.Prefix != "":
-		route_match = MATCH_PREFIX
+		route_match = MatchPrefix
 	case route.Regex != "":
-		route_match = MATCH_REGEX
+		route_match = MatchRegex
 	}
 
 	switch ingress_match {
-	case MATCH_PATH:
+	case MatchPath:
 		switch route_match {
-		case MATCH_PATH:
+		case MatchPath:
 			// pick only if both patch match
 			if route.Path == path {
 				return route
 			}
-		case MATCH_PREFIX:
+		case MatchPrefix:
 			// pick if route prefix satisfies the path and change route to path
 			if strings.HasPrefix(path, route.Prefix) {
 				route.Path = path
 				route.Prefix = ""
 				return route
 			}
-		case MATCH_REGEX:
+		case MatchRegex:
 			// pick path if it matches route's regex
 			if matched, _ := regexp.MatchString(route.Regex, path); matched {
 				route.Path = path
@@ -314,14 +317,14 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 			}
 		}
 		return nil
-	case MATCH_PREFIX:
+	case MatchPrefix:
 		switch route_match {
-		case MATCH_PATH:
+		case MatchPath:
 			// if mixed, pick if route path satisfies the prefix
 			if strings.HasPrefix(route.Path, prefix) {
 				return route
 			}
-		case MATCH_PREFIX:
+		case MatchPrefix:
 			// pick the longest prefix if both are prefix matches
 			if strings.HasPrefix(route.Prefix, prefix) {
 				return route
@@ -329,7 +332,7 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 				route.Prefix = prefix
 				return route
 			}
-		case MATCH_REGEX:
+		case MatchRegex:
 			// pick prefix if it matches route's regex
 			if matched, _ := regexp.MatchString(route.Regex, prefix); matched {
 				route.Path = ""
@@ -339,19 +342,19 @@ func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTP
 			}
 		}
 		return nil
-	case MATCH_REGEX:
+	case MatchRegex:
 		switch route_match {
-		case MATCH_PATH:
+		case MatchPath:
 			// pick path if it matches route's regex
 			if matched, _ := regexp.MatchString(regex, route.Path); matched {
 				return route
 			}
-		case MATCH_PREFIX:
+		case MatchPrefix:
 			// pick prefix if it matches route's regex
 			if matched, _ := regexp.MatchString(regex, route.Prefix); matched {
 				return route
 			}
-		case MATCH_REGEX:
+		case MatchRegex:
 			// create a regex intersection
 			concat := ""
 			switch strings.Compare(regex, route.Regex) {
