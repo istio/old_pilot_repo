@@ -21,15 +21,17 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
@@ -110,9 +112,37 @@ and destination policies.
 				}
 				fmt.Printf("Created config %v at revision %v\n", config.Key(), rev)
 			}
+
 			if len(others) > 0 {
-				if err = runKubectl("create", others); err != nil {
+				if err = preprocMixerConfig(others); err != nil {
 					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				var errs *multierror.Error
+				var updated crd.IstioKind
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					err = otherClient.Post().
+						Namespace(config.Namespace).
+						Resource(resource.Name).
+						Body(&config).
+						Do().
+						Into(&updated)
+					if err != nil {
+						errs = multierror.Append(errs, err)
+						continue
+					}
+					fmt.Printf("Created config %s at revision %v\n", model.Key(config.Kind, config.Name, config.Namespace), updated.ResourceVersion)
+				}
+				if errs != nil {
+					return errs
 				}
 			}
 
@@ -164,8 +194,49 @@ and destination policies.
 			}
 
 			if len(others) > 0 {
-				if err = runKubectl("replace", others); err != nil {
+				if err = preprocMixerConfig(others); err != nil {
 					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				var errs *multierror.Error
+				var current crd.IstioKind
+				var updated crd.IstioKind
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					if config.ResourceVersion == "" {
+						err = otherClient.Get().
+							Namespace(config.Namespace).
+							Name(config.Name).
+							Resource(resource.Name).
+							Do().
+							Into(&current)
+						if err == nil && current.ResourceVersion != "" {
+							config.ResourceVersion = current.ResourceVersion
+						}
+					}
+
+					err = otherClient.Put().
+						Namespace(config.Namespace).
+						Name(config.Name).
+						Resource(resource.Name).
+						Body(&config).
+						Do().
+						Into(&updated)
+					if err != nil {
+						errs = multierror.Append(errs, err)
+						continue
+					}
+					fmt.Printf("Updated config %s to revision %v\n", model.Key(config.Kind, config.Name, config.Namespace), updated.ResourceVersion)
+				}
+				if errs != nil {
+					return errs
 				}
 			}
 
@@ -296,10 +367,34 @@ and destination policies.
 					fmt.Printf("Deleted config: %v\n", config.Key())
 				}
 			}
+			if errs != nil {
+				return errs
+			}
 
 			if len(others) > 0 {
-				if err = runKubectl("delete", others); err != nil {
-					errs = multierror.Append(errs, err)
+				if err = preprocMixerConfig(others); err != nil {
+					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					err = otherClient.Delete().
+						Namespace(config.Namespace).
+						Resource(resource.Name).
+						Do().
+						Error()
+					if err != nil {
+						errs = multierror.Append(errs, fmt.Errorf("failed to delete: %v", err))
+						continue
+					}
+					fmt.Printf("Deleted cofig: %s\n", model.Key(config.Kind, config.Name, config.Namespace))
 				}
 			}
 
@@ -420,6 +515,9 @@ func readInputsKubectl(reader io.Reader) ([]model.Config, []crd.IstioKind, error
 			return nil, nil, fmt.Errorf("cannot parse proto message: %v", err)
 		}
 
+		if obj.APIVersion != "" && obj.APIVersion != crd.IstioAPIGroupVersion.String() {
+			return nil, nil, fmt.Errorf("unrecognized api version: %s", obj.APIVersion)
+		}
 		schema, exists := model.IstioConfigTypes.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
 		if !exists {
 			glog.V(7).Infof("Unrecognized type %v; considering as mixer config", obj.Kind)
@@ -502,51 +600,56 @@ func preprocMixerConfig(configs []crd.IstioKind) error {
 			configs[i].Namespace = namespace
 		}
 		if config.APIVersion == "" {
-			configs[i].APIVersion = fmt.Sprintf("%s/%s", model.IstioAPIGroup, model.IstioAPIVersion)
+			configs[i].APIVersion = crd.IstioAPIGroupVersion.String()
 		}
 		// TODO: invokes the mixer validation webhook.
 	}
 	return nil
 }
 
-func runKubectl(subcommand string, configs []crd.IstioKind) error {
-	if err := preprocMixerConfig(configs); err != nil {
-		return err
-	}
-
-	kubectl := kubectlcommand
-	if kubectl == "" {
-		kubectl = "kubectl"
-	}
-	cmd := exec.Command(kubectl, subcommand, "-f", "-")
-	stdin, err := cmd.StdinPipe()
+func apiResources(config *rest.Config, configs []crd.IstioKind) (map[string]metav1.APIResource, error) {
+	client, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	go func() {
-		defer stdin.Close()
-		var bytes []byte
-		for _, config := range configs {
-			bytes, err = yaml.Marshal(config)
-			if err != nil {
-				glog.Errorf("Failed to marshal: %v", err)
-				return
-			}
-			if _, err = stdin.Write([]byte("\n---\n")); err != nil {
-				glog.Errorf("Failed to write into pipe: %v", err)
-				return
-			}
-			if _, err = stdin.Write(bytes); err != nil {
-				glog.Errorf("Failed to write into pipe: %v", err)
-				return
-			}
+	resources, err := client.ServerResourcesForGroupVersion(crd.IstioAPIGroupVersion.String())
+	if err != nil {
+		return nil, err
+	}
+	kindsSet := map[string]bool{}
+	for _, config := range configs {
+		if !kindsSet[config.Kind] {
+			kindsSet[config.Kind] = true
 		}
-	}()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		glog.Errorf("Error on kubectl: output\n%s", out)
-	} else {
-		glog.V(6).Infof("kubectl output:\n%s", out)
 	}
-	return err
+	result := make(map[string]metav1.APIResource, len(kindsSet))
+	for _, resource := range resources.APIResources {
+		if kindsSet[resource.Kind] {
+			result[resource.Kind] = resource
+		}
+	}
+	return result, nil
+}
+
+func restClientForOthers(config *rest.Config) (*rest.RESTClient, error) {
+	configCopied := *config
+	configCopied.ContentConfig = dynamic.ContentConfig()
+	configCopied.GroupVersion = &crd.IstioAPIGroupVersion
+	return rest.RESTClientFor(config)
+}
+
+func prepareClientForOthers(configs []crd.IstioKind) (*rest.RESTClient, map[string]metav1.APIResource, error) {
+	restConfig, err := crd.CreateRESTConfig(kubeconfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	resources, err := apiResources(restConfig, configs)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := restClientForOthers(restConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, resources, nil
 }
