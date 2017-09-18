@@ -57,24 +57,6 @@ if [[ "${IP_RANGES_INCLUDE}" && "${IP_RANGES_EXCLUDE}" ]]; then
   exit 1
 fi
 
-#Outbound iptables rule to redirect to sidecar or bypass traffic to sidecar and send directly out.
-function output_redir() {
-    local range=$1
-    shift
-    local inc=$1
-    shift
-    sifs=$IFS
-    IFS=,
-    for cidr in ${range}; do
-        if [ ${inc} = "include" ]; then
-            iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
-        else
-            iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j RETURN                  -m comment --comment "istio/exclude-ip-range-${cidr}"
-        fi
-    done
-    IFS=${sifs}
-}
-
 # Create a new chain for redirecting inbound and outbound traffic to
 # the common Envoy port.
 iptables -t nat -N ISTIO_REDIRECT                                             -m comment --comment "istio/redirect-common-chain"
@@ -111,14 +93,21 @@ iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m
 # IF IP_RANGES_EXCLUDE is non-empty, traffic specified by it will
 # NOT be redirected to the sidecar.
 # NOTE: IP_RANGES_INCLUDE and IP_RANGES_EXCLUDE cannot be specified.
+sifs=$IFS
+IFS=,
 if [ "${IP_RANGES_INCLUDE}" != "" ]; then
-    output_redir ${IP_RANGES_INCLUDE} "include"
+    for cidr in ${IP_RANGES_INCLUDE}; do
+        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j ISTIO_REDIRECT          -m comment --comment "istio/redirect-ip-range-${cidr}"
+    done
     iptables -t nat -A ISTIO_OUTPUT -j RETURN                                 -m comment --comment "istio/bypass-default-outbound"
 elif [ "${IP_RANGES_EXCLUDE}" != "" ]; then
-    output_redir ${IP_RANGES_EXCLUDE} "exclude"
+    for cidr in ${IP_RANGES_EXCLUDE}; do
+        iptables -t nat -A ISTIO_OUTPUT -d ${cidr} -j RETURN                  -m comment --comment "istio/exclude-ip-range-${cidr}"
+    done
     iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                         -m comment --comment "istio/bypass-exclude-default-outbound"
 else
     iptables -t nat -A ISTIO_OUTPUT -j ISTIO_REDIRECT                         -m comment --comment "istio/redirect-default-outbound"
 fi
+IFS=${sifs}
 
 exit 0

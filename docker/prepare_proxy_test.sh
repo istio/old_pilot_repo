@@ -1,6 +1,6 @@
 #!/bin/bash
 # in glcoud: prepare_proxy_test.sh 
-# in your dev environment: HUB=quay.io/${whoami} prepare_proxy_test.sh local
+# in your dev environment: docker/prepare_proxy_test.sh -d "quay.io" -p local -c 192.168.0.0/16
 #
 
 set -o errexit
@@ -8,27 +8,52 @@ set -o nounset
 set -o pipefail
 set -ex
 
-# customize for development / debug setup
-# by specifying an environment var HUB to desired setting
-if [ "$HUB" = "" ]; then
-    HUB=docker.io/$(whoami)
-fi
+usage () {
+  echo "${0} [-d HUB] [-p gcloud|local] [-c cidrs] [-h]"
+  echo ''
+  echo ' -d: docker hub to use (default: docker.io/) (optional)'
+  echo ' -p: platform to use (default: gcloud)  (optional)'
+  echo ' -c: list of cidrs to use (default: self selected) (optional)'
+  echo ''
+}
+
+LIST_CIDRS=""
+HUB=docker.io/$(whoami)
+PLATFORM=gcloud
+
+while getopts ":d:p:c:h" opt; do
+  case ${opt} in
+    d)
+      HUB=${OPTARG}/$(whoami)
+      ;;
+    p)
+      PLATFORM=${OPTARG}
+      if [ "${PLATFORM}" != "gcloud" ] && [ "${PLATFORM}" != "local" ]; then
+        echo "Invalid platform ${PLATFORM}" >&2
+        usage
+        exit 1
+      fi
+      ;;
+    c)
+      LIST_CIDRS=${OPTARG}
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 TAG=test
 NAMESPACE=prepare-proxy-test0
 
-LIST_CIDRS=""
-if [ $# -eq 0 ]; then
-    PLATFORM=gcloud
-    GCLOUD_CLUSTER_NAME=c1
-    GCLOUD_CLUSTER_ZONE=us-central1-a
-else
-    PLATFORM=$1
-    shift
-    if [ $# -eq 2 ]; then
-        LIST_CIDRS=$1
-        shift
-    fi
-fi
+GCLOUD_CLUSTER_NAME=c1
+GCLOUD_CLUSTER_ZONE=us-central1-a
 
 ENVOY_UID=1337
 ENVOY_PORT=80
@@ -108,9 +133,7 @@ function assertRedirected {
 
 function getPodName() {
     local appName=$1
-    shift
-    local iter=$1
-    shift
+    local iter=$2
     local NAME=""
     while [ "$NAME" = "" ]; do NAME=$(kc get pod -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].metadata.name}'); done
     echo $NAME
@@ -118,9 +141,7 @@ function getPodName() {
 
 function getPodIP() {
     local appName=$1
-    shift
-    local iter=$1
-    shift
+    local iter=$2
     local IP=
     while [ "$IP" = "" ]; do IP=$(kc get pod -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].status.podIP}'); done
     echo $IP
@@ -128,9 +149,7 @@ function getPodIP() {
 
 function getSvcIP() {
     local appName=$1
-    shift
-    local iter=$1
-    shift
+    local iter=$2
     local IP=
     while [ "$IP" = "" ]; do IP=$(kc get svc -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].spec.clusterIP}'); done
     echo $IP
