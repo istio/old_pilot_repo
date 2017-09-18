@@ -26,20 +26,20 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 )
 
-type egress_rules struct {
+type egressRules struct {
 	*infra
 }
 
-func (t *egress_rules) String() string {
+func (t *egressRules) String() string {
 	return "egress-rules"
 }
 
-func (t *egress_rules) setup() error {
+func (t *egressRules) setup() error {
 	return nil
 }
 
 // TODO: test negatives
-func (t *egress_rules) run() error {
+func (t *egressRules) run() error {
 	cases := []struct {
 		description string
 		config      string
@@ -83,7 +83,7 @@ func (t *egress_rules) run() error {
 	}
 	var errs error
 	for _, cs := range cases {
-		log("Checking egress_rules test", cs.description)
+		log("Checking egressRules test", cs.description)
 		if err := t.applyConfig(cs.config, nil); err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (t *egress_rules) run() error {
 	return errs
 }
 
-func (t *egress_rules) teardown() {
+func (t *egressRules) teardown() {
 	glog.Info("Cleaning up egress rules...")
 	if err := t.deleteAllConfigs(); err != nil {
 		glog.Warning(err)
@@ -106,7 +106,7 @@ func (t *egress_rules) teardown() {
 }
 
 // verifyReachable verifies that the url is reachable
-func (t *egress_rules) verifyReachable(url string, shouldBeReachable bool) error {
+func (t *egressRules) verifyReachable(url string, shouldBeReachable bool) error {
 	funcs := make(map[string]func() status)
 	for _, src := range []string{"a", "b"} {
 		name := fmt.Sprintf("Request from %s to %s", src, url)
