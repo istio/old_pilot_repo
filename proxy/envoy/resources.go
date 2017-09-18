@@ -15,6 +15,8 @@
 package envoy
 
 import (
+	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -252,34 +254,123 @@ func (route *HTTPRoute) CatchAll() bool {
 	return len(route.Headers) == 0 && route.Path == "" && route.Prefix == "/"
 }
 
-// CombinePathPrefix checks that the route applies for a given path and prefix
-// match and updates the path and the prefix in the route. If the route is
-// incompatible with the path or the prefix, returns nil.  Either path or
-// prefix must be set but not both.  The resulting route must match exactly the
-// requests that match both the original route and the supplied path and
-// prefix.
-func (route *HTTPRoute) CombinePathPrefix(path, prefix string) *HTTPRoute {
+const (
+	MATCH_PATH   = iota
+	MATCH_PREFIX = iota
+	MATCH_REGEX  = iota
+)
+
+// CombinePathPrefixRegex checks that the route applies for a given path, prefix
+// and regex match and updates the path, prefix, and regex in the route. If the
+// route is incompatible with these fields, returns nil. One of path or prefix
+// or regex must be set.  The resulting route must match exactly the requests
+// that match both the original route and the supplied path, prefix and regex.
+func (route *HTTPRoute) CombinePathPrefixRegex(path, prefix, regex string) *HTTPRoute {
+
+	var ingress_match, route_match int
+
+	// assumption is that the validation engine has ensured that only path/prefix/regex is set
+	// for both ingress and route
 	switch {
-	case path == "" && route.Path == "" && strings.HasPrefix(route.Prefix, prefix):
-		// pick the longest prefix if both are prefix matches
-		return route
-	case path == "" && route.Path == "" && strings.HasPrefix(prefix, route.Prefix):
-		route.Prefix = prefix
-		return route
-	case prefix == "" && route.Prefix == "" && route.Path == path:
-		// pick only if path matches if both are path matches
-		return route
-	case path == "" && route.Prefix == "" && strings.HasPrefix(route.Path, prefix):
-		// if mixed, pick if route path satisfies the prefix
-		return route
-	case prefix == "" && route.Path == "" && strings.HasPrefix(path, route.Prefix):
-		// if mixed, pick if route prefix satisfies the path and change route to path
-		route.Path = path
-		route.Prefix = ""
-		return route
-	default:
+	case path != "":
+		ingress_match = MATCH_PATH
+	case prefix != "":
+		ingress_match = MATCH_PREFIX
+	case regex != "":
+		ingress_match = MATCH_REGEX
+	}
+
+	switch {
+	case route.Path != "":
+		route_match = MATCH_PATH
+	case route.Prefix != "":
+		route_match = MATCH_PREFIX
+	case route.Regex != "":
+		route_match = MATCH_REGEX
+	}
+
+	switch ingress_match {
+	case MATCH_PATH:
+		switch route_match {
+		case MATCH_PATH:
+			// pick only if both patch match
+			if route.Path == path {
+				return route
+			}
+		case MATCH_PREFIX:
+			// pick if route prefix satisfies the path and change route to path
+			if strings.HasPrefix(path, route.Prefix) {
+				route.Path = path
+				route.Prefix = ""
+				return route
+			}
+		case MATCH_REGEX:
+			// pick path if it matches route's regex
+			if matched, _ := regexp.MatchString(route.Regex, path); matched {
+				route.Path = path
+				route.Prefix = ""
+				route.Regex = ""
+				return route
+			}
+		}
+		return nil
+	case MATCH_PREFIX:
+		switch route_match {
+		case MATCH_PATH:
+			// if mixed, pick if route path satisfies the prefix
+			if strings.HasPrefix(route.Path, prefix) {
+				return route
+			}
+		case MATCH_PREFIX:
+			// pick the longest prefix if both are prefix matches
+			if strings.HasPrefix(route.Prefix, prefix) {
+				return route
+			} else if strings.HasPrefix(prefix, route.Prefix) {
+				route.Prefix = prefix
+				return route
+			}
+		case MATCH_REGEX:
+			// pick prefix if it matches route's regex
+			if matched, _ := regexp.MatchString(route.Regex, prefix); matched {
+				route.Path = ""
+				route.Prefix = prefix
+				route.Regex = ""
+				return route
+			}
+		}
+		return nil
+	case MATCH_REGEX:
+		switch route_match {
+		case MATCH_PATH:
+			// pick path if it matches route's regex
+			if matched, _ := regexp.MatchString(regex, route.Path); matched {
+				return route
+			}
+		case MATCH_PREFIX:
+			// pick prefix if it matches route's regex
+			if matched, _ := regexp.MatchString(regex, route.Prefix); matched {
+				return route
+			}
+		case MATCH_REGEX:
+			// create a regex intersection
+			concat := ""
+			switch strings.Compare(regex, route.Regex) {
+			case 0: // they are both same
+				concat = regex
+			case -1: //regex < route.Regex
+				concat = fmt.Sprintf("(?=^%s$)%s", regex, route.Regex)
+			case 1: // regex > route.Regex
+				concat = fmt.Sprintf("(?=^%s$)%s", route.Regex, regex)
+			}
+			route.Regex = concat
+			route.Prefix = ""
+			route.Path = ""
+			return route
+		}
 		return nil
 	}
+
+	return nil
 }
 
 // RetryPolicy definition

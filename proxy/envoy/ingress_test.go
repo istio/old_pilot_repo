@@ -21,6 +21,10 @@ func TestRouteCombination(t *testing.T) {
 	prefix1 := &HTTPRoute{Prefix: "/xyz"}
 	prefix2 := &HTTPRoute{Prefix: "/x"}
 	prefix3 := &HTTPRoute{Prefix: "/z"}
+	regex1 := &HTTPRoute{Regex: "/xy[az]"}
+	regex2 := &HTTPRoute{Regex: "/scoo[by]"}
+	regex3 := &HTTPRoute{Regex: "/doo[123]"}
+	combined := &HTTPRoute{Regex: "(?=^/doo[123]$)/scoo[by]"}
 
 	testCases := []struct {
 		a    *HTTPRoute
@@ -44,16 +48,23 @@ func TestRouteCombination(t *testing.T) {
 		{path3, prefix1, nil},
 		{path3, prefix2, nil},
 		{path3, prefix3, path3},
+		{path1, regex1, path1},
+		{prefix1, regex1, prefix1},
+		{prefix2, regex2, nil},
+		{regex2, prefix2, nil},
+		{path2, regex2, nil},
+		{regex2, path2, nil},
+		{regex2, regex3, combined},
 	}
 
 	for _, test := range testCases {
 		a := *test.a
-		got := a.CombinePathPrefix(test.b.Path, test.b.Prefix)
+		got := a.CombinePathPrefixRegex(test.b.Path, test.b.Prefix, test.b.Regex)
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("%s.CombinePathPrefix(%s) => got %v, want %v", spew.Sdump(test.a), spew.Sdump(test.b), got, test.want)
 		}
 		b := *test.b
-		got = b.CombinePathPrefix(test.a.Path, test.a.Prefix)
+		got = b.CombinePathPrefixRegex(test.a.Path, test.a.Prefix, test.a.Regex)
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("%s.CombinePathPrefix(%s) => got %v, want %v", spew.Sdump(test.b), spew.Sdump(test.a), got, test.want)
 		}
