@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
+	"istio.io/pilot/platform"
 )
 
 type egressRules struct {
@@ -39,6 +40,14 @@ func (t *egressRules) setup() error {
 
 // TODO: test negatives
 func (t *egressRules) run() error {
+	if !t.Egress {
+		glog.Info("skipping test since egress is missing")
+		return nil
+	}
+	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry { // TODO: re-enable once Eureka egress is working
+		return nil
+	}
+
 	cases := []struct {
 		description string
 		config      string
