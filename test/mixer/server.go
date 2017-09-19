@@ -68,16 +68,14 @@ func (s *Server) decode(attrs *istio_mixer_v1.Attributes) map[string]string {
 			j := -i - 1
 			if len(attrs.Words) > int(j) {
 				return attrs.Words[j]
-			} else {
-				return fmt.Sprintf("#unknown:%d", i)
 			}
-		} else {
-			if len(s.words) > int(i) {
-				return s.words[i]
-			} else {
-				return fmt.Sprintf("#unknown:%d", i)
-			}
+			return fmt.Sprintf("#unknown:%d", i)
 		}
+
+		if len(s.words) > int(i) {
+			return s.words[i]
+		}
+		return fmt.Sprintf("#unknown:%d", i)
 	}
 
 	out := make(map[string]string)
