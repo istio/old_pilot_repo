@@ -92,9 +92,14 @@ type agent struct {
 	instance *instance
 }
 
-func (a *agent) Run(stop <-chan struct{}) {
-	log.Printf("Starting registration agent for %s", a.instance.ID)
-	a.stop = stop
+func maintainRegistration(url string, client http.Client, inst *instance, stop <-chan struct{}) {
+	log.Printf("Starting registration agent for %s", inst.ID)
+	a := &agent{
+		stop:     stop,
+		client:   client,
+		url:      url,
+		instance: inst,
+	}
 	go a.unregistered()
 	<-stop
 }
@@ -216,16 +221,17 @@ type mirror struct {
 	agents   map[string]map[string]chan struct{}
 }
 
-func newMirror(url string, podCache *podCache) *mirror {
-	return &mirror{
+func maintainMirror(url string, podCache *podCache, endpoints <-chan *v1.Endpoints) {
+	m := &mirror{
 		url:      url,
 		podCache: podCache,
 		agents:   make(map[string]map[string]chan struct{}),
 	}
+	m.sync(endpoints)
 }
 
 // TODO: logic for endpoint deletion
-func (m *mirror) Sync(endpoints <-chan *v1.Endpoints) {
+func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
 	for endpoint := range endpoints {
 		instances := m.convertEndpoints(endpoint)
 
@@ -270,17 +276,10 @@ func (m *mirror) Sync(endpoints <-chan *v1.Endpoints) {
 	}
 }
 
-func (m *mirror) startAgent(name string, instance *instance) {
+func (m *mirror) startAgent(name string, inst *instance) {
 	stop := make(chan struct{})
-	m.agents[name][instance.ID] = stop
-	a := &agent{
-		url:      m.url,
-		instance: instance,
-		client: http.Client{
-			Timeout: time.Second * 15,
-		},
-	}
-	go a.Run(stop)
+	m.agents[name][inst.ID] = stop
+	go maintainRegistration(m.url, http.Client{Timeout: 15 * time.Second}, inst, stop)
 }
 
 func (m *mirror) stopAgent(name, id string) {
@@ -455,7 +454,6 @@ func main() {
 	)
 
 	pc := newPodCache(podInformer)
-	m := newMirror(eurekaURL, pc)
 
 	stop := make(chan struct{})
 
@@ -472,6 +470,6 @@ func main() {
 
 	go endpointInformer.Run(stop)
 	go podInformer.Run(stop)
-	go m.Sync(endpoints)
+	go maintainMirror(eurekaURL, pc, endpoints)
 	<-stop
 }
