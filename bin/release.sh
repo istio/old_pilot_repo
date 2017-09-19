@@ -27,7 +27,9 @@ if [ ! "${TAG_NAME}" ] ; then
   usage
 fi
 
-# Build environment setup
+# Cloud Builder checks out code in /workspace.
+# We need to recreate the GOPATH directory structure
+# for pilot to build correctly
 function prepare_gopath() {
   [[ -z ${GOPATH} ]] && export GOPATH=/tmp/gopath
   mkdir -p ${GOPATH}/src/istio.io
