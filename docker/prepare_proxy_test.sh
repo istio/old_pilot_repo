@@ -1,16 +1,57 @@
-#!/bin/sh
+#!/bin/bash
+# in glcoud: prepare_proxy_test.sh 
+# in your dev environment: docker/prepare_proxy_test.sh -d "quay.io" -p local -c 192.168.0.0/16
+#
 
 set -o errexit
 set -o nounset
 set -o pipefail
 set -ex
 
-# customize for development / debug setup
+usage () {
+  echo "${0} [-d HUB] [-p gcloud|local] [-c cidrs] [-h]"
+  echo ''
+  echo ' -d: docker hub to use (default: docker.io/) (optional)'
+  echo ' -p: platform to use (default: gcloud)  (optional)'
+  echo ' -c: list of cidrs to use (default: self selected) (optional)'
+  echo ''
+}
+
+LIST_CIDRS=""
 HUB=docker.io/$(whoami)
+PLATFORM=gcloud
+
+while getopts ":d:p:c:h" opt; do
+  case ${opt} in
+    d)
+      HUB=${OPTARG}/$(whoami)
+      ;;
+    p)
+      PLATFORM=${OPTARG}
+      if [ "${PLATFORM}" != "gcloud" ] && [ "${PLATFORM}" != "local" ]; then
+        echo "Invalid platform ${PLATFORM}" >&2
+        usage
+        exit 1
+      fi
+      ;;
+    c)
+      LIST_CIDRS=${OPTARG}
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 TAG=test
 NAMESPACE=prepare-proxy-test0
 
-PLATFORM=gcloud
 GCLOUD_CLUSTER_NAME=c1
 GCLOUD_CLUSTER_ZONE=us-central1-a
 
@@ -19,18 +60,6 @@ ENVOY_PORT=80
 SERVER_PORT=${ENVOY_PORT}
 CLIENT_PORT=81
 OTHER_PORT=82
-
-function buildImages() {
-    if [[ "$HUB" =~ ^gcr\.io ]]; then
-        gcloud docker --authorize-only
-    fi
-
-    for image in app init proxy; do
-        bazel run //docker:${image}_debug
-        docker tag istio/docker:${image}_debug $HUB/$image:$TAG
-        docker push $HUB/$image:$TAG
-    done
-}
 
 function kc() {
     kubectl -n ${NAMESPACE} "$@"
@@ -66,6 +95,16 @@ function k8sClusterAndServiceIPRange() {
 	               grep -e clusterIpv4Cidr -e servicesIpv4Cidr |
 	               cut -f2 -d' ' | paste -sd ","
             ;;
+        local)
+            serviceip=$(kc cluster-info dump | grep -e 'service-cluster-ip-range' | cut -f2 -d'=')
+            suffix='",'
+            serviceip="${serviceip%$suffix}"
+            if [ "${LIST_CIDRS}" != "" ]; then
+                echo "$serviceip,${LIST_CIDRS}"
+            else
+                echo "$serviceip"
+            fi
+            ;;
         *)
             echo ""
     esac
@@ -92,6 +131,30 @@ function assertRedirected {
     prev=${current}
 }
 
+function getPodName() {
+    local appName=$1
+    local iter=$2
+    local NAME=""
+    while [ "$NAME" = "" ]; do NAME=$(kc get pod -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].metadata.name}'); done
+    echo $NAME
+}
+
+function getPodIP() {
+    local appName=$1
+    local iter=$2
+    local IP=
+    while [ "$IP" = "" ]; do IP=$(kc get pod -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].status.podIP}'); done
+    echo $IP
+}
+
+function getSvcIP() {
+    local appName=$1
+    local iter=$2
+    local IP=
+    while [ "$IP" = "" ]; do IP=$(kc get svc -l app=${appName},iter="${iter}" -o jsonpath='{.items[0].spec.clusterIP}'); done
+    echo $IP
+}
+
 TEST_ITER=0
 function runTest() {
     TEST_ITER=$((${TEST_ITER} + 1))
@@ -110,24 +173,30 @@ function runTest() {
 	    -e "s|SERVER_PORT|${SERVER_PORT}|" |
         kc apply -f -
 
-    waitDeploymentReady client
-    waitDeploymentReady server
+    for svc in client server clientv2; do
+        waitDeploymentReady ${svc}
+    done
 
     # Get specific client and server pod name and IP address.
-    CLIENT=
-    while [ "$CLIENT" = "" ]; do CLIENT=$(kc get pod -l app=client,iter="${TEST_ITER_LABEL}" -o jsonpath='{.items[0].metadata.name}'); done
-    CLIENT_IP=
-    while [ "$CLIENT_IP" = "" ]; do CLIENT_IP=$(kc get pod -l app=client,iter="${TEST_ITER_LABEL}" -o jsonpath='{.items[0].status.podIP}'); done
-    SERVER=
-    while [ "$SERVER" = "" ]; do SERVER=$(kc get pod -l app=server,iter="${TEST_ITER_LABEL}" -o jsonpath='{.items[0].metadata.name}'); done
-    SERVER_IP=
-    while [ "$SERVER_IP" = "" ]; do SERVER_IP=$(kc get pod -l app=server,iter="${TEST_ITER_LABEL}" -o jsonpath='{.items[0].status.podIP}'); done
+    CLIENT=$(getPodName client ${TEST_ITER_LABEL})
+    CLIENT_IP=$(getPodIP client ${TEST_ITER_LABEL})
+
+    SERVER=$(getPodName server ${TEST_ITER_LABEL})
+    SERVER_IP=$(getPodIP server ${TEST_ITER_LABEL})
+
+    CLIENTV2=$(getPodName clientv2 ${TEST_ITER_LABEL})
+    CLIENTV2_IP=$(getPodIP clientv2 ${TEST_ITER_LABEL})
+    CLIENTV2_SVC_IP=$(getSvcIP clientv2 ${TEST_ITER_LABEL})
 
     if [ "${TEST_IP_RANGE_INCLUDE}" = 1 ]; then
         # Only redirect service and pod traffic to Envoy.
         INCLUDE_IP_RANGE=$(k8sClusterAndServiceIPRange)
         kc exec ${SERVER} -c init -- \
            /usr/local/bin/prepare_proxy.sh -u ${ENVOY_UID} -p ${ENVOY_PORT} -i ${INCLUDE_IP_RANGE}
+    elif [ "${TEST_IP_RANGE_EXCLUDE}" = 1 ]; then
+        EXCLUDE_IP_RANGE="$CLIENTV2_IP,$CLIENTV2_SVC_IP"
+        kc exec ${SERVER} -c init -- \
+           /usr/local/bin/prepare_proxy.sh -u ${ENVOY_UID} -p ${ENVOY_PORT} -e ${EXCLUDE_IP_RANGE}
     else
         # redirect all outbound traffic to Envoy.
         kc exec ${SERVER} -c init -- \
@@ -227,12 +296,35 @@ function runTest() {
             die "server => external from proxy failed"
         assertRedirected 0
     fi
+
+    if [ "${TEST_IP_RANGE_EXCLUDE}" = 1 ]; then
+        # server app to client2 address from app exclude proxy
+        kc exec ${SERVER} -c app -t -- curl -s ${CLIENTV2_IP}:${CLIENT_PORT} |
+            grep ServicePort=${CLIENT_PORT} ||
+            die "server => ${CLIENTV2_IP} from app failed"
+        assertRedirected 0
+
+        # server app to clientv2 svc ip:port to make sure redirected == 0
+        kc exec ${SERVER} -c app -t -- curl -s clientv2:${CLIENT_PORT} |
+            grep ServicePort=${CLIENT_PORT} ||
+            die "server => ${CLIENTV2_SVC_IP} from app failed"
+        assertRedirected 0
+
+        # server app to client1 address from app via proxy
+        kc exec ${SERVER} -c app -t -- curl -s client:${CLIENT_PORT} |
+            grep ServicePort=${CLIENT_PORT} &&
+            die "server => ${CLIENT_IP} from app failed"
+        assertRedirected 1
+    fi
 }
 
-buildImages
-
+TEST_IP_RANGE_EXCLUDE=0
 TEST_IP_RANGE_INCLUDE=0
 runTest
 
 TEST_IP_RANGE_INCLUDE=1
+runTest
+
+TEST_IP_RANGE_INCLUDE=0
+TEST_IP_RANGE_EXCLUDE=1
 runTest
