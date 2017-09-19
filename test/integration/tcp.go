@@ -37,7 +37,7 @@ func (t *tcp) teardown() {
 }
 
 func (t *tcp) run() error {
-	// TCP in Eureka is tested the headless service test.
+	// TCP in Eureka is tested by the headless service test.
 	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry {
 		return nil
 	}
