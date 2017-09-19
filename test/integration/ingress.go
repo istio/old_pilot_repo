@@ -20,6 +20,7 @@ import (
 
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"istio.io/pilot/platform"
 )
 
 type ingress struct {
@@ -37,6 +38,9 @@ func (t *ingress) String() string {
 
 func (t *ingress) setup() error {
 	if !t.Ingress {
+		return nil
+	}
+	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry { // TODO: re-enable once Eureka ingress is working
 		return nil
 	}
 	t.logs = makeAccessLogs()
@@ -59,6 +63,9 @@ func (t *ingress) setup() error {
 func (t *ingress) run() error {
 	if !t.Ingress {
 		glog.Info("skipping test since ingress is missing")
+		return nil
+	}
+	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry { // TODO: re-enable once Eureka ingress is working
 		return nil
 	}
 

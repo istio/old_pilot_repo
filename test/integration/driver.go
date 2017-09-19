@@ -201,10 +201,10 @@ func runTests(envs ...infra) {
 		tests := []test{
 			&http{infra: &istio},
 			&grpc{infra: &istio},
-			//&tcp{infra: &istio},
+			&tcp{infra: &istio},
 			&headless{infra: &istio},
-			//&ingress{infra: &istio},
-			//&egress{infra: &istio},
+			&ingress{infra: &istio},
+			&egress{infra: &istio},
 			&routing{infra: &istio},
 			&zipkin{infra: &istio},
 		}
