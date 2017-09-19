@@ -43,7 +43,7 @@ var knownTypes = map[string]struct {
 }{
 EOF
 
-CRDS="MockConfig RouteRule IngressRule DestinationPolicy"
+CRDS="MockConfig RouteRule IngressRule EgressRule DestinationPolicy"
 
 for crd in $CRDS; do
 cat << EOF
@@ -51,7 +51,7 @@ cat << EOF
 		object: &${crd}{
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "${crd}",
-				APIVersion: model.IstioAPIVersion,
+				APIVersion: model.IstioAPIGroup + "/" + model.IstioAPIVersion,
 			},
 		},
 		collection: &${crd}List{},
@@ -67,4 +67,3 @@ EOF
 for crd in $CRDS; do
   sed -e "1,20d;s/IstioKind/$crd/g" adapter/config/crd/config.go
 done
-

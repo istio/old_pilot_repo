@@ -1,11 +1,9 @@
-type: ingress-rule
-name: bar
-spec:
-  destination: world.default.svc.cluster.local
-  destinationPortName: http
-  name: bar
-  match:
-    http_headers:
+destination:
+  name: world
+destinationPortName: http
+match:
+  request:
+    headers:
       authority:
         exact: world.com
       uri:

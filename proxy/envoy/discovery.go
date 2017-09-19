@@ -224,6 +224,7 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 		configHandler := func(model.Config, model.Event) { out.clearCache() }
 		configCache.RegisterEventHandler(model.RouteRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.IngressRule.Type, configHandler)
+		configCache.RegisterEventHandler(model.EgressRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.DestinationPolicy.Type, configHandler)
 	}
 
@@ -242,7 +243,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Doc("Services in SDS"))
 
 	// This route makes discovery act as an Envoy Service discovery service (SDS).
-	// See https://lyft.github.io/envoy/docs/intro/arch_overview/service_discovery.html#arch-overview-service-discovery-sds
+	// See https://envoyproxy.github.io/envoy/intro/arch_overview/service_discovery.html#service-discovery-service-sds
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/registration/{%s}", ServiceKey)).
 		To(ds.ListEndpoints).
@@ -250,7 +251,7 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		Param(ws.PathParameter(ServiceKey, "tuple of service name and tag name").DataType("string")))
 
 	// This route makes discovery act as an Envoy Cluster discovery service (CDS).
-	// See https://lyft.github.io/envoy/docs/configuration/cluster_manager/cds.html
+	// See https://envoyproxy.github.io/envoy/configuration/cluster_manager/cds.html#config-cluster-manager-cds
 	ws.Route(ws.
 		GET(fmt.Sprintf("/v1/clusters/{%s}/{%s}", ServiceCluster, ServiceNode)).
 		To(ds.ListClusters).
@@ -274,15 +275,6 @@ func (ds *DiscoveryService) Register(container *restful.Container) {
 		GET(fmt.Sprintf("/v1/listeners/{%s}/{%s}", ServiceCluster, ServiceNode)).
 		To(ds.ListListeners).
 		Doc("LDS registration").
-		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
-		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
-
-	// This route responds to secret requests. This is a temporary API due to lack of discovery API for TLS
-	// contexts
-	ws.Route(ws.
-		GET(fmt.Sprintf("/v1alpha/secret/{%s}/{%s}", ServiceCluster, ServiceNode)).
-		To(ds.ListSecret).
-		Doc("List TLS secret URI for a listener").
 		Param(ws.PathParameter(ServiceCluster, "client proxy service cluster").DataType("string")).
 		Param(ws.PathParameter(ServiceNode, "client proxy service node").DataType("string")))
 
@@ -404,19 +396,13 @@ func (ds *DiscoveryService) ListEndpoints(request *restful.Request, response *re
 	writeResponse(response, out)
 }
 
-func (ds *DiscoveryService) parseDiscoveryRequest(request *restful.Request) (string, string, proxy.Node, error) {
-	cluster := request.PathParameter(ServiceCluster)
-	// request has to match the IstioServiceCluster (default is "istio-proxy")
-	if cluster != ds.Mesh.IstioServiceCluster {
-		return cluster, "", proxy.Node{}, fmt.Errorf("unexpected %s %q", ServiceCluster, cluster)
-	}
-
+func (ds *DiscoveryService) parseDiscoveryRequest(request *restful.Request) (proxy.Node, error) {
 	node := request.PathParameter(ServiceNode)
 	role, err := proxy.ParseServiceNode(node)
 	if err != nil {
-		return cluster, node, role, multierror.Prefix(err, fmt.Sprintf("unexpected %s: ", ServiceNode))
+		return role, multierror.Prefix(err, fmt.Sprintf("unexpected %s: ", ServiceNode))
 	}
-	return cluster, node, role, nil
+	return role, nil
 }
 
 // ListClusters responds to CDS requests for all outbound clusters
@@ -424,13 +410,11 @@ func (ds *DiscoveryService) ListClusters(request *restful.Request, response *res
 	key := request.Request.URL.String()
 	out, cached := ds.cdsCache.cachedDiscoveryResponse(key)
 	if !cached {
-		cluster, node, role, err := ds.parseDiscoveryRequest(request)
+		role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
 			errorResponse(response, http.StatusNotFound, "CDS "+err.Error())
 			return
 		}
-		glog.V(5).Infof("CDS Discovery request to ListClusters for service_cluster %s, service_node %s, role %s",
-			cluster, node, role.Type)
 
 		clusters := buildClusters(ds.Environment, role)
 		if out, err = json.MarshalIndent(ClusterManager{Clusters: clusters}, " ", " "); err != nil {
@@ -447,13 +431,11 @@ func (ds *DiscoveryService) ListListeners(request *restful.Request, response *re
 	key := request.Request.URL.String()
 	out, cached := ds.ldsCache.cachedDiscoveryResponse(key)
 	if !cached {
-		cluster, node, role, err := ds.parseDiscoveryRequest(request)
+		role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
 			errorResponse(response, http.StatusNotFound, "LDS "+err.Error())
 			return
 		}
-		glog.V(5).Infof("LDS Discovery request to ListListeners for service_cluster %s, service_node %s, role %s",
-			cluster, node, role.Type)
 
 		listeners := buildListeners(ds.Environment, role)
 		out, err = json.MarshalIndent(ldsResponse{Listeners: listeners}, " ", " ")
@@ -473,65 +455,19 @@ func (ds *DiscoveryService) ListRoutes(request *restful.Request, response *restf
 	key := request.Request.URL.String()
 	out, cached := ds.rdsCache.cachedDiscoveryResponse(key)
 	if !cached {
-		cluster, node, role, err := ds.parseDiscoveryRequest(request)
+		role, err := ds.parseDiscoveryRequest(request)
 		if err != nil {
 			errorResponse(response, http.StatusNotFound, "RDS "+err.Error())
 			return
 		}
 
 		routeConfigName := request.PathParameter(RouteConfigName)
-
-		glog.V(5).Infof("RDS Discovery request to ListRoutes for service_cluster %s, service_node %s, "+
-			"role %s, route-config-name %s",
-			cluster, node, role.Type, routeConfigName)
-
 		routeConfig := buildRDSRoute(ds.Mesh, role, routeConfigName, ds.ServiceDiscovery, ds.IstioConfigStore)
 		if out, err = json.MarshalIndent(routeConfig, " ", " "); err != nil {
 			errorResponse(response, http.StatusInternalServerError, "RDS "+err.Error())
 			return
 		}
 		ds.rdsCache.updateCachedDiscoveryResponse(key, out)
-	}
-	writeResponse(response, out)
-}
-
-// ListSecret responds to TLS secret registration
-func (ds *DiscoveryService) ListSecret(request *restful.Request, response *restful.Response) {
-	// caching is disabled due to lack of secret watch notifications
-
-	cluster, node, role, err := ds.parseDiscoveryRequest(request)
-
-	if err != nil {
-		errorResponse(response, http.StatusNotFound, "ListSecrets "+err.Error())
-		return
-	}
-
-	glog.V(5).Infof("ListSecrets Discovery request to ListSecret for service_cluster %s, service_node %s, role %s",
-		cluster, node, role.Type)
-
-	if role.Type != proxy.Ingress {
-		writeResponse(response, nil)
-		return
-	}
-
-	_, secret := buildIngressRoutes(ds.Mesh, ds, ds)
-
-	if secret == "" {
-		glog.V(5).Infof("Secret is not set")
-		writeResponse(response, nil)
-		return
-	}
-
-	tls, err := ds.GetTLSSecret(secret)
-	if err != nil {
-		errorResponse(response, http.StatusNotFound,
-			fmt.Sprintf("ListSecrets Failed to read the secret: %s", err))
-		return
-	}
-
-	out, err := json.Marshal(tls)
-	if err != nil {
-		errorResponse(response, http.StatusInternalServerError, "ListSecrets "+err.Error())
 	}
 	writeResponse(response, out)
 }

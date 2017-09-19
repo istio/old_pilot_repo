@@ -1,11 +1,9 @@
-type: route-rule
-name: timeout
-spec:
-  destination: world.default.svc.cluster.local
-  http_req_timeout:
-    simple_timeout:
-      timeout: 30s
-  http_req_retries:
-    simple_retry:
-      attempts: 1
-      per_try_timeout: 5s
+destination:
+  name: world
+httpReqTimeout:
+  simpleTimeout:
+    timeout: 30s
+httpReqRetries:
+  simple_retry:
+    attempts: 1
+    perTryTimeout: 5s

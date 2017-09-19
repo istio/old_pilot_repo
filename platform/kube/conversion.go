@@ -45,8 +45,8 @@ const (
 	IstioURIPrefix = "spiffe"
 )
 
-func convertTags(obj meta_v1.ObjectMeta) model.Tags {
-	out := make(model.Tags, len(obj.Labels))
+func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
+	out := make(model.Labels, len(obj.Labels))
 	for k, v := range obj.Labels {
 		out[k] = v
 	}
@@ -71,33 +71,35 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 		external = svc.Spec.ExternalName
 	}
 
-	// must have address or be external (but not both)
-	if (addr == "" && external == "") || (addr != "" && external != "") {
-		return nil
-	}
-
 	ports := make([]*model.Port, 0, len(svc.Spec.Ports))
 	for _, port := range svc.Spec.Ports {
 		ports = append(ports, convertPort(port))
 	}
 
+	loadBalancingDisabled := addr == "" && external == "" // headless services should not be load balanced
+
 	serviceaccounts := make([]string, 0)
 	if svc.Annotations != nil {
-		for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
-			serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+		if svc.Annotations[CanonicalServiceAccountsOnVMAnnotation] != "" {
+			for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
+				serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+			}
 		}
-		for _, ksa := range strings.Split(svc.Annotations[KubeServiceAccountsOnVMAnnotation], ",") {
-			serviceaccounts = append(serviceaccounts, kubeToIstioServiceAccount(ksa, svc.Namespace, domainSuffix))
+		if svc.Annotations[KubeServiceAccountsOnVMAnnotation] != "" {
+			for _, ksa := range strings.Split(svc.Annotations[KubeServiceAccountsOnVMAnnotation], ",") {
+				serviceaccounts = append(serviceaccounts, kubeToIstioServiceAccount(ksa, svc.Namespace, domainSuffix))
+			}
 		}
 	}
 	sort.Sort(sort.StringSlice(serviceaccounts))
 
 	return &model.Service{
-		Hostname:        serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:           ports,
-		Address:         addr,
-		ExternalName:    external,
-		ServiceAccounts: serviceaccounts,
+		Hostname:              serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:                 ports,
+		Address:               addr,
+		ExternalName:          external,
+		ServiceAccounts:       serviceaccounts,
+		LoadBalancingDisabled: loadBalancingDisabled,
 	}
 }
 
@@ -157,6 +159,8 @@ func convertProtocol(name string, proto v1.Protocol) model.Protocol {
 			out = model.ProtocolHTTP2
 		case "https":
 			out = model.ProtocolHTTPS
+		case "mongo":
+			out = model.ProtocolMONGO
 		}
 	}
 	return out

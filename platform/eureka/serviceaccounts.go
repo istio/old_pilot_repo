@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+package eureka
 
-// SecretRegistry defines a read-only interface for secret key material
-// The implementation should not cache or persist the secrets and pass
-// the data immediately to the client of this interface.
-type SecretRegistry interface {
-	// GetTLSSecret retrieves a TLS secret by implementation specific URI
-	GetTLSSecret(uri string) (*TLSSecret, error)
+import "istio.io/pilot/model"
+
+type serviceAccounts struct {
 }
 
-// TLSSecret defines a TLS configuration.
-type TLSSecret struct {
-	Certificate []byte `json:"cert"`
-	PrivateKey  []byte `json:"key"`
+// NewServiceAccounts instantiates the Eureka service account interface
+func NewServiceAccounts() model.ServiceAccounts {
+	return &serviceAccounts{}
+}
+
+func (sa *serviceAccounts) GetIstioServiceAccounts(hostname string, ports []string) []string {
+	return nil
 }

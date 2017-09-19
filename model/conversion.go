@@ -16,6 +16,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -36,7 +37,11 @@ func (ps *ProtoSchema) Make() (proto.Message, error) {
 }
 
 // ToJSON marshals a proto to canonical JSON
-func (ps *ProtoSchema) ToJSON(msg proto.Message) (string, error) {
+func ToJSON(msg proto.Message) (string, error) {
+	if msg == nil {
+		return "", errors.New("unexpected nil message")
+	}
+
 	// Marshal from proto to json bytes
 	m := jsonpb.Marshaler{}
 	out, err := m.MarshalToString(msg)
@@ -47,8 +52,8 @@ func (ps *ProtoSchema) ToJSON(msg proto.Message) (string, error) {
 }
 
 // ToYAML marshals a proto to canonical YAML
-func (ps *ProtoSchema) ToYAML(msg proto.Message) (string, error) {
-	js, err := ps.ToJSON(msg)
+func ToYAML(msg proto.Message) (string, error) {
+	js, err := ToJSON(msg)
 	if err != nil {
 		return "", err
 	}
@@ -58,8 +63,8 @@ func (ps *ProtoSchema) ToYAML(msg proto.Message) (string, error) {
 
 // ToJSONMap converts a proto message to a generic map using canonical JSON encoding
 // JSON encoding is specified here: https://developers.google.com/protocol-buffers/docs/proto3#json
-func (ps *ProtoSchema) ToJSONMap(msg proto.Message) (map[string]interface{}, error) {
-	js, err := ps.ToJSON(msg)
+func ToJSONMap(msg proto.Message) (map[string]interface{}, error) {
+	js, err := ToJSON(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -125,68 +130,4 @@ func (ps *ProtoSchema) FromJSONMap(data interface{}) (proto.Message, error) {
 		return nil, multierror.Prefix(err, fmt.Sprintf("YAML decoding error: %v", string(str)))
 	}
 	return out, nil
-}
-
-// JSONConfig is the JSON serialized form of the config unit
-type JSONConfig struct {
-	ConfigMeta
-
-	// Spec is the content of the config
-	Spec interface{} `json:"spec,omitempty"`
-}
-
-// FromJSON deserializes and validates a JSON config object
-func (descriptor ConfigDescriptor) FromJSON(config JSONConfig) (*Config, error) {
-	schema, ok := descriptor.GetByType(config.Type)
-	if !ok {
-		return nil, fmt.Errorf("unknown spec type %s", config.Type)
-	}
-
-	message, err := schema.FromJSONMap(config.Spec)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse proto message: %v", err)
-	}
-
-	if err = schema.Validate(message); err != nil {
-		return nil, err
-	}
-	return &Config{
-		ConfigMeta: config.ConfigMeta,
-		Spec:       message,
-	}, nil
-}
-
-// FromYAML deserializes and validates a YAML config object
-func (descriptor ConfigDescriptor) FromYAML(content []byte) (*Config, error) {
-	out := JSONConfig{}
-	err := yaml.Unmarshal(content, &out)
-	if err != nil {
-		return nil, err
-	}
-	return descriptor.FromJSON(out)
-}
-
-// ToYAML serializes a config into a YAML form
-func (descriptor ConfigDescriptor) ToYAML(config Config) (string, error) {
-	schema, exists := descriptor.GetByType(config.Type)
-	if !exists {
-		return "", fmt.Errorf("missing type %q", config.Type)
-	}
-
-	spec, err := schema.ToJSONMap(config.Spec)
-	if err != nil {
-		return "", err
-	}
-
-	out := JSONConfig{
-		ConfigMeta: config.ConfigMeta,
-		Spec:       spec,
-	}
-
-	bytes, err := yaml.Marshal(out)
-	if err != nil {
-		return "", err
-	}
-
-	return string(bytes), nil
 }

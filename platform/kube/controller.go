@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/model"
 )
 
@@ -43,17 +42,15 @@ const (
 
 // ControllerOptions stores the configurable attributes of a Controller.
 type ControllerOptions struct {
-	// Namespace to restrict controller to (empty to disable restriction)
-	Namespace    string
-	AppNamespace string
-	ResyncPeriod time.Duration
-	DomainSuffix string
+	// Namespace the controller watches. If set to meta_v1.NamespaceAll (""), controller watches all namespaces
+	WatchedNamespace string
+	ResyncPeriod     time.Duration
+	DomainSuffix     string
 }
 
 // Controller is a collection of synchronized resource watchers
 // Caches are thread-safe
 type Controller struct {
-	mesh         *proxyconfig.ProxyMeshConfig
 	domainSuffix string
 
 	client    kubernetes.Interface
@@ -71,11 +68,11 @@ type cacheHandler struct {
 }
 
 // NewController creates a new Kubernetes controller
-func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfig,
-	options ControllerOptions) *Controller {
+func NewController(client kubernetes.Interface, options ControllerOptions) *Controller {
+	glog.V(2).Infof("Service controller watching namespace %q", options.WatchedNamespace)
+
 	// Queue requires a time duration for a retry delay after a handler error
 	out := &Controller{
-		mesh:         mesh,
 		domainSuffix: options.DomainSuffix,
 		client:       client,
 		queue:        NewQueue(1 * time.Second),
@@ -83,18 +80,18 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 
 	out.services = out.createInformer(&v1.Service{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Services(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Services(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Services(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Services(options.WatchedNamespace).Watch(opts)
 		})
 
 	out.endpoints = out.createInformer(&v1.Endpoints{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Endpoints(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Endpoints(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Endpoints(options.WatchedNamespace).Watch(opts)
 		})
 
 	out.nodes = out.createInformer(&v1.Node{}, options.ResyncPeriod,
@@ -107,10 +104,10 @@ func NewController(client kubernetes.Interface, mesh *proxyconfig.ProxyMeshConfi
 
 	out.pods = newPodCache(out.createInformer(&v1.Pod{}, options.ResyncPeriod,
 		func(opts meta_v1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Pods(meta_v1.NamespaceAll).List(opts)
+			return client.CoreV1().Pods(options.WatchedNamespace).List(opts)
 		},
 		func(opts meta_v1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Pods(meta_v1.NamespaceAll).Watch(opts)
+			return client.CoreV1().Pods(options.WatchedNamespace).Watch(opts)
 		}))
 
 	return out
@@ -265,7 +262,8 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 }
 
 // Instances implements a service catalog operation
-func (c *Controller) Instances(hostname string, ports []string, tagsList model.TagsList) []*model.ServiceInstance {
+func (c *Controller) Instances(hostname string, ports []string,
+	labelsList model.LabelsCollection) []*model.ServiceInstance {
 	// Get actual service by name
 	name, namespace, err := parseHostname(hostname)
 	if err != nil {
@@ -297,9 +295,9 @@ func (c *Controller) Instances(hostname string, ports []string, tagsList model.T
 			var out []*model.ServiceInstance
 			for _, ss := range ep.Subsets {
 				for _, ea := range ss.Addresses {
-					tags, _ := c.pods.tagsByIP(ea.IP)
-					// check that one of the input tags is a subset of the tags
-					if !tagsList.HasSubsetOf(tags) {
+					labels, _ := c.pods.labelsByIP(ea.IP)
+					// check that one of the input labels is a subset of the labels
+					if !labelsList.HasSubsetOf(labels) {
 						continue
 					}
 
@@ -320,7 +318,7 @@ func (c *Controller) Instances(hostname string, ports []string, tagsList model.T
 									ServicePort: svcPort,
 								},
 								Service:          svc,
-								Tags:             tags,
+								Labels:           labels,
 								AvailabilityZone: az,
 								ServiceAccount:   sa,
 							})
@@ -355,7 +353,7 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 						if !exists {
 							continue
 						}
-						tags, _ := c.pods.tagsByIP(ea.IP)
+						labels, _ := c.pods.labelsByIP(ea.IP)
 						pod, exists := c.pods.getPodByIP(ea.IP)
 						az, sa := "", ""
 						if exists {
@@ -369,7 +367,7 @@ func (c *Controller) HostInstances(addrs map[string]bool) []*model.ServiceInstan
 								ServicePort: svcPort,
 							},
 							Service:          svc,
-							Tags:             tags,
+							Labels:           labels,
 							AvailabilityZone: az,
 							ServiceAccount:   sa,
 						})
@@ -390,7 +388,7 @@ func (c *Controller) GetIstioServiceAccounts(hostname string, ports []string) []
 
 	// Get the service accounts running service within Kubernetes. This is reflected by the pods that
 	// the service is deployed on, and the service accounts of the pods.
-	for _, si := range c.Instances(hostname, ports, model.TagsList{}) {
+	for _, si := range c.Instances(hostname, ports, model.LabelsCollection{}) {
 		if si.ServiceAccount != "" {
 			saSet[si.ServiceAccount] = true
 		}

@@ -22,7 +22,7 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   annotations:
-    policy.sidecar.istio.io: "policy.sidecar.istio.io/force-off"
+    sidecar.istio.io/inject: "false"
   name: istio-ingress
 spec:
   replicas: 1
@@ -35,7 +35,17 @@ spec:
       containers:
       - name: istio-proxy
         image: {{.Hub}}/proxy_debug:{{.Tag}}
-        args: ["proxy", "ingress", "-v", "{{.Verbosity}}"]
+        args:
+        - proxy
+        - ingress
+        - -v
+        - "{{.Verbosity}}"
+        - --discoveryAddress
+        - istio-pilot:8080
+{{if .Zipkin}}
+        - --zipkinAddress
+        - zipkin:9411
+{{end}}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 443
@@ -52,25 +62,22 @@ spec:
               apiVersion: v1
               fieldPath: metadata.namespace
         volumeMounts:
-        - name: config-volume
-          mountPath: /etc/istio/config
-          readOnly: true
         - mountPath: /etc/istio/proxy/
           name: istio-envoy
-{{if eq .Auth 1}}
+        - mountPath: /etc/istio/ingress-certs
+          name: ingress-certs
         - mountPath: /etc/certs
           name: istio-certs
           readOnly: true
-{{end}}
       volumes:
-      - name: config-volume
-        configMap:
-          name: istio
+      - name: ingress-certs
+        secret:
+          secretName: istio-ingress-certs
+          optional: true
       - emptyDir:
           medium: Memory
         name: istio-envoy
-{{if eq .Auth 1}}
       - name: istio-certs
         secret:
           secretName: istio.default
-{{end}}
+          optional: true

@@ -44,10 +44,6 @@ fi
 
 echo '=== Bazel Build ==='
 ./bin/install-prereqs.sh
-bazel build //...
-
-
-echo '=== Go Build ==='
 ./bin/init.sh
 
 echo '=== Code Check ==='
@@ -56,20 +52,11 @@ echo '=== Code Check ==='
 echo '=== Bazel Tests ==='
 bazel test //...
 
-echo '=== Code Coverage ==='
-./bin/codecov.sh | tee codecov.report
-if [ "${CI:-}" == 'bootstrap' ]; then
-    BUILD_ID="PROW-${BUILD_NUMBER}" JOB_NAME='pilot/presubmit' bin/toolbox/pkg_coverage.sh
-
-    curl -s https://codecov.io/bash \
-      | CI_JOB_ID="${JOB_NAME}" CI_BUILD_ID="${BUILD_NUMBER}" bash /dev/stdin \
-        -K -Z -B "${PULL_BASE_REF}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -t @/etc/codecov/pilot.token
-else
-    echo 'Not in bootstrap environment, skipping code coverage publishing'
-fi
-
 echo '=== Build istioctl ==='
 ./bin/upload-istioctl -p "gs://istio-artifacts/pilot/${GIT_SHA}/artifacts/istioctl"
+
+echo "=== Pushing Debian Packages ==="
+bin/push-debian.sh -c opt -p "gs://istio-artifacts/pilot/${GIT_SHA}/artifacts/debs"
 
 echo '=== Running e2e Tests ==='
 ./bin/e2e.sh -tag "${GIT_SHA}" -hub 'gcr.io/istio-testing'

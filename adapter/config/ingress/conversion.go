@@ -64,11 +64,14 @@ func convertIngress(ingress v1beta1.Ingress, domainSuffix string) []model.Config
 func createIngressRule(name, host, path, domainSuffix string,
 	ingress v1beta1.Ingress, backend v1beta1.IngressBackend, tlsSecret string) model.Config {
 	rule := &proxyconfig.IngressRule{
-		Name:        name,
-		Destination: serviceHostname(backend.ServiceName, ingress.Namespace, domainSuffix),
-		TlsSecret:   tlsSecret,
+		Destination: &proxyconfig.IstioService{
+			Name: backend.ServiceName,
+		},
+		TlsSecret: tlsSecret,
 		Match: &proxyconfig.MatchCondition{
-			HttpHeaders: make(map[string]*proxyconfig.StringMatch, 2),
+			Request: &proxyconfig.MatchRequest{
+				Headers: make(map[string]*proxyconfig.StringMatch, 2),
+			},
 		},
 	}
 	switch backend.ServicePort.Type {
@@ -83,7 +86,7 @@ func createIngressRule(name, host, path, domainSuffix string,
 	}
 
 	if host != "" {
-		rule.Match.HttpHeaders[model.HeaderAuthority] = &proxyconfig.StringMatch{
+		rule.Match.Request.Headers[model.HeaderAuthority] = &proxyconfig.StringMatch{
 			MatchType: &proxyconfig.StringMatch_Exact{Exact: host},
 		}
 	}
@@ -91,17 +94,19 @@ func createIngressRule(name, host, path, domainSuffix string,
 	if path != "" {
 		if isRegularExpression(path) {
 			if strings.HasSuffix(path, ".*") && !isRegularExpression(strings.TrimSuffix(path, ".*")) {
-				rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
+				rule.Match.Request.Headers[model.HeaderURI] = &proxyconfig.StringMatch{
 					MatchType: &proxyconfig.StringMatch_Prefix{Prefix: strings.TrimSuffix(path, ".*")},
 				}
 			} else {
-				rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
+				rule.Match.Request.Headers[model.HeaderURI] = &proxyconfig.StringMatch{
 					MatchType: &proxyconfig.StringMatch_Regex{Regex: path},
 				}
 			}
 		} else {
-			rule.Match.HttpHeaders[model.HeaderURI] = &proxyconfig.StringMatch{
-				MatchType: &proxyconfig.StringMatch_Exact{Exact: path},
+			rule.Match.Request.Headers[model.HeaderURI] = &proxyconfig.StringMatch{
+				// Always do prefix match for ingress paths
+				// as thats what the standard kubernetes nginx ingress does.
+				MatchType: &proxyconfig.StringMatch_Prefix{Prefix: path},
 			}
 		}
 	}
@@ -111,6 +116,7 @@ func createIngressRule(name, host, path, domainSuffix string,
 			Type:            model.IngressRule.Type,
 			Name:            name,
 			Namespace:       ingress.Namespace,
+			Domain:          domainSuffix,
 			Labels:          ingress.Labels,
 			Annotations:     ingress.Annotations,
 			ResourceVersion: ingress.ResourceVersion,
@@ -155,26 +161,21 @@ func isRegularExpression(s string) bool {
 	return len(s) < len(regexp.QuoteMeta(s))
 }
 
-// serviceHostname produces FQDN for a k8s service
-func serviceHostname(name, namespace, domainSuffix string) string {
-	return fmt.Sprintf("%s.%s.svc.%s", name, namespace, domainSuffix)
-}
-
 // shouldProcessIngress determines whether the given ingress resource should be processed
 // by the controller, based on its ingress class annotation.
 // See https://github.com/kubernetes/ingress/blob/master/examples/PREREQUISITES.md#ingress-class
-func shouldProcessIngress(mesh *proxyconfig.ProxyMeshConfig, ingress *v1beta1.Ingress) bool {
+func shouldProcessIngress(mesh *proxyconfig.MeshConfig, ingress *v1beta1.Ingress) bool {
 	class, exists := "", false
 	if ingress.Annotations != nil {
 		class, exists = ingress.Annotations[kube.IngressClassAnnotation]
 	}
 
 	switch mesh.IngressControllerMode {
-	case proxyconfig.ProxyMeshConfig_OFF:
+	case proxyconfig.MeshConfig_OFF:
 		return false
-	case proxyconfig.ProxyMeshConfig_STRICT:
+	case proxyconfig.MeshConfig_STRICT:
 		return exists && class == mesh.IngressClass
-	case proxyconfig.ProxyMeshConfig_DEFAULT:
+	case proxyconfig.MeshConfig_DEFAULT:
 		return !exists || class == mesh.IngressClass
 	default:
 		glog.Warningf("invalid ingress synchronization mode: %v", mesh.IngressControllerMode)

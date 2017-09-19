@@ -16,11 +16,9 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,7 +29,6 @@ type ingress struct {
 
 const (
 	ingressServiceName = "istio-ingress"
-	ingressSecretName  = "ingress"
 )
 
 func (t *ingress) String() string {
@@ -44,40 +41,15 @@ func (t *ingress) setup() error {
 	}
 	t.logs = makeAccessLogs()
 
-	// send secrets
-	key, err := ioutil.ReadFile("docker/certs/cert.key")
-	if err != nil {
-		return err
-	}
-	crt, err := ioutil.ReadFile("docker/certs/cert.crt")
-	if err != nil {
-		return err
-	}
-	_, err = client.CoreV1().Secrets(t.Namespace).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: ingressSecretName},
-		Data: map[string][]byte{
-			"tls.key": key,
-			"tls.crt": crt,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
 	// parse and send yamls
-	yamlFile, err := ioutil.ReadFile("test/integration/testdata/ingress.yaml")
-	if err != nil {
+	if yaml, err := fill("ingress.yaml.tmpl", t.infra); err != nil {
 		return err
-	}
-	if err = t.kubeApply(string(yamlFile), t.Namespace); err != nil {
+	} else if err = t.kubeApply(yaml, t.Namespace); err != nil {
 		return err
 	}
 
 	// send route rules for "c" only
-	if err = t.applyConfig("rule-default-route.yaml.tmpl", map[string]string{
-		"Destination": "c",
-		"Namespace":   t.Namespace,
-	}); err != nil {
+	if err := t.applyConfig("rule-default-route.yaml.tmpl", nil); err != nil {
 		return err
 	}
 

@@ -48,6 +48,10 @@ spec:
   - port: {{.DebugPort}}
     name: tcp-debug
 {{end}}
+{{if .UseAdmissionWebhook}}
+  - port: 443
+    name: webhook
+{{end}}
   selector:
     infra: pilot
 ---
@@ -60,7 +64,7 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   annotations:
-    policy.sidecar.istio.io: "policy.sidecar.istio.io/force-off"
+    sidecar.istio.io/inject: "false"
   name: istio-pilot
 spec:
   replicas: 1
@@ -74,7 +78,12 @@ spec:
       - name: discovery
         image: {{.Hub}}/pilot:{{.Tag}}
         imagePullPolicy: IfNotPresent
-        args: ["discovery", "-v", "{{.Verbosity}}", "-a", "{{.Namespace}}"]
+        args:
+        - discovery
+        - --v={{.Verbosity}}
+{{if .UseAdmissionWebhook}}
+        - --admission-service={{.AdmissionServiceName}}
+{{end}}
         ports:
         - containerPort: 8080
 {{if .DebugPort}}
@@ -82,6 +91,9 @@ spec:
         volumeMounts:
           - mountPath: "/data/debug"
             name: debug
+{{end}}
+{{if .UseAdmissionWebhook}}
+        - containerPort: 443
 {{end}}
         env:
         - name: POD_NAME
