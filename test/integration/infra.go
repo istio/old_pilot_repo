@@ -32,6 +32,7 @@ import (
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/model"
+	"istio.io/pilot/platform"
 	"istio.io/pilot/platform/kube/inject"
 	"istio.io/pilot/test/util"
 )
@@ -200,8 +201,10 @@ func (infra *infra) setup() error {
 	if err := deploy("mixer.yaml.tmpl", infra.IstioNamespace); err != nil {
 		return err
 	}
-	if err := deploy("eureka.yaml.tmpl", infra.IstioNamespace); err != nil {
-		return err
+	if platform.ServiceRegistry(infra.Registry) == platform.EurekaRegistry {
+		if err := deploy("eureka.yaml.tmpl", infra.IstioNamespace); err != nil {
+			return err
+		}
 	}
 
 	if infra.Auth != proxyconfig.MeshConfig_NONE {
