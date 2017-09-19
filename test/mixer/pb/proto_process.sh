@@ -1,7 +1,7 @@
 #!/bin/bash
 cat <<EOF
 syntax = "proto3";
-package pb;
+package istio.mixer.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";

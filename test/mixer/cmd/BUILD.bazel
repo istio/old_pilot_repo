@@ -4,6 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = ["main.go"],
     visibility = ["//visibility:private"],
+    deps = [
+        "//test/mixer:go_default_library",
+        "//test/mixer/pb:go_default_library",
+        "@org_golang_google_grpc//:go_default_library",
+    ],
 )
 
 go_binary(

@@ -483,6 +483,10 @@ filegroup(
     name = "mixer",
     srcs = glob(["mixer/v1/*.proto"]),
 )
+filegroup(
+    name = "wordlist",
+    srcs = ["mixer/v1/global_dictionary.yaml"],
+)
     """,
     commit = ISTIO_API,
     remote = "https://github.com/istio/api.git",

@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+
 	"istio.io/pilot/test/mixer"
 	"istio.io/pilot/test/mixer/pb"
 )
@@ -39,8 +40,8 @@ func main() {
 		log.Fatal(err)
 	}
 	grpcServer := grpc.NewServer()
-	instance := &mixer.Server{}
-	pb.RegisterMixerServer(grpcServer, instance)
+	instance := mixer.NewServer()
+	istio_mixer_v1.RegisterMixerServer(grpcServer, instance)
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatal(err)
 	}
