@@ -56,26 +56,26 @@ func init() {
 		"Select a namespace for the controller loop. If not set, uses ${POD_NAMESPACE} environment variable")
 }
 
-type RegisterInstance struct {
-	Instance Instance `json:"instance"`
+type registerInstance struct {
+	Instance instance `json:"instance"`
 }
 
-type Instance struct {
+type instance struct { // nolint: aligncheck
 	ID         string   `json:"instanceId,omitempty"`
 	Hostname   string   `json:"hostName"`
 	App        string   `json:"app"`
 	IPAddress  string   `json:"ipAddr"`
-	Port       Port     `json:"port,omitempty"`
-	SecurePort Port     `json:"securePort,omitempty"`
-	Metadata   Metadata `json:"metadata,omitempty"`
+	Port       port     `json:"port,omitempty"`
+	SecurePort port     `json:"securePort,omitempty"`
+	Metadata   metadata `json:"metadata,omitempty"`
 }
 
-type Port struct {
+type port struct {
 	Port    int  `json:"$,string"`
 	Enabled bool `json:"@enabled,string"`
 }
 
-type Metadata map[string]string
+type metadata map[string]string
 
 const (
 	heartbeatInterval = 30 * time.Second
@@ -89,7 +89,7 @@ type agent struct {
 	stop     <-chan struct{}
 	client   http.Client
 	url      string
-	instance *Instance
+	instance *instance
 }
 
 func (a *agent) Run(stop <-chan struct{}) {
@@ -142,7 +142,7 @@ func (a *agent) registered() {
 }
 
 func (a *agent) register() error {
-	payload := RegisterInstance{Instance: *a.instance}
+	payload := registerInstance{Instance: *a.instance}
 	data, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -158,7 +158,7 @@ func (a *agent) register() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("unexpected status code %s", resp.Status)
@@ -176,7 +176,7 @@ func (a *agent) heartbeat() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code %s", resp.Status)
@@ -270,7 +270,7 @@ func (m *mirror) Sync(endpoints <-chan *v1.Endpoints) {
 	}
 }
 
-func (m *mirror) startAgent(name string, instance *Instance) {
+func (m *mirror) startAgent(name string, instance *instance) {
 	stop := make(chan struct{})
 	m.agents[name][instance.ID] = stop
 	a := &agent{
@@ -288,51 +288,51 @@ func (m *mirror) stopAgent(name, id string) {
 	delete(m.agents[name], id)
 }
 
-func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*Instance {
-	instances := make([]*Instance, 0)
+func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*instance {
+	instances := make([]*instance, 0)
 	for _, ss := range ep.Subsets {
 		for _, addr := range ss.Addresses {
-			for _, port := range ss.Ports {
-				metadata := make(Metadata)
+			for _, ssPort := range ss.Ports {
+				md := make(metadata)
 
 				// add labels
 				pod, exists := m.podCache.getByIP(addr.IP)
 				if exists {
 					for k, v := range pod.Labels {
-						metadata[k] = v
+						md[k] = v
 					}
 				}
 
 				// add protocol labels
-				protocol := kube.ConvertProtocol(port.Name, port.Protocol)
+				protocol := kube.ConvertProtocol(ssPort.Name, ssPort.Protocol)
 				switch protocol {
 				case model.ProtocolUDP:
-					metadata["istio.protocol"] = "udp"
+					md["istio.protocol"] = "udp"
 				case model.ProtocolTCP:
-					metadata["istio.protocol"] = "tcp"
+					md["istio.protocol"] = "tcp"
 				case model.ProtocolHTTP:
-					metadata["istio.protocol"] = "http"
+					md["istio.protocol"] = "http"
 				case model.ProtocolHTTP2:
-					metadata["istio.protocol"] = "http2"
+					md["istio.protocol"] = "http2"
 				case model.ProtocolHTTPS:
-					metadata["istio.protocol"] = "https"
+					md["istio.protocol"] = "https"
 				case model.ProtocolGRPC:
-					metadata["istio.protocol"] = "grpc"
+					md["istio.protocol"] = "grpc"
 				}
 
 				hostname := fmt.Sprintf("%s.%s.svc.cluster.local",
 					ep.ObjectMeta.Name, ep.ObjectMeta.Namespace)
 
-				instances = append(instances, &Instance{
-					ID:        fmt.Sprintf("%s-%s-%d", ep.ObjectMeta.Name, addr.IP, port.Port),
+				instances = append(instances, &instance{
+					ID:        fmt.Sprintf("%s-%s-%d", ep.ObjectMeta.Name, addr.IP, ssPort.Port),
 					App:       ep.ObjectMeta.Name,
 					Hostname:  hostname,
 					IPAddress: addr.IP,
-					Port: Port{
-						Port:    int(port.Port),
+					Port: port{
+						Port:    int(ssPort.Port),
 						Enabled: true,
 					},
-					Metadata: metadata,
+					Metadata: md,
 				})
 			}
 		}
@@ -414,7 +414,7 @@ func main() {
 		log.Println(err)
 		return
 	}
-	endpoints := make(chan *v1.Endpoints, 1)
+	endpoints := make(chan *v1.Endpoints)
 
 	endpointInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
