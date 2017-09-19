@@ -28,10 +28,17 @@ if [ ! "${TAG_NAME}" ] ; then
 fi
 
 # Build environment setup
-mkdir -p /tmp/gopath/src/istio.io
-ln -s /workspace /tmp/gopath/src/istio.io/pilot
-cd /tmp/gopath/src/istio.io/pilot
-touch platform/kube/config
+function prepare_gopath() {
+  [[ -z ${GOPATH} ]] && export GOPATH=/tmp/gopath
+  mkdir -p ${GOPATH}/src/istio.io
+  [[ -d ${GOPATH}/src/istio.io/pilot ]] || ln -s ${PWD} ${GOPATH}/src/istio.io/pilot
+  cd ${GOPATH}/src/istio.io/pilot
+  touch platform/kube/config
+}
+
+if [ ${PWD} != "${GOPATH}/src/istio.io/pilot" ]; then
+  prepare_gopath
+fi
 
 # Download and set the credentials for docker.io/istio hub
 mkdir -p "${HOME}/.docker"
