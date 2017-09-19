@@ -84,7 +84,7 @@ spec:
         - -a
         - {{.Namespace}}
         - --registries
-        - Eureka
+        - {{.Registry}}
         - --eurekaserverURL
         - http://eureka:8080
 {{if .UseAdmissionWebhook}}

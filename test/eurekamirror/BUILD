@@ -11,7 +11,6 @@ go_library(
         "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
         "@io_k8s_apimachinery//pkg/runtime:go_default_library",
         "@io_k8s_apimachinery//pkg/watch:go_default_library",
-        "@io_k8s_client_go//kubernetes:go_default_library",
         "@io_k8s_client_go//tools/cache:go_default_library",
     ],
 )

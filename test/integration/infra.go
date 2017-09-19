@@ -50,6 +50,7 @@ type infra struct { // nolint: aligncheck
 
 	Namespace      string
 	IstioNamespace string
+	Registry       string
 	Verbosity      int
 
 	// map from app to pods
