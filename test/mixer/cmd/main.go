@@ -12,25 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mixer
+package main
 
 import (
-	"golang.org/x/net/context"
+	"flag"
+	"fmt"
+	"log"
+	"net"
 
+	"google.golang.org/grpc"
+	"istio.io/pilot/test/mixer"
 	"istio.io/pilot/test/mixer/pb"
 )
 
-// Server is a basic Mixer server
-type Server struct {
-	counter int
+var (
+	port int
+)
+
+func init() {
+	flag.IntVar(&port, "port", 9091, "HTTP/2 port")
 }
 
-func (s *Server) Check(context.Context, *pb.CheckRequest) (*pb.CheckResponse, error) {
-	s.counter++
-	return nil, nil
-}
-
-func (s *Server) Report(context.Context, *pb.ReportRequest) (*pb.ReportResponse, error) {
-	// do nothing deliberately
-	return &pb.ReportReponse{}, nil
+func main() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatal(err)
+	}
+	grpcServer := grpc.NewServer()
+	instance := &mixer.Server{}
+	pb.RegisterMixerServer(grpcServer, instance)
+	if err = grpcServer.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
 }
