@@ -90,9 +90,9 @@ iptables -t nat -A ISTIO_OUTPUT -d 127.0.0.1/32 -j RETURN                     -m
 # All outbound traffic will be redirected to Envoy by default. If
 # IP_RANGES_INCLUDE is non-empty, only traffic bound for the
 # destinations specified in this list will be captured.
-# IF IP_RANGES_EXCLUDE is non-empty, traffic specified by it will
+# If IP_RANGES_EXCLUDE is non-empty, traffic specified by it will
 # NOT be redirected to the sidecar.
-# NOTE: IP_RANGES_INCLUDE and IP_RANGES_EXCLUDE cannot be specified.
+# NOTE: IP_RANGES_INCLUDE and IP_RANGES_EXCLUDE are mutually exclusive.
 sifs=$IFS
 IFS=,
 if [ "${IP_RANGES_INCLUDE}" != "" ]; then

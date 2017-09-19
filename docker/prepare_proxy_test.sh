@@ -299,11 +299,16 @@ function runTest() {
 
     if [ "${TEST_IP_RANGE_EXCLUDE}" = 1 ]; then
         # server app to client2 address from app exclude proxy
-        kc exec ${SERVER} -c app -t -- curl -s clientv2:${CLIENT_PORT} |
+        kc exec ${SERVER} -c app -t -- curl -s ${CLIENTV2_IP}:${CLIENT_PORT} |
             grep ServicePort=${CLIENT_PORT} ||
             die "server => ${CLIENTV2_IP} from app failed"
         assertRedirected 0
-        # TBD: also try clientv2 svc ip:port to make sure redirected == 0
+
+        # server app to clientv2 svc ip:port to make sure redirected == 0
+        kc exec ${SERVER} -c app -t -- curl -s clientv2:${CLIENT_PORT} |
+            grep ServicePort=${CLIENT_PORT} ||
+            die "server => ${CLIENTV2_SVC_IP} from app failed"
+        assertRedirected 0
 
         # server app to client1 address from app via proxy
         kc exec ${SERVER} -c app -t -- curl -s client:${CLIENT_PORT} |
