@@ -92,7 +92,6 @@ type agent struct {
 	instance *Instance
 }
 
-// TODO: stop is synchronous, which may be slow
 func (a *agent) Run(stop <-chan struct{}) {
 	log.Printf("Starting registration agent for %s", a.instance.ID)
 	a.stop = stop
@@ -210,6 +209,7 @@ func (a *agent) buildInstancePath() string {
 	return fmt.Sprintf(instancePath, a.url, a.instance.App, a.instance.ID)
 }
 
+// mirrors k8s instances to an Eureka server
 type mirror struct {
 	url      string
 	podCache *podCache
@@ -340,6 +340,7 @@ func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*Instance {
 	return instances
 }
 
+// podCache maintains a cache of ip -> pod mappings
 type podCache struct {
 	mutex sync.Mutex
 	cache map[string]string
