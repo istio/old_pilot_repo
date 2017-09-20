@@ -33,11 +33,15 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
+	"net/url"
+
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
 	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"istio.io/pilot/tools/version"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -403,6 +407,46 @@ and destination policies.
 		},
 	}
 
+	configCmd = &cobra.Command{
+		Use:   "config-create <ip>:<port>",
+		Short: "Create base kubeconfig file for a server",
+		Example: `
+		# Create a config file for the api server.
+		istioctl config-create 127.0.0.1:8080
+		`,
+		RunE: func(c *cobra.Command, args []string) error {
+
+			configName := "istio"
+
+			if len(args) < 1 {
+				c.Println(c.UsageString())
+				return fmt.Errorf("specify the the api server ip")
+			}
+
+			u, err := url.ParseRequestURI(args[0])
+			if err != nil {
+				c.Println(c.UsageString())
+				return err
+			}
+
+			config := clientcmdapi.Config{
+				Clusters: map[string]*clientcmdapi.Cluster{
+					configName: {Server: u.String()},
+				},
+				Contexts: map[string]*clientcmdapi.Context{
+					configName: {Cluster: configName, AuthInfo: ""},
+				},
+				CurrentContext: configName,
+			}
+
+			pathOpts := clientcmd.NewDefaultPathOptions()
+			pathOpts.GlobalFile = kubeconfig
+			err = clientcmd.ModifyConfig(pathOpts, config, false)
+
+			return err
+		},
+	}
+
 	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Display version information",
@@ -443,6 +487,7 @@ func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
