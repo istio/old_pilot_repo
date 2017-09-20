@@ -53,7 +53,8 @@ var (
 	kubeconfig     string
 	namespace      string
 	istioNamespace string
-	contextName    string
+	istioContext   string
+	istioAPIServer string
 
 	// input file name
 	file string
@@ -408,60 +409,61 @@ and destination policies.
 	}
 
 	configCmd = &cobra.Command{
-		Use:   "config-create <ip>:<port>",
+		Use:   "context-create --api-server <ip>:<port>",
 		Short: "Create base kubeconfig file for a server",
 		Example: `
 		# Create a config file for the api server.
-		istioctl config-create http://127.0.0.1:8080
+		istioctl context-create --api-server http://127.0.0.1:8080
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) < 1 {
+			if istioAPIServer == "" {
 				c.Println(c.UsageString())
-				return fmt.Errorf("specify the the api server ip")
+				return fmt.Errorf("specify the the Istio api server IP")
 			}
 
-			u, err := url.ParseRequestURI(args[0])
+			u, err := url.ParseRequestURI(istioAPIServer)
 			if err != nil {
 				c.Println(c.UsageString())
 				return err
 			}
 
 			configAccess := clientcmd.NewDefaultPathOptions()
-			// use specified kubeconfig file for the location of new config
+			// use specified kubeconfig file for the location of the config to create or modify
 			configAccess.GlobalFile = kubeconfig
 
+			// gets existing kubeconfig or returns new empty config
 			config, err := configAccess.GetStartingConfig()
 			if err != nil {
 				return err
 			}
 
-			cluster, exists := config.Clusters[contextName]
+			cluster, exists := config.Clusters[istioContext]
 			if !exists {
 				cluster = clientcmdapi.NewCluster()
 			}
 			cluster.Server = u.String()
-			config.Clusters[contextName] = cluster
+			config.Clusters[istioContext] = cluster
 
-			context, exists := config.Contexts[contextName]
+			context, exists := config.Contexts[istioContext]
 			if !exists {
 				context = clientcmdapi.NewContext()
 			}
-			context.Cluster = contextName
-			config.Contexts[contextName] = context
+			context.Cluster = istioContext
+			config.Contexts[istioContext] = context
 
 			contextSwitched := false
-			if config.CurrentContext != "" && config.CurrentContext != contextName {
+			if config.CurrentContext != "" && config.CurrentContext != istioContext {
 				contextSwitched = true
 			}
-			config.CurrentContext = contextName
+			config.CurrentContext = istioContext
 			if err = clientcmd.ModifyConfig(configAccess, *config, false); err != nil {
 				return err
 			}
 
 			if contextSwitched {
-				fmt.Printf("kubeconfig context switched to %q\n", contextName)
+				fmt.Printf("kubeconfig context switched to %q\n", istioContext)
 			}
-			fmt.Println("Configuration file created")
+			fmt.Println("Context created")
 			return nil
 		},
 	}
@@ -493,8 +495,10 @@ func init() {
 		"Config namespace")
 
 	defaultContext := "istio"
-	rootCmd.PersistentFlags().StringVarP(&contextName, "context", "t", defaultContext,
-		"Kubernetes configuration file context to use in config-create")
+	configCmd.PersistentFlags().StringVar(&istioContext, "context", defaultContext,
+		"Kubernetes configuration file context name")
+	configCmd.PersistentFlags().StringVar(&istioAPIServer, "api-server", "",
+		"URL for Istio api server")
 
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
