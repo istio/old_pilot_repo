@@ -429,20 +429,31 @@ and destination policies.
 				return err
 			}
 
-			config := clientcmdapi.Config{
-				Clusters: map[string]*clientcmdapi.Cluster{
-					configName: {Server: u.String()},
-				},
-				Contexts: map[string]*clientcmdapi.Context{
-					configName: {Cluster: configName, AuthInfo: ""},
-				},
-				CurrentContext: configName,
+			configAccess := clientcmd.NewDefaultPathOptions()
+			// use specified kubeconfig file for the location of new config
+			configAccess.GlobalFile = kubeconfig
+
+			config, err := configAccess.GetStartingConfig()
+			if err != nil {
+				return err
 			}
 
-			pathOpts := clientcmd.NewDefaultPathOptions()
-			// use specified kubeconfig file for the location of new config
-			pathOpts.GlobalFile = kubeconfig
-			err = clientcmd.ModifyConfig(pathOpts, config, false)
+			cluster, exists := config.Clusters[configName]
+			if !exists {
+				cluster = clientcmdapi.NewCluster()
+			}
+			cluster.Server = u.String()
+			config.Clusters[configName] = cluster
+
+			context, exists := config.Contexts[configName]
+			if !exists {
+				context = clientcmdapi.NewContext()
+			}
+			context.Cluster = configName
+			config.Contexts[configName] = context
+
+			config.CurrentContext = configName
+			err = clientcmd.ModifyConfig(configAccess, *config, false)
 
 			return err
 		},
