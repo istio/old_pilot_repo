@@ -450,7 +450,7 @@ and destination policies.
 			config.Contexts[contextName] = context
 
 			contextSwitched := false
-			if config.CurrentContext != contextName {
+			if config.CurrentContext != "" && config.CurrentContext != contextName {
 				contextSwitched = true
 			}
 			config.CurrentContext = contextName
