@@ -409,7 +409,7 @@ and destination policies.
 	}
 
 	configCmd = &cobra.Command{
-		Use:   "context-create --api-server <ip>:<port>",
+		Use:   "context-create --api-server http://<ip>:<port>",
 		Short: "Create base kubeconfig file for a server",
 		Example: `
 		# Create a config file for the api server.
