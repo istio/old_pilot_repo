@@ -412,7 +412,7 @@ and destination policies.
 		Short: "Create base kubeconfig file for a server",
 		Example: `
 		# Create a config file for the api server.
-		istioctl config-create 127.0.0.1:8080
+		istioctl config-create http://127.0.0.1:8080
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
 
@@ -440,6 +440,7 @@ and destination policies.
 			}
 
 			pathOpts := clientcmd.NewDefaultPathOptions()
+			// use specified kubeconfig file for the location of new config
 			pathOpts.GlobalFile = kubeconfig
 			err = clientcmd.ModifyConfig(pathOpts, config, false)
 
