@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Mirrors Kubernetes endpoint instances into an Eureka server.
+//
+// The Eureka mirror process watches endpoints in Kubernetes, converts
+// endpoint instances to Eureka instances and maintains their registration
+// with an Eureka server. The Eureka mirror processes the corresponding
+// pod labels for the endpoint instances and converts them into Eureka
+// metadata during the conversion.
+//
+// TODO: reduce dup between Eureka clients here and inside the Eureka adapter
+
 package main
 
 import (
@@ -230,7 +240,7 @@ func maintainMirror(url string, podCache *podCache, endpoints <-chan *v1.Endpoin
 // TODO: logic for endpoint deletion
 func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
 	for endpoint := range endpoints {
-		if endpoint.Namespace == "kube-system" || endpoint.Namespace == "default" { // FIXME: hardcoded
+		if endpoint.Namespace == "kube-system" {
 			continue
 		}
 
