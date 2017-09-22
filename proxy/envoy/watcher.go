@@ -103,7 +103,8 @@ func (w *watcher) Reload() {
 	w.agent.ScheduleConfigUpdate(config)
 }
 
-type watchFileEventsFn func(ctx context.Context, wch <-chan *fsnotify.FileEvent, maxDelay time.Duration, notifyFn func())
+type watchFileEventsFn func(ctx context.Context, wch <-chan *fsnotify.FileEvent,
+	maxDelay time.Duration, notifyFn func())
 
 // watchFileEvents watches for changes on a channel and notifies via notifyFn().
 // The function batches changes so that related changes are processed together.
@@ -143,7 +144,8 @@ func watchFileEvents(ctx context.Context, wch <-chan *fsnotify.FileEvent, maxDel
 // `updateFunc` method when changes are detected. This method is blocking
 // so it should be run as a goroutine.
 // updateFunc will not be called more than one time per maxDelay.
-func watchCerts(ctx context.Context, certsDirs []string, watchFileEventsFn watchFileEventsFn, maxDelay time.Duration, updateFunc func()) {
+func watchCerts(ctx context.Context, certsDirs []string, watchFileEventsFn watchFileEventsFn,
+	maxDelay time.Duration, updateFunc func()) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Warningf("failed to create a watcher for certificate files: %v", err)
