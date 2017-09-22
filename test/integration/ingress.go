@@ -40,7 +40,7 @@ func (t *ingress) setup() error {
 	if !t.Ingress {
 		return nil
 	}
-	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry { // TODO: re-enable once Eureka ingress is working
+	if platform.ServiceRegistry(t.Registry) != platform.KubernetesRegistry {
 		return nil
 	}
 	t.logs = makeAccessLogs()
@@ -65,7 +65,7 @@ func (t *ingress) run() error {
 		glog.Info("skipping test since ingress is missing")
 		return nil
 	}
-	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry { // TODO: re-enable once Eureka ingress is working
+	if platform.ServiceRegistry(t.Registry) != platform.KubernetesRegistry {
 		return nil
 	}
 

@@ -276,6 +276,12 @@ func (infra *infra) deployApps() error {
 
 func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, port4, port5, port6 int,
 	version string, injectProxy bool) error {
+	// Eureka does not support management ports
+	healthPort := "true"
+	if platform.ServiceRegistry(infra.Registry) == platform.EurekaRegistry {
+		healthPort = "false"
+	}
+
 	w, err := fill("app.yaml.tmpl", map[string]string{
 		"Hub":            infra.Hub,
 		"Tag":            infra.Tag,
@@ -290,6 +296,7 @@ func (infra *infra) deployApp(deployment, svcName string, port1, port2, port3, p
 		"version":        version,
 		"istioNamespace": infra.IstioNamespace,
 		"injectProxy":    strconv.FormatBool(injectProxy),
+		"healthPort":     healthPort,
 	})
 	if err != nil {
 		return err
