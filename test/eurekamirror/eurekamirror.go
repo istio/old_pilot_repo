@@ -33,7 +33,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -221,62 +220,92 @@ func (a *agent) buildInstancePath() string {
 	return fmt.Sprintf(instancePath, a.url, a.instance.App, a.instance.ID)
 }
 
-// mirrors k8s instances to an Eureka server
-type mirror struct {
-	url      string
-	podCache *podCache
-	agents   map[string]map[string]chan struct{}
+type eventKind int
+
+const (
+	addEvent eventKind = iota
+	deleteEvent
+)
+
+type event struct {
+	kind eventKind
+	obj  interface{}
 }
 
-func maintainMirror(url string, podCache *podCache, endpoints <-chan *v1.Endpoints) {
+// mirrors k8s instances to an Eureka server
+// TODO: this may need flow control if enough events are being generated
+type mirror struct {
+	url string
+	// mapping of endpoint name to instance id
+	agents map[string]map[string]chan struct{}
+	// mapping of ip to pod name
+	podCache map[string]string
+	podStore cache.Store
+}
+
+func maintainMirror(url string, podStore cache.Store, events <-chan event) {
 	m := &mirror{
 		url:      url,
-		podCache: podCache,
 		agents:   make(map[string]map[string]chan struct{}),
+		podStore: podStore,
+		podCache: make(map[string]string),
 	}
-	m.sync(endpoints)
+	m.sync(events)
 }
 
-// TODO: logic for endpoint deletion
-func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
-	for endpoint := range endpoints {
-		if endpoint.Namespace == "kube-system" {
-			continue
-		}
+func (m *mirror) sync(events <-chan event) {
+	for ev := range events {
+		switch ev.obj.(type) {
+		case *v1.Endpoints:
+			endpoint := ev.obj.(*v1.Endpoints)
+			switch ev.kind {
+			case addEvent:
+				instances := m.convertEndpoints(endpoint)
 
-		instances := m.convertEndpoints(endpoint)
+				newIDs := make(map[string]bool)
+				for _, instance := range instances {
+					newIDs[instance.ID] = true
+				}
 
-		newIDs := make(map[string]bool)
-		for _, instance := range instances {
-			newIDs[instance.ID] = true
-		}
+				agents, exists := m.agents[endpoint.Name]
+				if !exists {
+					m.agents[endpoint.Name] = make(map[string]chan struct{})
+					agents = m.agents[endpoint.Name]
+				}
 
-		agents, exists := m.agents[endpoint.Name]
-		if !exists {
-			m.agents[endpoint.Name] = make(map[string]chan struct{})
-			agents = m.agents[endpoint.Name]
-		}
+				// remove instances that are gone
+				toRemove := make([]string, 0)
+				for id := range agents {
+					if !newIDs[id] {
+						toRemove = append(toRemove, id)
+					}
+				}
+				for _, id := range toRemove {
+					m.stopAgent(endpoint.Name, id)
+				}
 
-		// remove instances that are gone
-		toRemove := make([]string, 0)
-		for id := range agents {
-			if !newIDs[id] {
-				toRemove = append(toRemove, id)
+				// add instances that are new
+				for _, instance := range instances {
+					if _, exists := agents[instance.ID]; !exists {
+						m.startAgent(endpoint.Name, instance)
+					}
+				}
+			case deleteEvent:
+				for id := range m.agents[endpoint.Name] {
+					m.stopAgent(endpoint.Name, id)
+				}
+				delete(m.agents, endpoint.Name)
 			}
-		}
-		for _, id := range toRemove {
-			m.stopAgent(endpoint.Name, id)
-		}
-
-		// add instances that are new
-		for _, instance := range instances {
-			if _, exists := agents[instance.ID]; !exists {
-				m.startAgent(endpoint.Name, instance)
+		case *v1.Pod:
+			pod := ev.obj.(*v1.Pod)
+			switch ev.kind {
+			case addEvent:
+				if pod.Status.PodIP != "" {
+					m.podCache[pod.Status.PodIP] = podKey(pod)
+				}
+			case deleteEvent:
+				delete(m.podCache, podKey(pod))
 			}
-		}
-
-		if len(agents) == 0 {
-			delete(m.agents, endpoint.Name)
 		}
 	}
 
@@ -288,17 +317,6 @@ func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
 	}
 }
 
-func (m *mirror) startAgent(name string, inst *instance) {
-	stop := make(chan struct{})
-	m.agents[name][inst.ID] = stop
-	go maintainRegistration(m.url, http.Client{Timeout: 15 * time.Second}, inst, stop)
-}
-
-func (m *mirror) stopAgent(name, id string) {
-	close(m.agents[name][id])
-	delete(m.agents[name], id)
-}
-
 func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*instance {
 	instances := make([]*instance, 0)
 	for _, ss := range ep.Subsets {
@@ -307,7 +325,7 @@ func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*instance {
 				md := make(metadata)
 
 				// add labels
-				pod, exists := m.podCache.getByIP(addr.IP)
+				pod, exists := m.getPodByIP(addr.IP)
 				if exists {
 					for k, v := range pod.Labels {
 						md[k] = v
@@ -348,63 +366,12 @@ func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*instance {
 	return instances
 }
 
-// podCache maintains a cache of ip -> pod mappings
-type podCache struct {
-	mutex sync.Mutex
-	cache map[string]string
-	store cache.Store
-}
-
-func newPodCache(informer cache.SharedIndexInformer) *podCache {
-	c := &podCache{
-		cache: make(map[string]string),
-		store: informer.GetStore(),
-	}
-
-	informer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				c.add(obj.(*v1.Pod))
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				c.remove(old.(*v1.Pod))
-				c.add(cur.(*v1.Pod))
-			},
-			DeleteFunc: func(obj interface{}) {
-				c.remove(obj.(*v1.Pod))
-			},
-		},
-	)
-
-	return c
-}
-
-func (c *podCache) key(pod *v1.Pod) string {
-	return pod.Namespace + "/" + pod.Name
-}
-
-func (c *podCache) add(pod *v1.Pod) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	if pod.Status.PodIP != "" {
-		c.cache[pod.Status.PodIP] = c.key(pod)
-	}
-}
-
-func (c *podCache) remove(pod *v1.Pod) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	delete(c.cache, c.key(pod))
-}
-
-func (c *podCache) getByIP(addr string) (*v1.Pod, bool) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	name, exists := c.cache[addr]
+func (m *mirror) getPodByIP(addr string) (*v1.Pod, bool) {
+	name, exists := m.podCache[addr]
 	if !exists {
 		return nil, false
 	}
-	obj, exists, err := c.store.GetByKey(name)
+	obj, exists, err := m.podStore.GetByKey(name)
 	if err != nil {
 		log.Println(err)
 	}
@@ -412,6 +379,21 @@ func (c *podCache) getByIP(addr string) (*v1.Pod, bool) {
 		return nil, false
 	}
 	return obj.(*v1.Pod), true
+}
+
+func (m *mirror) startAgent(name string, inst *instance) {
+	stop := make(chan struct{})
+	m.agents[name][inst.ID] = stop
+	go maintainRegistration(m.url, http.Client{Timeout: 15 * time.Second}, inst, stop)
+}
+
+func (m *mirror) stopAgent(name, id string) {
+	close(m.agents[name][id])
+	delete(m.agents[name], id)
+}
+
+func podKey(pod *v1.Pod) string {
+	return pod.Namespace + "/" + pod.Name
 }
 
 func main() {
@@ -422,7 +404,20 @@ func main() {
 		log.Println(err)
 		return
 	}
-	endpoints := make(chan *v1.Endpoints)
+
+	events := make(chan event)
+	handler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			events <- event{addEvent, obj}
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			events <- event{deleteEvent, old}
+			events <- event{addEvent, cur}
+		},
+		DeleteFunc: func(obj interface{}) {
+			events <- event{deleteEvent, obj}
+		},
+	}
 
 	endpointInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -435,20 +430,7 @@ func main() {
 		},
 		&v1.Endpoints{}, 1*time.Second, cache.Indexers{},
 	)
-
-	endpointInformer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				endpoints <- obj.(*v1.Endpoints)
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				endpoints <- cur.(*v1.Endpoints)
-			},
-			DeleteFunc: func(obj interface{}) {
-				endpoints <- obj.(*v1.Endpoints) // TODO: what does the obj look like in this case?
-			},
-		},
-	)
+	endpointInformer.AddEventHandler(handler)
 
 	podInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -461,20 +443,19 @@ func main() {
 		},
 		&v1.Pod{}, 1*time.Second, cache.Indexers{},
 	)
-
-	pc := newPodCache(podInformer)
+	podInformer.AddEventHandler(handler)
 
 	stop := make(chan struct{})
 
 	go endpointInformer.Run(stop)
 	go podInformer.Run(stop)
-	go maintainMirror(eurekaURL, pc, endpoints)
+	go maintainMirror(eurekaURL, podInformer.GetStore(), events)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-c
 	log.Printf("captured sig %v, exiting\n", sig)
 	close(stop)
-	close(endpoints)
+	close(events)
 	os.Exit(1)
 }
