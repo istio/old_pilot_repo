@@ -15,30 +15,25 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"flag"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
-	log "fmt"
-
-	"flag"
-
+	"istio.io/pilot/model"
 	"istio.io/pilot/platform/kube"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-
-	"bytes"
-	"encoding/json"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"sync"
-
-	"istio.io/pilot/model"
 )
 
 var (
@@ -93,7 +88,7 @@ type agent struct {
 }
 
 func maintainRegistration(url string, client http.Client, inst *instance, stop <-chan struct{}) {
-	log.Printf("Starting registration agent for %s", inst.ID)
+	log.Println("Starting registration agent for", inst.ID, "with hostname", inst.Hostname)
 	a := &agent{
 		stop:     stop,
 		client:   client,
@@ -119,6 +114,7 @@ func (a *agent) unregistered() {
 	case <-heartbeatDelay:
 		go a.registered() // start heartbeating
 	case <-a.stop:
+		log.Println("Stopping registration agent", a.instance.ID, "with hostname", a.instance.Hostname)
 		return
 	}
 }
@@ -142,6 +138,7 @@ func (a *agent) registered() {
 		if err := a.unregister(); err != nil {
 			log.Println(err)
 		}
+		log.Println("Stopping registration agent", a.instance.ID, "with hostname", a.instance.Hostname)
 		return
 	}
 }
@@ -233,6 +230,10 @@ func maintainMirror(url string, podCache *podCache, endpoints <-chan *v1.Endpoin
 // TODO: logic for endpoint deletion
 func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
 	for endpoint := range endpoints {
+		if endpoint.Namespace == "kube-system" || endpoint.Namespace == "default" { // FIXME: hardcoded
+			continue
+		}
+
 		instances := m.convertEndpoints(endpoint)
 
 		newIDs := make(map[string]bool)
@@ -243,6 +244,7 @@ func (m *mirror) sync(endpoints <-chan *v1.Endpoints) {
 		agents, exists := m.agents[endpoint.Name]
 		if !exists {
 			m.agents[endpoint.Name] = make(map[string]chan struct{})
+			agents = m.agents[endpoint.Name]
 		}
 
 		// remove instances that are gone
@@ -319,13 +321,10 @@ func (m *mirror) convertEndpoints(ep *v1.Endpoints) []*instance {
 					md["istio.protocol"] = "grpc"
 				}
 
-				hostname := fmt.Sprintf("%s.%s.svc.cluster.local",
-					ep.ObjectMeta.Name, ep.ObjectMeta.Namespace)
-
 				instances = append(instances, &instance{
 					ID:        fmt.Sprintf("%s-%s-%d", ep.ObjectMeta.Name, addr.IP, ssPort.Port),
 					App:       ep.ObjectMeta.Name,
-					Hostname:  hostname,
+					Hostname:  fmt.Sprintf("%s.%s.svc.cluster.local", ep.Name, ep.Namespace),
 					IPAddress: addr.IP,
 					Port: port{
 						Port:    int(ssPort.Port),
@@ -457,19 +456,15 @@ func main() {
 
 	stop := make(chan struct{})
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		for sig := range c {
-			log.Printf("captured sig %v, exiting\n", sig)
-			close(stop)
-			close(endpoints)
-			os.Exit(1)
-		}
-	}()
-
 	go endpointInformer.Run(stop)
 	go podInformer.Run(stop)
 	go maintainMirror(eurekaURL, pc, endpoints)
-	<-stop
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-c
+	log.Printf("captured sig %v, exiting\n", sig)
+	close(stop)
+	close(endpoints)
+	os.Exit(1)
 }
