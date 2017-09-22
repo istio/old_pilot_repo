@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"flag"
 	"io/ioutil"
 	"os"
 	"path"
@@ -194,7 +193,7 @@ func TestEnvoyArgs(t *testing.T) {
 	test := envoy{config: config, node: "my-node"}
 	testProxy := NewProxy(config, "my-node")
 	if !reflect.DeepEqual(testProxy, test) {
-		t.Errorf("unexpected struct %v", testProxy)
+		t.Errorf("unexpected struct got\n%v\nwant\n%v", testProxy, test)
 	}
 
 	got := test.args("test.json", 5)
@@ -242,5 +241,3 @@ func TestEnvoyRun(t *testing.T) {
 		t.Errorf("expected error on bad config path")
 	}
 }
-
-var _ = flag.Lookup("v").Value.Set("99")
