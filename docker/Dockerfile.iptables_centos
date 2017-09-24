@@ -1,0 +1,5 @@
+FROM centos:7
+RUN yum -y update \
+ && yum -y install iptables \
+ && yum clean all \
+ && rm -rf /var/cache/yum
