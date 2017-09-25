@@ -191,7 +191,7 @@ func CheckMapInvariant(r model.ConfigStore, t *testing.T, namespace string, n in
 	}
 
 	// check for missing type
-	if l, _ := r.List("missing", namespace); len(l) > 0 {
+	if l, _ := r.List("missing", namespace); len(l) > 0 { // nolint: gas
 		t.Errorf("unexpected objects for missing type")
 	}
 
@@ -346,7 +346,7 @@ func CheckCacheFreshness(cache model.ConfigStoreCache, namespace string, t *test
 
 	// validate cache consistency
 	cache.RegisterEventHandler(model.MockConfig.Type, func(config model.Config, ev model.Event) {
-		elts, _ := cache.List(model.MockConfig.Type, namespace)
+		elts, _ := cache.List(model.MockConfig.Type, namespace) // nolint: gas
 		elt, exists := cache.Get(o.Type, o.Name, o.Namespace)
 		switch ev {
 		case model.EventAdd:
@@ -424,7 +424,7 @@ func CheckCacheSync(store model.ConfigStore, cache model.ConfigStoreCache, names
 	defer close(stop)
 	go cache.Run(stop)
 	util.Eventually(func() bool { return cache.HasSynced() }, t)
-	os, _ := cache.List(model.MockConfig.Type, namespace)
+	os, _ := cache.List(model.MockConfig.Type, namespace) // nolint: gas
 	if len(os) != n {
 		t.Errorf("cache.List => Got %d, expected %d", len(os), n)
 	}
@@ -438,7 +438,7 @@ func CheckCacheSync(store model.ConfigStore, cache model.ConfigStoreCache, names
 
 	// check again in the controller cache
 	util.Eventually(func() bool {
-		os, _ = cache.List(model.MockConfig.Type, namespace)
+		os, _ = cache.List(model.MockConfig.Type, namespace) // nolint: gas
 		glog.Infof("cache.List => Got %d, expected %d", len(os), 0)
 		return len(os) == 0
 	}, t)
@@ -452,8 +452,8 @@ func CheckCacheSync(store model.ConfigStore, cache model.ConfigStoreCache, names
 
 	// check directly through the client
 	util.Eventually(func() bool {
-		cs, _ := cache.List(model.MockConfig.Type, namespace)
-		os, _ := store.List(model.MockConfig.Type, namespace)
+		cs, _ := cache.List(model.MockConfig.Type, namespace) // nolint: gas
+		os, _ := store.List(model.MockConfig.Type, namespace) // nolint: gas
 		glog.Infof("cache.List => Got %d, expected %d", len(cs), n)
 		glog.Infof("store.List => Got %d, expected %d", len(os), n)
 		return len(os) == n && len(cs) == n
