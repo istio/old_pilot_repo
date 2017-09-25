@@ -68,8 +68,8 @@ func NewWatcher(config proxyconfig.ProxyConfig, agent proxy.Agent, role proxy.No
 	}
 }
 
-// defaultMaxDelay is the maximum amount of time to wait before delivering events.
-const defaultMaxDelay = 5 * time.Second
+// defaultMinDelay is the minimum amount of time between delivery of two successive events via updateFunc.
+const defaultMinDelay = 10 * time.Second
 
 func (w *watcher) Run(ctx context.Context) {
 	// agent consumes notifications from the controller
@@ -84,7 +84,7 @@ func (w *watcher) Run(ctx context.Context) {
 		certDirs = append(certDirs, cert.Directory)
 	}
 
-	go watchCerts(ctx, certDirs, watchFileEvents, defaultMaxDelay, w.Reload)
+	go watchCerts(ctx, certDirs, watchFileEvents, defaultMinDelay, w.Reload)
 
 	<-ctx.Done()
 }
@@ -104,14 +104,14 @@ func (w *watcher) Reload() {
 }
 
 type watchFileEventsFn func(ctx context.Context, wch <-chan *fsnotify.FileEvent,
-	maxDelay time.Duration, notifyFn func())
+	minDelay time.Duration, notifyFn func())
 
 // watchFileEvents watches for changes on a channel and notifies via notifyFn().
 // The function batches changes so that related changes are processed together.
-// The function ensures that notifyFn() is called no more than one time per maxDelay.
+// The function ensures that notifyFn() is called no more than one time per minDelay.
 // The function does not return until the the context is cancelled.
-func watchFileEvents(ctx context.Context, wch <-chan *fsnotify.FileEvent, maxDelay time.Duration, notifyFn func()) {
-	// timer and channel for managing maxDelay.
+func watchFileEvents(ctx context.Context, wch <-chan *fsnotify.FileEvent, minDelay time.Duration, notifyFn func()) {
+	// timer and channel for managing minDelay.
 	var timeChan <-chan time.Time
 	var timer *time.Timer
 
@@ -123,7 +123,7 @@ func watchFileEvents(ctx context.Context, wch <-chan *fsnotify.FileEvent, maxDel
 				continue
 			}
 			// create new timer
-			timer = time.NewTimer(maxDelay)
+			timer = time.NewTimer(minDelay)
 			timeChan = timer.C
 		case <-timeChan:
 			// reset timer
@@ -143,9 +143,9 @@ func watchFileEvents(ctx context.Context, wch <-chan *fsnotify.FileEvent, maxDel
 // watchCerts watches all certificate directories and calls the provided
 // `updateFunc` method when changes are detected. This method is blocking
 // so it should be run as a goroutine.
-// updateFunc will not be called more than one time per maxDelay.
+// updateFunc will not be called more than one time per minDelay.
 func watchCerts(ctx context.Context, certsDirs []string, watchFileEventsFn watchFileEventsFn,
-	maxDelay time.Duration, updateFunc func()) {
+	minDelay time.Duration, updateFunc func()) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Warningf("failed to create a watcher for certificate files: %v", err)
@@ -164,7 +164,7 @@ func watchCerts(ctx context.Context, certsDirs []string, watchFileEventsFn watch
 			return
 		}
 	}
-	watchFileEventsFn(ctx, fw.Event, maxDelay, updateFunc)
+	watchFileEventsFn(ctx, fw.Event, minDelay, updateFunc)
 }
 
 func generateCertHash(h hash.Hash, certsDir string, files []string) {
