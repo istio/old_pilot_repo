@@ -3,7 +3,7 @@
 set -ex
 
 # Install linters
-go get -u github.com/alecthomas/gometalinter
+go get -u gopkg.in/alecthomas/gometalinter.v1
 gometalinter --install --update --vendored-linters
 
 # Install buildifier BUILD file validator
