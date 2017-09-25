@@ -5,7 +5,7 @@ buildifier -showlog -mode=check $(find . -type f \( -name 'BUILD' -or -name 'WOR
 
 NUM_CPU=$(getconf _NPROCESSORS_ONLN)
 
-gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
+gometalinter.v1 --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
   --enable=aligncheck\
   --enable=deadcode\
   --enable=errcheck\
