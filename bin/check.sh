@@ -20,7 +20,6 @@ gometalinter.v1 --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-a
   --enable=ineffassign\
   --enable=interfacer\
   --enable=lll --line-length=120\
-  --enable=megacheck\
   --enable=misspell\
   --enable=structcheck\
   --enable=unconvert\
@@ -31,5 +30,6 @@ gometalinter.v1 --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-a
 
 # Disabled linters:
 # --enable=dupl\
+# --enable=megacheck\
 # --enable=gocyclo\
 # --cyclo-over=15\
