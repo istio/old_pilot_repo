@@ -14,6 +14,7 @@ gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
   --enable=gofmt\
   --enable=goimports\
   --enable=golint\
+  --enable=gotype\
   --exclude=.pb.go\
   --exclude=gen_test.go\
   --enable=ineffassign\
@@ -32,4 +33,3 @@ gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
 # --enable=dupl\
 # --enable=gocyclo\
 # --cyclo-over=15\
-# --enable=gotype\
