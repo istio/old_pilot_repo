@@ -227,7 +227,8 @@ func buildSidecarListenersClusters(
 		clusters = append(clusters,
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
-			buildHTTPListener(mesh, node, instances, nil, LocalhostAddress, int(mesh.ProxyHttpPort), RDSAll, false, EgressTraceOperation))
+			buildHTTPListener(mesh, node, instances, nil, LocalhostAddress, int(mesh.ProxyHttpPort),
+					RDSAll, false, EgressTraceOperation))
 		// TODO: need inbound listeners in HTTP_PROXY case, with dedicated ingress listener.
 	}
 
@@ -409,7 +410,8 @@ func buildOutboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node, in
 
 	for port, routeConfig := range httpOutbound {
 		listeners = append(listeners,
-			buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port, fmt.Sprintf("%d", port), false, EgressTraceOperation))
+			buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port,
+				fmt.Sprintf("%d", port), false, EgressTraceOperation))
 		clusters = append(clusters, routeConfig.clusters()...)
 	}
 
@@ -661,7 +663,8 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
-				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address, endpoint.Port, "", false, IngressTraceOperation))
+				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
+					endpoint.Port, "", false, IngressTraceOperation))
 
 		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO:
 			listener := buildTCPListener(&TCPRouteConfig{
