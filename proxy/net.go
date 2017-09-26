@@ -53,7 +53,10 @@ func WaitForPrivateNetwork() bool {
 
 // Returns a private IP address, or unspecified IP (0.0.0.0) if no IP is available
 func getPrivateIPIfAvailable() net.IP {
-	addrs, _ := net.InterfaceAddrs()
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return net.IPv4zero
+	}
 	for _, addr := range addrs {
 		var ip net.IP
 		switch v := addr.(type) {

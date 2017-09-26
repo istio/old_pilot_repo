@@ -5,7 +5,7 @@ buildifier -showlog -mode=check $(find . -type f \( -name 'BUILD' -or -name 'WOR
 
 NUM_CPU=$(getconf _NPROCESSORS_ONLN)
 
-gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
+gometalinter.v1 --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
   --enable=aligncheck\
   --enable=deadcode\
   --enable=errcheck\
@@ -19,7 +19,6 @@ gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
   --enable=ineffassign\
   --enable=interfacer\
   --enable=lll --line-length=120\
-  --enable=megacheck\
   --enable=misspell\
   --enable=structcheck\
   --enable=unconvert\
@@ -30,6 +29,7 @@ gometalinter --concurrency=${NUM_CPU} --enable-gc --deadline=300s --disable-all\
 
 # Disabled linters:
 # --enable=dupl\
+# --enable=megacheck\
 # --enable=gocyclo\
 # --cyclo-over=15\
 # --enable=gotype\

@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	ingressSecretName = "istio-ingress-certs"
+	ingressSecretName = "istio-ingress-certs" //nolint: gas
 )
 
 type infra struct { // nolint: aligncheck

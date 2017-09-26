@@ -565,6 +565,7 @@ func readInputs() ([]model.Config, []crd.IstioKind, error) {
 }
 
 // Print a simple list of names
+// nolint: errcheck, gas
 func printShortOutput(_ *crd.Client, configList []model.Config) {
 	var w tabwriter.Writer
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
@@ -577,7 +578,7 @@ func printShortOutput(_ *crd.Client, configList []model.Config) {
 		)
 		fmt.Fprintf(&w, "%s\t%s\t%s\n", c.Name, kind, c.Namespace)
 	}
-	w.Flush() // nolint: errcheck
+	w.Flush()
 }
 
 // Print as YAML

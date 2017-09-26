@@ -42,9 +42,9 @@ import (
 )
 
 const (
-	secretServerKey  = "server-key.pem"
-	secretServerCert = "server-cert.pem"
-	secretCACert     = "ca-cert.pem"
+	secretServerKey  = "server-key.pem"  // nolint: gas
+	secretServerCert = "server-cert.pem" // nolint: gas
+	secretCACert     = "ca-cert.pem"     // nolint: gas
 )
 
 // ControllerOptions contains the configuration for the Istio Pilot validation
@@ -244,7 +244,7 @@ func (ac *AdmissionController) Run(stop <-chan struct{}) {
 		}
 	}()
 	<-stop
-	server.Close() // nolint: errcheck
+	server.Close() // nolint: errcheck, gas
 }
 
 // Unregister unregisters the external admission webhook

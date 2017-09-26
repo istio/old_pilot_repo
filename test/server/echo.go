@@ -82,6 +82,7 @@ type codeAndSlices struct {
 	slices           int
 }
 
+// nolint: errcheck, gas
 func (h handler) addResponsePayload(r *http.Request, body *bytes.Buffer) {
 
 	body.WriteString("ServiceVersion=" + version + "\n")
