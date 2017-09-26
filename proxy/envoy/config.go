@@ -228,7 +228,7 @@ func buildSidecarListenersClusters(
 			httpOutbound.clusters()...)
 		listeners = append(listeners,
 			buildHTTPListener(mesh, node, instances, nil, LocalhostAddress, int(mesh.ProxyHttpPort),
-					RDSAll, false, EgressTraceOperation))
+				RDSAll, false, EgressTraceOperation))
 		// TODO: need inbound listeners in HTTP_PROXY case, with dedicated ingress listener.
 	}
 
