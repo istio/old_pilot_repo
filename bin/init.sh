@@ -40,12 +40,13 @@ for f in code.pb.go error_details.pb.go status.pb.go; do
     vendor/github.com/googleapis/googleapis/google/rpc/
 done
 
-mkdir -p vendor/istio.io/pilot/test/mixer/pb
+mkdir -p vendor/istio.io/pilot/test/mixer/istio_mixer_v1
+ln -sf "$genfiles/test/mixer/istio_mixer_v1/mixer.pb.go" \
+  vendor/istio.io/pilot/test/mixer/istio_mixer_v1/
+mkdir -p vendor/istio.io/pilot/test/mixer/wordlist
+ln -sf "$genfiles/test/mixer/wordlist/wordlist.go" \
+  vendor/istio.io/pilot/test/mixer/wordlist/
 mkdir -p vendor/istio.io/pilot/test/grpcecho
-ln -sf "$genfiles/test/mixer/pb/mixer.pb.go" \
-  vendor/istio.io/pilot/test/mixer/pb/
-ln -sf "$genfiles/test/mixer/wordlist.go" \
-  vendor/istio.io/pilot/test/mixer/
 ln -sf "$genfiles/test/grpcecho/echo.pb.go" \
   vendor/istio.io/pilot/test/grpcecho/
 
