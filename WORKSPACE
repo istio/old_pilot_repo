@@ -429,7 +429,7 @@ go_repository(
 
 # Change this and the docker/Dockerfile.proxy* files together
 # This SHA is obtained from proxy/postsubmit job
-ISTIO_PROXY_BUCKET = "4a493c07e34e764e29013c794ad295f665d8eebc"
+ISTIO_PROXY_BUCKET = "dda39724815250c24cd002ca49180f3cfa3ef458"
 
 http_file(
     name = "envoy_binary",
@@ -460,6 +460,9 @@ go_repository(
     importpath = "google.golang.org/grpc",
 )
 
+# This SHA is obtained from istio/api
+ISTIO_API = "2b5fabb787e4fa030edb7cfb7000890f31c4c73e"
+
 new_git_repository(
     name = "io_istio_api",
     build_file_content = """
@@ -476,8 +479,16 @@ go_proto_library(
         "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
     ],
 )
+filegroup(
+    name = "mixer",
+    srcs = glob(["mixer/v1/*.proto"]),
+)
+filegroup(
+    name = "wordlist",
+    srcs = ["mixer/v1/global_dictionary.yaml"],
+)
     """,
-    commit = "f25de4f0d4f9812a567974b868c44366253e22c5",  # Sep 14, 2017
+    commit = ISTIO_API,
     remote = "https://github.com/istio/api.git",
 )
 

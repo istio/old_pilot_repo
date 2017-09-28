@@ -54,7 +54,7 @@ minikube start \
     --kubernetes-version=v1.7.5
 ```
 
-Add `--extra-config=apiserver.Authorization.Mode=RBAC` to the list of minikube flags to enable RBAC in minikube.
+RBAC will be supported in minikube starting from version 0.22.2. With that version of minikube, add `--bootstrapper kubeadm --extra-config=apiserver.Authorization.Mode=RBAC` to `minikube start` command, in addition to the flags above, to enable RBAC.
 
 ### Using development cluster
 
@@ -120,6 +120,8 @@ the proxy via iptables. This can sometimes be undesirable while debugging, e.g.
 trying to install additional test tools via apt-get. Use
 `proxy-redirection-clear` to temporarily disable the iptable redirection rules
 and `proxy-redirection-restore` to restore them.
+
+The integration tests use a test mixer server that implements Mixer protocol but provides a programming interface to hardcode test behaviors. The implementation is located [here](../test/mixer).
 
 ## Test logging
 

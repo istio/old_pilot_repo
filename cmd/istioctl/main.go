@@ -15,19 +15,26 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
+	"text/tabwriter"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"istio.io/pilot/adapter/config/crd"
 	"istio.io/pilot/cmd"
@@ -46,6 +53,8 @@ var (
 	kubeconfig     string
 	namespace      string
 	istioNamespace string
+	istioContext   string
+	istioAPIServer string
 
 	// input file name
 	file string
@@ -85,11 +94,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("create takes no arguments")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to create")
 			}
 			for _, config := range varr {
@@ -97,15 +106,49 @@ and destination policies.
 					config.Namespace = namespace
 				}
 
-				configClient, err := newClient()
-				if err != nil {
+				var configClient *crd.Client
+				if configClient, err = newClient(); err != nil {
 					return err
 				}
-				rev, err := configClient.Create(config)
-				if err != nil {
+				var rev string
+				if rev, err = configClient.Create(config); err != nil {
 					return err
 				}
 				fmt.Printf("Created config %v at revision %v\n", config.Key(), rev)
+			}
+
+			if len(others) > 0 {
+				if err = preprocMixerConfig(others); err != nil {
+					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				var errs *multierror.Error
+				var updated crd.IstioKind
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					err = otherClient.Post().
+						Namespace(config.Namespace).
+						Resource(resource.Name).
+						Body(&config).
+						Do().
+						Into(&updated)
+					if err != nil {
+						errs = multierror.Append(errs, err)
+						continue
+					}
+					key := model.Key(config.Kind, config.Name, config.Namespace)
+					fmt.Printf("Created config %s at revision %v\n", key, updated.ResourceVersion)
+				}
+				if errs != nil {
+					return errs
+				}
 			}
 
 			return nil
@@ -123,11 +166,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("replace takes no arguments")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to replace")
 			}
 			for _, config := range varr {
@@ -135,8 +178,8 @@ and destination policies.
 					config.Namespace = namespace
 				}
 
-				configClient, err := newClient()
-				if err != nil {
+				var configClient *crd.Client
+				if configClient, err = newClient(); err != nil {
 					return err
 				}
 				// fill up revision
@@ -147,12 +190,60 @@ and destination policies.
 					}
 				}
 
-				newRev, err := configClient.Update(config)
-				if err != nil {
+				var newRev string
+				if newRev, err = configClient.Update(config); err != nil {
 					return err
 				}
 
 				fmt.Printf("Updated config %v to revision %v\n", config.Key(), newRev)
+			}
+
+			if len(others) > 0 {
+				if err = preprocMixerConfig(others); err != nil {
+					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				var errs *multierror.Error
+				var current crd.IstioKind
+				var updated crd.IstioKind
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					if config.ResourceVersion == "" {
+						err = otherClient.Get().
+							Namespace(config.Namespace).
+							Name(config.Name).
+							Resource(resource.Name).
+							Do().
+							Into(&current)
+						if err == nil && current.ResourceVersion != "" {
+							config.ResourceVersion = current.ResourceVersion
+						}
+					}
+
+					err = otherClient.Put().
+						Namespace(config.Namespace).
+						Name(config.Name).
+						Resource(resource.Name).
+						Body(&config).
+						Do().
+						Into(&updated)
+					if err != nil {
+						errs = multierror.Append(errs, err)
+						continue
+					}
+					key := model.Key(config.Kind, config.Name, config.Namespace)
+					fmt.Printf("Updated config %s to revision %v\n", key, updated.ResourceVersion)
+				}
+				if errs != nil {
+					return errs
+				}
 			}
 
 			return nil
@@ -164,13 +255,13 @@ and destination policies.
 		Short: "Retrieve policies and rules",
 		Example: `
 		# List all route rules
-		istioctl get route-rules
+		istioctl get routerules
 
 		# List all destination policies
-		istioctl get destination-policies
+		istioctl get destinationpolicies
 
 		# Get a specific rule named productpage-default
-		istioctl get route-rule productpage-default
+		istioctl get routerule productpage-default
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
 			configClient, err := newClient()
@@ -180,7 +271,7 @@ and destination policies.
 			if len(args) < 1 {
 				c.Println(c.UsageString())
 				return fmt.Errorf("specify the type of resource to get. Types are %v",
-					strings.Join(configClient.ConfigDescriptor().Types(), ", "))
+					strings.Join(supportedTypes(configClient), ", "))
 			}
 
 			typ, err := schema(configClient, args[0])
@@ -230,7 +321,7 @@ and destination policies.
 		istioctl delete -f example-routing.yaml
 
 		# Delete the rule productpage-default
-		istioctl delete route-rule productpage-default
+		istioctl delete routerule productpage-default
 		`,
 		RunE: func(c *cobra.Command, args []string) error {
 			configClient, errs := newClient()
@@ -263,11 +354,11 @@ and destination policies.
 				c.Println(c.UsageString())
 				return fmt.Errorf("delete takes no arguments when the file option is used")
 			}
-			varr, err := readInputs()
+			varr, others, err := readInputs()
 			if err != nil {
 				return err
 			}
-			if len(varr) == 0 {
+			if len(varr) == 0 && len(others) == 0 {
 				return errors.New("nothing to delete")
 			}
 			for _, config := range varr {
@@ -282,7 +373,98 @@ and destination policies.
 					fmt.Printf("Deleted config: %v\n", config.Key())
 				}
 			}
+			if errs != nil {
+				return errs
+			}
+
+			if len(others) > 0 {
+				if err = preprocMixerConfig(others); err != nil {
+					return err
+				}
+				otherClient, resources, oerr := prepareClientForOthers(others)
+				if oerr != nil {
+					return oerr
+				}
+				for _, config := range others {
+					resource, ok := resources[config.Kind]
+					if !ok {
+						errs = multierror.Append(errs, fmt.Errorf("kind %s is not known", config.Kind))
+						continue
+					}
+					err = otherClient.Delete().
+						Namespace(config.Namespace).
+						Resource(resource.Name).
+						Do().
+						Error()
+					if err != nil {
+						errs = multierror.Append(errs, fmt.Errorf("failed to delete: %v", err))
+						continue
+					}
+					fmt.Printf("Deleted cofig: %s\n", model.Key(config.Kind, config.Name, config.Namespace))
+				}
+			}
+
 			return errs
+		},
+	}
+
+	configCmd = &cobra.Command{
+		Use:   "context-create --api-server http://<ip>:<port>",
+		Short: "Create a kubeconfig file suitable for use with istioctl in a non kubernetes environment",
+		Example: `
+		# Create a config file for the api server.
+		istioctl context-create --api-server http://127.0.0.1:8080
+		`,
+		RunE: func(c *cobra.Command, args []string) error {
+			if istioAPIServer == "" {
+				c.Println(c.UsageString())
+				return fmt.Errorf("specify the the Istio api server IP")
+			}
+
+			u, err := url.ParseRequestURI(istioAPIServer)
+			if err != nil {
+				c.Println(c.UsageString())
+				return err
+			}
+
+			configAccess := clientcmd.NewDefaultPathOptions()
+			// use specified kubeconfig file for the location of the config to create or modify
+			configAccess.GlobalFile = kubeconfig
+
+			// gets existing kubeconfig or returns new empty config
+			config, err := configAccess.GetStartingConfig()
+			if err != nil {
+				return err
+			}
+
+			cluster, exists := config.Clusters[istioContext]
+			if !exists {
+				cluster = clientcmdapi.NewCluster()
+			}
+			cluster.Server = u.String()
+			config.Clusters[istioContext] = cluster
+
+			context, exists := config.Contexts[istioContext]
+			if !exists {
+				context = clientcmdapi.NewContext()
+			}
+			context.Cluster = istioContext
+			config.Contexts[istioContext] = context
+
+			contextSwitched := false
+			if config.CurrentContext != "" && config.CurrentContext != istioContext {
+				contextSwitched = true
+			}
+			config.CurrentContext = istioContext
+			if err = clientcmd.ModifyConfig(configAccess, *config, false); err != nil {
+				return err
+			}
+
+			if contextSwitched {
+				fmt.Printf("kubeconfig context switched to %q\n", istioContext)
+			}
+			fmt.Println("Context created")
+			return nil
 		},
 	}
 
@@ -312,6 +494,12 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", v1.NamespaceDefault,
 		"Config namespace")
 
+	defaultContext := "istio"
+	configCmd.PersistentFlags().StringVar(&istioContext, "context", defaultContext,
+		"Kubernetes configuration file context name")
+	configCmd.PersistentFlags().StringVar(&istioAPIServer, "api-server", "",
+		"URL for Istio api server")
+
 	postCmd.PersistentFlags().StringVarP(&file, "file", "f", "",
 		"Input file with the content of the configuration objects (if not set, command reads from the standard input)")
 	putCmd.PersistentFlags().AddFlag(postCmd.PersistentFlags().Lookup("file"))
@@ -326,6 +514,7 @@ func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
@@ -339,123 +528,78 @@ func main() {
 	}
 }
 
-// The schema is based on the kind (for example "route-rule" or "destination-policy")
+// The schema is based on the kind (for example "routerule" or "destinationpolicy")
 func schema(configClient *crd.Client, typ string) (model.ProtoSchema, error) {
 	for _, desc := range configClient.ConfigDescriptor() {
-		if desc.Type == typ || desc.Plural == typ {
+		switch typ {
+		case desc.Type, desc.Plural: // legacy hyphenated resources names
+			return model.ProtoSchema{}, fmt.Errorf("%q not recognized. Please use non-hyphenated resource name %q",
+				typ, crd.ResourceName(typ))
+		case crd.ResourceName(desc.Type), crd.ResourceName(desc.Plural):
 			return desc, nil
 		}
 	}
 	return model.ProtoSchema{}, fmt.Errorf("Istio doesn't have configuration type %s, the types are %v",
-		typ, strings.Join(configClient.ConfigDescriptor().Types(), ", "))
+		typ, strings.Join(supportedTypes(configClient), ", "))
 }
 
 // readInputs reads multiple documents from the input and checks with the schema
-func readInputs() ([]model.Config, error) {
+func readInputs() ([]model.Config, []crd.IstioKind, error) {
 	var reader io.Reader
-	if file == "" {
+	switch file {
+	case "":
+		return nil, nil, errors.New("filename not specified (see --filename or -f)")
+	case "-":
 		reader = os.Stdin
-	} else {
+	default:
 		var err error
-		reader, err = os.Open(file)
-		if err != nil {
-			return nil, err
+		if reader, err = os.Open(file); err != nil {
+			return nil, nil, err
 		}
 	}
 	input, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if out, err := readInputsLegacy(bytes.NewReader(input)); err == nil {
-		return out, nil
-	}
-	return readInputsKubectl(bytes.NewReader(input))
-}
-
-// readInputsKubectl reads multiple documents from the input and checks with
-// the schema.
-//
-// NOTE: This function only decodes a subset of the complete k8s
-// ObjectMeta as identified by the fields in model.ConfigMeta. This
-// would typically only be a problem if a user dumps an configuration
-// object with kubectl and then re-ingests it through istioctl.
-func readInputsKubectl(reader io.Reader) ([]model.Config, error) {
-	var varr []model.Config
-
-	// We store route-rules as a YaML stream; there may be more than one decoder.
-	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
-	for {
-		obj := crd.IstioKind{}
-		err := yamlDecoder.Decode(&obj)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
-		}
-
-		schema, exists := model.IstioConfigTypes.GetByType(crd.CamelCaseToKabobCase(obj.Kind))
-		if !exists {
-			return nil, fmt.Errorf("unrecognized type %v", obj.Kind)
-		}
-
-		config, err := crd.ConvertObject(schema, &obj, "")
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
-		}
-
-		if err := schema.Validate(config.Spec); err != nil {
-			return nil, fmt.Errorf("configuration is invalid: %v", err)
-		}
-
-		varr = append(varr, *config)
-	}
-	glog.V(2).Infof("parsed %d inputs", len(varr))
-
-	return varr, nil
-}
-
-// readInputsLegacy reads multiple documents from the input and checks
-// with the schema.
-func readInputsLegacy(reader io.Reader) ([]model.Config, error) {
-	var varr []model.Config
-
-	// We store route-rules as a YaML stream; there may be more than one decoder.
-	yamlDecoder := kubeyaml.NewYAMLOrJSONDecoder(reader, 512*1024)
-	for {
-		v := model.JSONConfig{}
-		err := yamlDecoder.Decode(&v)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
-		}
-
-		config, err := model.IstioConfigTypes.FromJSON(v)
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse proto message: %v", err)
-		}
-
-		varr = append(varr, *config)
-	}
-	glog.V(2).Infof("parsed %d inputs", len(varr))
-
-	return varr, nil
+	return crd.ParseInputs(string(input))
 }
 
 // Print a simple list of names
 func printShortOutput(_ *crd.Client, configList []model.Config) {
+	var w tabwriter.Writer
+	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
+	fmt.Fprintf(&w, "NAME\tKIND\tNAMESPACE\n")
 	for _, c := range configList {
-		fmt.Printf("%v\n", c.Key())
+		kind := fmt.Sprintf("%s.%s.%s",
+			crd.KabobCaseToCamelCase(c.Type),
+			model.IstioAPIVersion,
+			model.IstioAPIGroup,
+		)
+		fmt.Fprintf(&w, "%s\t%s\t%s\n", c.Name, kind, c.Namespace)
 	}
+	w.Flush() // nolint: errcheck
 }
 
 // Print as YAML
 func printYamlOutput(configClient *crd.Client, configList []model.Config) {
-	for _, c := range configList {
-		yaml, _ := configClient.ConfigDescriptor().ToYAML(c)
-		fmt.Print(yaml)
+	descriptor := configClient.ConfigDescriptor()
+	for _, config := range configList {
+		schema, exists := descriptor.GetByType(config.Type)
+		if !exists {
+			glog.Errorf("Unknown kind %q for %v", crd.ResourceName(config.Type), config.Name)
+			continue
+		}
+		obj, err := crd.ConvertConfig(schema, config)
+		if err != nil {
+			glog.Errorf("Could not decode %v: %v", config.Name, err)
+			continue
+		}
+		bytes, err := yaml.Marshal(obj)
+		if err != nil {
+			glog.Errorf("Could not convert %v to YAML: %v", config, err)
+			continue
+		}
+		fmt.Print(string(bytes))
 		fmt.Println("---")
 	}
 }
@@ -466,4 +610,72 @@ func newClient() (*crd.Client, error) {
 		model.EgressRule,
 		model.DestinationPolicy,
 	}, "")
+}
+
+func supportedTypes(configClient *crd.Client) []string {
+	types := configClient.ConfigDescriptor().Types()
+	for i := range types {
+		types[i] = crd.ResourceName(types[i])
+	}
+	return types
+}
+
+func preprocMixerConfig(configs []crd.IstioKind) error {
+	for i, config := range configs {
+		if config.Namespace == "" {
+			configs[i].Namespace = namespace
+		}
+		if config.APIVersion == "" {
+			configs[i].APIVersion = crd.IstioAPIGroupVersion.String()
+		}
+		// TODO: invokes the mixer validation webhook.
+	}
+	return nil
+}
+
+func apiResources(config *rest.Config, configs []crd.IstioKind) (map[string]metav1.APIResource, error) {
+	client, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	resources, err := client.ServerResourcesForGroupVersion(crd.IstioAPIGroupVersion.String())
+	if err != nil {
+		return nil, err
+	}
+	kindsSet := map[string]bool{}
+	for _, config := range configs {
+		if !kindsSet[config.Kind] {
+			kindsSet[config.Kind] = true
+		}
+	}
+	result := make(map[string]metav1.APIResource, len(kindsSet))
+	for _, resource := range resources.APIResources {
+		if kindsSet[resource.Kind] {
+			result[resource.Kind] = resource
+		}
+	}
+	return result, nil
+}
+
+func restClientForOthers(config *rest.Config) (*rest.RESTClient, error) {
+	configCopied := *config
+	configCopied.ContentConfig = dynamic.ContentConfig()
+	configCopied.GroupVersion = &crd.IstioAPIGroupVersion
+	return rest.RESTClientFor(config)
+}
+
+func prepareClientForOthers(configs []crd.IstioKind) (*rest.RESTClient, map[string]metav1.APIResource, error) {
+	restConfig, err := crd.CreateRESTConfig(kubeconfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	resources, err := apiResources(restConfig, configs)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := restClientForOthers(restConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, resources, nil
 }

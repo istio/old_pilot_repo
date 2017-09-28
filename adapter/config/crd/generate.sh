@@ -55,7 +55,7 @@ cat << EOF
 		object: &${crd}{
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "${crd}",
-				APIVersion: model.IstioAPIVersion,
+				APIVersion: model.IstioAPIGroup + "/" + model.IstioAPIVersion,
 			},
 		},
 		collection: &${crd}List{},

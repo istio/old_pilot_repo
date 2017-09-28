@@ -90,6 +90,9 @@ const (
 	// LocalhostAddress for local binding
 	LocalhostAddress = "127.0.0.1"
 
+	// EgressTraceOperation denotes the name of trace operation for Envoy
+	EgressTraceOperation = "egress"
+
 	// IngressTraceOperation denotes the name of trace operation for Envoy
 	IngressTraceOperation = "ingress"
 
@@ -159,7 +162,7 @@ type HTTPTraceDriverConfig struct {
 }
 
 // RootRuntime definition.
-// See: https://lyft.github.io/envoy/docs/configuration/overview/overview.html
+// See https://envoyproxy.github.io/envoy/configuration/overview/overview.html
 type RootRuntime struct {
 	SymlinkRoot          string `json:"symlink_root"`
 	Subdirectory         string `json:"subdirectory"`
@@ -290,7 +293,7 @@ type RetryPolicy struct {
 }
 
 // WeightedCluster definition
-// See https://lyft.github.io/envoy/docs/configuration/http_conn_man/route_config/route.html
+// See https://envoyproxy.github.io/envoy/configuration/http_conn_man/route_config/route.html
 type WeightedCluster struct {
 	Clusters         []*WeightedClusterEntry `json:"clusters"`
 	RuntimeKeyPrefix string                  `json:"runtime_key_prefix,omitempty"`

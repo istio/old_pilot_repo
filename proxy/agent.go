@@ -35,7 +35,7 @@ import (
 // successfully launch a new Envoy process that will replace the running Envoy
 // processes, the restart epoch of the new process must be exactly 1 greater
 // than the highest restart epoch of the currently running Envoy processes.
-// See https://lyft.github.io/envoy/docs/intro/arch_overview/hot_restart.html
+// See https://envoyproxy.github.io/envoy/intro/arch_overview/hot_restart.html
 // for more information about the Envoy hot restart protocol.
 //
 // Agent requires two functions "run" and "cleanup". Run function is a call to
@@ -214,18 +214,26 @@ func (a *agent) Run(ctx context.Context) {
 			// cleanup for the epoch
 			a.proxy.Cleanup(status.epoch)
 
-			// schedule a retry for a transient error and skip aborts
-			if status.err != nil && status.err != errAbort && !reflect.DeepEqual(a.desiredConfig, a.currentConfig) {
-				if a.retry.budget > 0 {
-					delayDuration := a.retry.InitialInterval * (1 << uint(a.retry.MaxRetries-a.retry.budget))
-					restart := time.Now().Add(delayDuration)
-					a.retry.restart = &restart
-					a.retry.budget = a.retry.budget - 1
-					glog.V(2).Infof("Updated retry delay to %v, budget to %d", delayDuration, a.retry.budget)
+			// schedule a retry for an error.
+			// the current config might be out of date from here since its proxy might have been aborted.
+			// the current config will change on abort, hence retrying prior to abort will not progress.
+			// that means that aborted envoy might need to re-schedule a retry if it was not already scheduled.
+			if status.err != nil {
+				// skip retrying twice by checking retry restart delay
+				if a.retry.restart == nil {
+					if a.retry.budget > 0 {
+						delayDuration := a.retry.InitialInterval * (1 << uint(a.retry.MaxRetries-a.retry.budget))
+						restart := time.Now().Add(delayDuration)
+						a.retry.restart = &restart
+						a.retry.budget = a.retry.budget - 1
+						glog.V(2).Infof("Epoch %d: set retry delay to %v, budget to %d", status.epoch, delayDuration, a.retry.budget)
+					} else {
+						glog.Error("Permanent error: budget exhausted trying to fulfill the desired configuration")
+						a.proxy.Panic(a.desiredConfig)
+						return
+					}
 				} else {
-					glog.Error("Permanent error: budget exhausted trying to fulfill the desired configuration")
-					a.proxy.Panic(a.desiredConfig)
-					return
+					glog.V(2).Infof("Epoch %d: restart already scheduled", status.epoch)
 				}
 			}
 
