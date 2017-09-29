@@ -17,7 +17,9 @@
 # deployment should watch for creation of this secret and register
 # itself with k8s apiserver when secret becomes available.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 function usage() {
     cat <<EOF
