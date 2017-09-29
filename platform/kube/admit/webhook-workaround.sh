@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script implements a workaround for enabling dynamic external
 # webhooks on GKE as described by
