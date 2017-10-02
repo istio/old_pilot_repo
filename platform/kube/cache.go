@@ -75,9 +75,6 @@ func (pc *PodCache) getPodByIP(addr string) (*v1.Pod, bool) {
 
 // labelsByIP returns pod labels or nil if pod not found or an error occurred
 func (pc *PodCache) labelsByIP(addr string) (model.Labels, bool) {
-	pc.rwMu.RLock()
-	defer pc.rwMu.RUnlock()
-
 	pod, exists := pc.getPodByIP(addr)
 	if !exists {
 		return nil, false
