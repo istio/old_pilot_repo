@@ -75,6 +75,9 @@
          "weight": 25
         }
        ]
+      },
+      "decorator": {
+       "operation": "weighted"
       }
      }
     ]

@@ -15,6 +15,9 @@
        "retry_on": "5xx,connect-failure,refused-stream",
        "num_retries": 1,
        "per_try_timeout_ms": 5000
+      },
+      "decorator": {
+       "operation": "egress-timeout"
       }
      }
     ]
@@ -89,6 +92,9 @@
        "retry_on": "5xx,connect-failure,refused-stream",
        "num_retries": 1,
        "per_try_timeout_ms": 5000
+      },
+      "decorator": {
+       "operation": "timeout"
       }
      }
     ]

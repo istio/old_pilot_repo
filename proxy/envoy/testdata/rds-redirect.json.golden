@@ -81,7 +81,10 @@
         "name": "scooby",
         "value": "doo"
        }
-      ]
+      ],
+      "decorator": {
+       "operation": "redirect"
+      }
      },
      {
       "prefix": "/",

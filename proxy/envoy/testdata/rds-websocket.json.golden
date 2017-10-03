@@ -20,7 +20,10 @@
      {
       "prefix": "/websocket",
       "cluster": "out.e5c9564b7c4dbb0355a4f740e9d29277ccca97cd",
-      "use_websocket": true
+      "use_websocket": true,
+      "decorator": {
+       "operation": "websocket"
+      }
      },
      {
       "prefix": "/",

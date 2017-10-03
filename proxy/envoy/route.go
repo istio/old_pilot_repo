@@ -83,6 +83,22 @@ func buildInboundWebsocketRoute(rule *proxyconfig.RouteRule, cluster *Cluster) *
 	return route
 }
 
+func buildInboundRoute(config model.Config, rule *proxyconfig.RouteRule, cluster *Cluster) *HTTPRoute {
+	route := buildHTTPRouteMatch(rule.Match)
+	route.Cluster = cluster.Name
+	route.clusters = []*Cluster{cluster}
+	if rule.Rewrite != nil && rule.Rewrite.GetUri() != "" {
+		// overwrite the computed prefix with the rewritten prefix,
+		// for this is what we expect from remote envoys
+		route.Prefix = rule.Rewrite.GetUri()
+		route.Path = ""
+	}
+
+	route.Decorator = buildDecorator(config)
+
+	return route
+}
+
 func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Duration) *Cluster {
 	cluster := &Cluster{
 		Name:             fmt.Sprintf("%s%d", InboundClusterPrefix, port),
@@ -199,6 +215,8 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 		route.WebsocketUpgrade = true
 	}
 
+	route.Decorator = buildDecorator(config)
+
 	return route
 }
 
@@ -214,6 +232,15 @@ func buildCluster(address, name string, timeout *duration.Duration) *Cluster {
 			},
 		},
 	}
+}
+
+func buildDecorator(config model.Config) *Decorator {
+	if config.ConfigMeta.Name != "" {
+		return &Decorator{
+			Operation:             config.ConfigMeta.Name,
+		}
+	}
+	return nil
 }
 
 func buildZipkinTracing() *Tracing {

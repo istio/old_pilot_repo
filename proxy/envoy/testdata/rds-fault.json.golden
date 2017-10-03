@@ -80,7 +80,10 @@
         "name": "scooby",
         "value": "doo"
        }
-      ]
+      ],
+      "decorator": {
+       "operation": "fault"
+      }
      },
      {
       "prefix": "/",
