@@ -461,7 +461,7 @@ go_repository(
 )
 
 # This SHA is obtained from istio/api
-ISTIO_API = "3520b5436dd8d8bc7c27fc1f9f267093f7254cf6"
+ISTIO_API = "995768771a45f1bd63a5750590cdf7734482c184"
 
 new_git_repository(
     name = "io_istio_api",
@@ -489,7 +489,7 @@ filegroup(
 )
     """,
     commit = ISTIO_API,
-    remote = "https://github.com/istio/api.git",
+    remote = "https://github.com/objectiser/istio-api.git",
 )
 
 GOOGLEAPIS_BUILD_FILE = """

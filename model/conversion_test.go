@@ -37,6 +37,9 @@ func TestProtoSchemaConversions(t *testing.T) {
 			{Destination: &proxyconfig.IstioService{Name: "bar"}, Weight: 75},
 			{Destination: &proxyconfig.IstioService{Name: "baz"}, Weight: 25},
 		},
+		Decorator: &proxyconfig.Decorator{
+			Operation: "foobar",
+		},
 	}
 
 	wantJSON := `
@@ -58,11 +61,16 @@ func TestProtoSchemaConversions(t *testing.T) {
 			},
 			"weight": 25
 		}
-		]
+		],
+		"decorator": {
+			"operation": "foobar"
+		}
 	}
 	`
 
-	wantYAML := "destination:\n" +
+	wantYAML := "decorator:\n" +
+		"  operation: foobar\n" +
+		"destination:\n" +
 		"  name: foo\n" +
 		"precedence: 5\n" +
 		"route:\n" +
@@ -91,6 +99,9 @@ func TestProtoSchemaConversions(t *testing.T) {
 				},
 				"weight": 25.0,
 			},
+		},
+		"decorator": map[string]interface{}{
+			"operation": "foobar",
 		},
 	}
 

@@ -199,6 +199,10 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 		route.WebsocketUpgrade = true
 	}
 
+	if rule.Decorator != nil {
+		route.Decorator = buildDecorator(rule.Decorator)
+	}
+
 	return route
 }
 
@@ -213,6 +217,12 @@ func buildCluster(address, name string, timeout *duration.Duration) *Cluster {
 				URL: "tcp://" + address,
 			},
 		},
+	}
+}
+
+func buildDecorator(decorator *proxyconfig.Decorator) *Decorator {
+	return &Decorator{
+		Operation:             decorator.Operation,
 	}
 }
 
