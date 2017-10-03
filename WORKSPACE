@@ -2,13 +2,14 @@ workspace(name = "com_github_istio_pilot")
 
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "eba68677493422112dd25f6a0b4bbdb02387e5a4",  # Aug 1, 2017
+    commit = "0e5a0e51b4e9fc3b5ef1436639a43fce27559744",  # Oct 3, 2017
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_repositories", "go_repository")
+load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_repository", "go_register_toolchains")
 
-go_repositories()
+go_rules_dependencies()
+go_register_toolchains()
 
 ##
 ## Kubernetes dependencies
