@@ -6,6 +6,12 @@ git_repository(
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
+git_repository(
+    name = "com_github_google_protobuf",
+    commit = "593e917c176b5bc5aafa57bf9f6030d749d91cd5",  # Jan 2017 3.2.0
+    remote = "https://github.com/google/protobuf.git",
+)
+
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_repository", "go_register_toolchains")
 
 go_rules_dependencies()
@@ -447,12 +453,6 @@ go_repository(
     name = "com_github_golang_protobuf",
     commit = "8ee79997227bf9b34611aee7946ae64735e6fd93",
     importpath = "github.com/golang/protobuf",
-)
-
-git_repository(
-    name = "com_github_google_protobuf",
-    commit = "593e917c176b5bc5aafa57bf9f6030d749d91cd5",  # Jan 2017 3.2.0
-    remote = "https://github.com/google/protobuf.git",
 )
 
 go_repository(
