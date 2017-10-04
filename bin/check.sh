@@ -11,6 +11,7 @@ NUM_CPU=$(getconf _NPROCESSORS_ONLN)
 gometalinter="docker run \
   -v $(bazel info output_base):$(bazel info output_base) \
   -v $(pwd):/go/src/istio.io/pilot \
+  -w /go/src/istio.io/pilot \
   gcr.io/istio-testing/linter:bfcc1d6942136fd86eb6f1a6fb328de8398fbd80"
 $gometalinter \
   --concurrency=${NUM_CPU} --enable-gc --deadline=300s \
