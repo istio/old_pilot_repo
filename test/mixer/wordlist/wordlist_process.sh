@@ -34,6 +34,7 @@ func GlobalList() []string {
 }
 
 var (
+        // nolint: aligncheck
 	globalList = []string{
 EOF
 
