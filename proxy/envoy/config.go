@@ -372,14 +372,8 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 		},
 	}
 
-	baseListener := &Listener{
-		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
-		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
-		Filters: []*NetworkFilter{baseTCPProxy},
-	}
-
 	switch protocol {
-	case model.ProtocolMONGO:
+	case model.ProtocolMongo:
 		// TODO: add a watcher for /var/lib/istio/mongo/certs
 		// if certs are found use, TLS or mTLS clusters for talking to MongoDB.
 		// User is responsible for mounting those certs in the pod.
@@ -388,15 +382,15 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 			Address: fmt.Sprintf("tcp://%s:%d", ip, port),
 			Filters: []*NetworkFilter{{
 				Type: both,
-				Name: MONGOProxyFilter,
-				Config: &MONGOProxyFilterConfig{
+				Name: MongoProxyFilter,
+				Config: &MongoProxyFilterConfig{
 					StatPrefix: "mongo",
 				},
 			},
 				baseTCPProxy,
 			},
 		}
-	case model.ProtocolREDIS:
+	case model.ProtocolRedis:
 		// Redis filter requires the cluster name to be specified
 		// as part of the filter. We extract the cluster from the
 		// TCPRoute. Since TCPRoute has only one route, we take the
@@ -412,19 +406,24 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 				Address: fmt.Sprintf("tcp://%s:%d", ip, port),
 				Filters: []*NetworkFilter{{
 					Type: both,
-					Name: REDISProxyFilter,
-					Config: &REDISProxyFilterConfig{
+					Name: RedisProxyFilter,
+					Config: &RedisProxyFilterConfig{
 						ClusterName: tcpConfig.Routes[0].Cluster,
 						StatPrefix:  "redis",
-						ConnPool: &REDISConnPool{
-							OperationTimeoutMS: int64(REDISDefaultOpTimeout),
+						ConnPool: &RedisConnPool{
+							OperationTimeoutMS: int64(RedisDefaultOpTimeout / time.Millisecond),
 						},
 					},
 				}},
 			}
 		}
 	}
-	return baseListener
+
+	return &Listener{
+		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
+		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
+		Filters: []*NetworkFilter{baseTCPProxy},
+	}
 }
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
@@ -493,7 +492,7 @@ func buildDestinationHTTPRoutes(service *model.Service,
 			return []*HTTPRoute{buildDefaultRoute(cluster)}
 		}
 
-	case model.ProtocolTCP, model.ProtocolMONGO, model.ProtocolREDIS:
+	case model.ProtocolTCP, model.ProtocolMongo, model.ProtocolRedis:
 		// handled by buildOutboundTCPListeners
 
 	default:
@@ -579,7 +578,7 @@ func buildOutboundTCPListeners(mesh *proxyconfig.MeshConfig, services []*model.S
 		}
 		for _, servicePort := range service.Ports {
 			switch servicePort.Protocol {
-			case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO, model.ProtocolREDIS:
+			case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMongo, model.ProtocolRedis:
 				if service.LoadBalancingDisabled || service.Address == "" {
 					// ensure only one wildcard listener is created per port
 					if wildcardListenerPorts[servicePort.Port] {
@@ -694,7 +693,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
 					endpoint.Port, "", false, IngressTraceOperation))
 
-		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMONGO, model.ProtocolREDIS:
+		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMongo, model.ProtocolRedis:
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
 			}, endpoint.Address, endpoint.Port, protocol)
@@ -849,7 +848,7 @@ func buildMgmtPortListeners(mesh *proxyconfig.MeshConfig, managementPorts model.
 	for _, mPort := range managementPorts {
 		switch mPort.Protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC, model.ProtocolTCP,
-			model.ProtocolHTTPS, model.ProtocolMONGO, model.ProtocolREDIS:
+			model.ProtocolHTTPS, model.ProtocolMongo, model.ProtocolRedis:
 			cluster := buildInboundCluster(mPort.Port, model.ProtocolTCP, mesh.ConnectTimeout)
 			listener := buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{managementIP})},
