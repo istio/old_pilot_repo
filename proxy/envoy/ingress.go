@@ -33,14 +33,14 @@ func buildIngressListeners(mesh *proxyconfig.MeshConfig,
 	config model.IstioConfigStore,
 	ingress proxy.Node) Listeners {
 	listeners := Listeners{
-		buildHTTPListener(mesh, ingress, nil, instances, WildcardAddress, 80, "80", true, EgressTraceOperation),
+		buildHTTPListener(mesh, ingress, instances, nil, WildcardAddress, 80, "80", true, EgressTraceOperation),
 	}
 
 	// lack of SNI in Envoy implies that TLS secrets are attached to listeners
 	// therefore, we should first check that TLS endpoint is needed before shipping TLS listener
 	_, secret := buildIngressRoutes(mesh, instances, discovery, config)
 	if secret != "" {
-		listener := buildHTTPListener(mesh, ingress, nil, instances, WildcardAddress, 443, "443", true, EgressTraceOperation)
+		listener := buildHTTPListener(mesh, ingress, instances, nil, WildcardAddress, 443, "443", true, EgressTraceOperation)
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, proxy.IngressCertFilename),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, proxy.IngressKeyFilename),
@@ -102,7 +102,7 @@ func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 		sort.Sort(RoutesByPath(routes))
 		rc.VirtualHosts = append(rc.VirtualHosts, &VirtualHost{
 			Name:    host,
-			Domains: []string{host, host + ":80"},
+			Domains: buildIngressVhostDomains(host, 80),
 			Routes:  routes,
 		})
 	}
@@ -112,13 +112,25 @@ func buildIngressRoutes(mesh *proxyconfig.MeshConfig,
 		sort.Sort(RoutesByPath(routes))
 		rcTLS.VirtualHosts = append(rcTLS.VirtualHosts, &VirtualHost{
 			Name:    host,
-			Domains: []string{host, host + ":443"},
+			Domains: buildIngressVhostDomains(host, 443),
 			Routes:  routes,
 		})
 	}
 
 	configs := HTTPRouteConfigs{80: rc, 443: rcTLS}
 	return configs.normalize(), tlsAll
+}
+
+// buildIngressVhostDomains returns an array of domain strings with the port attached
+func buildIngressVhostDomains(vhost string, port int) []string {
+	domains := make([]string, 0)
+	domains = append(domains, vhost)
+
+	if vhost != "*" {
+		domains = append(domains, fmt.Sprintf("%s:%d", vhost, port))
+	}
+
+	return domains
 }
 
 // buildIngressRoute translates an ingress rule to an Envoy route
