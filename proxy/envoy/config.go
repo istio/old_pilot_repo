@@ -403,6 +403,9 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 		// cluster from the first route. The moment this route array
 		// has multiple routes, we need a fallback. For the moment,
 		// fallback to base TCP.
+
+		// Unlike Mongo, Redis is a standalone filter, that is not
+		// stacked on top of tcp_proxy
 		if len(tcpConfig.Routes) == 1 {
 			return &Listener{
 				Name:    fmt.Sprintf("redis_%s_%d", ip, port),
@@ -417,9 +420,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 							OperationTimeoutMS: int64(REDISDefaultOpTimeout),
 						},
 					},
-				},
-					baseTCPProxy,
-				},
+				}},
 			}
 		}
 	}

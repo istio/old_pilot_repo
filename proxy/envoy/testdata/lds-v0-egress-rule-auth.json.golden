@@ -260,23 +260,6 @@
        },
        "stat_prefix": "redis"
       }
-     },
-     {
-      "type": "read",
-      "name": "tcp_proxy",
-      "config": {
-       "stat_prefix": "tcp",
-       "route_config": {
-        "routes": [
-         {
-          "cluster": "out.ad08e00d6d07a7cdbdbacfc83fef3fd62aaa4c26",
-          "destination_ip_list": [
-           "10.1.0.0/32"
-          ]
-         }
-        ]
-       }
-      }
      }
     ],
     "bind_to_port": false
@@ -490,23 +473,6 @@
        },
        "stat_prefix": "redis"
       }
-     },
-     {
-      "type": "read",
-      "name": "tcp_proxy",
-      "config": {
-       "stat_prefix": "tcp",
-       "route_config": {
-        "routes": [
-         {
-          "cluster": "in.1110",
-          "destination_ip_list": [
-           "10.1.1.0/32"
-          ]
-         }
-        ]
-       }
-      }
      }
     ],
     "ssl_context": {
@@ -683,23 +649,6 @@
         "op_timeout_ms": 30000
        },
        "stat_prefix": "redis"
-      }
-     },
-     {
-      "type": "read",
-      "name": "tcp_proxy",
-      "config": {
-       "stat_prefix": "tcp",
-       "route_config": {
-        "routes": [
-         {
-          "cluster": "out.12a577b4dd04c9a3fed313fc71fb850e7f9c345f",
-          "destination_ip_list": [
-           "10.2.0.0/32"
-          ]
-         }
-        ]
-       }
       }
      }
     ],
