@@ -100,4 +100,9 @@ func TestParseInputs(t *testing.T) {
 	if err != nil || len(varr) == 0 {
 		t.Errorf("ParseInputs(correct input) => got %v, %v", varr, err)
 	}
+
+	varr, _, err = ParseInputs("kind: RouteRule\nspec:\n  destination:\n    service: x\n  decorator:\n    operation: hello")
+	if err != nil || len(varr) == 0 {
+		t.Errorf("ParseInputs(correct input) => got %v, %v", varr, err)
+	}
 }
