@@ -51,7 +51,6 @@ var (
 	connectTimeout         time.Duration
 	statsdUdpAddress       string // nolint: golint
 	proxyAdminPort         int
-	ingressOverride        bool
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -143,11 +142,6 @@ var (
 			}
 
 			if role.Type == proxy.Ingress {
-				// Run this as ingress controller only to gain access to the LB ports
-				// all other ingress configurations will be provided by standard route rules
-				if ingressOverride {
-					role.Type = proxy.Sidecar
-				}
 				certs = append(certs, envoy.CertSource{
 					Directory: proxy.IngressCertsPath,
 					Files:     []string{proxy.IngressCertFilename, proxy.IngressKeyFilename},
@@ -221,8 +215,6 @@ func init() {
 		"IP Address and Port of a statsd UDP listener (e.g. 10.75.241.127:9125)")
 	proxyCmd.PersistentFlags().IntVar(&proxyAdminPort, "proxyAdminPort", int(values.ProxyAdminPort),
 		"Port on which Envoy should listen for administrative commands")
-	proxyCmd.PersistentFlags().BoolVar(&ingressOverride, "ingressOverride", false,
-		"Ignore Kubernetes Ingress resource and use only Istio route rules for ingress")
 
 	cmd.AddFlags(rootCmd)
 
