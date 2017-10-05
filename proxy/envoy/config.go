@@ -372,7 +372,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 		},
 	}
 
-	bazeListener := &Listener{
+	baseListener := &Listener{
 		Name:    fmt.Sprintf("tcp_%s_%d", ip, port),
 		Address: fmt.Sprintf("tcp://%s:%d", ip, port),
 		Filters: []*NetworkFilter{baseTCPProxy},
@@ -414,7 +414,7 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 						ClusterName: tcpConfig.Routes[0].Cluster,
 						StatPrefix:  "redis",
 						ConnPool: &REDISConnPool{
-							OperationTimeoutMS: REDISDefaultOpTimeout,
+							OperationTimeoutMS: int64(REDISDefaultOpTimeout),
 						},
 					},
 				},
