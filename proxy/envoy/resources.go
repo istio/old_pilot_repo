@@ -526,9 +526,9 @@ type REDISConnPool struct {
 
 // REDISProxyFilterConfig definition
 type REDISProxyFilterConfig struct {
-	ClusterName string `json:"cluster_name"`
-	ConnPool *REDISConnPool `json:"conn_pool"`
-	StatPrefix string `json:"stat_prefix"`
+	ClusterName string         `json:"cluster_name"`
+	ConnPool    *REDISConnPool `json:"conn_pool"`
+	StatPrefix  string         `json:"stat_prefix"`
 }
 
 func (*REDISProxyFilterConfig) isNetworkFilterConfig() {}
