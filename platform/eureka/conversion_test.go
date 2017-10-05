@@ -198,6 +198,7 @@ func TestConvertProtocol(t *testing.T) {
 		{in: makeMetadata(metadataHTTPS), out: model.ProtocolHTTPS},
 		{in: makeMetadata(metadataGRPC), out: model.ProtocolGRPC},
 		{in: makeMetadata(metadataMONGO), out: model.ProtocolMONGO},
+		{in: makeMetadata(metadataREDIS), out: model.ProtocolREDIS},
 	}
 
 	for _, tt := range protocolTests {

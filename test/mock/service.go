@@ -101,6 +101,11 @@ func MakeService(hostname, address string) *model.Service {
 				Name:     "mongo",
 				Port:     100, // target port 1100
 				Protocol: model.ProtocolMONGO,
+			},
+			{
+				Name:     "redis",
+				Port:     110, // target port 1110
+				Protocol: model.ProtocolREDIS,
 			}},
 	}
 }

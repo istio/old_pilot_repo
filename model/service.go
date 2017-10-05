@@ -103,6 +103,8 @@ const (
 	ProtocolUDP Protocol = "UDP"
 	// ProtocolMONGO declares that the port carries mongoDB traffic
 	ProtocolMONGO Protocol = "MONGO"
+	// ProtocolREDIS declares that the port carries redis traffic
+	ProtocolREDIS Protocol = "REDIS"
 )
 
 // IsHTTP is true for protocols that use HTTP as transport protocol

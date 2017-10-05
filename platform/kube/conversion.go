@@ -162,6 +162,8 @@ func ConvertProtocol(name string, proto v1.Protocol) model.Protocol {
 			out = model.ProtocolHTTPS
 		case "mongo":
 			out = model.ProtocolMONGO
+		case "redis":
+			out = model.ProtocolREDIS
 		}
 	}
 	return out
