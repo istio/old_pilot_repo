@@ -421,12 +421,9 @@ func buildTCPListener(tcpConfig *TCPRouteConfig, ip string, port int, protocol m
 					baseTCPProxy,
 				},
 			}
-		} else { //fallback to tcp proxy
-			return baseListener
 		}
-	default:
-		return baseListener
 	}
+	return baseListener
 }
 
 // buildOutboundListeners combines HTTP routes and TCP listeners
