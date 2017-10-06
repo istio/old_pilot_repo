@@ -68,7 +68,6 @@ var (
 				role.Type = proxy.NodeType(args[0])
 			}
 
-			// TODO: refactor logic + add eureka
 			// set values from registry platform
 			if role.IPAddress == "" {
 				if serviceregistry == platform.KubernetesRegistry {
