@@ -88,9 +88,9 @@ const (
 	RedisProxyFilter = "redis_proxy"
 
 	// RedisDefaultOpTimeout is the op timeout used for Redis Proxy filter
-	// Currently it is set to 30ms (conversion happens in the filter)
+	// Currently it is set to 30ms
 	// TODO - Allow this to be configured.
-	RedisDefaultOpTimeout = 30 * time.Second
+	RedisDefaultOpTimeout = 30 * time.Millisecond
 
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
@@ -330,6 +330,7 @@ func (host *VirtualHost) clusters() Clusters {
 
 // HTTPRouteConfig definition
 type HTTPRouteConfig struct {
+	ValidateClusters bool `json:"validate_clusters`
 	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
 }
 
@@ -340,7 +341,7 @@ type HTTPRouteConfigs map[int]*HTTPRouteConfig
 func (routes HTTPRouteConfigs) EnsurePort(port int) *HTTPRouteConfig {
 	config, ok := routes[port]
 	if !ok {
-		config = &HTTPRouteConfig{}
+		config = &HTTPRouteConfig{ValidateClusters: true} // FIXME: hacky
 		routes[port] = config
 	}
 	return config
@@ -369,7 +370,7 @@ func (routes HTTPRouteConfigs) normalize() HTTPRouteConfigs {
 // note that the virtual hosts without an explicit port suffix (IP:PORT) are stripped
 // for all routes except the route for port 80.
 func (routes HTTPRouteConfigs) combine() *HTTPRouteConfig {
-	out := &HTTPRouteConfig{}
+	out := &HTTPRouteConfig{ValidateClusters: true} // FIXME: hacky
 	for port, config := range routes {
 		for _, host := range config.VirtualHosts {
 			vhost := &VirtualHost{
@@ -413,7 +414,7 @@ func (rc *HTTPRouteConfig) normalize() *HTTPRouteConfig {
 	hosts := make([]*VirtualHost, len(rc.VirtualHosts))
 	copy(hosts, rc.VirtualHosts)
 	sort.Slice(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
-	return &HTTPRouteConfig{VirtualHosts: hosts}
+	return &HTTPRouteConfig{ValidateClusters: true, VirtualHosts: hosts} // FIXME: hacky
 }
 
 // AccessLog definition.
