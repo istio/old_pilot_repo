@@ -248,7 +248,8 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.1081"
+            "cluster": "in.1081",
+            "use_websocket": true
            }
           ]
          }
@@ -392,7 +393,8 @@
           "routes": [
            {
             "prefix": "/",
-            "cluster": "in.80"
+            "cluster": "in.80",
+            "use_websocket": true
            }
           ]
          }

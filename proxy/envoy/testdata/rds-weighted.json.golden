@@ -75,7 +75,8 @@
          "weight": 25
         }
        ]
-      }
+      },
+      "use_websocket": true
      }
     ]
    }

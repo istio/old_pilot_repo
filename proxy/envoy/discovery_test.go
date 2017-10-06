@@ -275,19 +275,6 @@ func TestRouteDiscoveryRewrite(t *testing.T) {
 	compareResponse(response, "testdata/rds-rewrite.json", t)
 }
 
-func TestRouteDiscoveryWebsocket(t *testing.T) {
-	_, registry, ds := commonSetup(t)
-	addConfig(registry, websocketRouteRule, t)
-
-	url := fmt.Sprintf("/v1/routes/80/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
-	response := makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/rds-websocket.json", t)
-
-	url = fmt.Sprintf("/v1/listeners/%s/%s", "istio-proxy", mock.HelloProxyV0.ServiceNode())
-	response = makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/lds-websocket.json", t)
-}
-
 func TestRouteDiscoveryIngress(t *testing.T) {
 	_, registry, ds := commonSetup(t)
 	addIngressRoutes(registry, t)
@@ -337,10 +324,6 @@ func TestSidecarListenerDiscovery(t *testing.T) {
 		{
 			name: "rewrite",
 			file: rewriteRouteRule,
-		},
-		{
-			name: "websocket",
-			file: websocketRouteRule,
 		},
 		{
 			name: "timeout",

@@ -80,7 +80,8 @@
         "name": "scooby",
         "value": "doo"
        }
-      ]
+      ],
+      "use_websocket": true
      },
      {
       "prefix": "/",

@@ -68,21 +68,6 @@ func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 	}
 }
 
-func buildInboundWebsocketRoute(rule *proxyconfig.RouteRule, cluster *Cluster) *HTTPRoute {
-	route := buildHTTPRouteMatch(rule.Match)
-	route.Cluster = cluster.Name
-	route.clusters = []*Cluster{cluster}
-	route.WebsocketUpgrade = true
-	if rule.Rewrite != nil && rule.Rewrite.GetUri() != "" {
-		// overwrite the computed prefix with the rewritten prefix,
-		// for this is what we expect from remote envoys
-		route.Prefix = rule.Rewrite.GetUri()
-		route.Path = ""
-	}
-
-	return route
-}
-
 func buildInboundCluster(port int, protocol model.Protocol, timeout *duration.Duration) *Cluster {
 	cluster := &Cluster{
 		Name:             fmt.Sprintf("%s%d", InboundClusterPrefix, port),
@@ -145,6 +130,13 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 		}
 	}
 
+	// Set the websocket upgrade flag on all HTTP routes. If the request is
+	// not a websocket upgrade, Envoy will process the request as a normal
+	// HTTP request
+	if port.Protocol == model.ProtocolHTTP {
+		route.WebsocketUpgrade = true
+	}
+
 	destination := service.Hostname
 
 	if len(rule.Route) > 0 {
@@ -178,6 +170,8 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 		route.HostRedirect = rule.Redirect.Authority
 		route.PathRedirect = rule.Redirect.Uri
 		route.Cluster = ""
+		// Routes with redirects cannot have websockets enabled.
+		route.WebsocketUpgrade = false
 	}
 
 	if rule.Rewrite != nil {
@@ -193,10 +187,6 @@ func buildHTTPRoute(config model.Config, service *model.Service, port *model.Por
 				route.faults = append(route.faults, fault)
 			}
 		}
-	}
-
-	if rule.WebsocketUpgrade {
-		route.WebsocketUpgrade = true
 	}
 
 	return route

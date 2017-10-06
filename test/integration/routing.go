@@ -96,7 +96,7 @@ func (t *routing) run() error {
 		// i.e., we are effectively checking websockets beyond just the upgrade.
 		{
 			description: "routing 100 percent to c-v1 with websocket upgrades",
-			config:      "rule-websocket-route.yaml.tmpl",
+			config:      "rule-default-route.yaml.tmpl",
 			check: func() error {
 				return t.verifyRouting("ws", "a", "c", "testwebsocket", "enabled", 100, map[string]int{"v1": 100, "v2": 0})
 			},

@@ -329,7 +329,8 @@
              "mixer_check": "on",
              "mixer_forward": "off",
              "mixer_report": "on"
-            }
+            },
+            "use_websocket": true
            }
           ]
          }
@@ -548,7 +549,8 @@
              "mixer_check": "on",
              "mixer_forward": "off",
              "mixer_report": "on"
-            }
+            },
+            "use_websocket": true
            }
           ]
          }

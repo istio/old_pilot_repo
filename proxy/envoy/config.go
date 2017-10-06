@@ -653,6 +653,13 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 		switch protocol {
 		case model.ProtocolHTTP, model.ProtocolHTTP2, model.ProtocolGRPC:
 			defaultRoute := buildDefaultRoute(cluster)
+			// Websocket enabled routes need to have an explicit use_websocket : true
+			// This setting needs to be enabled on Envoys at both sender and receiver end.
+			// It doesn't hurt to have this setting on by default on all HTTP/1.1 routes
+			// because Envoy will process non websocket requests as regular HTTP requests.
+			if protocol == model.ProtocolHTTP {
+				defaultRoute.WebsocketUpgrade = true
+			}
 
 			// set server-side mixer filter config for inbound HTTP routes
 			if mesh.MixerAddress != "" {
@@ -664,31 +671,6 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				Domains: []string{"*"},
 				Routes:  []*HTTPRoute{},
 			}
-
-			// Websocket enabled routes need to have an explicit use_websocket : true
-			// This setting needs to be enabled on Envoys at both sender and receiver end
-			if protocol == model.ProtocolHTTP {
-				// get all the route rules applicable to the instances
-				rules := config.RouteRulesByDestination(instances)
-				// sort for the output uniqueness
-				model.SortRouteRules(rules)
-				for _, config := range rules {
-					rule := config.Spec.(*proxyconfig.RouteRule)
-					if rule.WebsocketUpgrade {
-						websocketRoute := buildInboundWebsocketRoute(rule, cluster)
-
-						// set server-side mixer filter config for inbound HTTP routes
-						// Note: websocket routes do not call the filter chain. Will be
-						// resolved in future.
-						if mesh.MixerAddress != "" {
-							websocketRoute.OpaqueConfig = buildMixerOpaqueConfig(!mesh.DisablePolicyChecks, false)
-						}
-
-						host.Routes = append(host.Routes, websocketRoute)
-					}
-				}
-			}
-
 			host.Routes = append(host.Routes, defaultRoute)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}

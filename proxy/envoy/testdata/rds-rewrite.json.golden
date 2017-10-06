@@ -66,7 +66,8 @@
       "prefix": "/old/path",
       "prefix_rewrite": "/new/path",
       "host_rewrite": "foo.bar.com",
-      "cluster": "out.a2263b90cd24e500e9ed95f79ae47eabdc77dc74"
+      "cluster": "out.a2263b90cd24e500e9ed95f79ae47eabdc77dc74",
+      "use_websocket": true
      },
      {
       "prefix": "/",

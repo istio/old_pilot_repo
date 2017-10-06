@@ -547,17 +547,6 @@ func TestValidateRouteAndIngressRule(t *testing.T) {
 			},
 		},
 			valid: false},
-		{name: "websocket upgrade invalid redirect", in: &proxyconfig.RouteRule{
-			Destination: &proxyconfig.IstioService{Name: "foobar"},
-			Redirect: &proxyconfig.HTTPRedirect{
-				Uri: "/new/path",
-			},
-			Route: []*proxyconfig.DestinationWeight{
-				{Destination: &proxyconfig.IstioService{Name: "host"}, Weight: 100},
-			},
-			WebsocketUpgrade: true,
-		},
-			valid: false},
 		{name: "route rule match invalid rewrite", in: &proxyconfig.RouteRule{
 			Destination: &proxyconfig.IstioService{Name: "foobar"},
 			Rewrite:     &proxyconfig.HTTPRewrite{},
