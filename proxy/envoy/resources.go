@@ -330,7 +330,7 @@ func (host *VirtualHost) clusters() Clusters {
 
 // HTTPRouteConfig definition
 type HTTPRouteConfig struct {
-	ValidateClusters bool `json:"validate_clusters`
+	ValidateClusters bool `json:"validate_clusters"`
 	VirtualHosts []*VirtualHost `json:"virtual_hosts"`
 }
 
