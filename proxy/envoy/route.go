@@ -237,7 +237,7 @@ func buildCluster(address, name string, timeout *duration.Duration) *Cluster {
 func buildDecorator(config model.Config) *Decorator {
 	if config.ConfigMeta.Name != "" {
 		return &Decorator{
-			Operation:             config.ConfigMeta.Name,
+			Operation: config.ConfigMeta.Name,
 		}
 	}
 	return nil
