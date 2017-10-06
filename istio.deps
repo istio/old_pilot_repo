@@ -11,20 +11,20 @@
 		"repoName": "proxy",
 		"prodBranch": "master",
 		"file": "WORKSPACE",
-		"lastStableSHA": "5d544187a15e11b593e931902e2d74f8dca26ef7"
+		"lastStableSHA": "67851b9648346112987cb1ccf79a30b912724475"
 	},
 	{
 		"name": "/envoy",
 		"repoName": "proxy",
 		"prodBranch": "master",
 		"file": "docker/Dockerfile.proxy",
-		"lastStableSHA": "5d544187a15e11b593e931902e2d74f8dca26ef7"
+		"lastStableSHA": "67851b9648346112987cb1ccf79a30b912724475"
 	},
 	{
 		"name": "/envoy-debug",
 		"repoName": "proxy",
 		"prodBranch": "master",
 		"file": "docker/Dockerfile.proxy_debug",
-		"lastStableSHA": "5d544187a15e11b593e931902e2d74f8dca26ef7"
+		"lastStableSHA": "67851b9648346112987cb1ccf79a30b912724475"
 	}
 ]
