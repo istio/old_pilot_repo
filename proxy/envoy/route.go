@@ -68,25 +68,11 @@ func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 	}
 }
 
-func buildInboundWebsocketRoute(rule *proxyconfig.RouteRule, cluster *Cluster) *HTTPRoute {
-	route := buildHTTPRouteMatch(rule.Match)
-	route.Cluster = cluster.Name
-	route.clusters = []*Cluster{cluster}
-	route.WebsocketUpgrade = true
-	if rule.Rewrite != nil && rule.Rewrite.GetUri() != "" {
-		// overwrite the computed prefix with the rewritten prefix,
-		// for this is what we expect from remote envoys
-		route.Prefix = rule.Rewrite.GetUri()
-		route.Path = ""
-	}
-
-	return route
-}
-
 func buildInboundRoute(config model.Config, rule *proxyconfig.RouteRule, cluster *Cluster) *HTTPRoute {
 	route := buildHTTPRouteMatch(rule.Match)
 	route.Cluster = cluster.Name
 	route.clusters = []*Cluster{cluster}
+	route.WebsocketUpgrade = rule.WebsocketUpgrade
 	if rule.Rewrite != nil && rule.Rewrite.GetUri() != "" {
 		// overwrite the computed prefix with the rewritten prefix,
 		// for this is what we expect from remote envoys
@@ -94,7 +80,9 @@ func buildInboundRoute(config model.Config, rule *proxyconfig.RouteRule, cluster
 		route.Path = ""
 	}
 
-	route.Decorator = buildDecorator(config)
+	if !rule.WebsocketUpgrade {
+		route.Decorator = buildDecorator(config)
+	}
 
 	return route
 }
