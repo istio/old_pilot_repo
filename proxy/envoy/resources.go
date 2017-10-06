@@ -90,7 +90,7 @@ const (
 	// RedisDefaultOpTimeout is the op timeout used for Redis Proxy filter
 	// Currently it is set to 30ms
 	// TODO - Allow this to be configured.
-	RedisDefaultOpTimeout = 30 * time.Millisecond
+	RedisDefaultOpTimeout = 30 * time.Second
 
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
