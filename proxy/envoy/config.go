@@ -117,7 +117,7 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyc
 // buildListeners produces a list of listeners and referenced clusters for all proxies
 func buildListeners(env proxy.Environment, node proxy.Node) Listeners {
 	switch node.Type {
-	case proxy.Sidecar:
+	case proxy.Sidecar, proxy.LB:
 		instances := env.HostInstances(map[string]bool{node.IPAddress: true})
 		listeners, _ := buildSidecarListenersClusters(env.Mesh, instances,
 			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
@@ -135,7 +135,7 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 	var clusters Clusters
 	var instances []*model.ServiceInstance
 	switch node.Type {
-	case proxy.Sidecar:
+	case proxy.Sidecar, proxy.LB:
 		instances = env.HostInstances(map[string]bool{node.IPAddress: true})
 		_, clusters = buildSidecarListenersClusters(env.Mesh, instances,
 			env.Services(), env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)
@@ -180,7 +180,11 @@ func buildSidecarListenersClusters(
 	listeners := make(Listeners, 0)
 	clusters := make(Clusters, 0)
 
-	if mesh.ProxyListenPort > 0 {
+	if node.Type == proxy.LB {
+		outbound, outClusters := buildOutboundListeners(mesh, node, instances, services, config)
+		listeners = append(listeners, outbound...)
+		clusters = append(clusters, outClusters...)
+	} else if mesh.ProxyListenPort > 0 {
 		inbound, inClusters := buildInboundListeners(mesh, node, instances, config)
 		outbound, outClusters := buildOutboundListeners(mesh, node, instances, services, config)
 		mgmtListeners, mgmtClusters := buildMgmtPortListeners(mesh, managementPorts, node.IPAddress)
@@ -250,7 +254,7 @@ func buildRDSRoute(mesh *proxyconfig.MeshConfig, node proxy.Node, routeName stri
 		httpConfigs, _ = buildIngressRoutes(mesh, instances, discovery, config)
 	case proxy.Egress:
 		httpConfigs = buildEgressRoutes(mesh, discovery)
-	case proxy.Sidecar:
+	case proxy.Sidecar, proxy.LB:
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
 		httpConfigs = buildOutboundHTTPRoutes(mesh, node, instances, services, config)
@@ -439,9 +443,17 @@ func buildOutboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node, in
 	httpOutbound = buildEgressFromSidecarHTTPRoutes(mesh, instances, config, httpOutbound)
 
 	for port, routeConfig := range httpOutbound {
-		listeners = append(listeners,
-			buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port,
-				fmt.Sprintf("%d", port), false, EgressTraceOperation))
+		var l *Listener
+		if sidecar.Type == proxy.LB {
+			// if this is in LB mode, then use ingress style trace operation, and remote address settings
+			l = buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port,
+				fmt.Sprintf("%d", port), true, IngressTraceOperation)
+		} else {
+			l = buildHTTPListener(mesh, sidecar, instances, routeConfig, WildcardAddress, port,
+				fmt.Sprintf("%d", port), false, EgressTraceOperation)
+		}
+
+		listeners = append(listeners, l)
 		clusters = append(clusters, routeConfig.clusters()...)
 	}
 

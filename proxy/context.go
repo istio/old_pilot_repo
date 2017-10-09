@@ -72,6 +72,9 @@ const (
 
 	// Egress type is used for cluster egress proxies
 	Egress NodeType = "egress"
+
+	// LB type is used for load balancer mode
+	LB NodeType = "lb"
 )
 
 // ServiceNode encodes the proxy node attributes into a URI-acceptable string
