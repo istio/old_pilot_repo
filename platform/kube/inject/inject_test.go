@@ -152,6 +152,10 @@ func TestIntoResourceFile(t *testing.T) {
 			in:   "testdata/replicationcontroller.yaml",
 			want: "testdata/replicationcontroller.yaml.injected",
 		},
+		{
+			in:   "testdata/hello-ibm.yaml",
+			want: "testdata/hello-ibm.yaml.inject",
+		},
 	}
 
 	for _, c := range cases {
@@ -161,8 +165,9 @@ func TestIntoResourceFile(t *testing.T) {
 		}
 
 		config := &Config{
-			Policy:     InjectionPolicyEnabled,
-			Namespaces: []string{v1.NamespaceAll},
+			Policy:            InjectionPolicyEnabled,
+			IncludeNamespaces: []string{v1.NamespaceAll},
+			ExcludeNamespaces: []string{"ibm-system"},
 			Params: Params{
 				InitImage:       InitImageName(unitTestHub, unitTestTag, c.debugMode),
 				ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, c.debugMode),
