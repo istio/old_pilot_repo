@@ -43,6 +43,8 @@ const (
 
 	// IstioURIPrefix is the URI prefix in the Istio service account scheme
 	IstioURIPrefix = "spiffe"
+
+	PortSecurityAnnotationKeyPrefix = "tls.istio.io"
 )
 
 func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
@@ -53,12 +55,14 @@ func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
 	return out
 }
 
+// Extracts security option for given port from annotation. If there is no such
+// annotation, or the annotation value is not recognized, returns
+// model.SecurityDefault.
 func extractSecurityOption(port v1.ServicePort, obj meta_v1.ObjectMeta) model.SecurityOption {
 	if obj.Annotations == nil {
 		return model.SecurityDefault
 	}
-	tls_config_key := fmt.Sprintf("tls.istio.io/%d", int(port.Port))
-	switch obj.Annotations[tls_config_key] {
+	switch obj.Annotations[portSecurityAnnotationKey(int(port.Port))] {
 	case "disable":
 		return model.SecurityDisable
 	case "enable":
@@ -127,6 +131,10 @@ func serviceHostname(name, namespace, domainSuffix string) string {
 // canonicalToIstioServiceAccount converts a Canonical service account to an Istio service account
 func canonicalToIstioServiceAccount(saname string) string {
 	return fmt.Sprintf("%v://%v", IstioURIPrefix, saname)
+}
+
+func portSecurityAnnotationKey(port int) string {
+	return fmt.Sprintf("%s/%d", PortSecurityAnnotationKeyPrefix, port)
 }
 
 // kubeToIstioServiceAccount converts a K8s service account to an Istio service account

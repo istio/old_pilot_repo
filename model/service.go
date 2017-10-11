@@ -78,6 +78,9 @@ type Port struct {
 	// Protocol to be used for the port.
 	Protocol Protocol `json:"protocol,omitempty"`
 
+	// In combine with the mesh's AuthPolicy, controls authentication for
+	// Envoy-to-Envoy communication.
+	// This value is extracted from service annotation.
 	SecurityOption SecurityOption `json:"security_option,omitempty"`
 }
 
@@ -112,11 +115,13 @@ const (
 type SecurityOption string
 
 const (
-	// Enable mTLS
+	// Enable authentication. This overrules mesh's AuthPolicy.
 	SecurityEnable SecurityOption = "enable"
-	// Disable mTLS
+
+	// Disable authentication. This overrules mesh's AuthPolicy.
 	SecurityDisable SecurityOption = "disable"
 
+	// Set authentication as specified by mesh's AuthPolicy.
 	SecurityDefault SecurityOption = ""
 )
 

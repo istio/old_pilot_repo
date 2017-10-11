@@ -29,7 +29,7 @@ func buildEgressListeners(mesh *proxyconfig.MeshConfig, egress proxy.Node) Liste
 	port := proxy.ParsePort(mesh.EgressProxyAddress)
 	listener := buildHTTPListener(mesh, egress, nil, nil, WildcardAddress, port, fmt.Sprintf("%d", port),
 		false, IngressTraceOperation)
-	applyInboundAuth(listener, mesh, model.SecurityDefault)
+	mayApplyInboundAuth(listener, mesh, model.SecurityDefault)
 	return Listeners{listener}
 }
 

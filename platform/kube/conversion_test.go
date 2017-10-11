@@ -15,7 +15,6 @@
 package kube
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -182,23 +181,23 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 
 	ip := "10.0.0.1"
 
-	test_cases := []struct {
+	testCases := []struct {
 		port             int
 		annotation_value string
-		wanted_value     model.SecurityOption
+		want             model.SecurityOption
 	}{
 		{8080, "enable", model.SecurityEnable},
 		{8080, "disable", model.SecurityDisable},
-		{8080, "invalid", model.SecurityDefault},
+		{8080, "invalid-option", model.SecurityDefault},
 		{9999, "enable", model.SecurityDefault},
 	}
-	for _, test := range test_cases {
+	for _, test := range testCases {
 		localSvc := v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: namespace,
 				Annotations: map[string]string{
-					fmt.Sprintf("tls.istio.io/%d", test.port): test.annotation_value,
+					portSecurityAnnotationKey(test.port): test.annotation_value,
 				},
 			},
 			Spec: v1.ServiceSpec{
@@ -223,10 +222,10 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 				len(service.Ports))
 		}
 
-		if service.Ports[0].SecurityOption != test.wanted_value {
+		if service.Ports[0].SecurityOption != test.want {
 			t.Errorf("incorrect security option => %v, want %v\n",
 				service.Ports[0].SecurityOption,
-				test.wanted_value)
+				test.want)
 		}
 	}
 

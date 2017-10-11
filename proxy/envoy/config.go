@@ -385,7 +385,7 @@ func shouldApplyAuth(mesh *proxyconfig.MeshConfig, security_option model.Securit
 		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && security_option != model.SecurityDisable)
 }
 
-func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, security_option model.SecurityOption) {
+func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, security_option model.SecurityOption) {
 	if shouldApplyAuth(mesh, security_option) {
 >>>>>>> Draft implementation for security optin/optout via service annotation
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
@@ -675,6 +675,8 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
 		clusters = append(clusters, cluster)
 
+		var listener *Listener
+
 		// Local service instances can be accessed through one of three
 		// addresses: localhost, endpoint IP, and service
 		// VIP. Localhost bypasses the proxy and doesn't need any TCP
@@ -722,13 +724,11 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 			host.Routes = append(host.Routes, defaultRoute)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
-			listener := buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
+			listener = buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
 				endpoint.Port, "", false, IngressTraceOperation)
-			applyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
-			listeners = append(listeners, listener)
 
 		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMongo, model.ProtocolRedis:
-			listener := buildTCPListener(&TCPRouteConfig{
+			listener = buildTCPListener(&TCPRouteConfig{
 				Routes: []*TCPRoute{buildTCPRoute(cluster, []string{endpoint.Address})},
 			}, endpoint.Address, endpoint.Port, protocol)
 
@@ -741,17 +741,16 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				}
 				listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 			}
-			applyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
-			listeners = append(listeners, listener)
 
 		default:
 			glog.V(4).Infof("Unsupported inbound protocol %v for port %#v", protocol, servicePort)
 		}
-	}
 
-	// for _, listener := range listeners {
-	// 	applyInboundAuth(listener, mesh)
-	// }
+		if listener != nil {
+			mayApplyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
+			listeners = append(listeners, listener)
+		}
+	}
 
 	return listeners, clusters
 }
