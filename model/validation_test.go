@@ -851,6 +851,8 @@ func TestValidateProxyConfig(t *testing.T) {
 		ServiceCluster:         "",
 		StatsdUdpAddress:       "10.0.0.100",
 		ZipkinAddress:          "10.0.0.100",
+		InfraAuthPolicy:        -1,
+		MixerAddress:           "10.0.0.100",
 	}
 
 	err := ValidateProxyConfig(&invalid)
@@ -860,7 +862,7 @@ func TestValidateProxyConfig(t *testing.T) {
 		switch err.(type) {
 		case *multierror.Error:
 			// each field must cause an error in the field
-			if len(err.(*multierror.Error).Errors) < 11 {
+			if len(err.(*multierror.Error).Errors) < 13 {
 				t.Errorf("expected an error for each field %v", err)
 			}
 		default:

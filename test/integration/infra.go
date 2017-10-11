@@ -52,11 +52,13 @@ type infra struct { // nolint: aligncheck
 	IstioNamespace string
 	Registry       string
 	Verbosity      int
+	MixerAddress   string
 
 	// map from app to pods
 	apps map[string][]string
 
 	Auth proxyconfig.MeshConfig_AuthPolicy
+	InfraAuthPolicy int32
 
 	// switches for infrastructure components
 	Mixer     bool
@@ -206,10 +208,8 @@ func (infra *infra) setup() error {
 		}
 	}
 
-	if infra.Auth != proxyconfig.MeshConfig_NONE {
-		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
-			return err
-		}
+	if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
 	}
 	if err := deploy("headless.yaml.tmpl", infra.Namespace); err != nil {
 		return err

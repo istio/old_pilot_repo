@@ -222,7 +222,12 @@ type fileConfig struct {
 }
 
 const (
-	envoyConfig = "testdata/envoy.json"
+	envoySidecarConfig = "testdata/envoy-sidecar.json"
+	envoyMixerConfig = "testdata/envoy-mixer.json"
+	envoyPilotConfig = "testdata/envoy-pilot.json"
+	envoySidecarAuthConfig = "testdata/envoy-sidecar-auth.json"
+	envoyMixerAuthConfig = "testdata/envoy-mixer-auth.json"
+	envoyPilotAuthConfig = "testdata/envoy-pilot-auth.json"
 )
 
 var (
@@ -315,13 +320,26 @@ func addConfig(r model.ConfigStore, config fileConfig, t *testing.T) {
 	}
 }
 
+func makeProxyNode(Type proxy.NodeType) proxy.Node {
+	role := proxy.Node{Type:Type}
+	return role
+}
+
 func makeProxyConfig() proxyconfig.ProxyConfig {
-	mesh := proxy.DefaultProxyConfig()
-	mesh.ZipkinAddress = "localhost:6000"
-	mesh.StatsdUdpAddress = "10.1.1.10:9125"
-	mesh.DiscoveryAddress = "localhost:8080"
-	mesh.DiscoveryRefreshDelay = ptypes.DurationProto(10 * time.Millisecond)
-	return mesh
+	proxyConfig := proxy.DefaultProxyConfig()
+	proxyConfig.ZipkinAddress = "localhost:6000"
+	proxyConfig.MixerAddress = "localhost:15004"
+	proxyConfig.StatsdUdpAddress = "10.1.1.10:9125"
+	proxyConfig.DiscoveryAddress = "localhost:15003"
+	proxyConfig.DiscoveryRefreshDelay = ptypes.DurationProto(10 * time.Millisecond)
+	return proxyConfig
+}
+
+func makeProxyConfigInfraAuth() proxyconfig.ProxyConfig {
+	proxyConfig := makeProxyConfig()
+	proxyConfig.InfraAuthPolicy = proxyconfig.AuthPolicy_MUTUAL_TLS
+	proxyConfig.PilotSan = []string{"spiffe://cluster.local/ns/istio-system-auth/sa/istio-pilot-service-account"}
+	return proxyConfig
 }
 
 func makeMeshConfig() proxyconfig.MeshConfig {
@@ -332,18 +350,74 @@ func makeMeshConfig() proxyconfig.MeshConfig {
 	return mesh
 }
 
-func TestSidecarConfig(t *testing.T) {
-	config := buildConfig(Listeners{}, Clusters{}, true, makeProxyConfig())
-	if config == nil {
-		t.Fatal("Failed to generate config")
-	}
+func TestProxyConfig(t *testing.T) {
+	cases := []struct {
+		role proxy.Node
+		envoyConfigFilename string
+		}{
+			{
+				makeProxyNode(proxy.Sidecar),
+				envoySidecarConfig,
+			},
+			{
+				makeProxyNode(proxy.Mixer),
+				envoyMixerConfig,
+			},
+			{
+				makeProxyNode(proxy.Pilot),
+				envoyPilotConfig,
+			},
+		}
 
-	err := config.WriteFile(envoyConfig)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	proxyConfig := makeProxyConfig()
+	for _, c := range cases {
+		config := buildConfig(c.role, proxyConfig)
+		if config == nil {
+			t.Fatal("Failed to generate config")
+		}
 
-	util.CompareYAML(envoyConfig, t)
+		err := config.WriteFile(c.envoyConfigFilename)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		util.CompareYAML(c.envoyConfigFilename, t)
+	}
+}
+
+func TestProxyConfigInfraAuth(t *testing.T) {
+	cases := []struct {
+		role proxy.Node
+		envoyConfigFilename string
+		}{
+			{
+				makeProxyNode(proxy.Sidecar),
+				envoySidecarAuthConfig,
+			},
+			{
+				makeProxyNode(proxy.Mixer),
+				envoyMixerAuthConfig,
+			},
+			{
+				makeProxyNode(proxy.Pilot),
+				envoyPilotAuthConfig,
+			},
+		}
+
+	proxyConfig := makeProxyConfigInfraAuth()
+	for _, c := range cases {
+		config := buildConfig(c.role, proxyConfig)
+		if config == nil {
+			t.Fatal("Failed to generate config")
+		}
+
+		err := config.WriteFile(c.envoyConfigFilename)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		util.CompareYAML(c.envoyConfigFilename, t)
+	}
 }
 
 /*
