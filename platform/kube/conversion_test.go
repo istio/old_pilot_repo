@@ -15,6 +15,7 @@
 package kube
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -173,6 +174,62 @@ func TestServiceConversionWithEmptyServiceAccountsAnnotation(t *testing.T) {
 	if len(sa) != 0 {
 		t.Errorf("number of service accounts is incorrect: %d, expected 0", len(sa))
 	}
+}
+
+func TestServiceSecurityAnnotation(t *testing.T) {
+	serviceName := "service1"
+	namespace := "default"
+
+	ip := "10.0.0.1"
+
+	test_cases := []struct {
+		port             int
+		annotation_value string
+		wanted_value     model.SecurityOption
+	}{
+		{8080, "enable", model.SecurityEnable},
+		{8080, "disable", model.SecurityDisable},
+		{8080, "invalid", model.SecurityDefault},
+		{9999, "enable", model.SecurityDefault},
+	}
+	for _, test := range test_cases {
+		localSvc := v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					fmt.Sprintf("tls.istio.io/%d", test.port): test.annotation_value,
+				},
+			},
+			Spec: v1.ServiceSpec{
+				ClusterIP: ip,
+				Ports: []v1.ServicePort{
+					{
+						Name:     "http",
+						Port:     8080,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		}
+
+		service := convertService(localSvc, domainSuffix)
+		if service == nil {
+			t.Errorf("could not convert service")
+		}
+
+		if len(service.Ports) != 1 {
+			t.Errorf("incorrect number of ports => %v, want 1\n",
+				len(service.Ports))
+		}
+
+		if service.Ports[0].SecurityOption != test.wanted_value {
+			t.Errorf("incorrect security option => %v, want %v\n",
+				service.Ports[0].SecurityOption,
+				test.wanted_value)
+		}
+	}
+
 }
 
 func TestExternalServiceConversion(t *testing.T) {

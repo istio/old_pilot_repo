@@ -53,11 +53,27 @@ func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
 	return out
 }
 
-func convertPort(port v1.ServicePort) *model.Port {
+func extractSecurityOption(port v1.ServicePort, obj meta_v1.ObjectMeta) model.SecurityOption {
+	if obj.Annotations == nil {
+		return model.SecurityDefault
+	}
+	tls_config_key := fmt.Sprintf("tls.istio.io/%d", int(port.Port))
+	switch obj.Annotations[tls_config_key] {
+	case "disable":
+		return model.SecurityDisable
+	case "enable":
+		return model.SecurityEnable
+	default:
+		return model.SecurityDefault
+	}
+}
+
+func convertPort(port v1.ServicePort, obj meta_v1.ObjectMeta) *model.Port {
 	return &model.Port{
-		Name:     port.Name,
-		Port:     int(port.Port),
-		Protocol: ConvertProtocol(port.Name, port.Protocol),
+		Name:           port.Name,
+		Port:           int(port.Port),
+		Protocol:       ConvertProtocol(port.Name, port.Protocol),
+		SecurityOption: extractSecurityOption(port, obj),
 	}
 }
 
@@ -73,7 +89,7 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 
 	ports := make([]*model.Port, 0, len(svc.Spec.Ports))
 	for _, port := range svc.Spec.Ports {
-		ports = append(ports, convertPort(port))
+		ports = append(ports, convertPort(port, svc.ObjectMeta))
 	}
 
 	loadBalancingDisabled := addr == "" && external == "" // headless services should not be load balanced

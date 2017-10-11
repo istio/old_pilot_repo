@@ -373,11 +373,21 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 	}
 }
 
+<<<<<<< HEAD
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
 		// do nothing
 	case proxyconfig.MeshConfig_MUTUAL_TLS:
+=======
+func shouldApplyAuth(mesh *proxyconfig.MeshConfig, security_option model.SecurityOption) bool {
+	return security_option == model.SecurityEnable ||
+		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && security_option != model.SecurityDisable)
+}
+
+func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, security_option model.SecurityOption) {
+	if shouldApplyAuth(mesh, security_option) {
+>>>>>>> Draft implementation for security optin/optout via service annotation
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
 }
@@ -658,6 +668,8 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 	// TODO: validate that duplicated endpoints for services can be handled (e.g. above assumption)
 	for _, instance := range instances {
 		endpoint := instance.Endpoint
+		// fmt.Printf("Instant security option %d : %s\n", int(endpoint.ServicePort.Port), endpoint.ServicePort.SecurityOption)
+
 		servicePort := endpoint.ServicePort
 		protocol := servicePort.Protocol
 		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
@@ -710,9 +722,10 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 			host.Routes = append(host.Routes, defaultRoute)
 
 			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
-			listeners = append(listeners,
-				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
-					endpoint.Port, "", false, IngressTraceOperation))
+			listener := buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
+				endpoint.Port, "", false, IngressTraceOperation)
+			applyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
+			listeners = append(listeners, listener)
 
 		case model.ProtocolTCP, model.ProtocolHTTPS, model.ProtocolMongo, model.ProtocolRedis:
 			listener := buildTCPListener(&TCPRouteConfig{
@@ -728,7 +741,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 				}
 				listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 			}
-
+			applyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
 			listeners = append(listeners, listener)
 
 		default:
@@ -736,9 +749,9 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 		}
 	}
 
-	for _, listener := range listeners {
-		applyInboundAuth(listener, mesh)
-	}
+	// for _, listener := range listeners {
+	// 	applyInboundAuth(listener, mesh)
+	// }
 
 	return listeners, clusters
 }

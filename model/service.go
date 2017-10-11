@@ -77,6 +77,8 @@ type Port struct {
 
 	// Protocol to be used for the port.
 	Protocol Protocol `json:"protocol,omitempty"`
+
+	SecurityOption SecurityOption `json:"security_option,omitempty"`
 }
 
 // PortList is a set of ports
@@ -105,6 +107,17 @@ const (
 	ProtocolMongo Protocol = "Mongo"
 	// ProtocolRedis declares that the port carries redis traffic
 	ProtocolRedis Protocol = "Redis"
+)
+
+type SecurityOption string
+
+const (
+	// Enable mTLS
+	SecurityEnable SecurityOption = "enable"
+	// Disable mTLS
+	SecurityDisable SecurityOption = "disable"
+
+	SecurityDefault SecurityOption = ""
 )
 
 // IsHTTP is true for protocols that use HTTP as transport protocol
