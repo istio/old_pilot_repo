@@ -55,7 +55,7 @@ const unitTestHub = "docker.io/istio"
 // Default unit test DebugMode parameter
 const unitTestDebugMode = true
 
-func TestIntoResourceFile(t *testing.T) {
+func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 	cases := []struct {
 		authConfigPath  string
 		enableAuth      bool
@@ -152,6 +152,58 @@ func TestIntoResourceFile(t *testing.T) {
 			in:   "testdata/replicationcontroller.yaml",
 			want: "testdata/replicationcontroller.yaml.injected",
 		},
+	}
+
+	for _, c := range cases {
+		mesh := proxy.DefaultMeshConfig()
+		if c.enableAuth {
+			mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
+		}
+
+		config := &Config{
+			Policy:            InjectionPolicyEnabled,
+			IncludeNamespaces: []string{v1.NamespaceAll},
+			Params: Params{
+				InitImage:       InitImageName(unitTestHub, unitTestTag, c.debugMode),
+				ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, c.debugMode),
+				ImagePullPolicy: "IfNotPresent",
+				Verbosity:       DefaultVerbosity,
+				SidecarProxyUID: DefaultSidecarProxyUID,
+				Version:         "12345678",
+				EnableCoreDump:  c.enableCoreDump,
+				Mesh:            &mesh,
+				DebugMode:       c.debugMode,
+			},
+		}
+
+		if c.imagePullPolicy != "" {
+			config.Params.ImagePullPolicy = c.imagePullPolicy
+		}
+
+		in, err := os.Open(c.in)
+		if err != nil {
+			t.Fatalf("Failed to open %q: %v", c.in, err)
+		}
+		defer func() { _ = in.Close() }()
+		var got bytes.Buffer
+		if err = IntoResourceFile(config, in, &got); err != nil {
+			t.Fatalf("IntoResourceFile(%v) returned an error: %v", c.in, err)
+		}
+
+		util.CompareContent(got.Bytes(), c.want, t)
+	}
+}
+
+func TestIntoResourceFileWithExcludeNamespaces(t *testing.T) {
+	cases := []struct {
+		authConfigPath  string
+		enableAuth      bool
+		in              string
+		want            string
+		imagePullPolicy string
+		enableCoreDump  bool
+		debugMode       bool
+	}{
 		{
 			in:   "testdata/hello-host-network.yaml",
 			want: "testdata/hello-host-network.yaml.injected",
@@ -170,7 +222,6 @@ func TestIntoResourceFile(t *testing.T) {
 
 		config := &Config{
 			Policy:            InjectionPolicyEnabled,
-			IncludeNamespaces: []string{v1.NamespaceAll},
 			ExcludeNamespaces: []string{"ibm-system"},
 			Params: Params{
 				InitImage:       InitImageName(unitTestHub, unitTestTag, c.debugMode),
@@ -387,8 +438,9 @@ func TestGetInitializerConfig(t *testing.T) {
 	defer util.DeleteNamespace(cl, ns)
 
 	goodConfig := Config{
-		Policy:          InjectionPolicyDisabled,
-		InitializerName: DefaultInitializerName,
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		IncludeNamespaces: []string{""},
 		Params: Params{
 			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
 			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
@@ -440,8 +492,9 @@ func TestGetInitializerConfig(t *testing.T) {
 				},
 			},
 			want: Config{
-				Policy:          DefaultInjectionPolicy,
-				InitializerName: DefaultInitializerName,
+				Policy:            DefaultInjectionPolicy,
+				InitializerName:   DefaultInitializerName,
+				IncludeNamespaces: []string{""},
 				Params: Params{
 					InitImage:       InitImageName(DefaultHub, version.Info.Version, false),
 					ProxyImage:      ProxyImageName(DefaultHub, version.Info.Version, false),

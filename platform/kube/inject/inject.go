@@ -193,8 +193,18 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 		return nil, err
 	}
 
-	if len(c.IncludeNamespaces) >= 1 && len(c.ExcludeNamespaces) >= 1 {
+	if c.IncludeNamespaces != nil && c.ExcludeNamespaces != nil {
 		return nil, fmt.Errorf("Cannot configure both namespaces and excludeNamespaces")
+	}
+
+	if c.IncludeNamespaces == nil {
+		c.IncludeNamespaces = []string{""}
+	}
+
+	for _, excludeNamespace := range c.ExcludeNamespaces {
+		if excludeNamespace == "" {
+			return nil, fmt.Errorf("Cannot configure ExcludeNamespaces as NamespaceAll")
+		}
 	}
 
 	// apply safe defaults if not specified
