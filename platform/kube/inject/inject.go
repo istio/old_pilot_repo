@@ -361,6 +361,7 @@ func injectIntoSpec(p *Params, spec *v1.PodSpec, metadata *metav1.ObjectMeta) {
 	args = append(args, "--connectTimeout", timeString(p.Mesh.DefaultConfig.ConnectTimeout))
 	args = append(args, "--statsdUdpAddress", p.Mesh.DefaultConfig.StatsdUdpAddress)
 	args = append(args, "--proxyAdminPort", fmt.Sprintf("%d", p.Mesh.DefaultConfig.ProxyAdminPort))
+	args = append(args, "--infraAuthPolicy", fmt.Sprintf("%d", int(p.Mesh.DefaultConfig.InfraAuthPolicy)))
 
 	volumeMounts := []v1.VolumeMount{
 		{

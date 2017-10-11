@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -51,6 +52,8 @@ var (
 	connectTimeout         time.Duration
 	statsdUDPAddress       string
 	proxyAdminPort         int
+	infraAuthPolicy        int
+	mixerAddress           string
 
 	rootCmd = &cobra.Command{
 		Use:   "agent",
@@ -91,9 +94,11 @@ var (
 					role.ID = role.IPAddress
 				}
 			}
+			pilotDomain := role.Domain
 			if role.Domain == "" {
 				if serviceregistry == platform.KubernetesRegistry {
 					role.Domain = os.Getenv("POD_NAMESPACE") + ".svc.cluster.local"
+					pilotDomain = "cluster.local"
 				} else if serviceregistry == platform.ConsulRegistry {
 					role.Domain = "service.consul"
 				} else {
@@ -118,6 +123,28 @@ var (
 			proxyConfig.ConnectTimeout = ptypes.DurationProto(connectTimeout)
 			proxyConfig.StatsdUdpAddress = statsdUDPAddress
 			proxyConfig.ProxyAdminPort = int32(proxyAdminPort)
+			proxyConfig.MixerAddress = mixerAddress
+			switch infraAuthPolicy {
+			case int(proxyconfig.AuthPolicy_NONE):
+				proxyConfig.InfraAuthPolicy = proxyconfig.AuthPolicy_NONE
+			case int(proxyconfig.AuthPolicy_MUTUAL_TLS):
+				var ns string
+				proxyConfig.InfraAuthPolicy = proxyconfig.AuthPolicy_MUTUAL_TLS
+				if serviceregistry == platform.KubernetesRegistry {
+					partNS := strings.Split(discoveryAddress, ".")
+					if len(partNS) > 1 {
+						parts := strings.Split(partNS[1], ":")
+						if len(parts) > 0 && len(parts[0]) > 0 {
+							ns = parts[0]
+						} else {
+							ns = os.Getenv("POD_NAMESPACE")
+						}
+					} else {
+						ns = os.Getenv("POD_NAMESPACE")
+					}
+				}
+				proxyConfig.PilotSan = envoy.GetPilotSAN(pilotDomain, ns)
+			}
 
 			// resolve statsd address
 			if proxyConfig.StatsdUdpAddress != "" {
@@ -220,6 +247,9 @@ func init() {
 		"IP Address and Port of a statsd UDP listener (e.g. 10.75.241.127:9125)")
 	proxyCmd.PersistentFlags().IntVar(&proxyAdminPort, "proxyAdminPort", int(values.ProxyAdminPort),
 		"Port on which Envoy should listen for administrative commands")
+	proxyCmd.PersistentFlags().IntVar(&infraAuthPolicy, "infraAuthPolicy", int(values.InfraAuthPolicy),
+		"Enum value of infraAuthPolicy")
+	proxyCmd.PersistentFlags().StringVar(&mixerAddress, "mixerAddress", "",	"Mixer Address")
 
 	cmd.AddFlags(rootCmd)
 

@@ -73,17 +73,27 @@ func (conf *Config) Write(w io.Writer) error {
 	return err
 }
 
-// buildConfig creates a proxy config with discovery services and admin port
-func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyconfig.ProxyConfig) *Config {
+// buildConfigApps creates a proxy config with discovery services and admin port
+// it creates config for Ingress, Egress and Sidecar proxies
+func buildConfigApps(role proxy.Node, config proxyconfig.ProxyConfig) *Config {
+	listeners := Listeners{}
+
+	clusterRDS := buildCluster(config.DiscoveryAddress, RDSName, config.ConnectTimeout)
+	clusterLDS := buildCluster(config.DiscoveryAddress, LDSName, config.ConnectTimeout)
+	clusters := Clusters{clusterRDS, clusterLDS}
+
 	out := &Config{
 		Listeners: listeners,
+		LDS: &LDSCluster{
+			Cluster:        LDSName,
+			RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
+		},
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
 			Address:       fmt.Sprintf("tcp://%s:%d", LocalhostAddress, config.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
-			Clusters: append(clusters,
-				buildCluster(config.DiscoveryAddress, RDSName, config.ConnectTimeout)),
+			Clusters: clusters,
 			SDS: &DiscoveryCluster{
 				Cluster:        buildCluster(config.DiscoveryAddress, SDSName, config.ConnectTimeout),
 				RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
@@ -96,13 +106,16 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyc
 		StatsdUDPIPAddress: config.StatsdUdpAddress,
 	}
 
-	if lds {
-		out.LDS = &LDSCluster{
-			Cluster:        LDSName,
-			RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
-		}
-		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
-			buildCluster(config.DiscoveryAddress, LDSName, config.ConnectTimeout))
+	// apply auth policies 
+	switch config.InfraAuthPolicy {
+	case proxyconfig.AuthPolicy_NONE:
+		// do nothing
+	case proxyconfig.AuthPolicy_MUTUAL_TLS:
+		sslContext := buildClusterSSLContext(proxy.AuthCertsPath, config.PilotSan)
+		clusterRDS.SSLContext = sslContext
+		clusterLDS.SSLContext = sslContext
+		out.ClusterManager.SDS.Cluster.SSLContext = sslContext
+		out.ClusterManager.CDS.Cluster.SSLContext = sslContext
 	}
 
 	if config.ZipkinAddress != "" {
@@ -111,6 +124,39 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyc
 		out.Tracing = buildZipkinTracing()
 	}
 
+	return out
+}
+
+// buildConfig creates a proxy config with discovery services and admin port
+func buildConfig(role proxy.Node, config proxyconfig.ProxyConfig) *Config {
+	var out *Config
+
+	switch  role.Type {
+	case proxy.Mixer, proxy.Pilot:
+		out = buildConfigIstio(role, config)
+	case proxy.Sidecar, proxy.Ingress, proxy.Egress:
+		// use LDS instead of static listeners and clusters
+		out = buildConfigApps(role, config)
+	}
+
+	return out
+}
+
+// buildConfigIstio creates inbound proxy config for Mixer or Pilot
+func buildConfigIstio(role proxy.Node, config proxyconfig.ProxyConfig) *Config {
+	listeners, clusters := buildIstioInboundListeners(&config, role)
+
+	out := &Config{
+		Listeners: listeners,
+		Admin: Admin{
+			AccessLogPath: DefaultAccessLog,
+			Address:       fmt.Sprintf("tcp://%s:%d", LocalhostAddress, config.ProxyAdminPort),
+		},
+		ClusterManager: ClusterManager{
+			Clusters: clusters,
+		},
+		StatsdUDPIPAddress: config.StatsdUdpAddress,
+	}
 	return out
 }
 
@@ -156,7 +202,7 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 
 	// append Mixer service definition if necessary
 	if env.Mesh.MixerAddress != "" {
-		clusters = append(clusters, buildMixerCluster(env.Mesh))
+		clusters = append(clusters, buildMixerCluster(env.Mesh, node, env.MixerSAN))
 	}
 
 	return clusters
@@ -354,9 +400,19 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 	}
 }
 
+func applyInboundInfraAuth(listener *Listener, config *proxyconfig.ProxyConfig) {
+	switch config.InfraAuthPolicy {
+	case proxyconfig.AuthPolicy_NONE:
+		// do nothing
+	case proxyconfig.AuthPolicy_MUTUAL_TLS:
+		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
+	}
+}
+
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
+		// do nothing
 	case proxyconfig.MeshConfig_MUTUAL_TLS:
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
@@ -721,6 +777,38 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 	for _, listener := range listeners {
 		applyInboundAuth(listener, mesh)
 	}
+
+	return listeners, clusters
+}
+
+// buildIstioInboundListeners listeners for Mixer and Pilot and server-side (inbound) configuration
+func buildIstioInboundListeners(config *proxyconfig.ProxyConfig, role proxy.Node) (Listeners, Clusters) {
+	listeners := make(Listeners, 0, 1)
+	clusters := make(Clusters, 0, 1)
+
+	var listenPort int
+	var endpointPort int
+	switch role.Type {
+	case proxy.Mixer:
+		parts := strings.Split(config.MixerAddress, ":")
+		listenPort, _ = strconv.Atoi(parts[1])
+		endpointPort = proxy.MixerAppListenPort
+	case proxy.Pilot:
+		parts := strings.Split(config.DiscoveryAddress, ":")
+		listenPort, _ = strconv.Atoi(parts[1])
+		endpointPort = proxy.DiscoveryAppListenPort
+	}
+
+	cluster := buildInboundCluster(endpointPort, model.ProtocolTCP, config.ConnectTimeout)
+
+	listener := buildTCPListener(&TCPRouteConfig{
+				Routes: []*TCPRoute{buildTCPRoute(cluster, nil)},
+			}, WildcardAddress, listenPort, model.ProtocolTCP)
+	listener.BindToPort = true
+	applyInboundInfraAuth(listener, config)
+
+	listeners = append(listeners, listener)
+	clusters = append(clusters, cluster)
 
 	return listeners, clusters
 }

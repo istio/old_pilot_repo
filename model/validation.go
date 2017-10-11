@@ -1144,5 +1144,17 @@ func ValidateProxyConfig(config *proxyconfig.ProxyConfig) (errs error) {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
 	}
 
+	switch config.InfraAuthPolicy {
+	case proxyconfig.AuthPolicy_NONE, proxyconfig.AuthPolicy_MUTUAL_TLS:
+	default:
+		errs = multierror.Append(errs, fmt.Errorf("unrecognized infra auth policy %q", config.InfraAuthPolicy))
+	}
+
+	if config.MixerAddress != "" {
+		if err := ValidateProxyAddress(config.MixerAddress); err != nil {
+			errs = multierror.Append(errs, multierror.Prefix(err, "invalid Mixer address:"))
+		}
+	}
+
 	return
 }

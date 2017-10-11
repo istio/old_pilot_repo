@@ -90,8 +90,7 @@ func (w *watcher) Run(ctx context.Context) {
 }
 
 func (w *watcher) Reload() {
-	// use LDS instead of static listeners and clusters
-	config := buildConfig(Listeners{}, Clusters{}, true, w.config)
+	config := buildConfig(w.role, w.config)
 
 	// compute hash of dependent certificates
 	h := sha256.New()

@@ -219,7 +219,9 @@ func TestEnvoyRun(t *testing.T) {
 	}
 	config.BinaryPath = path.Join(dir, "envoy")
 	config.ConfigPath = "tmp"
-	envoyConfig := buildConfig(Listeners{}, Clusters{}, true, config)
+
+	role := proxy.Node{Type:proxy.Sidecar}
+	envoyConfig := buildConfigApps(role, config)
 	proxy := envoy{config: config, node: "my-node", extraArgs: []string{"--mode", "validate"}}
 	abortCh := make(chan error, 1)
 

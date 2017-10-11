@@ -14,6 +14,7 @@ go_library(
         "resources.go",
         "route.go",
         "watcher.go",
+        "infra_auth.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

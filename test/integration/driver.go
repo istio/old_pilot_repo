@@ -129,6 +129,7 @@ func main() {
 	params.Ingress = true
 	params.Egress = true
 	params.Zipkin = true
+	params.MixerAddress = "istio-mixer:15004"
 
 	if len(params.Namespace) != 0 && authmode == "both" {
 		glog.Infof("When namespace(=%s) is specified, auth mode(=%s) must be one of enable or disable.",
@@ -158,6 +159,7 @@ func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
 	out.Auth = proxyconfig.MeshConfig_MUTUAL_TLS
+	out.InfraAuthPolicy = int32(proxyconfig.AuthPolicy_MUTUAL_TLS)
 	return out
 }
 
