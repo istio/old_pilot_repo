@@ -21,6 +21,6 @@ spec:
         - containerPort: 80
           name: http
         resources: {}
-      hostNetwork: true        
+      hostNetwork: true
 status: {}
 ---

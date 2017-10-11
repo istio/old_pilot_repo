@@ -18,4 +18,3 @@ spec:
             - name: http
               containerPort: 80
       hostNetwork: true
-              
