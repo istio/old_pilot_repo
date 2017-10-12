@@ -4,7 +4,7 @@
 		"repoName": "api",
 		"prodBranch": "master",
 		"file": "WORKSPACE",
-		"lastStableSHA": "1e039b5b0312aeadf958039c7330faeaf66917b1"
+		"lastStableSHA": "fadf8937f1e3b88a0a5fb7325d34259f0d65d947"
 	},
 	{
 		"name": "ISTIO_PROXY_BUCKET",
