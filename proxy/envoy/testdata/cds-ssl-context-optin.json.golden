@@ -98,7 +98,7 @@
     "lb_type": "round_robin",
     "hosts": [
      {
-      "url": "tcp://localhost:8888"
+      "url": "tcp://istio-egress.istio-system:8888"
      }
     ]
    },
@@ -153,7 +153,7 @@
     "lb_type": "round_robin",
     "hosts": [
      {
-      "url": "tcp://localhost:8888"
+      "url": "tcp://istio-egress.istio-system:8888"
      }
     ]
    },
@@ -191,7 +191,7 @@
     "lb_type": "round_robin",
     "hosts": [
      {
-      "url": "tcp://localhost:9091"
+      "url": "tcp://istio-mixer.istio-system:9091"
      }
     ],
     "features": "http2",

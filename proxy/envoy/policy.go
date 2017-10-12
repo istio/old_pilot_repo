@@ -40,7 +40,7 @@ func applyClusterPolicy(cluster *Cluster,
 	// Original DST cluster are used to route to services outside the mesh
 	// where Istio auth does not apply.
 	if cluster.Type != ClusterTypeOriginalDST {
-		if shouldApplyAuth(mesh, cluster.port.SecurityOption) {
+		if shouldApplyAuth(mesh, cluster.port.AuthenticationPolicy) {
 			// apply auth policies
 			ports := model.PortList{cluster.port}.GetNames()
 			serviceAccounts := accounts.GetIstioServiceAccounts(cluster.hostname, ports)

@@ -81,7 +81,7 @@ type Port struct {
 	// In combine with the mesh's AuthPolicy, controls authentication for
 	// Envoy-to-Envoy communication.
 	// This value is extracted from service annotation.
-	SecurityOption SecurityOption `json:"security_option,omitempty"`
+	AuthenticationPolicy AuthenticationPolicy `json:"authentication_policy,omitempty"`
 }
 
 // PortList is a set of ports
@@ -112,17 +112,17 @@ const (
 	ProtocolRedis Protocol = "Redis"
 )
 
-type SecurityOption string
+type AuthenticationPolicy string
 
 const (
 	// Enable authentication. This overrules mesh's AuthPolicy.
-	SecurityEnable SecurityOption = "enable"
+	AuthenticationEnable AuthenticationPolicy = "enable"
 
 	// Disable authentication. This overrules mesh's AuthPolicy.
-	SecurityDisable SecurityOption = "disable"
+	AuthenticationDisable AuthenticationPolicy = "disable"
 
 	// Set authentication as specified by mesh's AuthPolicy.
-	SecurityDefault SecurityOption = ""
+	AuthenticationDefault AuthenticationPolicy = ""
 )
 
 // IsHTTP is true for protocols that use HTTP as transport protocol

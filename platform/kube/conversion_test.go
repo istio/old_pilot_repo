@@ -184,12 +184,12 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 	testCases := []struct {
 		port             int
 		annotation_value string
-		want             model.SecurityOption
+		want             model.AuthenticationPolicy
 	}{
-		{8080, "enable", model.SecurityEnable},
-		{8080, "disable", model.SecurityDisable},
-		{8080, "invalid-option", model.SecurityDefault},
-		{9999, "enable", model.SecurityDefault},
+		{8080, "enable", model.AuthenticationEnable},
+		{8080, "disable", model.AuthenticationDisable},
+		{8080, "invalid-option", model.AuthenticationDefault},
+		{9999, "enable", model.AuthenticationDefault},
 	}
 	for _, test := range testCases {
 		localSvc := v1.Service{
@@ -197,7 +197,7 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 				Name:      serviceName,
 				Namespace: namespace,
 				Annotations: map[string]string{
-					portSecurityAnnotationKey(test.port): test.annotation_value,
+					portAuthenticationAnnotationKey(test.port): test.annotation_value,
 				},
 			},
 			Spec: v1.ServiceSpec{
@@ -222,9 +222,9 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 				len(service.Ports))
 		}
 
-		if service.Ports[0].SecurityOption != test.want {
-			t.Errorf("incorrect security option => %v, want %v\n",
-				service.Ports[0].SecurityOption,
+		if service.Ports[0].AuthenticationPolicy != test.want {
+			t.Errorf("incorrect authentication policy => %v, want %v\n",
+				service.Ports[0].AuthenticationPolicy,
 				test.want)
 		}
 	}

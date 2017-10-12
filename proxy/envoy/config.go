@@ -374,6 +374,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
@@ -388,6 +389,15 @@ func shouldApplyAuth(mesh *proxyconfig.MeshConfig, security_option model.Securit
 func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, security_option model.SecurityOption) {
 	if shouldApplyAuth(mesh, security_option) {
 >>>>>>> Draft implementation for security optin/optout via service annotation
+=======
+func shouldApplyAuth(mesh *proxyconfig.MeshConfig, authentication_policy model.AuthenticationPolicy) bool {
+	return authentication_policy == model.AuthenticationEnable ||
+		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && authentication_policy != model.AuthenticationDisable)
+}
+
+func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, authentication_policy model.AuthenticationPolicy) {
+	if shouldApplyAuth(mesh, authentication_policy) {
+>>>>>>> Rename SecurtiyOption -> AuthenticationPolicy.
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
 }
@@ -668,8 +678,6 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 	// TODO: validate that duplicated endpoints for services can be handled (e.g. above assumption)
 	for _, instance := range instances {
 		endpoint := instance.Endpoint
-		// fmt.Printf("Instant security option %d : %s\n", int(endpoint.ServicePort.Port), endpoint.ServicePort.SecurityOption)
-
 		servicePort := endpoint.ServicePort
 		protocol := servicePort.Protocol
 		cluster := buildInboundCluster(endpoint.Port, protocol, mesh.ConnectTimeout)
@@ -747,7 +755,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 		}
 
 		if listener != nil {
-			mayApplyInboundAuth(listener, mesh, endpoint.ServicePort.SecurityOption)
+			mayApplyInboundAuth(listener, mesh, endpoint.ServicePort.AuthenticationPolicy)
 			listeners = append(listeners, listener)
 		}
 	}
