@@ -496,26 +496,8 @@ filegroup(
 # This SHA is obtained from envoyproxy/data-plane-api
 ENVOY_API = "67ceb6429aca38aecd722494baa0e499dadd3caf"
 
-new_git_repository(
-    name = "com_github_envoyproxy_data_plane_api",
-    build_file_content = """
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
-load("@io_bazel_rules_go//proto:go_proto_library.bzl", "go_proto_library")
-package(default_visibility = ["//visibility:public"])
-go_prefix("github.com/envoyproxy/data-plane-api")
-go_proto_library(
-    name = "go_default_library",
-    srcs = glob(["api/*.proto"]),
-    deps = [
-        "@com_github_golang_protobuf//ptypes/any:go_default_library",
-        "@com_github_golang_protobuf//ptypes/struct:go_default_library",
-        "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-        "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-        "@com_github_googleapis_googleapis//google/api/annotations:go_default_library",
-    ],
-)
-
-    """,
+git_repository(
+    name = "envoy_api",
     commit = ENVOY_API,
     remote = "https://github.com/envoyproxy/data-plane-api.git",
 )
