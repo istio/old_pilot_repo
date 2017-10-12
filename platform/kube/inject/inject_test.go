@@ -152,6 +152,10 @@ func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 			in:   "testdata/replicationcontroller.yaml",
 			want: "testdata/replicationcontroller.yaml.injected",
 		},
+		{
+			in:   "testdata/hello-host-network.yaml",
+			want: "testdata/hello-host-network.yaml.injected",
+		},
 	}
 
 	for _, c := range cases {
@@ -205,12 +209,8 @@ func TestIntoResourceFileWithExcludeNamespaces(t *testing.T) {
 		debugMode       bool
 	}{
 		{
-			in:   "testdata/hello-host-network.yaml",
-			want: "testdata/hello-host-network.yaml.injected",
-		},
-		{
 			in:   "testdata/hello-ibm.yaml",
-			want: "testdata/hello-ibm.yaml.inject",
+			want: "testdata/hello-ibm.yaml.injected",
 		},
 	}
 
@@ -440,7 +440,7 @@ func TestGetInitializerConfig(t *testing.T) {
 	goodConfig := Config{
 		Policy:            InjectionPolicyDisabled,
 		InitializerName:   DefaultInitializerName,
-		IncludeNamespaces: []string{""},
+		IncludeNamespaces: []string{v1.NamespaceAll},
 		Params: Params{
 			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
 			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
@@ -449,6 +449,23 @@ func TestGetInitializerConfig(t *testing.T) {
 		},
 	}
 	goodConfigYAML, err := yaml.Marshal(&goodConfig)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
+	badConfig := Config{
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		IncludeNamespaces: []string{v1.NamespaceAll},
+		ExcludeNamespaces: []string{"ibm-system"},
+		Params: Params{
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
+		},
+	}
+	badConfigYAML, err := yaml.Marshal(&badConfig)
 	if err != nil {
 		t.Fatalf("Failed to create test config data: %v", err)
 	}
@@ -494,7 +511,7 @@ func TestGetInitializerConfig(t *testing.T) {
 			want: Config{
 				Policy:            DefaultInjectionPolicy,
 				InitializerName:   DefaultInitializerName,
-				IncludeNamespaces: []string{""},
+				IncludeNamespaces: []string{v1.NamespaceAll},
 				Params: Params{
 					InitImage:       InitImageName(DefaultHub, version.Info.Version, false),
 					ProxyImage:      ProxyImageName(DefaultHub, version.Info.Version, false),
@@ -514,6 +531,18 @@ func TestGetInitializerConfig(t *testing.T) {
 				},
 			},
 			want: goodConfig,
+		},
+		{
+			name:      "normal config",
+			queryName: "config",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "config"},
+				Data: map[string]string{
+					InitializerConfigMapKey: string(badConfigYAML),
+				},
+			},
+			wantErr: true,
 		},
 	}
 
