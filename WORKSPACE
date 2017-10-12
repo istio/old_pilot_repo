@@ -479,7 +479,6 @@ go_proto_library(
         "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
     ],
 )
-
 filegroup(
     name = "mixer",
     srcs = glob(["mixer/v1/*.proto"]),
@@ -491,15 +490,6 @@ filegroup(
     """,
     commit = ISTIO_API,
     remote = "https://github.com/istio/api.git",
-)
-
-# This SHA is obtained from envoyproxy/data-plane-api
-ENVOY_API = "67ceb6429aca38aecd722494baa0e499dadd3caf"
-
-git_repository(
-    name = "envoy_api",
-    commit = ENVOY_API,
-    remote = "https://github.com/envoyproxy/data-plane-api.git",
 )
 
 GOOGLEAPIS_BUILD_FILE = """
