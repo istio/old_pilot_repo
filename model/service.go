@@ -115,13 +115,16 @@ const (
 type AuthenticationPolicy string
 
 const (
-	// Enable authentication. This overrules mesh's AuthPolicy.
+	// AuthenticationDisable indicates authentication should be enable (on the
+	// associated port). This overrules mesh's AuthPolicy.
 	AuthenticationEnable AuthenticationPolicy = "enable"
 
-	// Disable authentication. This overrules mesh's AuthPolicy.
+	// AuthenticationDisable indicates authentication should be disable (on the
+	// associated port). This overrules mesh's AuthPolicy.
 	AuthenticationDisable AuthenticationPolicy = "disable"
 
-	// Set authentication as specified by mesh's AuthPolicy.
+	// AuthenticationDefault indicates authentication should be set based on
+	// mesh's AuthPolicy.
 	AuthenticationDefault AuthenticationPolicy = ""
 )
 
