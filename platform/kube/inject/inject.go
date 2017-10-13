@@ -193,10 +193,6 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 		return nil, err
 	}
 
-	if c.IncludeNamespaces == nil && c.ExcludeNamespaces == nil {
-		return nil, fmt.Errorf("cannot leave both namespaces and excludeNamespaces")
-	}
-
 	if c.IncludeNamespaces != nil && c.ExcludeNamespaces != nil {
 		return nil, fmt.Errorf("cannot configure both namespaces and excludeNamespaces")
 	}
@@ -206,7 +202,7 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 	}
 
 	for _, excludeNamespace := range c.ExcludeNamespaces {
-		if excludeNamespace == "" {
+		if excludeNamespace == v1.NamespaceAll {
 			return nil, fmt.Errorf("cannot configure ExcludeNamespaces as NamespaceAll")
 		}
 	}
@@ -483,10 +479,6 @@ func intoObject(c *Config, in interface{}) (interface{}, error) {
 
 	// skip customized exclude namespaces
 	for _, excludeNamespace := range c.ExcludeNamespaces {
-		if excludeNamespace == "" {
-			return out, nil
-		}
-
 		if obj.GetNamespace() == excludeNamespace {
 			return out, nil
 		}
