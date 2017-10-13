@@ -328,7 +328,7 @@ func TestInjectRequired(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if got := injectRequired(c.policy, c.meta); got != c.want {
+		if got := injectRequired(ignoredNamespaces, []string{}, c.policy, c.meta); got != c.want {
 			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
 		}
 	}
