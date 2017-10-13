@@ -437,6 +437,14 @@ func TestGetInitializerConfig(t *testing.T) {
 	}
 	defer util.DeleteNamespace(cl, ns)
 
+	defaultConfig := Config{
+		IncludeNamespaces: []string{v1.NamespaceAll},
+	}
+	defaultConfigYAML, err := yaml.Marshal(&defaultConfig)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
 	goodConfig := Config{
 		Policy:            InjectionPolicyDisabled,
 		InitializerName:   DefaultInitializerName,
@@ -453,7 +461,7 @@ func TestGetInitializerConfig(t *testing.T) {
 		t.Fatalf("Failed to create test config data: %v", err)
 	}
 
-	badConfig := Config{
+	badConfigWithIncludeAndExcludeNamespaces := Config{
 		Policy:            InjectionPolicyDisabled,
 		InitializerName:   DefaultInitializerName,
 		IncludeNamespaces: []string{v1.NamespaceAll},
@@ -465,7 +473,22 @@ func TestGetInitializerConfig(t *testing.T) {
 			ImagePullPolicy: "Always",
 		},
 	}
-	badConfigYAML, err := yaml.Marshal(&badConfig)
+	badConfigWithIncludeAndExcludeNamespacesYAML, err := yaml.Marshal(&badConfigWithIncludeAndExcludeNamespaces)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
+	badConfigWithoutIncludeAndExcludeNamespaces := Config{
+		Policy:          InjectionPolicyDisabled,
+		InitializerName: DefaultInitializerName,
+		Params: Params{
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
+		},
+	}
+	badConfigWithoutIncludeAndExcludeNamespacesYAML, err := yaml.Marshal(&badConfigWithoutIncludeAndExcludeNamespaces)
 	if err != nil {
 		t.Fatalf("Failed to create test config data: %v", err)
 	}
@@ -505,7 +528,7 @@ func TestGetInitializerConfig(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
 				ObjectMeta: metav1.ObjectMeta{Name: "default-config"},
 				Data: map[string]string{
-					InitializerConfigMapKey: "",
+					InitializerConfigMapKey: string(defaultConfigYAML),
 				},
 			},
 			want: Config{
@@ -533,13 +556,25 @@ func TestGetInitializerConfig(t *testing.T) {
 			want: goodConfig,
 		},
 		{
-			name:      "normal config",
-			queryName: "config",
+			name:      "bad config with includeNamespaces and excludeNamespaces",
+			queryName: "bad-config-with-include-and-exclude-namespaces",
 			configMap: &v1.ConfigMap{
 				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-				ObjectMeta: metav1.ObjectMeta{Name: "config"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-with-include-and-exclude-namespaces"},
 				Data: map[string]string{
-					InitializerConfigMapKey: string(badConfigYAML),
+					InitializerConfigMapKey: string(badConfigWithIncludeAndExcludeNamespacesYAML),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "bad config without includeNamespaces and excludeNamespaces",
+			queryName: "bad-config-without-include-and-exclude-namespaces",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-without-include-and-exclude-namespaces"},
+				Data: map[string]string{
+					InitializerConfigMapKey: string(badConfigWithoutIncludeAndExcludeNamespacesYAML),
 				},
 			},
 			wantErr: true,

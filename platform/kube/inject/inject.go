@@ -193,6 +193,10 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 		return nil, err
 	}
 
+	if c.IncludeNamespaces == nil && c.ExcludeNamespaces == nil {
+		return nil, fmt.Errorf("cannot leave both namespaces and excludeNamespaces")
+	}
+
 	if c.IncludeNamespaces != nil && c.ExcludeNamespaces != nil {
 		return nil, fmt.Errorf("cannot configure both namespaces and excludeNamespaces")
 	}
