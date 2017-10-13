@@ -57,7 +57,6 @@ const unitTestDebugMode = true
 
 func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 	cases := []struct {
-		authConfigPath  string
 		enableAuth      bool
 		in              string
 		want            string
@@ -120,19 +119,16 @@ func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 		},
 		{
 			enableAuth:     true,
-			authConfigPath: "/etc/certs/",
 			in:             "testdata/auth.yaml",
 			want:           "testdata/auth.yaml.injected",
 		},
 		{
 			enableAuth:     true,
-			authConfigPath: "/etc/certs/",
 			in:             "testdata/auth.non-default-service-account.yaml",
 			want:           "testdata/auth.non-default-service-account.yaml.injected",
 		},
 		{
 			enableAuth:     true,
-			authConfigPath: "/etc/non-default-dir/",
 			in:             "testdata/auth.yaml",
 			want:           "testdata/auth.cert-dir.yaml.injected",
 		},
@@ -200,7 +196,6 @@ func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 
 func TestIntoResourceFileWithExcludeNamespaces(t *testing.T) {
 	cases := []struct {
-		authConfigPath  string
 		enableAuth      bool
 		in              string
 		want            string
