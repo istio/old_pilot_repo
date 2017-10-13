@@ -65,6 +65,9 @@ func buildDefaultRoute(cluster *Cluster) *HTTPRoute {
 		Prefix:   "/",
 		Cluster:  cluster.Name,
 		clusters: []*Cluster{cluster},
+		Decorator: &Decorator{
+			Operation: "default-route",
+		},
 	}
 }
 
