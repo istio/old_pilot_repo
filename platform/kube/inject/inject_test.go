@@ -118,19 +118,19 @@ func TestIntoResourceFileWithIncludeNamespaces(t *testing.T) {
 			enableCoreDump: true,
 		},
 		{
-			enableAuth:     true,
-			in:             "testdata/auth.yaml",
-			want:           "testdata/auth.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.yaml",
+			want:       "testdata/auth.yaml.injected",
 		},
 		{
-			enableAuth:     true,
-			in:             "testdata/auth.non-default-service-account.yaml",
-			want:           "testdata/auth.non-default-service-account.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.non-default-service-account.yaml",
+			want:       "testdata/auth.non-default-service-account.yaml.injected",
 		},
 		{
-			enableAuth:     true,
-			in:             "testdata/auth.yaml",
-			want:           "testdata/auth.cert-dir.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.yaml",
+			want:       "testdata/auth.cert-dir.yaml.injected",
 		},
 		{
 			in:   "testdata/daemonset.yaml",
