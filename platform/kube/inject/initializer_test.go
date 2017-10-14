@@ -276,6 +276,17 @@ func TestModifyRequired(t *testing.T) {
 			include:   []string{v1.NamespaceAll},
 			want:      true,
 		},
+		{
+			namespace: "foo-bar",
+			ignore:    []string{"istio-system"},
+			include:   []string{"foo-bar"},
+			want:      true,
+		},
+		{
+			namespace: "foo-bar",
+			include:   []string{"baz"},
+			want:      false,
+		},
 	}
 
 	for _, c := range cases {
