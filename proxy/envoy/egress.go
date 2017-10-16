@@ -45,7 +45,7 @@ func buildEgressRoutes(mesh *proxyconfig.MeshConfig, services model.ServiceDisco
 		}
 	}
 	port := proxy.ParsePort(mesh.EgressProxyAddress)
-	configs := HTTPRouteConfigs{port: &HTTPRouteConfig{VirtualHosts: vhosts}}
+	configs := HTTPRouteConfigs{port: &HTTPRouteConfig{ValidateClusters: true, VirtualHosts: vhosts}}
 	return configs.normalize()
 }
 

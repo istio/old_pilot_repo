@@ -722,7 +722,7 @@ func buildInboundListeners(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 
 			host.Routes = append(host.Routes, defaultRoute)
 
-			config := &HTTPRouteConfig{VirtualHosts: []*VirtualHost{host}}
+			config := &HTTPRouteConfig{ValidateClusters: true, VirtualHosts: []*VirtualHost{host}}
 			listeners = append(listeners,
 				buildHTTPListener(mesh, sidecar, instances, config, endpoint.Address,
 					endpoint.Port, "", false, IngressTraceOperation))
