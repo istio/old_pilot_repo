@@ -69,7 +69,8 @@ To run the complete set of tests, use the following commands:
     bazel test //...
     bin/e2e.sh [-hub docker.io/<username>]
     
-_Note1_: If you are using OS X, append `--cpu=k8` to the bazel test command.
+_Note1_: If you are using OS X, append `--cpu=k8` to the bazel test command
+to _build linux binaries_.
 _Note2_: The optional `-h` flag should point to a Docker registry that you have access to push images.
 
 ## Code linters
