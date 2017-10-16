@@ -28,7 +28,7 @@ see the Istio
 
 # Quick start
 
-1. *Install Bazel:* [Bazel 0.6.0](https://github.com/bazelbuild/bazel/releases/tag/0.6.0) or
+1. *Install Bazel:* [Bazel 0.6.1](https://github.com/bazelbuild/bazel/releases/tag/0.6.1) or
   higher. Debian packages are available on Linux. For OS X users, bazel is
   available via Homebrew.
   > NOTE 1: Bazel tool is still maturing, and as such has several issues that
