@@ -438,6 +438,22 @@ func TestGetInitializerConfig(t *testing.T) {
 		t.Fatalf("Failed to create test config data: %v", err)
 	}
 
+	badConfigWithExcludeNamespacesAll := Config{
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		ExcludeNamespaces: []string{v1.NamespaceAll},
+		Params: Params{
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
+		},
+	}
+	badConfigWithExcludeNamespacesAllYAML, err := yaml.Marshal(&badConfigWithExcludeNamespacesAll)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
 	cases := []struct {
 		name      string
 		configMap *v1.ConfigMap
@@ -508,6 +524,18 @@ func TestGetInitializerConfig(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-with-include-and-exclude-namespaces"},
 				Data: map[string]string{
 					InitializerConfigMapKey: string(badConfigWithIncludeAndExcludeNamespacesYAML),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "bad config excludeNamespaces=v1.NamespaceAll",
+			queryName: "bad-config-with-exclude-namespaces-equal-all",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-with-exclude-namespaces-equal-all"},
+				Data: map[string]string{
+					InitializerConfigMapKey: string(badConfigWithExcludeNamespacesAllYAML),
 				},
 			},
 			wantErr: true,
