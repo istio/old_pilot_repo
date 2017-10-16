@@ -54,7 +54,7 @@ clean:
 
 .PHONY: test
 test:
-	@bazel test ${BUILD_FLAGS} //...
+	@bazel test //...
 
 .PHONY: e2etest
 e2etest:

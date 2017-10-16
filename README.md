@@ -55,6 +55,8 @@ the dependencies.
 1. *Build:* Run `make build` to compile the code.
 
 1. *Unit test:* Run `make test` to run unit tests.
+   > NOTE: If you are running on OS X, //proxy/envoy:go_default_test will
+   > fail. You can ignore this failure.
 
 1. *Dockerize:* Run `make docker HUB=docker.io/<username> TAG=<sometag>`. 
 This will build a docker container for Pilot, the sidecar, and other 
