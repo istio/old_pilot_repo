@@ -157,7 +157,7 @@ func TestClusterDiscoveryCircuitBreaker(t *testing.T) {
 	compareResponse(response, "testdata/cds-circuit-breaker.json", t)
 }
 
-func TestClusterDiscoveryWithSecurityOptin(t *testing.T) {
+func TestClusterDiscoveryWithAuthOptIn(t *testing.T) {
 	// Change mock service security for test.
 	mock.WorldService.Ports[0].AuthenticationPolicy = model.AuthenticationEnable
 	_, _, ds := commonSetup(t)
@@ -179,7 +179,7 @@ func TestClusterDiscoveryWithSecurityOn(t *testing.T) {
 	compareResponse(response, "testdata/cds-ssl-context.json", t)
 }
 
-func TestClusterDiscoveryWithSecurityOptout(t *testing.T) {
+func TestClusterDiscoveryWithAuthOptOut(t *testing.T) {
 	mesh := makeMeshConfig()
 	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 	registry := memory.Make(model.IstioConfigTypes)
@@ -436,7 +436,7 @@ func TestListenerDiscoverySidecar(t *testing.T) {
 	}
 }
 
-func TestListenerDiscoverySidecarAuthOptin(t *testing.T) {
+func TestListenerDiscoverySidecarAuthOptIn(t *testing.T) {
 	mesh := makeMeshConfig()
 	registry := memory.Make(model.IstioConfigTypes)
 
@@ -449,7 +449,7 @@ func TestListenerDiscoverySidecarAuthOptin(t *testing.T) {
 	mock.HelloService.Ports[0].AuthenticationPolicy = model.AuthenticationDefault
 }
 
-func TestListenerDiscoverySidecarAuthOptout(t *testing.T) {
+func TestListenerDiscoverySidecarAuthOptOut(t *testing.T) {
 	mesh := makeMeshConfig()
 	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
 	registry := memory.Make(model.IstioConfigTypes)
