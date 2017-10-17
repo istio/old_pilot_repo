@@ -20,6 +20,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
+	"istio.io/pilot/platform/kube"
+
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	v2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -43,7 +45,7 @@ import (
 var ignoredNamespaces = []string{
 	metav1.NamespaceSystem,
 	metav1.NamespacePublic,
-	"istio-system",
+	kube.IstioNamespace,
 }
 
 // Initializer implements a k8s initializer for transparently
