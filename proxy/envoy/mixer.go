@@ -133,7 +133,9 @@ func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
 	if strings.HasPrefix(role.ID, "vm-") {
 		split := strings.SplitAfterN(role.ID, "-", 3)
 		if len(split) == 3 {
-			attr[AttrDestinationService] = split[2] + "." + role.Domain
+			// role.ID has the namespace and so does role.Domain (!), trim:
+			domainWithouNamespace := role.Domain[strings.Index(role.Domain, "."):]
+			attr[AttrDestinationService] = split[2] + domainWithouNamespace
 		}
 	}
 	return &FilterMixerConfig{
