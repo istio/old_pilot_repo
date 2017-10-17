@@ -186,6 +186,27 @@ func TestInitialize(t *testing.T) {
 			wantPatched:            true,
 			wantDebug:              true,
 		},
+		{
+			name:                   "deploy in non-included namespace",
+			in:                     "testdata/deploy-in-non-included-namespace.yaml",
+			policy:                 InjectionPolicyEnabled,
+			objNamespace:           "foo",
+			includeNamespaces:      []string{"bar"},
+			wantPatchBytesFilename: "testdata/deploy-in-non-included-namespace.yaml.patch",
+			wantPatched:            true,
+			wantDebug:              true,
+		},
+		{
+			name:                   "deploy in non-excluded namespace",
+			in:                     "testdata/deploy-in-non-excluded-namespace.yaml",
+			policy:                 InjectionPolicyEnabled,
+			objNamespace:           "foo",
+			includeNamespaces:      []string{v1.NamespaceAll},
+			excludeNamespaces:      []string{"bar"},
+			wantPatchBytesFilename: "testdata/deploy-in-non-excluded-namespace.yaml.patch",
+			wantPatched:            true,
+			wantDebug:              true,
+		},
 	}
 
 	for _, c := range cases {
