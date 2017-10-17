@@ -405,7 +405,8 @@ func shouldApplyAuth(mesh *proxyconfig.MeshConfig, authenticationPolicy model.Au
 		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && authenticationPolicy != model.AuthenticationDisable)
 }
 
-func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, authenticationPolicy model.AuthenticationPolicy) {
+func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig,
+	authenticationPolicy model.AuthenticationPolicy) {
 	if shouldApplyAuth(mesh, authenticationPolicy) {
 >>>>>>> Fix go lint
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
