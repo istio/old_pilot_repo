@@ -129,11 +129,11 @@ func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
 		AttrDestinationIP:  role.IPAddress,
 		AttrDestinationUID: "kubernetes://" + role.ID,
 	}
-	// vm-NNN-rest -> service==rest
+	// vm-NNN-rest -> service==rest.domain (domain is needed for mixer)
 	if strings.HasPrefix(role.ID, "vm-") {
 		split := strings.SplitAfterN(role.ID, "-", 3)
 		if len(split) == 3 {
-			attr[AttrDestinationService] = split[2]
+			attr[AttrDestinationService] = split[2] + "." + role.Domain
 		}
 	}
 	return &FilterMixerConfig{
