@@ -125,8 +125,8 @@ func mixerHTTPRouteConfig(role proxy.Node, service string) *FilterMixerConfig {
 func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
 	return &FilterMixerConfig{
 		MixerAttributes: map[string]string{
-			AttrDestinationIP:  role.IPAddress,
-			AttrDestinationUID: "kubernetes://" + role.ID,
+			AttrDestinationIP: role.IPAddress,
+			//	AttrDestinationUID: "kubernetes://" + role.ID,
 		},
 		DisableTCPCheckCalls: !check,
 	}
