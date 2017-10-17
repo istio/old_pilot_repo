@@ -112,10 +112,11 @@ const (
 	ProtocolRedis Protocol = "Redis"
 )
 
+// AuthenticationPolicy defines authentication policy for port.
 type AuthenticationPolicy string
 
 const (
-	// AuthenticationDisable indicates authentication should be enable (on the
+	// AuthenticationEnable indicates authentication should be enable (on the
 	// associated port). This overrules mesh's AuthPolicy.
 	AuthenticationEnable AuthenticationPolicy = "enable"
 

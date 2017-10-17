@@ -182,9 +182,9 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 	ip := "10.0.0.1"
 
 	testCases := []struct {
-		port             int
-		annotation_value string
-		want             model.AuthenticationPolicy
+		port            int
+		annotationValue string
+		want            model.AuthenticationPolicy
 	}{
 		{8080, "enable", model.AuthenticationEnable},
 		{8080, "disable", model.AuthenticationDisable},
@@ -197,7 +197,7 @@ func TestServiceSecurityAnnotation(t *testing.T) {
 				Name:      serviceName,
 				Namespace: namespace,
 				Annotations: map[string]string{
-					portAuthenticationAnnotationKey(test.port): test.annotation_value,
+					portAuthenticationAnnotationKey(test.port): test.annotationValue,
 				},
 			},
 			Spec: v1.ServiceSpec{

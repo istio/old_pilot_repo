@@ -375,6 +375,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
@@ -398,6 +399,15 @@ func shouldApplyAuth(mesh *proxyconfig.MeshConfig, authentication_policy model.A
 func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, authentication_policy model.AuthenticationPolicy) {
 	if shouldApplyAuth(mesh, authentication_policy) {
 >>>>>>> Rename SecurtiyOption -> AuthenticationPolicy.
+=======
+func shouldApplyAuth(mesh *proxyconfig.MeshConfig, authenticationPolicy model.AuthenticationPolicy) bool {
+	return authenticationPolicy == model.AuthenticationEnable ||
+		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && authenticationPolicy != model.AuthenticationDisable)
+}
+
+func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, authenticationPolicy model.AuthenticationPolicy) {
+	if shouldApplyAuth(mesh, authenticationPolicy) {
+>>>>>>> Fix go lint
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
 }

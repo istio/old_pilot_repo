@@ -44,6 +44,8 @@ const (
 	// IstioURIPrefix is the URI prefix in the Istio service account scheme
 	IstioURIPrefix = "spiffe"
 
+	// PortAuthenticationAnnotationKeyPrefix is the annotation key prefix that used to define
+	// authentication policy.
 	PortAuthenticationAnnotationKeyPrefix = "tls.istio.io"
 )
 
