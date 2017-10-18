@@ -19,9 +19,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
-
-	"istio.io/pilot/platform/kube"
-
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	v2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -40,6 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	"istio.io/pilot/platform/kube"
 )
 
 var ignoredNamespaces = []string{
