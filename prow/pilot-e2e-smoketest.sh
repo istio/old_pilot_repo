@@ -39,7 +39,7 @@ else
 fi
 
 echo "=== Clone istio/istio ==="
-git clone --depth 1 https://github.com/istio/istio "${ISTIO_TMP_DIR}"
+git clone --depth 1 https://github.com/istio/istio "${ISTIO_TMP_DIR}" -b release-0.2
 cd "${ISTIO_TMP_DIR}"
 
 HUB="gcr.io/istio-testing"
