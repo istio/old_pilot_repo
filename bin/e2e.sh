@@ -32,15 +32,27 @@ set -x
 args=""
 hub="gcr.io/istio-testing"
 tag=$(whoami)_$(date +%y%m%d_%H%M%S)
+circleci="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -tag) tag="$2"; shift ;;
         -hub) hub="$2"; shift ;;
+        -circleci) circleci="true" ;;
         *) args=$args" $1" ;;
     esac
     shift
 done
 
-bin/push-docker -hub $hub -tag $tag
-bazel run //test/integration -- --logtostderr $args -hub $hub -tag $tag
+if [ "$circleci" == "true"]; then
+    bin/install-kubernetes.sh
+    make setup
+    make build
+    make test
+    make docker HUB=$hub TAG=$tag
+    make e2etest HUB=$hub TAG=$tag TESTOPTS=$args
+    bin/uninstall-kubernetes.sh
+else
+    bin/push-docker -hub $hub -tag $tag
+    bazel run //test/integration -- --logtostderr $args -hub $hub -tag $tag
+fi
