@@ -14,11 +14,12 @@ if [ "${detected_OS}" == "Darwin" ]; then # Mac OS X
 fi
 
 # Ensure expected GOPATH setup
-PDIR=`pwd`
-if [ $PDIR != "${GOPATH-$HOME/go}/src/istio.io/pilot" ]; then
-       echo "Pilot not found in GOPATH/src/istio.io/"
-       exit 1
-fi
+PDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+#PDIR=`pwd`
+# if [ $PDIR != "${GOPATH-$HOME/go}/src/istio.io/pilot" ]; then
+#        echo "Pilot not found in GOPATH/src/istio.io/"
+#        exit 1
+# fi
 
 # Building and testing with Bazel
 bazel build ${BUILD_FLAGS} //...

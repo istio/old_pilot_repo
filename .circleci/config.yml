@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     machine: true
-    working_directory: /usr/local/go_workspace/src/istio.io/pilot
+    working_directory: ~/go/src/istio.io/pilot
     environment:
       CHANGE_MINIKUBE_NONE_USER: true
     steps:
