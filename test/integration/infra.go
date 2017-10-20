@@ -57,6 +57,9 @@ type infra struct { // nolint: aligncheck
 	apps map[string][]string
 
 	Auth proxyconfig.MeshConfig_AuthPolicy
+	ControlPlaneAuthPolicy int32
+	MixerCustomConfigFile string
+	PilotCustomConfigFile string
 
 	// switches for infrastructure components
 	Mixer     bool
@@ -213,10 +216,8 @@ func (infra *infra) setup() error {
 		}
 	}
 
-	if infra.Auth != proxyconfig.MeshConfig_NONE {
-		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
-			return err
-		}
+	if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
 	}
 	if err := deploy("headless.yaml.tmpl", infra.Namespace); err != nil {
 		return err

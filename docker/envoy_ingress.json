@@ -2,7 +2,7 @@
   "listeners": [],
   "lds": {
     "cluster": "lds",
-    "refresh_delay_ms": 10
+    "refresh_delay_ms": 1000
   },
   "admin": {
     "access_log_path": "/dev/stdout",
@@ -17,7 +17,7 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://istio-pilot.istio-system:15003"
+            "url": "tcp://istio-pilot:15003"
           }
         ]
       },
@@ -28,9 +28,27 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://istio-pilot.istio-system:15003"
+            "url": "tcp://istio-pilot:15003"
           }
         ]
+      },
+      {
+        "name": "mixer_server",
+        "connect_timeout_ms": 1000,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://istio-mixer:15004"
+          }
+        ],
+        "features": "http2",
+          "circuit_breakers": {
+            "default": {
+              "max_pending_requests": 10000,
+              "max_requests": 10000
+            }
+          }
       },
       {
         "name": "zipkin",
@@ -39,7 +57,7 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://localhost:6000"
+            "url": "tcp://zipkin:9411"
           }
         ]
       }
@@ -52,11 +70,11 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://istio-pilot.istio-system:15003"
+            "url": "tcp://istio-pilot:15003"
           }
         ]
       },
-      "refresh_delay_ms": 10
+      "refresh_delay_ms": 1000
     },
     "cds": {
       "cluster": {
@@ -66,14 +84,13 @@
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://istio-pilot.istio-system:15003"
+            "url": "tcp://istio-pilot:15003"
           }
         ]
       },
-      "refresh_delay_ms": 10
+      "refresh_delay_ms": 1000
     }
   },
-  "statsd_udp_ip_address": "10.1.1.10:9125",
   "tracing": {
     "http": {
       "driver": {
