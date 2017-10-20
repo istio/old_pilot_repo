@@ -24,6 +24,11 @@ MINIKUBE_VERSION="v0.22.3"
 curl -Lo minikube https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64
 chmod +x minikube
 sudo mv minikube /usr/local/bin/
+
+curl -Lo kubectl  http://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
 minikube config set kubernetes-version v1.7.4
 minikube config set vm-driver none
 sudo minikube start --vm-driver=none
@@ -36,8 +41,5 @@ sudo chown -R $USER $HOME/.minikube
 sudo chgrp -R $USER $HOME/.minikube 
 
 
-curl -Lo kubectl  http://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl
-chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
 
 kubectl get po --all-namespaces
