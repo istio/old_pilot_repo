@@ -45,6 +45,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$circleci" == "true"]; then
+    bin/install-bazel.sh
     bin/install-kubernetes.sh
     make setup
     make build

@@ -1,26 +1,9 @@
 version: 2
 jobs:
    build:
-     docker:
-       - image: circleci/golang:latest
+     working_directory: /go/src/istio.io/pilot
+     machine: true
+     resource_class: xlarge
      steps:
        - checkout
-       - run: echo "hello world"
-# defaults: &defaults
-#   working_directory: /go/src/istio.io/pilot
-#   machine: true
-
-# version: 2
-# jobs:
-#    build:
-#      <<: *defaults
-#      resource_class: xlarge
-#      steps:
-#        - checkout
-#        - run: bin/e2e.sh -circleci
-
-# workflows:
-#   version: 2
-#   all:
-#     jobs:
-#       - build
+       - run: bin/e2e.sh -circleci
