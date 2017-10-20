@@ -15,19 +15,20 @@
 # limitations under the License.
 #
 ################################################################################
-
+set -x
 SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 # Need to enable mount propagation.  Older Ubuntu doesn't use
 # systemd so need to do it manually
 type -a systemctl > /dev/null
 if [ $? -ne 0 ]; then
-    mkdir -p /var/lib/kubelet
-    mount --bind /var/lib/kubelet /var/lib/kubelet
-    mount --make-shared /var/lib/kubelet
+    set -e
+    sudo mkdir -p /var/lib/kubelet
+    sudo mount --bind /var/lib/kubelet /var/lib/kubelet
+    sudo mount --make-shared /var/lib/kubelet
 fi
 
-export K8S_VERSION="v1.7.3"
+export K8S_VERSION="v1.7.4"
 export ARCH=amd64
 
 docker run -d \
