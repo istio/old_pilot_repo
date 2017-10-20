@@ -27,13 +27,6 @@ jobs:
       - run:
           command: |
             sudo -E kubectl cluster-info
-      # - run:
-      #     command: |
-      #       sudo -E kubectl run circleci-example --image=nginx
-      # - run:
-      #     command: |
-      #       kubectl get deployment
-      #       kubectl delete deployment circleci-example
       - run:
           command: |
             ln -s ~/.kube/config platform/kube/
