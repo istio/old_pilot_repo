@@ -34,8 +34,10 @@ jobs:
       #     command: |
       #       kubectl get deployment
       #       kubectl delete deployment circleci-example
-      - run: make setup
-      - run: make build
-      - run: make test
+      - run:
+          command: |
+            ln -s ~/.kube/config platform/kube/
+      - run: bazel build //...
+      - run: bazel test //...
       - run: make docker HUB=docker.io/rshriram TAG=test
       - run: make e2etest HUB=docker.io/rshriram TAG=test
