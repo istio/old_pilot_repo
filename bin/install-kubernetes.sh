@@ -19,12 +19,25 @@ set -x
 SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 K8S_VERSION="v1.7.4"
-ARCH="amd64"
+MINIKUBE_VERSION="v0.22.3"
 
-# Install kubernetes CLI
-sudo kubeadm init --pod-network-cidr=10.244.0.0/16
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-kubectl taint nodes --all node-role.kubernetes.io/master-
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64
+chmod +x minikube
+sudo mv minikube /usr/local/bin/
+minikube config set kubernetes-version v1.7.4
+minikube config set vm-driver none
+sudo minikube start --vm-driver=none
+
+sudo mv /root/.kube $HOME/.kube # this will write over any previous configuration
+sudo chown -R $USER $HOME/.kube
+sudo chgrp -R $USER $HOME/.kube
+sudo mv /root/.minikube $HOME/.minikube # this will write over any previous configuration
+sudo chown -R $USER $HOME/.minikube
+sudo chgrp -R $USER $HOME/.minikube 
+
+
+curl -Lo kubectl  http://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
 kubectl get po --all-namespaces
