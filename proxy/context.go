@@ -124,12 +124,6 @@ const (
 
 	// IngressKeyFilename is the ingress private key file name
 	IngressKeyFilename = "tls.key"
-
-	// DiscoveryAppListenPort is the port on which the Discovery service listens
-	DiscoveryAppListenPort = 8080
-
-	// MixerAppListenPort is the port on which the Mixer service listens
-	MixerAppListenPort = 9091
 )
 
 // DefaultProxyConfig for individual proxies
