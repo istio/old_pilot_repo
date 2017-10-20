@@ -33,4 +33,4 @@ jobs:
           command: |
             kubectl get deployment
             kubectl delete deployment circleci-example
-      - run: bin/e2e.sh -circleci
+#      - run: bin/e2e.sh -circleci
