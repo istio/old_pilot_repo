@@ -3,7 +3,7 @@ jobs:
    build:
      working_directory: /go/src/istio.io/pilot
      machine: true
-     resource_class: xlarge
+     #resource_class: xlarge
      steps:
        - checkout
        - run: bin/e2e.sh -circleci
