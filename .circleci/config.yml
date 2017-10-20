@@ -8,6 +8,7 @@ jobs:
       CHANGE_MINIKUBE_NONE_USER: true
     steps:
       - checkout
+      - run: bin/install-bazel.sh
       - run:
           command: |
             curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.7.4/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
@@ -26,11 +27,15 @@ jobs:
       - run:
           command: |
             sudo -E kubectl cluster-info
-      - run:
-          command: |
-            sudo -E kubectl run circleci-example --image=nginx
-      - run:
-          command: |
-            kubectl get deployment
-            kubectl delete deployment circleci-example
-#      - run: bin/e2e.sh -circleci
+      # - run:
+      #     command: |
+      #       sudo -E kubectl run circleci-example --image=nginx
+      # - run:
+      #     command: |
+      #       kubectl get deployment
+      #       kubectl delete deployment circleci-example
+      - run: make setup
+      - run: make build
+      - run: make test
+      - run: make docker HUB=docker.io/rshriram TAG=test
+      - run: make e2etest HUB=docker.io/rshriram TAG=test

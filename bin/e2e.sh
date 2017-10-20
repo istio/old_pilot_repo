@@ -46,13 +46,13 @@ done
 
 if [ "$circleci" == "true" ]; then
     bin/install-bazel.sh
-    bin/install-kubernetes.sh
-    make setup
-    make build
-    make test
+#    bin/install-kubernetes.sh
+#    make setup
+#    make build
+#    make test
     make docker HUB=$hub TAG=$tag
     make e2etest HUB=$hub TAG=$tag TESTOPTS=$args
-    bin/uninstall-kubernetes.sh
+#    bin/uninstall-kubernetes.sh
 else
     bin/push-docker -hub $hub -tag $tag
     bazel run //test/integration -- --logtostderr $args -hub $hub -tag $tag
