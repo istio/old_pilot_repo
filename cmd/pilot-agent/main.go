@@ -251,8 +251,8 @@ func init() {
 		"IP Address and Port of a statsd UDP listener (e.g. 10.75.241.127:9125)")
 	proxyCmd.PersistentFlags().IntVar(&proxyAdminPort, "proxyAdminPort", int(values.ProxyAdminPort),
 		"Port on which Envoy should listen for administrative commands")
-	proxyCmd.PersistentFlags().IntVar(&controlPlaneAuthPolicy, "controlPlaneAuthPolicy", int(values.ControlPlaneAuthPolicy),
-		"Enum value of controlPlaneAuthPolicy")
+	proxyCmd.PersistentFlags().IntVar(&controlPlaneAuthPolicy, "controlPlaneAuthPolicy",
+		int(values.ControlPlaneAuthPolicy), "Enum value of controlPlaneAuthPolicy")
 	proxyCmd.PersistentFlags().StringVar(&customConfigFile, "customConfigFile", values.CustomConfigFile,
 		"Path to the generated configuration file directory")
 
