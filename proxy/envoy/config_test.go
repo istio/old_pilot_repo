@@ -222,7 +222,7 @@ type fileConfig struct {
 }
 
 const (
-	envoySidecarConfig = "testdata/envoy-sidecar.json"
+	envoySidecarConfig     = "testdata/envoy-sidecar.json"
 	envoySidecarAuthConfig = "testdata/envoy-sidecar-auth.json"
 )
 
@@ -345,11 +345,11 @@ func makeMeshConfig() proxyconfig.MeshConfig {
 func TestProxyConfig(t *testing.T) {
 	cases := []struct {
 		envoyConfigFilename string
-		}{
-			{
-				envoySidecarConfig,
-			},
-		}
+	}{
+		{
+			envoySidecarConfig,
+		},
+	}
 
 	proxyConfig := makeProxyConfig()
 	for _, c := range cases {
@@ -370,11 +370,11 @@ func TestProxyConfig(t *testing.T) {
 func TestProxyConfigControlPlaneAuth(t *testing.T) {
 	cases := []struct {
 		envoyConfigFilename string
-		}{
-			{
-				envoySidecarAuthConfig,
-			},
-		}
+	}{
+		{
+			envoySidecarAuthConfig,
+		},
+	}
 
 	proxyConfig := makeProxyConfigControlPlaneAuth()
 	for _, c := range cases {

@@ -51,17 +51,17 @@ type CertSource struct {
 }
 
 type watcher struct {
-	agent  proxy.Agent
-	role   proxy.Node
-	config proxyconfig.ProxyConfig
-	certs  []CertSource
+	agent    proxy.Agent
+	role     proxy.Node
+	config   proxyconfig.ProxyConfig
+	certs    []CertSource
 	pilotSAN []string
 }
 
 // NewWatcher creates a new watcher instance from a proxy agent and a set of monitored certificate paths
 // (directories with files in them)
 func NewWatcher(config proxyconfig.ProxyConfig, agent proxy.Agent, role proxy.Node,
-		certs []CertSource, pilotSAN []string) Watcher {
+	certs []CertSource, pilotSAN []string) Watcher {
 	return &watcher{
 		agent:    agent,
 		role:     role,

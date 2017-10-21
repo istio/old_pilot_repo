@@ -90,14 +90,14 @@ func buildMixerCluster(mesh *proxyconfig.MeshConfig, role proxy.Node, mixerSAN [
 	}
 	mixerCluster.Features = ClusterFeatureHTTP2
 
-        // apply auth policies 
-        switch mesh.DefaultConfig.ControlPlaneAuthPolicy {
-        case proxyconfig.AuthenticationPolicy_NONE:
-                // do nothing
-        case proxyconfig.AuthenticationPolicy_MUTUAL_TLS:
-                // apply SSL context to enable mutual TLS between Envoy proxies between app and mixer
-                mixerCluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, mixerSAN)
-        }
+	// apply auth policies
+	switch mesh.DefaultConfig.ControlPlaneAuthPolicy {
+	case proxyconfig.AuthenticationPolicy_NONE:
+		// do nothing
+	case proxyconfig.AuthenticationPolicy_MUTUAL_TLS:
+		// apply SSL context to enable mutual TLS between Envoy proxies between app and mixer
+		mixerCluster.SSLContext = buildClusterSSLContext(proxy.AuthCertsPath, mixerSAN)
+	}
 
 	return mixerCluster
 }

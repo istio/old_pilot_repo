@@ -62,10 +62,10 @@ const (
 	// retry budget
 	budget = 90
 
-	MixerConfigFile = "/etc/istio/proxy/envoy_mixer.json"
+	MixerConfigFile     = "/etc/istio/proxy/envoy_mixer.json"
 	MixerConfigAuthFile = "/etc/istio/proxy/envoy_mixer_auth.json"
 
-	PilotConfigFile = "/etc/istio/proxy/envoy_pilot.json"
+	PilotConfigFile     = "/etc/istio/proxy/envoy_pilot.json"
 	PilotConfigAuthFile = "/etc/istio/proxy/envoy_pilot_auth.json"
 )
 

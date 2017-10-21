@@ -56,10 +56,10 @@ type infra struct { // nolint: aligncheck
 	// map from app to pods
 	apps map[string][]string
 
-	Auth proxyconfig.MeshConfig_AuthPolicy
+	Auth                   proxyconfig.MeshConfig_AuthPolicy
 	ControlPlaneAuthPolicy int32
-	MixerCustomConfigFile string
-	PilotCustomConfigFile string
+	MixerCustomConfigFile  string
+	PilotCustomConfigFile  string
 
 	// switches for infrastructure components
 	Mixer     bool
