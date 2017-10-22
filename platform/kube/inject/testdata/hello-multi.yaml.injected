@@ -54,7 +54,7 @@ spec:
         - --proxyAdminPort
         - "15000"
         - --controlPlaneAuthPolicy
-        - "0"
+        - NONE
         env:
         - name: POD_NAME
           valueFrom:
@@ -164,7 +164,7 @@ spec:
         - --proxyAdminPort
         - "15000"
         - --controlPlaneAuthPolicy
-        - "0"
+        - NONE
         env:
         - name: POD_NAME
           valueFrom:

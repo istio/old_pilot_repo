@@ -47,7 +47,7 @@ spec:
         - zipkin:9411
 {{end}}
         - --controlPlaneAuthPolicy
-        - "{{.ControlPlaneAuthPolicy}}"
+        - "{{.ControlPlaneAuthPolicy.String}}"
         env:
         - name: POD_NAME
           valueFrom:

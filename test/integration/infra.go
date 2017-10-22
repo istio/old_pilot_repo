@@ -57,7 +57,7 @@ type infra struct { // nolint: aligncheck
 	apps map[string][]string
 
 	Auth                   proxyconfig.MeshConfig_AuthPolicy
-	ControlPlaneAuthPolicy int32
+	ControlPlaneAuthPolicy proxyconfig.AuthenticationPolicy
 	MixerCustomConfigFile  string
 	PilotCustomConfigFile  string
 

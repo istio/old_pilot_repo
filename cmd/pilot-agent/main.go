@@ -52,7 +52,7 @@ var (
 	connectTimeout         time.Duration
 	statsdUDPAddress       string
 	proxyAdminPort         int
-	controlPlaneAuthPolicy int
+	controlPlaneAuthPolicy string
 	customConfigFile       string
 
 	rootCmd = &cobra.Command{
@@ -127,9 +127,9 @@ var (
 
 			var pilotSAN []string
 			switch controlPlaneAuthPolicy {
-			case int(proxyconfig.AuthenticationPolicy_NONE):
+			case proxyconfig.AuthenticationPolicy_NONE.String():
 				proxyConfig.ControlPlaneAuthPolicy = proxyconfig.AuthenticationPolicy_NONE
-			case int(proxyconfig.AuthenticationPolicy_MUTUAL_TLS):
+			case proxyconfig.AuthenticationPolicy_MUTUAL_TLS.String():
 				var ns string
 				proxyConfig.ControlPlaneAuthPolicy = proxyconfig.AuthenticationPolicy_MUTUAL_TLS
 				if serviceregistry == platform.KubernetesRegistry {
@@ -137,8 +137,8 @@ var (
 					discoveryHostname := partDiscoveryAddress[0]
 					parts := strings.Split(discoveryHostname, ".")
 					if len(parts) == 1 {
-						// namespace of pilot is not part of discovery address use pod namespace
-						// e.g. istio-pilot:15003
+						// namespace of pilot is not part of discovery address use
+						// pod namespace e.g. istio-pilot:15003
 						ns = os.Getenv("POD_NAMESPACE")
 					} else {
 						// namespace is found in the discovery address
@@ -251,8 +251,8 @@ func init() {
 		"IP Address and Port of a statsd UDP listener (e.g. 10.75.241.127:9125)")
 	proxyCmd.PersistentFlags().IntVar(&proxyAdminPort, "proxyAdminPort", int(values.ProxyAdminPort),
 		"Port on which Envoy should listen for administrative commands")
-	proxyCmd.PersistentFlags().IntVar(&controlPlaneAuthPolicy, "controlPlaneAuthPolicy",
-		int(values.ControlPlaneAuthPolicy), "Enum value of controlPlaneAuthPolicy")
+	proxyCmd.PersistentFlags().StringVar(&controlPlaneAuthPolicy, "controlPlaneAuthPolicy",
+		values.ControlPlaneAuthPolicy.String(), "Control Plane Authentication Policy")
 	proxyCmd.PersistentFlags().StringVar(&customConfigFile, "customConfigFile", values.CustomConfigFile,
 		"Path to the generated configuration file directory")
 

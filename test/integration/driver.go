@@ -165,7 +165,7 @@ func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
 	out.Auth = proxyconfig.MeshConfig_MUTUAL_TLS
-	out.ControlPlaneAuthPolicy = int32(proxyconfig.AuthenticationPolicy_MUTUAL_TLS)
+	out.ControlPlaneAuthPolicy = proxyconfig.AuthenticationPolicy_MUTUAL_TLS
 	out.MixerCustomConfigFile = mixerConfigAuthFile
 	out.PilotCustomConfigFile = pilotConfigAuthFile
 	return out

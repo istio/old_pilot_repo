@@ -132,7 +132,7 @@ spec:
         - "--discoveryAddress"
         - "istio-pilot:15003"
         - "--controlPlaneAuthPolicy"
-        - "{{.ControlPlaneAuthPolicy}}"
+        - "{{.ControlPlaneAuthPolicy.String}}"
         - --customConfigFile
         - "{{.PilotCustomConfigFile}}"
         env:

@@ -46,7 +46,7 @@ spec:
         - -v
         - "{{.Verbosity}}"
         - --controlPlaneAuthPolicy
-        - "{{.ControlPlaneAuthPolicy}}"
+        - "{{.ControlPlaneAuthPolicy.String}}"
         - --customConfigFile
         - "{{.MixerCustomConfigFile}}"
         env:
