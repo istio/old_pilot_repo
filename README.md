@@ -1,5 +1,6 @@
 # Istio Pilot #
-[Build Status](https://prow.istio.io/?job=pilot-postsubmit)
+[Prow build Status](https://prow.istio.io/?job=pilot-postsubmit)
+[![CircleCI](https://circleci.com/gh/istio/pilot/tree/master.svg?style=svg)](https://circleci.com/gh/istio/pilot/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/istio/pilot)](https://goreportcard.com/report/github.com/istio/pilot)
 [![GoDoc](https://godoc.org/github.com/istio/pilot?status.svg)](https://godoc.org/github.com/istio/pilot)
 [![codecov.io](https://codecov.io/github/istio/pilot/coverage.svg?branch=master)](https://codecov.io/github/istio/pilot?branch=master)
@@ -60,7 +61,7 @@ the dependencies.
 
 1. *Dockerize:* Run `make docker HUB=docker.io/<username> TAG=<sometag>`. 
 This will build a docker container for Pilot, the sidecar, and other 
-utilities, and push them to Docker hub.
+utilities.
 
 1. *Integration test:* Run `make e2etest HUB=docker.io/<username> TAG=<sometag>` 
 with same image tags as the one you used in the dockerize stage. This step will
