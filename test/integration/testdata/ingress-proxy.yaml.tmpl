@@ -50,6 +50,26 @@ spec:
         ports:
         - containerPort: 443
         - containerPort: 80
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - curl http://localhost:15000/clusters && curl http://localhost:15000/listeners && curl http://localhost:15000/routes
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - curl http://localhost:15000/clusters
+          initialDelaySeconds: 5
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 10
         env:
         - name: POD_NAME
           valueFrom:
