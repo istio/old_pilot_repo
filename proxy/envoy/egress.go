@@ -34,10 +34,14 @@ func buildEgressListeners(mesh *proxyconfig.MeshConfig, egress proxy.Node) Liste
 }
 
 // buildEgressRoutes lists all HTTP route configs on the egress proxy
-func buildEgressRoutes(mesh *proxyconfig.MeshConfig, services model.ServiceDiscovery) HTTPRouteConfigs {
+func buildEgressRoutes(mesh *proxyconfig.MeshConfig, services model.ServiceDiscovery) (HTTPRouteConfigs, error) {
 	// Create a VirtualHost for each external service
 	vhosts := make([]*VirtualHost, 0)
-	for _, service := range services.Services() {
+	svcs, err := services.Services()
+	if err != nil {
+		return HTTPRouteConfigs{}, err
+	}
+	for _, service := range svcs {
 		if service.External() {
 			if host := buildEgressHTTPRoute(mesh, service); host != nil {
 				vhosts = append(vhosts, host)
@@ -46,7 +50,7 @@ func buildEgressRoutes(mesh *proxyconfig.MeshConfig, services model.ServiceDisco
 	}
 	port := proxy.ParsePort(mesh.EgressProxyAddress)
 	configs := HTTPRouteConfigs{port: &HTTPRouteConfig{VirtualHosts: vhosts}}
-	return configs.normalize()
+	return configs.normalize(), nil
 }
 
 // buildEgressRoute translates an egress rule to an Envoy route
