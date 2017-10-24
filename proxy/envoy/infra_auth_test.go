@@ -16,7 +16,7 @@ package envoy
 
 import (
 	"strings"
-        "testing"
+	"testing"
 )
 
 const (
