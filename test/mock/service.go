@@ -193,6 +193,9 @@ func (sd *ServiceDiscovery) ClearErrors() {
 
 // Services implements discovery interface
 func (sd *ServiceDiscovery) Services() ([]*model.Service, error) {
+	if sd.ServicesError != nil {
+		return nil, sd.ServicesError
+	}
 	out := make([]*model.Service, 0, len(sd.services))
 	for _, service := range sd.services {
 		out = append(out, service)
@@ -202,6 +205,9 @@ func (sd *ServiceDiscovery) Services() ([]*model.Service, error) {
 
 // GetService implements discovery interface
 func (sd *ServiceDiscovery) GetService(hostname string) (*model.Service, error) {
+	if sd.GetServiceError != nil {
+		return nil, sd.GetServiceError
+	}
 	val := sd.services[hostname]
 	return val, sd.GetServiceError
 }
@@ -209,6 +215,9 @@ func (sd *ServiceDiscovery) GetService(hostname string) (*model.Service, error) 
 // Instances implements discovery interface
 func (sd *ServiceDiscovery) Instances(hostname string, ports []string,
 	labels model.LabelsCollection) ([]*model.ServiceInstance, error) {
+	if sd.InstancesError != nil {
+		return nil, sd.InstancesError
+	}
 	service, ok := sd.services[hostname]
 	if !ok {
 		return nil, sd.InstancesError
@@ -231,6 +240,9 @@ func (sd *ServiceDiscovery) Instances(hostname string, ports []string,
 
 // HostInstances implements discovery interface
 func (sd *ServiceDiscovery) HostInstances(addrs map[string]bool) ([]*model.ServiceInstance, error) {
+	if sd.HostInstancesError != nil {
+		return nil, sd.HostInstancesError
+	}
 	out := make([]*model.ServiceInstance, 0)
 	for _, service := range sd.services {
 		if !service.External() {

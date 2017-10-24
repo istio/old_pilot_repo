@@ -109,7 +109,9 @@ func newServer() *mockServer {
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, string(data))
 		} else {
-			fmt.Fprintln(w, r.URL.Path)
+			data, _ := json.Marshal(&[]*api.CatalogService{})
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintln(w, string(data))
 		}
 	}))
 
@@ -187,7 +189,7 @@ func TestInstancesBadHostname(t *testing.T) {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
-	instances, err := controller.Instances("badhostname", []string{}, model.LabelsCollection{})
+	instances, err := controller.Instances("", []string{}, model.LabelsCollection{})
 	if err == nil {
 		t.Error("Instances() should return error when provided bad hostname")
 	}
@@ -236,6 +238,24 @@ func TestGetService(t *testing.T) {
 	}
 }
 
+func TestGetServiceError(t *testing.T) {
+	ts := newServer()
+	controller, err := NewController(ts.Server.URL, "datacenter", 3*time.Second)
+	if err != nil {
+		ts.Server.Close()
+		t.Errorf("could not create Consul Controller: %v", err)
+	}
+
+	ts.Server.Close()
+	service, err := controller.GetService("productpage.service.consul")
+	if err == nil {
+		t.Error("GetService() should return error when client experiences connection problem")
+	}
+	if service != nil {
+		t.Error("GetService() should return nil when client experiences connection problem")
+	}
+}
+
 func TestGetServiceBadHostname(t *testing.T) {
 	ts := newServer()
 	defer ts.Server.Close()
@@ -244,7 +264,7 @@ func TestGetServiceBadHostname(t *testing.T) {
 		t.Errorf("could not create Consul Controller: %v", err)
 	}
 
-	service, err := controller.GetService("badshostname")
+	service, err := controller.GetService("")
 	if err == nil {
 		t.Error("GetService() should thow error for bad hostnames")
 	}
