@@ -39,6 +39,7 @@ go_test(
         "ingress_test.go",
         "route_test.go",
         "watcher_test.go",
+        "infra_auth_test.go",
     ],
     data = glob(["testdata/*.golden"]) + [
         ":envoy_binary",
