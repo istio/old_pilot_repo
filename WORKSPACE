@@ -15,6 +15,7 @@ git_repository(
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_repository", "go_register_toolchains")
 
 go_rules_dependencies()
+
 go_register_toolchains()
 
 ##
@@ -436,7 +437,7 @@ go_repository(
 
 # Change this and the docker/Dockerfile.proxy* files together
 # This SHA is obtained from proxy/postsubmit job
-ISTIO_PROXY_BUCKET = "67851b9648346112987cb1ccf79a30b912724475"
+ISTIO_PROXY_BUCKET = "f8b4de9a80f1d6b500b3148e0e3364daffbb9dfc"
 
 http_file(
     name = "envoy_binary",
@@ -462,7 +463,7 @@ go_repository(
 )
 
 # This SHA is obtained from istio/api
-ISTIO_API = "1e039b5b0312aeadf958039c7330faeaf66917b1"
+ISTIO_API = "e9acfad1a0716033e06f5508c4277a486b94d9db"
 
 new_git_repository(
     name = "io_istio_api",
