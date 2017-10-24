@@ -261,13 +261,6 @@ func TestClusterDiscoveryIngressError(t *testing.T) {
 	}
 }
 
-func TestClusterDiscoveryIstioEgress(t *testing.T) {
-	_, _, ds := commonSetup(t)
-	url := fmt.Sprintf("/v1/clusters/%s/%s", "istio-proxy", mock.Egress.ServiceNode())
-	response := makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/cds-istio-egress.json", t)
-}
-
 func TestClusterDiscoveryRouterError(t *testing.T) {
 	_, _, ds := commonSetup(t)
 	mockDiscovery.ServicesError = errors.New("Mock Services() error")
@@ -467,14 +460,6 @@ func TestRouteDiscoveryRouterWeighted(t *testing.T) {
 	compareResponse(response, "testdata/rds-router-weighted.json", t)
 }
 
-func TestRouteDiscoveryIstioEgress(t *testing.T) {
-	_, _, ds := commonSetup(t)
-
-	url := fmt.Sprintf("/v1/routes/8888/%s/%s", "istio-proxy", mock.Egress.ServiceNode())
-	response := makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/rds-istio-egress.json", t)
-}
-
 func TestListenerDiscoverySidecar(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -646,21 +631,6 @@ func TestListenerDiscoveryHttpProxy(t *testing.T) {
 	url = fmt.Sprintf("/v1/routes/%s/%s/%s", RDSAll, "istio-proxy", mock.HelloProxyV0.ServiceNode())
 	response = makeDiscoveryRequest(ds, "GET", url, t)
 	compareResponse(response, "testdata/rds-httpproxy.json", t)
-}
-
-func TestListenerDiscoveryIstioEgress(t *testing.T) {
-	mesh := makeMeshConfig()
-	registry := memory.Make(model.IstioConfigTypes)
-	ds := makeDiscoveryService(t, registry, &mesh)
-	addConfig(registry, egressRule, t)
-	url := fmt.Sprintf("/v1/listeners/%s/%s", "istio-proxy", mock.Egress.ServiceNode())
-	response := makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/lds-istio-egress.json", t)
-
-	mesh.AuthPolicy = proxyconfig.MeshConfig_MUTUAL_TLS
-	ds = makeDiscoveryService(t, registry, &mesh)
-	response = makeDiscoveryRequest(ds, "GET", url, t)
-	compareResponse(response, "testdata/lds-istio-egress-auth.json", t)
 }
 
 func TestListenerDiscoveryRouterError(t *testing.T) {

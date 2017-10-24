@@ -136,8 +136,6 @@ func buildListeners(env proxy.Environment, node proxy.Node) (Listeners, error) {
 			return Listeners{}, err
 		}
 		return buildIngressListeners(env.Mesh, instances, env.ServiceDiscovery, env.IstioConfigStore, node), nil
-	case proxy.Egress:
-		return buildEgressListeners(env.Mesh, node), nil
 	}
 	return nil, nil
 }
@@ -161,13 +159,6 @@ func buildClusters(env proxy.Environment, node proxy.Node) (Clusters, error) {
 	case proxy.Ingress:
 		instances, err = env.HostInstances(map[string]bool{node.IPAddress: true})
 		httpRouteConfigs, _ := buildIngressRoutes(env.Mesh, instances, env.ServiceDiscovery, env.IstioConfigStore)
-		clusters = httpRouteConfigs.clusters().normalize()
-	case proxy.Egress:
-		// TODO: decide upon instances for egress proxy
-		httpRouteConfigs, err := buildEgressRoutes(env.Mesh, env.ServiceDiscovery)
-		if err != nil {
-			return clusters, err
-		}
 		clusters = httpRouteConfigs.clusters().normalize()
 	}
 
@@ -291,12 +282,6 @@ func buildRDSRoute(mesh *proxyconfig.MeshConfig, node proxy.Node, routeName stri
 			return nil, err
 		}
 		httpConfigs, _ = buildIngressRoutes(mesh, instances, discovery, config)
-	case proxy.Egress:
-		var err error
-		httpConfigs, err = buildEgressRoutes(mesh, discovery)
-		if err != nil {
-			return nil, err
-		}
 	case proxy.Sidecar, proxy.Router:
 		instances, err := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		if err != nil {
@@ -578,26 +563,9 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 	// map for each service port to define filters
 	for _, service := range services {
 		for _, servicePort := range service.Ports {
-			// skip external services if the egress proxy is undefined
-			if service.External() && mesh.EgressProxyAddress == "" {
-				continue
-			}
-
 			routes := buildDestinationHTTPRoutes(service, servicePort, instances, config)
 
 			if len(routes) > 0 {
-				// must use egress proxy to route external name services
-				if service.External() {
-					for _, route := range routes {
-						route.HostRewrite = service.Hostname
-						for _, cluster := range route.clusters {
-							cluster.ServiceName = ""
-							cluster.Type = ClusterTypeStrictDNS
-							cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
-						}
-					}
-				}
-
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
 
