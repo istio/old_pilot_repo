@@ -376,6 +376,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
@@ -403,12 +404,25 @@ func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig, authe
 func shouldApplyAuth(mesh *proxyconfig.MeshConfig, authenticationPolicy model.AuthenticationPolicy) bool {
 	return authenticationPolicy == model.AuthenticationEnable ||
 		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && authenticationPolicy != model.AuthenticationDisable)
+=======
+// shouldApplyAuth returns true if service's authentication policy is enable, or the mesh's auth
+// policy is on and service's policy is NOT disable.
+func shouldApplyAuth(mesh *proxyconfig.MeshConfig, serviceAuthPolicy model.AuthenticationPolicy) bool {
+	return serviceAuthPolicy == model.AuthenticationEnable ||
+		(mesh.AuthPolicy == proxyconfig.MeshConfig_MUTUAL_TLS && serviceAuthPolicy != model.AuthenticationDisable)
+>>>>>>> Add comments
 }
 
+// mayApplyInboundAuth adds ssl_context to the listener if shouldApplyAuth.
 func mayApplyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig,
+<<<<<<< HEAD
 	authenticationPolicy model.AuthenticationPolicy) {
 	if shouldApplyAuth(mesh, authenticationPolicy) {
 >>>>>>> Fix go lint
+=======
+	serviceAuthPolicy model.AuthenticationPolicy) {
+	if shouldApplyAuth(mesh, serviceAuthPolicy) {
+>>>>>>> Add comments
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
 }
