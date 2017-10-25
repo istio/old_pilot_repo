@@ -74,16 +74,26 @@ func (conf *Config) Write(w io.Writer) error {
 }
 
 // buildConfig creates a proxy config with discovery services and admin port
-func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyconfig.ProxyConfig) *Config {
+// it creates config for Ingress, Egress and Sidecar proxies
+func buildConfig(config proxyconfig.ProxyConfig, pilotSAN []string) *Config {
+	listeners := Listeners{}
+
+	clusterRDS := buildCluster(config.DiscoveryAddress, RDSName, config.ConnectTimeout)
+	clusterLDS := buildCluster(config.DiscoveryAddress, LDSName, config.ConnectTimeout)
+	clusters := Clusters{clusterRDS, clusterLDS}
+
 	out := &Config{
 		Listeners: listeners,
+		LDS: &LDSCluster{
+			Cluster:        LDSName,
+			RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
+		},
 		Admin: Admin{
 			AccessLogPath: DefaultAccessLog,
 			Address:       fmt.Sprintf("tcp://%s:%d", LocalhostAddress, config.ProxyAdminPort),
 		},
 		ClusterManager: ClusterManager{
-			Clusters: append(clusters,
-				buildCluster(config.DiscoveryAddress, RDSName, config.ConnectTimeout)),
+			Clusters: clusters,
 			SDS: &DiscoveryCluster{
 				Cluster:        buildCluster(config.DiscoveryAddress, SDSName, config.ConnectTimeout),
 				RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
@@ -96,13 +106,16 @@ func buildConfig(listeners Listeners, clusters Clusters, lds bool, config proxyc
 		StatsdUDPIPAddress: config.StatsdUdpAddress,
 	}
 
-	if lds {
-		out.LDS = &LDSCluster{
-			Cluster:        LDSName,
-			RefreshDelayMs: protoDurationToMS(config.DiscoveryRefreshDelay),
-		}
-		out.ClusterManager.Clusters = append(out.ClusterManager.Clusters,
-			buildCluster(config.DiscoveryAddress, LDSName, config.ConnectTimeout))
+	// apply auth policies
+	switch config.ControlPlaneAuthPolicy {
+	case proxyconfig.AuthenticationPolicy_NONE:
+		// do nothing
+	case proxyconfig.AuthenticationPolicy_MUTUAL_TLS:
+		sslContext := buildClusterSSLContext(proxy.AuthCertsPath, pilotSAN)
+		clusterRDS.SSLContext = sslContext
+		clusterLDS.SSLContext = sslContext
+		out.ClusterManager.SDS.Cluster.SSLContext = sslContext
+		out.ClusterManager.CDS.Cluster.SSLContext = sslContext
 	}
 
 	if config.ZipkinAddress != "" {
@@ -125,8 +138,6 @@ func buildListeners(env proxy.Environment, node proxy.Node) Listeners {
 	case proxy.Ingress:
 		instances := env.HostInstances(map[string]bool{node.IPAddress: true})
 		return buildIngressListeners(env.Mesh, instances, env.ServiceDiscovery, env.IstioConfigStore, node)
-	case proxy.Egress:
-		return buildEgressListeners(env.Mesh, node)
 	}
 	return nil
 }
@@ -143,10 +154,6 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 		instances = env.HostInstances(map[string]bool{node.IPAddress: true})
 		httpRouteConfigs, _ := buildIngressRoutes(env.Mesh, instances, env.ServiceDiscovery, env.IstioConfigStore)
 		clusters = httpRouteConfigs.clusters().normalize()
-	case proxy.Egress:
-		// TODO: decide upon instances for egress proxy
-		httpRouteConfigs := buildEgressRoutes(env.Mesh, env.ServiceDiscovery)
-		clusters = httpRouteConfigs.clusters().normalize()
 	}
 
 	// apply custom policies for outbound clusters
@@ -156,7 +163,7 @@ func buildClusters(env proxy.Environment, node proxy.Node) Clusters {
 
 	// append Mixer service definition if necessary
 	if env.Mesh.MixerAddress != "" {
-		clusters = append(clusters, buildMixerCluster(env.Mesh))
+		clusters = append(clusters, buildMixerCluster(env.Mesh, node, env.MixerSAN))
 	}
 
 	return clusters
@@ -262,8 +269,6 @@ func buildRDSRoute(mesh *proxyconfig.MeshConfig, node proxy.Node, routeName stri
 	case proxy.Ingress:
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		httpConfigs, _ = buildIngressRoutes(mesh, instances, discovery, config)
-	case proxy.Egress:
-		httpConfigs = buildEgressRoutes(mesh, discovery)
 	case proxy.Sidecar, proxy.Router:
 		instances := discovery.HostInstances(map[string]bool{node.IPAddress: true})
 		services := discovery.Services()
@@ -371,6 +376,7 @@ func buildHTTPListener(mesh *proxyconfig.MeshConfig, node proxy.Node, instances 
 func applyInboundAuth(listener *Listener, mesh *proxyconfig.MeshConfig) {
 	switch mesh.AuthPolicy {
 	case proxyconfig.MeshConfig_NONE:
+		// do nothing
 	case proxyconfig.MeshConfig_MUTUAL_TLS:
 		listener.SSLContext = buildListenerSSLContext(proxy.AuthCertsPath)
 	}
@@ -539,26 +545,9 @@ func buildOutboundHTTPRoutes(mesh *proxyconfig.MeshConfig, sidecar proxy.Node,
 	// map for each service port to define filters
 	for _, service := range services {
 		for _, servicePort := range service.Ports {
-			// skip external services if the egress proxy is undefined
-			if service.External() && mesh.EgressProxyAddress == "" {
-				continue
-			}
-
 			routes := buildDestinationHTTPRoutes(service, servicePort, instances, config)
 
 			if len(routes) > 0 {
-				// must use egress proxy to route external name services
-				if service.External() {
-					for _, route := range routes {
-						route.HostRewrite = service.Hostname
-						for _, cluster := range route.clusters {
-							cluster.ServiceName = ""
-							cluster.Type = ClusterTypeStrictDNS
-							cluster.Hosts = []Host{{URL: fmt.Sprintf("tcp://%s", mesh.EgressProxyAddress)}}
-						}
-					}
-				}
-
 				host := buildVirtualHost(service, servicePort, suffix, routes)
 				http := httpConfigs.EnsurePort(servicePort.Port)
 

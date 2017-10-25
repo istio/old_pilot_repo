@@ -61,6 +61,12 @@ const (
 
 	// retry budget
 	budget = 90
+
+	mixerConfigFile     = "/etc/istio/proxy/envoy_mixer.json"
+	mixerConfigAuthFile = "/etc/istio/proxy/envoy_mixer_auth.json"
+
+	pilotConfigFile     = "/etc/istio/proxy/envoy_pilot.json"
+	pilotConfigAuthFile = "/etc/istio/proxy/envoy_pilot_auth.json"
 )
 
 func init() {
@@ -127,8 +133,9 @@ func main() {
 	params.Auth = proxyconfig.MeshConfig_NONE
 	params.Mixer = true
 	params.Ingress = true
-	params.Egress = true
 	params.Zipkin = true
+	params.MixerCustomConfigFile = mixerConfigFile
+	params.PilotCustomConfigFile = pilotConfigFile
 
 	if len(params.Namespace) != 0 && authmode == "both" {
 		glog.Infof("When namespace(=%s) is specified, auth mode(=%s) must be one of enable or disable.",
@@ -158,6 +165,9 @@ func setAuth(params infra) infra {
 	out := params
 	out.Name = "(auth infra)"
 	out.Auth = proxyconfig.MeshConfig_MUTUAL_TLS
+	out.ControlPlaneAuthPolicy = proxyconfig.AuthenticationPolicy_MUTUAL_TLS
+	out.MixerCustomConfigFile = mixerConfigAuthFile
+	out.PilotCustomConfigFile = pilotConfigAuthFile
 	return out
 }
 
@@ -196,7 +206,6 @@ func runTests(envs ...infra) {
 			&tcp{infra: &istio},
 			&headless{infra: &istio},
 			&ingress{infra: &istio},
-			&egress{infra: &istio},
 			&egressRules{infra: &istio},
 			&routing{infra: &istio},
 			&zipkin{infra: &istio},
@@ -236,9 +245,6 @@ func runTests(envs ...infra) {
 					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, "mixer"))
 				} else if strings.HasPrefix(pod, "istio-ingress") {
 					log("Ingress log", pod)
-					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
-				} else if strings.HasPrefix(pod, "istio-egress") {
-					log("Egress log", pod)
 					glog.Info(util.FetchLogs(client, pod, istio.IstioNamespace, inject.ProxyContainerName))
 				} else {
 					log("Proxy log", pod)

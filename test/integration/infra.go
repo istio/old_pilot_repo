@@ -56,12 +56,14 @@ type infra struct { // nolint: aligncheck
 	// map from app to pods
 	apps map[string][]string
 
-	Auth proxyconfig.MeshConfig_AuthPolicy
+	Auth                   proxyconfig.MeshConfig_AuthPolicy
+	ControlPlaneAuthPolicy proxyconfig.AuthenticationPolicy
+	MixerCustomConfigFile  string
+	PilotCustomConfigFile  string
 
 	// switches for infrastructure components
 	Mixer     bool
 	Ingress   bool
-	Egress    bool
 	Zipkin    bool
 	DebugPort int
 
@@ -214,10 +216,8 @@ func (infra *infra) setup() error {
 		}
 	}
 
-	if infra.Auth != proxyconfig.MeshConfig_NONE {
-		if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
-			return err
-		}
+	if err := deploy("ca.yaml.tmpl", infra.IstioNamespace); err != nil {
+		return err
 	}
 	if err := deploy("headless.yaml.tmpl", infra.Namespace); err != nil {
 		return err
@@ -246,12 +246,6 @@ func (infra *infra) setup() error {
 			return err
 		}
 	}
-	if infra.Egress {
-		if err := deploy("egress-proxy.yaml.tmpl", infra.IstioNamespace); err != nil {
-			return err
-		}
-	}
-
 	if infra.Zipkin {
 		if err := deploy("zipkin.yaml", infra.IstioNamespace); err != nil {
 			return err

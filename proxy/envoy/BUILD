@@ -5,9 +5,9 @@ go_library(
     srcs = [
         "config.go",
         "discovery.go",
-        "egress.go",
         "fault.go",
         "header.go",
+        "infra_auth.go",
         "ingress.go",
         "mixer.go",
         "policy.go",
@@ -36,6 +36,7 @@ go_test(
         "config_test.go",
         "discovery_test.go",
         "header_test.go",
+        "infra_auth_test.go",
         "ingress_test.go",
         "route_test.go",
         "watcher_test.go",
