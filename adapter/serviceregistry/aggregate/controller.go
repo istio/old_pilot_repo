@@ -55,8 +55,9 @@ func (c *Controller) Services() ([]*model.Service, error) {
 		svcs, err := r.Services()
 		if err != nil {
 			errs = multierror.Append(errs, err)
+		} else {
+			services = append(services, svcs...)
 		}
-		services = append(services, svcs...)
 	}
 	return services, errs
 }
@@ -68,8 +69,7 @@ func (c *Controller) GetService(hostname string) (*model.Service, error) {
 		service, err := r.GetService(hostname)
 		if err != nil {
 			errs = multierror.Append(errs, err)
-		}
-		if service != nil {
+		} else if service != nil {
 			if errs != nil {
 				glog.Warningf("GetService() found match but encountered an error: %v", errs)
 			}
@@ -102,8 +102,7 @@ func (c *Controller) Instances(hostname string, ports []string,
 		instances, err = r.Instances(hostname, ports, labels)
 		if err != nil {
 			errs = multierror.Append(errs, err)
-		}
-		if len(instances) > 0 {
+		} else if len(instances) > 0 {
 			if errs != nil {
 				glog.Warningf("Instances() found match but encountered an error: %v", errs)
 			}
@@ -121,8 +120,9 @@ func (c *Controller) HostInstances(addrs map[string]bool) ([]*model.ServiceInsta
 		insts, err := r.HostInstances(addrs)
 		if err != nil {
 			errs = multierror.Append(errs, err)
+		} else {
+			instances = append(instances, insts...)
 		}
-		instances = append(instances, insts...)
 	}
 
 	if len(instances) > 0 {
