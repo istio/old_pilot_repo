@@ -279,7 +279,6 @@ func (c *Controller) Instances(hostname string, ports []string,
 	// Locate all ports in the actual service
 	svc := convertService(*item, c.domainSuffix)
 	if svc == nil {
-		// TODO is this an error case?
 		return nil, nil
 	}
 	svcPorts := make(map[string]*model.Port)

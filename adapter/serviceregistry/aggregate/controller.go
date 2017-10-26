@@ -114,25 +114,25 @@ func (c *Controller) Instances(hostname string, ports []string,
 
 // HostInstances lists service instances for a given set of IPv4 addresses.
 func (c *Controller) HostInstances(addrs map[string]bool) ([]*model.ServiceInstance, error) {
-	instances := make([]*model.ServiceInstance, 0)
+	out := make([]*model.ServiceInstance, 0)
 	var errs error
 	for _, r := range c.registries {
-		insts, err := r.HostInstances(addrs)
+		instances, err := r.HostInstances(addrs)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		} else {
-			instances = append(instances, insts...)
+			out = append(out, instances...)
 		}
 	}
 
-	if len(instances) > 0 {
+	if len(out) > 0 {
 		if errs != nil {
 			glog.Warningf("HostInstances() found match but encountered an error: %v", errs)
 		}
-		return instances, nil
+		return out, nil
 	}
 
-	return instances, errs
+	return out, errs
 }
 
 // Run starts all the controllers

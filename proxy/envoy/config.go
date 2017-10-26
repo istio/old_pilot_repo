@@ -134,11 +134,11 @@ func buildListeners(env proxy.Environment, node proxy.Node) (Listeners, error) {
 	case proxy.Sidecar, proxy.Router:
 		instances, err := env.HostInstances(map[string]bool{node.IPAddress: true})
 		if err != nil {
-			return Listeners{}, err
+			return nil, err
 		}
 		services, err := env.Services()
 		if err != nil {
-			return Listeners{}, err
+			return nil, err
 		}
 		listeners, _ := buildSidecarListenersClusters(env.Mesh, instances,
 			services, env.ManagementPorts(node.IPAddress), node, env.IstioConfigStore)

@@ -83,7 +83,7 @@ func (c *Controller) getServices() (map[string][]string, error) {
 	data, _, err := c.client.Catalog().Services(nil)
 	if err != nil {
 		glog.Warningf("Could not retrieve services from consul: %v", err)
-		return make(map[string][]string), err
+		return nil, err
 	}
 
 	return data, nil
@@ -93,7 +93,7 @@ func (c *Controller) getCatalogService(name string, q *api.QueryOptions) ([]*api
 	endpoints, _, err := c.client.Catalog().Service(name, "", q)
 	if err != nil {
 		glog.Warningf("Could not retrieve service catalogue from consul: %v", err)
-		return []*api.CatalogService{}, err
+		return nil, err
 	}
 
 	return endpoints, nil
