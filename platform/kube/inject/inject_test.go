@@ -57,104 +57,127 @@ const unitTestDebugMode = true
 
 func TestIntoResourceFile(t *testing.T) {
 	cases := []struct {
-		authConfigPath  string
 		enableAuth      bool
 		in              string
 		want            string
 		imagePullPolicy string
 		enableCoreDump  bool
 		debugMode       bool
+		include         []string
+		exclude         []string
 	}{
 		// "testdata/hello.yaml" is tested in http_test.go (with debug)
 		{
 			in:        "testdata/hello.yaml",
 			want:      "testdata/hello.yaml.injected",
 			debugMode: true,
+			include:   []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello-probes.yaml",
-			want: "testdata/hello-probes.yaml.injected",
+			in:      "testdata/hello-probes.yaml",
+			want:    "testdata/hello-probes.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello.yaml",
-			want: "testdata/hello-config-map-name.yaml.injected",
+			in:      "testdata/hello.yaml",
+			want:    "testdata/hello-config-map-name.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/frontend.yaml",
-			want: "testdata/frontend.yaml.injected",
+			in:      "testdata/frontend.yaml",
+			want:    "testdata/frontend.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello-service.yaml",
-			want: "testdata/hello-service.yaml.injected",
+			in:      "testdata/hello-service.yaml",
+			want:    "testdata/hello-service.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello-multi.yaml",
-			want: "testdata/hello-multi.yaml.injected",
+			in:      "testdata/hello-multi.yaml",
+			want:    "testdata/hello-multi.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
 			imagePullPolicy: "Always",
 			in:              "testdata/hello.yaml",
 			want:            "testdata/hello-always.yaml.injected",
+			include:         []string{v1.NamespaceAll},
 		},
 		{
 			imagePullPolicy: "Never",
 			in:              "testdata/hello.yaml",
 			want:            "testdata/hello-never.yaml.injected",
+			include:         []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello-ignore.yaml",
-			want: "testdata/hello-ignore.yaml.injected",
+			in:      "testdata/hello-ignore.yaml",
+			want:    "testdata/hello-ignore.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/multi-init.yaml",
-			want: "testdata/multi-init.yaml.injected",
+			in:      "testdata/multi-init.yaml",
+			want:    "testdata/multi-init.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/statefulset.yaml",
-			want: "testdata/statefulset.yaml.injected",
+			in:      "testdata/statefulset.yaml",
+			want:    "testdata/statefulset.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
 			in:             "testdata/enable-core-dump.yaml",
 			want:           "testdata/enable-core-dump.yaml.injected",
 			enableCoreDump: true,
+			include:        []string{v1.NamespaceAll},
 		},
 		{
-			enableAuth:     true,
-			authConfigPath: "/etc/certs/",
-			in:             "testdata/auth.yaml",
-			want:           "testdata/auth.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.yaml",
+			want:       "testdata/auth.yaml.injected",
+			include:    []string{v1.NamespaceAll},
 		},
 		{
-			enableAuth:     true,
-			authConfigPath: "/etc/certs/",
-			in:             "testdata/auth.non-default-service-account.yaml",
-			want:           "testdata/auth.non-default-service-account.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.non-default-service-account.yaml",
+			want:       "testdata/auth.non-default-service-account.yaml.injected",
+			include:    []string{v1.NamespaceAll},
 		},
 		{
-			enableAuth:     true,
-			authConfigPath: "/etc/non-default-dir/",
-			in:             "testdata/auth.yaml",
-			want:           "testdata/auth.cert-dir.yaml.injected",
+			enableAuth: true,
+			in:         "testdata/auth.yaml",
+			want:       "testdata/auth.cert-dir.yaml.injected",
+			include:    []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/daemonset.yaml",
-			want: "testdata/daemonset.yaml.injected",
+			in:      "testdata/daemonset.yaml",
+			want:    "testdata/daemonset.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/job.yaml",
-			want: "testdata/job.yaml.injected",
+			in:      "testdata/job.yaml",
+			want:    "testdata/job.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/replicaset.yaml",
-			want: "testdata/replicaset.yaml.injected",
+			in:      "testdata/replicaset.yaml",
+			want:    "testdata/replicaset.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/replicationcontroller.yaml",
-			want: "testdata/replicationcontroller.yaml.injected",
+			in:      "testdata/replicationcontroller.yaml",
+			want:    "testdata/replicationcontroller.yaml.injected",
+			include: []string{v1.NamespaceAll},
 		},
 		{
-			in:   "testdata/hello-host-network.yaml",
-			want: "testdata/hello-host-network.yaml.injected",
+			in:      "testdata/hello-host-network.yaml",
+			want:    "testdata/hello-host-network.yaml.injected",
+			include: []string{v1.NamespaceAll},
+		},
+		{
+			in:      "testdata/hello-ibm.yaml",
+			want:    "testdata/hello-ibm.yaml.injected",
+			exclude: []string{"ibm-system"},
 		},
 	}
 
@@ -165,8 +188,9 @@ func TestIntoResourceFile(t *testing.T) {
 		}
 
 		config := &Config{
-			Policy:     InjectionPolicyEnabled,
-			Namespaces: []string{v1.NamespaceAll},
+			Policy:            InjectionPolicyEnabled,
+			IncludeNamespaces: c.include,
+			ExcludeNamespaces: c.exclude,
 			Params: Params{
 				InitImage:       InitImageName(unitTestHub, unitTestTag, c.debugMode),
 				ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, c.debugMode),
@@ -277,7 +301,7 @@ func TestInjectRequired(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if got := injectRequired(c.policy, c.meta); got != c.want {
+		if got := injectRequired([]string{v1.NamespaceAll}, ignoredNamespaces, []string{}, c.policy, c.meta); got != c.want {
 			t.Errorf("injectRequired(%v, %v) got %v want %v", c.policy, c.meta, got, c.want)
 		}
 	}
@@ -382,8 +406,9 @@ func TestGetInitializerConfig(t *testing.T) {
 	defer util.DeleteNamespace(cl, ns)
 
 	goodConfig := Config{
-		Policy:          InjectionPolicyDisabled,
-		InitializerName: DefaultInitializerName,
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		IncludeNamespaces: []string{v1.NamespaceAll},
 		Params: Params{
 			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
 			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
@@ -392,6 +417,39 @@ func TestGetInitializerConfig(t *testing.T) {
 		},
 	}
 	goodConfigYAML, err := yaml.Marshal(&goodConfig)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
+	badConfigWithIncludeAndExcludeNamespaces := Config{
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		IncludeNamespaces: []string{v1.NamespaceAll},
+		ExcludeNamespaces: []string{"ibm-system"},
+		Params: Params{
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
+		},
+	}
+	badConfigWithIncludeAndExcludeNamespacesYAML, err := yaml.Marshal(&badConfigWithIncludeAndExcludeNamespaces)
+	if err != nil {
+		t.Fatalf("Failed to create test config data: %v", err)
+	}
+
+	badConfigWithExcludeNamespacesAll := Config{
+		Policy:            InjectionPolicyDisabled,
+		InitializerName:   DefaultInitializerName,
+		ExcludeNamespaces: []string{v1.NamespaceAll},
+		Params: Params{
+			InitImage:       InitImageName(unitTestHub, unitTestTag, false),
+			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, false),
+			SidecarProxyUID: 1234,
+			ImagePullPolicy: "Always",
+		},
+	}
+	badConfigWithExcludeNamespacesAllYAML, err := yaml.Marshal(&badConfigWithExcludeNamespacesAll)
 	if err != nil {
 		t.Fatalf("Failed to create test config data: %v", err)
 	}
@@ -431,12 +489,13 @@ func TestGetInitializerConfig(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
 				ObjectMeta: metav1.ObjectMeta{Name: "default-config"},
 				Data: map[string]string{
-					InitializerConfigMapKey: "",
+					InitializerConfigMapKey: string(""),
 				},
 			},
 			want: Config{
-				Policy:          DefaultInjectionPolicy,
-				InitializerName: DefaultInitializerName,
+				Policy:            DefaultInjectionPolicy,
+				InitializerName:   DefaultInitializerName,
+				IncludeNamespaces: []string{v1.NamespaceAll},
 				Params: Params{
 					InitImage:       InitImageName(DefaultHub, version.Info.Version, false),
 					ProxyImage:      ProxyImageName(DefaultHub, version.Info.Version, false),
@@ -456,6 +515,30 @@ func TestGetInitializerConfig(t *testing.T) {
 				},
 			},
 			want: goodConfig,
+		},
+		{
+			name:      "bad config with includeNamespaces and excludeNamespaces",
+			queryName: "bad-config-with-include-and-exclude-namespaces",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-with-include-and-exclude-namespaces"},
+				Data: map[string]string{
+					InitializerConfigMapKey: string(badConfigWithIncludeAndExcludeNamespacesYAML),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "bad config excludeNamespaces=v1.NamespaceAll",
+			queryName: "bad-config-with-exclude-namespaces-equal-all",
+			configMap: &v1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bad-config-with-exclude-namespaces-equal-all"},
+				Data: map[string]string{
+					InitializerConfigMapKey: string(badConfigWithExcludeNamespacesAllYAML),
+				},
+			},
+			wantErr: true,
 		},
 	}
 

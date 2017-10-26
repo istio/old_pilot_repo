@@ -56,12 +56,6 @@ const (
 type InjectionPolicy string
 
 const (
-	// InjectionPolicyOff disables the initializer from modifying
-	// resources. The pending 'status.sidecar.istio.io initializer'
-	// initializer is still removed to avoid blocking creation of
-	// resources.
-	InjectionPolicyOff InjectionPolicy = "off"
-
 	// InjectionPolicyDisabled specifies that the initializer will not
 	// inject the sidecar into resources by default for the
 	// namespace(s) being watched. Resources can enable injection
@@ -159,7 +153,10 @@ type Config struct {
 	Policy InjectionPolicy `json:"policy"`
 
 	// deprecate if InitializerConfiguration becomes namespace aware
-	Namespaces []string `json:"namespaces"`
+	IncludeNamespaces []string `json:"namespaces"`
+
+	// deprecate if InitializerConfiguration becomes namespace aware
+	ExcludeNamespaces []string `json:"excludeNamespaces"`
 
 	// Params specifies the parameters of the injected sidcar template
 	Params Params `json:"params"`
@@ -190,9 +187,23 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 		return nil, err
 	}
 
+	if c.IncludeNamespaces != nil && c.ExcludeNamespaces != nil {
+		return nil, fmt.Errorf("cannot configure both namespaces and excludeNamespaces")
+	}
+
+	if c.IncludeNamespaces == nil {
+		c.IncludeNamespaces = []string{v1.NamespaceAll}
+	}
+
+	for _, excludeNamespace := range c.ExcludeNamespaces {
+		if excludeNamespace == v1.NamespaceAll {
+			return nil, fmt.Errorf("cannot configure ExcludeNamespaces as NamespaceAll")
+		}
+	}
+
 	// apply safe defaults if not specified
 	switch c.Policy {
-	case InjectionPolicyOff, InjectionPolicyDisabled, InjectionPolicyEnabled:
+	case InjectionPolicyDisabled, InjectionPolicyEnabled:
 	default:
 		c.Policy = DefaultInjectionPolicy
 	}
@@ -215,7 +226,39 @@ func GetInitializerConfig(kube kubernetes.Interface, namespace, injectConfigName
 	return &c, nil
 }
 
-func injectRequired(namespacePolicy InjectionPolicy, obj metav1.Object) bool {
+func injectRequired(include, ignored, excluded []string, namespacePolicy InjectionPolicy, obj metav1.Object) bool {
+	// skip special kubernetes system namespaces
+	for _, namespace := range ignored {
+		if obj.GetNamespace() == namespace {
+			return false
+		}
+	}
+
+	// skip customized exclude namespaces
+	for _, excludeNamespace := range excluded {
+		if obj.GetNamespace() == excludeNamespace {
+			return false
+		}
+	}
+
+	var included bool
+IncludeNamespaceSearch:
+	for _, namespace := range include {
+		if namespace == v1.NamespaceAll {
+			included = true
+			break IncludeNamespaceSearch
+		} else if obj.GetNamespace() == namespace {
+			// Don't skip. The initializer should initialize this
+			// resource.
+			included = true
+			break IncludeNamespaceSearch
+		}
+		// else, keep searching
+	}
+	if !included {
+		return false
+	}
+
 	var useDefault bool
 	var inject bool
 
@@ -453,14 +496,7 @@ func intoObject(c *Config, in interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	// skip special kubernetes system namespaces
-	for _, namespace := range ignoredNamespaces {
-		if obj.GetNamespace() == namespace {
-			return out, nil
-		}
-	}
-
-	if !injectRequired(c.Policy, obj) {
+	if !injectRequired(c.IncludeNamespaces, ignoredNamespaces, c.ExcludeNamespaces, c.Policy, obj) {
 		glog.V(2).Infof("Skipping %s/%s due to policy check", obj.GetNamespace(), obj.GetName())
 		return out, nil
 	}

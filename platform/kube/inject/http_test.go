@@ -34,8 +34,8 @@ import (
 var (
 	mesh           = proxy.DefaultMeshConfig()
 	httpTestConfig = &Config{
-		Policy:     InjectionPolicyEnabled,
-		Namespaces: []string{v1.NamespaceAll},
+		Policy:            InjectionPolicyEnabled,
+		IncludeNamespaces: []string{v1.NamespaceAll},
 		Params: Params{
 			InitImage:       InitImageName(unitTestHub, unitTestTag, unitTestDebugMode),
 			ProxyImage:      ProxyImageName(unitTestHub, unitTestTag, unitTestDebugMode),
@@ -112,7 +112,7 @@ func TestHTTPServer_inject(t *testing.T) {
 	for _, c := range cases {
 		body, err := ioutil.ReadFile(c.bodyFilename)
 		if err != nil {
-			t.Errorf("%v: could not read test body from %q%v", c.name, c.bodyFilename, err)
+			t.Errorf("%v: could not read test body from %q: %v", c.name, c.bodyFilename, err)
 			continue
 		}
 

@@ -37,12 +37,14 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	"istio.io/pilot/platform/kube"
 )
 
 var ignoredNamespaces = []string{
 	metav1.NamespaceSystem,
 	metav1.NamespacePublic,
-	"istio-system",
+	kube.IstioNamespace,
 }
 
 // Initializer implements a k8s initializer for transparently
@@ -111,53 +113,49 @@ func NewInitializer(restConfig *rest.Config, config *Config, cl kubernetes.Inter
 			return nil, err
 		}
 
-		for n := range i.config.Namespaces {
-			namespace := i.config.Namespaces[n]
-
-			watchlist := &cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					options.IncludeUninitialized = true
-					options.FieldSelector = fields.Everything().String()
-					return kindClient.Get().
-						Namespace(namespace).
-						Resource(kind.resource).
-						VersionedParams(&options, metav1.ParameterCodec).
-						Do().
-						Get()
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					options.IncludeUninitialized = true
-					options.Watch = true
-					options.FieldSelector = fields.Everything().String()
-					return kindClient.Get().
-						Namespace(namespace).
-						Resource(kind.resource).
-						VersionedParams(&options, metav1.ParameterCodec).
-						Watch()
-				},
-			}
-
-			patcher := func(namespace, name string, patchBytes []byte, obj runtime.Object) error {
-				return kindClient.Patch(types.StrategicMergePatchType).
-					Namespace(namespace).
+		watchlist := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.IncludeUninitialized = true
+				options.FieldSelector = fields.Everything().String()
+				return kindClient.Get().
+					Namespace(v1.NamespaceAll).
 					Resource(kind.resource).
-					Name(name).
-					Body(patchBytes).
+					VersionedParams(&options, metav1.ParameterCodec).
 					Do().
-					Into(obj)
-			}
-
-			_, controller := cache.NewInformer(watchlist, kind.obj, DefaultResyncPeriod,
-				cache.ResourceEventHandlerFuncs{
-					AddFunc: func(obj interface{}) {
-						if err := i.initialize(obj, patcher); err != nil {
-							glog.Error(err.Error())
-						}
-					},
-				},
-			)
-			i.controllers = append(i.controllers, controller)
+					Get()
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.IncludeUninitialized = true
+				options.Watch = true
+				options.FieldSelector = fields.Everything().String()
+				return kindClient.Get().
+					Namespace(v1.NamespaceAll).
+					Resource(kind.resource).
+					VersionedParams(&options, metav1.ParameterCodec).
+					Watch()
+			},
 		}
+
+		patcher := func(namespace, name string, patchBytes []byte, obj runtime.Object) error {
+			return kindClient.Patch(types.StrategicMergePatchType).
+				Namespace(namespace).
+				Resource(kind.resource).
+				Name(name).
+				Body(patchBytes).
+				Do().
+				Into(obj)
+		}
+
+		_, controller := cache.NewInformer(watchlist, kind.obj, DefaultResyncPeriod,
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					if err := i.initialize(obj, patcher); err != nil {
+						glog.Error(err.Error())
+					}
+				},
+			},
+		)
+		i.controllers = append(i.controllers, controller)
 	}
 	return i, nil
 }
@@ -166,28 +164,6 @@ func (i *Initializer) initialize(in interface{}, patcher patcherFunc) error {
 	obj, err := meta.Accessor(in)
 	if err != nil {
 		return err
-	}
-
-	var inject bool
-namespaceSearch:
-	for _, namespace := range i.config.Namespaces {
-		if namespace == v1.NamespaceAll {
-			inject = true
-			break namespaceSearch
-		} else if namespace == obj.GetNamespace() {
-			// Don't skip. The initializer should initialize this
-			// resource.
-			inject = true
-			break namespaceSearch
-		}
-		// else, keep searching
-	}
-	if !inject {
-		// Skip namespace(s) that we're not responsible for if
-		// len(pendingInitializers) == 0 { initializing.
-		glog.V(2).Infof("Skipping %s/%s: non-managed namespace",
-			obj.GetNamespace(), obj.GetName())
-		return nil
 	}
 
 	gvk, _, err := injectScheme.ObjectKind(in.(runtime.Object))
