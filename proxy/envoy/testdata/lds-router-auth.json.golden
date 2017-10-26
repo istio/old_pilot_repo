@@ -79,7 +79,30 @@
            "source.ip": "10.3.3.5",
            "source.uid": "kubernetes://router.default"
           },
-          "quota_name": "RequestCount"
+          "quota_name": "RequestCount",
+          "v2": {
+           "defaultDestinationService": ":default",
+           "forwardAttributes": {
+            "attributes": {
+             "source.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "source.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           },
+           "mixerAttributes": {
+            "attributes": {
+             "destination.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "destination.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           }
+          }
          }
         },
         {
@@ -131,7 +154,30 @@
            "source.ip": "10.3.3.5",
            "source.uid": "kubernetes://router.default"
           },
-          "quota_name": "RequestCount"
+          "quota_name": "RequestCount",
+          "v2": {
+           "defaultDestinationService": ":default",
+           "forwardAttributes": {
+            "attributes": {
+             "source.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "source.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           },
+           "mixerAttributes": {
+            "attributes": {
+             "destination.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "destination.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           }
+          }
          }
         },
         {
@@ -183,7 +229,30 @@
            "source.ip": "10.3.3.5",
            "source.uid": "kubernetes://router.default"
           },
-          "quota_name": "RequestCount"
+          "quota_name": "RequestCount",
+          "v2": {
+           "defaultDestinationService": ":default",
+           "forwardAttributes": {
+            "attributes": {
+             "source.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "source.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           },
+           "mixerAttributes": {
+            "attributes": {
+             "destination.ip": {
+              "stringValue": "10.3.3.5"
+             },
+             "destination.uid": {
+              "stringValue": "kubernetes://router.default"
+             }
+            }
+           }
+          }
          }
         },
         {
