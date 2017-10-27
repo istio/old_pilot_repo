@@ -42,7 +42,7 @@ func (t *tcp) run() error {
 		return nil
 	}
 	srcPods := []string{"a", "b", "t"}
-	dstPods := []string{"a", "b"}
+	dstPods := []string{"a", "b", "d"}
 	if t.Auth == proxyconfig.MeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		dstPods = append(dstPods, "t")
@@ -61,8 +61,11 @@ func (t *tcp) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && src == "t" {
-								// t cannot talk to envoy (a or b) with mTLS enabled.
+							if src == "t" &&
+								(t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS ||
+									(dst == "d" && port == ":9090")) {
+								// t cannot talk to envoy (a or b) with mTLS enabled,
+								// nor with d:9090 (which always has mTLS enabled.
 								if len(resp.code) == 0 || resp.code[0] != httpOk {
 									return nil
 								}

@@ -49,7 +49,7 @@ func (t *grpc) run() error {
 
 func (t *grpc) makeRequests() error {
 	srcPods := []string{"a", "b"}
-	dstPods := []string{"a", "b"}
+	dstPods := []string{"a", "b", "d"}
 	if t.Auth == proxyconfig.MeshConfig_NONE {
 		// t is not behind proxy, so it cannot talk in Istio auth.
 		srcPods = append(srcPods, "t")
@@ -60,6 +60,7 @@ func (t *grpc) makeRequests() error {
 	funcs := make(map[string]func() status)
 	for _, src := range srcPods {
 		for _, dst := range dstPods {
+			// Auth is enabled for d:7070 using per-service policy.
 			for _, port := range []string{":70", ":7070"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
 					name := fmt.Sprintf("GRPC request from %s to %s%s%s", src, dst, domain, port)
@@ -89,6 +90,10 @@ func (t *grpc) makeRequests() error {
 							}
 							if src == "t" && dst == "t" {
 								// Expected no match for t->t
+								return nil
+							}
+							if src == "t" && dst == "d" && port == ":7070" {
+								// Expected no match for t->d:7070
 								return nil
 							}
 							return errAgain
