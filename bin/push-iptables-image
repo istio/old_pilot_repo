@@ -16,7 +16,8 @@
 #
 ################################################################################
 #
-# This script creates a base image for the init image that includes iptables.
+# This script creates a base image for the init image that includes iptables
+# for the xenial and centos7.4 library runtimes.
 #
 
 set -ex
@@ -26,15 +27,19 @@ set -o pipefail
 
 PROJECT="istio-testing"
 DATE_PART=$(date +"%Y%m%d")
-SHA_PART=$(git show -q HEAD --pretty=format:%h)
+SHA_PART=$(git show HEAD --pretty=format:%h | head -1 || /bin/true)
 DOCKER_TAG="${DATE_PART}-${SHA_PART}"
-IMAGE_NAME="gcr.io/${PROJECT}/iptables:${DOCKER_TAG}"
+IMAGE_NAME_UBUNTU="docker.io/${PROJECT}/iptables_ubuntu:${DOCKER_TAG}"
+IMAGE_NAME_CENTOS="docker.io/${PROJECT}/iptables_centos:${DOCKER_TAG}"
 
 gcloud docker --authorize-only
 pushd docker
-  docker build -f Dockerfile.iptables -t "${IMAGE_NAME}" .
-  gcloud docker -- push "${IMAGE_NAME}"
+  docker build -f Dockerfile.iptables_ubuntu -t "${IMAGE_NAME_UBUNTU}" .
+  docker build -f Dockerfile.iptables_centos -t "${IMAGE_NAME_CENTOS}" .
+  gcloud docker -- push "${IMAGE_NAME_UBUNTU}"
+  gcloud docker -- push "${IMAGE_NAME_CENTOS}"
 popd
 
-echo Published image ${IMAGE_NAME}
+echo Published image ${IMAGE_NAME_UBUNTU}
+echo Published image ${IMAGE_NAME_CENTOS}
 echo Make sure to update WORKSPACE for the init container base image
