@@ -44,6 +44,7 @@ func buildIngressListeners(mesh *proxyconfig.MeshConfig,
 		listener.SSLContext = &SSLContext{
 			CertChainFile:  path.Join(proxy.IngressCertsPath, proxy.IngressCertFilename),
 			PrivateKeyFile: path.Join(proxy.IngressCertsPath, proxy.IngressKeyFilename),
+			AlpnProtocols:  ListenersAlpnProtocols,
 		}
 		listeners = append(listeners, listener)
 	}

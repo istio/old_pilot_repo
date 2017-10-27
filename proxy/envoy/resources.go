@@ -113,6 +113,10 @@ const (
 	// ZipkinCollectorEndpoint denotes the REST endpoint where Envoy posts Zipkin spans
 	ZipkinCollectorEndpoint = "/api/v1/spans"
 
+	// ListenersAlpnProtocols denotes the the list of ALPN protocols that the listener
+	// should expose
+	ListenersAlpnProtocols = "h2,http/1.1"
+
 	router  = "router"
 	auto    = "auto"
 	decoder = "decoder"
@@ -596,6 +600,7 @@ type SSLContext struct {
 	PrivateKeyFile           string `json:"private_key_file"`
 	CaCertFile               string `json:"ca_cert_file,omitempty"`
 	RequireClientCertificate bool   `json:"require_client_certificate"`
+	AlpnProtocols            string `json:"alpn_protocols,omitempty"`
 }
 
 // SSLContextExternal definition
