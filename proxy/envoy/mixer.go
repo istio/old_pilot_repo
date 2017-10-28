@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+
 	mpb "istio.io/api/mixer/v1"
 	mccpb "istio.io/api/mixer/v1/config/client"
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -183,9 +184,11 @@ func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig
 		}
 	}
 
-	if v2JSONMap, err := model.ToJSONMap(v2); err == nil {
+	if v2JSONMap, err := model.ToJSONMap(v2); err != nil {
 		glog.Warningf("Could not encode v2 HTTP mixerclient filter for node %q: %v", role, err)
+	} else {
 		filter.V2 = v2JSONMap
+
 	}
 	return filter
 }
@@ -206,9 +209,11 @@ func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
 			},
 		},
 	}
-	if v2JSONMap, err := model.ToJSONMap(v2); err == nil {
+	if v2JSONMap, err := model.ToJSONMap(v2); err != nil {
 		glog.Warningf("Could not encode v2 TCP mixerclient filter for node %q: %v", role, err)
+	} else {
 		filter.V2 = v2JSONMap
+
 	}
 	return filter
 }
