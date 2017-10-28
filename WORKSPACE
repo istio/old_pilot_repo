@@ -549,8 +549,9 @@ filegroup(
 )
 
     """,
-    commit = ISTIO_API,
-    remote = "https://github.com/istio/api.git",
+    #commit = ISTIO_API,
+    #remote = "https://github.com/istio/api.git",
+    path = "../api",
 )
 
 new_local_repository(
@@ -598,8 +599,9 @@ gogoslick_proto_library(
     ],
 )
     """,
-    commit = ISTIO_API,
-    remote = "https://github.com/istio/api.git",
+    #commit = ISTIO_API,
+    #remote = "https://github.com/istio/api.git",
+    path = "../api",
 )
 
 GOOGLEAPIS_BUILD_FILE = """

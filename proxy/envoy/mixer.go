@@ -17,8 +17,10 @@
 package envoy
 
 import (
+	"net"
 	"strings"
 
+	"github.com/golang/glog"
 	mpb "istio.io/api/mixer/v1"
 	mccpb "istio.io/api/mixer/v1/config/client"
 	proxyconfig "istio.io/api/proxy/v1/config"
@@ -136,7 +138,7 @@ func buildMixerOpaqueConfig(check, forward bool, destinationService string) map[
 // Mixer filter uses outbound configuration by default (forward attributes,
 // but not invoke check calls)
 func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig {
-	c := &FilterMixerConfig{
+	filter := &FilterMixerConfig{
 		MixerAttributes: map[string]string{
 			AttrDestinationIP:  role.IPAddress,
 			AttrDestinationUID: "kubernetes://" + role.ID,
@@ -148,36 +150,49 @@ func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig
 		QuotaName: MixerRequestCount,
 	}
 	v2 := &mccpb.MixerFilterConfig{
-		DefaultDestinationService: ":default", // TODO
 		MixerAttributes: &mpb.Attributes{
 			Attributes: map[string]*mpb.Attributes_AttributeValue{
-				AttrDestinationIP:  {Value: &mpb.Attributes_AttributeValue_StringValue{role.IPAddress}},
+				AttrDestinationIP:  {Value: &mpb.Attributes_AttributeValue_BytesValue{net.ParseIP(role.IPAddress)}},
 				AttrDestinationUID: {Value: &mpb.Attributes_AttributeValue_StringValue{"kubernetes://" + role.ID}},
 			},
 		},
 		ForwardAttributes: &mpb.Attributes{
 			Attributes: map[string]*mpb.Attributes_AttributeValue{
-				AttrSourceIP:  {Value: &mpb.Attributes_AttributeValue_StringValue{role.IPAddress}},
+				AttrSourceIP:  {Value: &mpb.Attributes_AttributeValue_BytesValue{net.ParseIP(role.IPAddress)}},
 				AttrSourceUID: {Value: &mpb.Attributes_AttributeValue_StringValue{"kubernetes://" + role.ID}},
 			},
 		},
 	}
 	if len(services) > 0 {
-		service := strings.Join(services, ",")
-		c.MixerAttributes[AttrDestinationService] = service
-		v2.MixerAttributes.Attributes[AttrDestinationService] = &mpb.Attributes_AttributeValue{
-			Value: &mpb.Attributes_AttributeValue_StringValue{service},
+		// legacy mixerclient behavior is a comma separated list of
+		// services. Can this be removed?
+		filter.MixerAttributes[AttrDestinationService] = strings.Join(services, ",")
+
+		// arbitrarily make the first service in the list the default
+		v2.DefaultDestinationService = services[0]
+	}
+
+	for _, service := range services {
+		v2.ControlConfigs[service] = &mccpb.MixerControlConfig{
+			MixerAttributes: &mpb.Attributes{
+				Attributes: map[string]*mpb.Attributes_AttributeValue{
+					AttrDestinationService: {Value: &mpb.Attributes_AttributeValue_StringValue{service}},
+				},
+			},
+			// TODO per-service HttpApiApsec, QuotaSpec
 		}
 	}
+
 	if v2JSONMap, err := model.ToJSONMap(v2); err == nil {
-		c.V2 = v2JSONMap
+		glog.Warningf("Could not encode v2 HTTP mixerclient filter for node %q: %v", role, err)
+		filter.V2 = v2JSONMap
 	}
-	return c
+	return filter
 }
 
 // Mixer TCP filter config for inbound requests.
 func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
-	c := &FilterMixerConfig{
+	filter := &FilterMixerConfig{
 		MixerAttributes: map[string]string{
 			AttrDestinationIP:  role.IPAddress,
 			AttrDestinationUID: "kubernetes://" + role.ID,
@@ -192,7 +207,8 @@ func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
 		},
 	}
 	if v2JSONMap, err := model.ToJSONMap(v2); err == nil {
-		c.V2 = v2JSONMap
+		glog.Warningf("Could not encode v2 TCP mixerclient filter for node %q: %v", role, err)
+		filter.V2 = v2JSONMap
 	}
-	return c
+	return filter
 }
