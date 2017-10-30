@@ -163,6 +163,7 @@ func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig
 				AttrSourceUID: {Value: &mpb.Attributes_AttributeValue_StringValue{"kubernetes://" + role.ID}},
 			},
 		},
+		ControlConfigs: map[string]*mccpb.MixerControlConfig{},
 	}
 	if len(services) > 0 {
 		// legacy mixerclient behavior is a comma separated list of
