@@ -45,6 +45,18 @@ for f in dest_policy.pb.go  http_fault.pb.go  l4_fault.pb.go  proxy_mesh.pb.go  
     vendor/istio.io/api/proxy/v1/config/
 done
 
+mkdir -p vendor/istio.io/api/mixer/v1/config/client
+
+# Mixerclient proto gen files
+for f in attributes.pb.go; do
+  ln -sf $genfiles/external/io_istio_api_mixer/mixer/v1/$f \
+    vendor/istio.io/api/mixer/v1/
+done
+for f in api_spec.pb.go mixer_filter_config.pb.go quota.pb.go service.pb.go; do
+  ln -sf $genfiles/external/io_istio_api_mixer_client/mixer/v1/config/client/$f \
+    vendor/istio.io/api/mixer/v1/config/client
+done
+
 # Mixer proto gen files
 mkdir -p vendor/github.com/googleapis/googleapis/google/rpc
 for f in code.pb.go error_details.pb.go status.pb.go; do

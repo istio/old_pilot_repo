@@ -12,6 +12,17 @@ git_repository(
     remote = "https://github.com/google/protobuf.git",
 )
 
+git_repository(
+    name = "org_pubref_rules_protobuf",
+    commit = "7ea48a1b1e62b199faba6f5a540dc68e27fda828",  # Sept 23, 2017 (Rename set -> depset for bazel 0.6.0 compatibility)
+    remote = "https://github.com/pubref/rules_protobuf",
+)
+
+bind(
+    name = "protocol_compiler",
+    actual = "@com_github_google_protobuf//:protoc",
+)
+
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_repository", "go_register_toolchains")
 
 go_rules_dependencies()
@@ -463,7 +474,7 @@ go_repository(
 )
 
 # This SHA is obtained from istio/api
-ISTIO_API = "e9acfad1a0716033e06f5508c4277a486b94d9db"
+ISTIO_API = "49f4ba80bd9415bf7efc17060c78487c3ce350b7" # TODO update after https://github.com/istio/api/pull/220 is merged
 
 new_git_repository(
     name = "io_istio_api",
@@ -488,6 +499,103 @@ filegroup(
 filegroup(
     name = "wordlist",
     srcs = ["mixer/v1/global_dictionary.yaml"],
+)
+    """,
+    commit = ISTIO_API,
+    remote = "https://github.com/istio/api.git",
+)
+
+new_git_repository(
+    name = "io_istio_api_mixer",
+    build_file_content = """
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+go_prefix("istio.io/api/mixer/v1")
+
+load("@org_pubref_rules_protobuf//gogo:rules.bzl", "gogoslick_proto_library")
+package(default_visibility = ["//visibility:public"])
+
+gogoslick_proto_library(
+    name = "mixer/v1",
+    importmap = {
+        "gogoproto/gogo.proto": "github.com/gogo/protobuf/gogoproto",
+        "google/protobuf/timestamp.proto": "github.com/gogo/protobuf/types",
+        "google/protobuf/duration.proto": "github.com/gogo/protobuf/types",
+        "mixer/v1/attributes.proto": "istio.io/api/mixer/v1",
+    },
+    imports = [
+        "../../external/com_github_gogo_protobuf",
+        "../../external/com_github_google_protobuf/src",
+    ],
+    inputs = [
+        "@com_github_google_protobuf//:well_known_protos",
+        "@com_github_gogo_protobuf//gogoproto:go_default_library_protos",
+    ],
+    protos = [
+        "mixer/v1/attributes.proto",
+    ],
+    verbose = 0,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_gogo_protobuf//gogoproto:go_default_library",
+        "@com_github_gogo_protobuf//sortkeys:go_default_library",
+        "@com_github_gogo_protobuf//types:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "attributes",
+    srcs = ["mixer/v1/attributes.proto"],
+    visibility = ["//visibility:public"],
+)
+
+    """,
+    commit = ISTIO_API,
+    remote = "https://github.com/istio/api.git",
+)
+
+new_git_repository(
+    name = "io_istio_api_mixer_client",
+    build_file_content = """
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+go_prefix("istio.io/api/mixer/v1/config/client")
+
+load("@org_pubref_rules_protobuf//gogo:rules.bzl", "gogoslick_proto_library")
+package(default_visibility = ["//visibility:public"])
+
+gogoslick_proto_library(
+    name = "mixer/v1/config/client",
+    importmap = {
+        "gogoproto/gogo.proto": "github.com/gogo/protobuf/gogoproto",
+        "mixer/v1/attributes.proto": "istio.io/api/mixer/v1",
+        "mixer/v1/config/client/api_spec.proto": "istio.io/api/mixer/v1/config/client",
+        "mixer/v1/config/client/quota.proto": "istio.io/api/mixer/v1/config/client",
+        "mixer/v1/config/client/service.proto": "istio.io/api/mixer/v1/config/client",
+        "mixer/v1/config/client/mixer_filter_config.proto": "istio.io/api/mixer/v1/config/client",
+    },
+    imports = [
+        "../../external/com_github_gogo_protobuf",
+        "../../external/com_github_google_protobuf/src",
+        "../../external/io_istio_api_mixer",
+    ],
+    inputs = [
+        "@com_github_google_protobuf//:well_known_protos",
+        "@com_github_gogo_protobuf//gogoproto:go_default_library_protos",
+        "@io_istio_api_mixer//:attributes",
+    ],
+    protos = [
+        "mixer/v1/config/client/service.proto",
+        "mixer/v1/config/client/api_spec.proto",
+        "mixer/v1/config/client/quota.proto",
+        "mixer/v1/config/client/mixer_filter_config.proto",
+    ],
+    verbose = 0,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_gogo_protobuf//gogoproto:go_default_library",
+        "@com_github_gogo_protobuf//sortkeys:go_default_library",
+        "@com_github_gogo_protobuf//types:go_default_library",
+        "@io_istio_api_mixer//:mixer/v1",
+    ],
 )
     """,
     commit = ISTIO_API,
