@@ -48,6 +48,8 @@ func (t *grpc) run() error {
 }
 
 func (t *grpc) makeRequests() error {
+	// Auth is enabled for d:7070 using per-service policy. We expect request
+	// from non-envoy client ("t") should fail all the time.
 	srcPods := []string{"a", "b"}
 	dstPods := []string{"a", "b", "d"}
 	if t.Auth == proxyconfig.MeshConfig_NONE {
@@ -60,7 +62,6 @@ func (t *grpc) makeRequests() error {
 	funcs := make(map[string]func() status)
 	for _, src := range srcPods {
 		for _, dst := range dstPods {
-			// Auth is enabled for d:7070 using per-service policy.
 			for _, port := range []string{":70", ":7070"} {
 				for _, domain := range []string{"", "." + t.Namespace} {
 					name := fmt.Sprintf("GRPC request from %s to %s%s%s", src, dst, domain, port)

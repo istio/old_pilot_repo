@@ -41,6 +41,8 @@ func (t *tcp) run() error {
 	if platform.ServiceRegistry(t.Registry) == platform.EurekaRegistry {
 		return nil
 	}
+	// Auth is enabled for d:9090 using per-service policy. We expect request
+	// from non-envoy client ("t") should fail all the time.
 	srcPods := []string{"a", "b", "t"}
 	dstPods := []string{"a", "b", "d"}
 	if t.Auth == proxyconfig.MeshConfig_NONE {

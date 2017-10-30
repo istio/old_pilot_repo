@@ -51,6 +51,9 @@ func (r *http) run() error {
 
 // makeRequests executes requests in pods and collects request ids per pod to check against access logs
 func (r *http) makeRequests() error {
+	// Auth is enabled for d:80, and disabled for d:8080 using per-service policy.
+	// We expect request from non-envoy client ("t") to d:80 should always fail,
+	// while to d:8080 should always success.
 	srcPods := []string{"a", "b", "t"}
 	dstPods := []string{"a", "b", "d"}
 	if r.Auth == proxyconfig.MeshConfig_NONE {
