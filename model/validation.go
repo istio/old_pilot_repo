@@ -1145,3 +1145,19 @@ func ValidateProxyConfig(config *proxyconfig.ProxyConfig) (errs error) {
 
 	return
 }
+
+func ValidateHTTPAPISpec(msg proto.Message) error {
+	return errors.New("not implemented yet")
+}
+
+func ValidateHTTPAPISpecBinding(msg proto.Message) error {
+	return errors.New("not implemented yet")
+}
+
+func ValidateQuotaSpec(msg proto.Message) error {
+	return errors.New("not implemented yet")
+}
+
+func ValidateQuotaSpecBinding(msg proto.Message) error {
+	return errors.New("not implemented yet")
+}

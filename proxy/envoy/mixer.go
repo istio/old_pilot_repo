@@ -18,6 +18,7 @@ package envoy
 
 import (
 	"net"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
@@ -141,7 +142,8 @@ func buildMixerOpaqueConfig(check, forward bool, destinationService string) map[
 
 // Mixer filter uses outbound configuration by default (forward attributes,
 // but not invoke check calls)
-func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig {
+func mixerHTTPRouteConfig(role proxy.Node, instances []*model.ServiceInstance,
+	config model.IstioConfigStore) *FilterMixerConfig {
 	filter := &FilterMixerConfig{
 		MixerAttributes: map[string]string{
 			AttrDestinationIP:  role.IPAddress,
@@ -168,24 +170,50 @@ func mixerHTTPRouteConfig(role proxy.Node, services []string) *FilterMixerConfig
 		},
 		ControlConfigs: map[string]*mccpb.MixerControlConfig{},
 	}
-	if len(services) > 0 {
+	if len(instances) > 0 {
 		// legacy mixerclient behavior is a comma separated list of
-		// services. Can this be removed?
+		// services. When can this be removed?
+		var services []string
+		if instances != nil {
+			serviceSet := make(map[string]bool, len(instances))
+			for _, instance := range instances {
+				serviceSet[instance.Service.Hostname] = true
+			}
+			for service := range serviceSet {
+				services = append(services, service)
+			}
+			sort.Strings(services)
+		}
 		filter.MixerAttributes[AttrDestinationService] = strings.Join(services, ",")
 
-		// arbitrarily make the first service in the list the default
+		// first service in the sorted list is the default
 		v2.DefaultDestinationService = services[0]
 	}
 
-	for _, service := range services {
-		v2.ControlConfigs[service] = &mccpb.MixerControlConfig{
+	for _, instance := range instances {
+		sc := &mccpb.MixerControlConfig{
 			MixerAttributes: &mpb.Attributes{
 				Attributes: map[string]*mpb.Attributes_AttributeValue{
-					AttrDestinationService: {Value: &mpb.Attributes_AttributeValue_StringValue{service}},
+					AttrDestinationService: {
+						Value: &mpb.Attributes_AttributeValue_StringValue{instance.Service.Hostname},
+					},
 				},
 			},
-			// TODO per-service HttpApiApsec, QuotaSpec
 		}
+
+		apiSpecs := config.HTTPAPISpecByDestination(instance)
+		model.SortHTTPAPISpec(apiSpecs)
+		for _, config := range apiSpecs {
+			sc.HttpApiSpec = append(sc.HttpApiSpec, config.Spec.(*mccpb.HTTPAPISpec))
+		}
+
+		quotaSpecs := config.QuotaSpecByDestination(instance)
+		model.SortQuotaSpec(quotaSpecs)
+		for _, config := range quotaSpecs {
+			sc.QuotaSpec = append(sc.QuotaSpec, config.Spec.(*mccpb.QuotaSpec))
+		}
+
+		v2.ControlConfigs[instance.Service.Hostname] = sc
 	}
 
 	if v2JSONMap, err := model.ToJSONMap(v2); err != nil {

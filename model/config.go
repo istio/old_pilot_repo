@@ -242,6 +242,14 @@ type IstioConfigStore interface {
 	// Policy returns a policy for a service version that match at least one of
 	// the source instances.  The labels must match precisely in the policy.
 	Policy(source []*ServiceInstance, destination string, labels Labels) *Config
+
+	// HTTPAPISpecByDestination selects Mixerclient HTTP API Specs
+	// associated with destination service instances.
+	HTTPAPISpecByDestination(instance *ServiceInstance) []Config
+
+	// QuotaSpecByDestination selects Mixerclient quota specifications
+	// associated with destination service instances.
+	QuotaSpecByDestination(instance *ServiceInstance) []Config
 }
 
 const (
@@ -307,12 +315,48 @@ var (
 		Validate:    ValidateDestinationPolicy,
 	}
 
+	//  describes
+	HTTPAPISpec = ProtoSchema{
+		Type:        "http-api-spec",
+		Plural:      "http-api-specs",
+		MessageName: "istio.mixer.v1.config.client.HTTPAPISpec",
+		Validate:    ValidateHTTPAPISpec,
+	}
+
+	//  describes
+	HTTPAPISpecBinding = ProtoSchema{
+		Type:        "http-api-spec-binding",
+		Plural:      "http-api-spec-bindings",
+		MessageName: "istio.mixer.v1.config.client.HTTPAPISpecBinding",
+		Validate:    ValidateHTTPAPISpecBinding,
+	}
+
+	//  describes
+	QuotaSpec = ProtoSchema{
+		Type:        "quota-spec",
+		Plural:      "quota-specs",
+		MessageName: "istio.mixer.v1.config.client.QuotaSpec",
+		Validate:    ValidateQuotaSpec,
+	}
+
+	//  describes
+	QuotaSpecBinding = ProtoSchema{
+		Type:        "quota-spec-binding",
+		Plural:      "quota-spec-bindings",
+		MessageName: "istio.mixer.v1.config.client.QuotaSpecBinding",
+		Validate:    ValidateQuotaSpecBinding,
+	}
+
 	// IstioConfigTypes lists all Istio config types with schemas and validation
 	IstioConfigTypes = ConfigDescriptor{
 		RouteRule,
 		IngressRule,
 		EgressRule,
 		DestinationPolicy,
+		HTTPAPISpec,
+		HTTPAPISpecBinding,
+		QuotaSpec,
+		QuotaSpecBinding,
 	}
 )
 
@@ -529,4 +573,29 @@ func RejectConflictingEgressRules(egressRules map[string]*proxyconfig.EgressRule
 	}
 
 	return filteredEgressRules, errs
+}
+
+// HTTPAPISpecByDestination selects Mixerclient HTTP API Specs
+// associated with destination service instances.
+func (store *istioConfigStore) HTTPAPISpecByDestination(instance *ServiceInstance) []Config {
+	// TODO - use HTTPAPISpecBinding to determine matching QuotaSepc
+	// for service instance.
+	return nil
+}
+
+// QuotaSpecByDestination selects Mixerclient quota specifications
+// associated with destination service instances.
+func (store *istioConfigStore) QuotaSpecByDestination(instance *ServiceInstance) []Config {
+	// TODO - use QuotaSpecBinding to determine matching QuotaSepc for service instance.
+	return nil
+}
+
+// SortHTTPAPISpec sorts a slice of HTTPAPISpec by TBD.
+func SortHTTPAPISpec(specs []Config) {
+	// TODO
+}
+
+// SortQuotaSpec sorts a slice of QuotaSpecs by TBD.
+func SortQuotaSpec(specs []Config) {
+	// TODO
 }
