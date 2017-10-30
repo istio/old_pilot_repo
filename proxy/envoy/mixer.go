@@ -95,6 +95,9 @@ type FilterMixerConfig struct {
 
 	// istio.io/api/mixer/v1/config/client configuration protobuf
 	// encoded as a generic map using canonical JSON encoding.
+	//
+	// If `V2` field is not empty, the DEPRECATED fields above should
+	// be discarded.
 	V2 map[string]interface{} `json:"v2,omitempty"`
 }
 
