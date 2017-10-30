@@ -17,6 +17,8 @@
 package envoy
 
 import (
+	"strings"
+
 	proxyconfig "istio.io/api/proxy/v1/config"
 	"istio.io/pilot/proxy"
 )
@@ -134,11 +136,21 @@ func mixerHTTPRouteConfig(role proxy.Node, service string) *FilterMixerConfig {
 
 // Mixer TCP filter config for inbound requests
 func mixerTCPConfig(role proxy.Node, check bool) *FilterMixerConfig {
+	attr := map[string]string{
+		AttrDestinationIP:  role.IPAddress,
+		AttrDestinationUID: "kubernetes://" + role.ID,
+	}
+	// vm-NNN-rest -> service==rest.domain (domain is needed for mixer)
+	if strings.HasPrefix(role.ID, "vm-") {
+		split := strings.SplitAfterN(role.ID, "-", 3)
+		if len(split) == 3 {
+			// role.ID has the namespace and so does role.Domain (!), trim:
+			domainWithouNamespace := role.Domain[strings.Index(role.Domain, "."):]
+			attr[AttrDestinationService] = split[2] + domainWithouNamespace
+		}
+	}
 	return &FilterMixerConfig{
-		MixerAttributes: map[string]string{
-			AttrDestinationIP:  role.IPAddress,
-			AttrDestinationUID: "kubernetes://" + role.ID,
-		},
+		MixerAttributes:      attr,
 		DisableTCPCheckCalls: !check,
 	}
 }
