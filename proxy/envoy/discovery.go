@@ -226,6 +226,11 @@ func NewDiscoveryService(ctl model.Controller, configCache model.ConfigStoreCach
 		configCache.RegisterEventHandler(model.IngressRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.EgressRule.Type, configHandler)
 		configCache.RegisterEventHandler(model.DestinationPolicy.Type, configHandler)
+
+		configCache.RegisterEventHandler(model.HTTPAPISpec.Type, configHandler)
+		configCache.RegisterEventHandler(model.HTTPAPISpecBinding.Type, configHandler)
+		configCache.RegisterEventHandler(model.QuotaSpec.Type, configHandler)
+		configCache.RegisterEventHandler(model.QuotaSpecBinding.Type, configHandler)
 	}
 
 	return out, nil
