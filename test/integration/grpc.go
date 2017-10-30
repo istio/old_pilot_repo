@@ -93,7 +93,7 @@ func (t *grpc) makeRequests() error {
 								return nil
 							}
 							if src == "t" && dst == "d" && port == ":7070" {
-								// Expected no match for t->d:7070
+								// Expected no match for t->d:7070 as d:7070 has mTLS enabled.
 								return nil
 							}
 							return errAgain

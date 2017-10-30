@@ -64,8 +64,8 @@ func (t *tcp) run() error {
 							if src == "t" &&
 								(t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS ||
 									(dst == "d" && port == ":9090")) {
-								// t cannot talk to envoy (a or b) with mTLS enabled,
-								// nor with d:9090 (which always has mTLS enabled.
+								// t cannot talk to envoy (a or b) when mTLS enabled,
+								// nor with d:9090 (which always has mTLS enabled).
 								if len(resp.code) == 0 || resp.code[0] != httpOk {
 									return nil
 								}
