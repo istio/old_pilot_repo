@@ -144,6 +144,7 @@ func buildMixerOpaqueConfig(check, forward bool, destinationService string) map[
 // but not invoke check calls)
 func mixerHTTPRouteConfig(role proxy.Node, instances []*model.ServiceInstance,
 	config model.IstioConfigStore) *FilterMixerConfig {
+
 	filter := &FilterMixerConfig{
 		MixerAttributes: map[string]string{
 			AttrDestinationIP:  role.IPAddress,
