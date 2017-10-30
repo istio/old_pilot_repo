@@ -474,7 +474,7 @@ go_repository(
 )
 
 # This SHA is obtained from istio/api
-ISTIO_API = "e9acfad1a0716033e06f5508c4277a486b94d9db" # TODO update after https://github.com/istio/api/pull/220 is merged
+ISTIO_API = "49f4ba80bd9415bf7efc17060c78487c3ce350b7" # TODO update after https://github.com/istio/api/pull/220 is merged
 
 new_git_repository(
     name = "io_istio_api",
@@ -505,7 +505,7 @@ filegroup(
     remote = "https://github.com/istio/api.git",
 )
 
-new_local_repository(
+new_git_repository(
     name = "io_istio_api_mixer",
     build_file_content = """
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
@@ -549,12 +549,11 @@ filegroup(
 )
 
     """,
-    #commit = ISTIO_API,
-    #remote = "https://github.com/istio/api.git",
-    path = "../api",
+    commit = ISTIO_API,
+    remote = "https://github.com/istio/api.git",
 )
 
-new_local_repository(
+new_git_repository(
     name = "io_istio_api_mixer_client",
     build_file_content = """
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
@@ -599,9 +598,8 @@ gogoslick_proto_library(
     ],
 )
     """,
-    #commit = ISTIO_API,
-    #remote = "https://github.com/istio/api.git",
-    path = "../api",
+    commit = ISTIO_API,
+    remote = "https://github.com/istio/api.git",
 )
 
 GOOGLEAPIS_BUILD_FILE = """
