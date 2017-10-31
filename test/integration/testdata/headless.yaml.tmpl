@@ -5,6 +5,8 @@ metadata:
   name: headless
   labels:
     app: b
+  annotations:
+    tls.istio.io/19090: disable
 spec:
   clusterIP: None
   ports:
