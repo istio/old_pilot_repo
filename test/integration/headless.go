@@ -50,9 +50,10 @@ func (t *headless) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
-							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && port == ":10090" {
+							// Port 19090 always has auth disabled (per service annotations)
+							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && port != ":19090" {
 								if len(resp.id) == 0 {
-									// Expected no match for t->headless when auth is on
+									// Expected no match for headless when auth is on
 									return nil
 								}
 								return errAgain
