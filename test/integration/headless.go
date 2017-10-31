@@ -36,10 +36,8 @@ func (t *headless) teardown() {
 }
 
 func (t *headless) run() error {
-	if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS {
-		return nil // TODO: mTLS
-	}
-
+	// Headless service does not support auth, so request should fail when auth is on,
+	// except for port 19090 that has auth disabled using per-service annotation.
 	srcPods := []string{"a", "b", "t"}
 	dstPods := []string{"headless"}
 	funcs := make(map[string]func() status)
@@ -52,6 +50,14 @@ func (t *headless) run() error {
 						url := fmt.Sprintf("http://%s%s%s/%s", dst, domain, port, src)
 						return func() status {
 							resp := t.clientRequest(src, url, 1, "")
+							// Port 19090 always has auth disabled (per service annotations)
+							if t.Auth == proxyconfig.MeshConfig_MUTUAL_TLS && port != ":19090" {
+								if len(resp.id) == 0 {
+									// Expected no match for headless when auth is on
+									return nil
+								}
+								return errAgain
+							}
 							if len(resp.code) > 0 && resp.code[0] == httpOk {
 								return nil
 							}
