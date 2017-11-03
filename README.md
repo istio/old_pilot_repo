@@ -1,3 +1,5 @@
+# ***Development has moved to [istio/istio](https://github.com/istio/istio)***
+
 # Istio Pilot #
 [Prow build Status](https://prow.istio.io/?job=pilot-postsubmit)
 [![CircleCI](https://circleci.com/gh/istio/pilot/tree/master.svg?style=svg)](https://circleci.com/gh/istio/pilot/tree/master)
