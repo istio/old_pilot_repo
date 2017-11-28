@@ -51,8 +51,6 @@ fi
 iptables -t nat -N ISTIO_REDIRECT                                             -m comment --comment "istio/redirect-common-chain"
 iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-port ${ENVOY_PORT}  -m comment --comment "istio/redirect-to-envoy-port"
 
-# Redirect all inbound traffic to Envoy.
-iptables -t nat -A PREROUTING -j ISTIO_REDIRECT                               -m comment --comment "istio/install-istio-prerouting"
 
 # Create a new chain for selectively redirecting outbound packets to
 # Envoy.
